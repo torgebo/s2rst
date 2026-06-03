@@ -1,0 +1,20 @@
+[package]
+name = "s2rst-python"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "PyO3 bindings that build the s2rst Python extension module (s2rst._core); not published to crates.io."
+repository = "https://github.com/torgebo/s2rst"
+publish = false
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Built without abi3: we ship per-version wheels (one per CPython version and
+# platform) for full-API access and the lowest Python/Rust per-call overhead.
+# To instead ship a single forward-compatible wheel, add e.g. "abi3-py39"
+# (smaller release matrix, slightly higher boundary-call cost).
+pyo3 = { version = "0.24", features = ["extension-module"] }
+s2rst = { path = "../core" }

@@ -1,0 +1,64 @@
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 01s
+     Running benches/edge_crossing.rs (target/release/deps/edge_crossing-2b5ada5fddbdf732)
+edge_crossing::edge_crossing_benchmarks::bench_crossing_sign
+  Instructions:                        3763|3935                 (-4.37103%) [-1.04571x]
+  L1 Hits:                             5399|5614                 (-3.82971%) [-1.03982x]
+  LL Hits:                                9|9                    (No change)
+  RAM Hits:                             140|145                  (-3.44828%) [-1.03571x]
+  Total read+write:                    5548|5768                 (-3.81415%) [-1.03965x]
+  Estimated Cycles:                   10344|10734                (-3.63331%) [-1.03770x]
+edge_crossing::edge_crossing_benchmarks::bench_crossing_sign_crossing
+  Instructions:                       12509|13265                (-5.69921%) [-1.06044x]
+  L1 Hits:                            18721|19680                (-4.87297%) [-1.05123x]
+  LL Hits:                                9|9                    (No change)
+  RAM Hits:                             150|156                  (-3.84615%) [-1.04000x]
+  Total read+write:                   18880|19845                (-4.86269%) [-1.05111x]
+  Estimated Cycles:                   24016|25185                (-4.64165%) [-1.04868x]
+edge_crossing::edge_crossing_benchmarks::bench_edge_crosser_chain
+  Instructions:                        3759|3931                 (-4.37548%) [-1.04576x]
+  L1 Hits:                             5394|5608                 (-3.81598%) [-1.03967x]
+  LL Hits:                                9|9                    (No change)
+  RAM Hits:                             139|145                  (-4.13793%) [-1.04317x]
+  Total read+write:                    5542|5762                 (-3.81812%) [-1.03970x]
+  Estimated Cycles:                   10304|10728                (-3.95227%) [-1.04115x]
+edge_crossing::edge_crossing_benchmarks::bench_edge_or_vertex_crossing
+  Instructions:                        3793|3965                 (-4.33796%) [-1.04535x]
+  L1 Hits:                             5442|5658                 (-3.81760%) [-1.03969x]
+  LL Hits:                               12|12                   (No change)
+  RAM Hits:                             146|150                  (-2.66667%) [-1.02740x]
+  Total read+write:                    5600|5820                 (-3.78007%) [-1.03929x]
+  Estimated Cycles:                   10612|10968                (-3.24581%) [-1.03355x]
+edge_crossing::edge_crossing_benchmarks::bench_intersection
+  Instructions:                        3917|4403                 (-11.0379%) [-1.12407x]
+  L1 Hits:                             5886|6513                 (-9.62690%) [-1.10652x]
+  LL Hits:                                9|9                    (No change)
+  RAM Hits:                             108|113                  (-4.42478%) [-1.04630x]
+  Total read+write:                    6003|6635                 (-9.52524%) [-1.10528x]
+  Estimated Cycles:                    9711|10513                (-7.62865%) [-1.08259x]
+
+Iai-Callgrind result: Ok. 5 without regressions; 0 regressed; 5 benchmarks finished in 4.56418s
+     Running benches/predicates.rs (target/release/deps/predicates-01e9ca37a2e37036)
+predicates::predicates_benchmarks::bench_sign
+  Instructions:                          41|41                   (No change)
+  L1 Hits:                               52|54                   (-3.70370%) [-1.03846x]
+  LL Hits:                                0|0                    (No change)
+  RAM Hits:                               7|5                    (+40.0000%) [+1.40000x]
+  Total read+write:                      59|59                   (No change)
+  Estimated Cycles:                     297|229                  (+29.6943%) [+1.29694x]
+predicates::predicates_benchmarks::bench_robust_sign
+  Instructions:                          66|66                   (No change)
+  L1 Hits:                               86|88                   (-2.27273%) [-1.02326x]
+  LL Hits:                                0|0                    (No change)
+  RAM Hits:                              12|10                   (+20.0000%) [+1.20000x]
+  Total read+write:                      98|98                   (No change)
+  Estimated Cycles:                     506|438                  (+15.5251%) [+1.15525x]
+predicates::predicates_benchmarks::bench_sign_near_collinear
+  Instructions:                          41|41                   (No change)
+  L1 Hits:                               53|53                   (No change)
+  LL Hits:                                0|0                    (No change)
+  RAM Hits:                               5|5                    (No change)
+  Total read+write:                      58|58                   (No change)
+  Estimated Cycles:                     228|228                  (No change)
+
+Iai-Callgrind result: Ok. 3 without regressions; 0 regressed; 3 benchmarks finished in 2.28825s

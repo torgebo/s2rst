@@ -1,0 +1,74 @@
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 20s
+     Running benches/wall/point_angle.rs (target/release/deps/wall_point_angle-fbf11c319c28a2cf)
+Gnuplot not found, using plotters backend
+Benchmarking point_distance
+Benchmarking point_distance: Warming up for 1.0000 s
+Benchmarking point_distance: Collecting 30 samples in estimated 3.0000 s (108M iterations)
+Benchmarking point_distance: Analyzing
+point_distance          time:   [28.056 ns 28.588 ns 29.199 ns]
+
+Benchmarking point_cross
+Benchmarking point_cross: Warming up for 1.0000 s
+Benchmarking point_cross: Collecting 30 samples in estimated 3.0000 s (373M iterations)
+Benchmarking point_cross: Analyzing
+point_cross             time:   [7.9488 ns 8.1027 ns 8.3404 ns]
+Found 1 outliers among 30 measurements (3.33%)
+  1 (3.33%) high severe
+
+Benchmarking point_normalize
+Benchmarking point_normalize: Warming up for 1.0000 s
+Benchmarking point_normalize: Collecting 30 samples in estimated 3.0000 s (318M iterations)
+Benchmarking point_normalize: Analyzing
+point_normalize         time:   [8.7340 ns 8.9488 ns 9.2369 ns]
+Found 4 outliers among 30 measurements (13.33%)
+  1 (3.33%) low mild
+  2 (6.67%) high mild
+  1 (3.33%) high severe
+
+Benchmarking angle_from_e6
+Benchmarking angle_from_e6: Warming up for 1.0000 s
+Benchmarking angle_from_e6: Collecting 30 samples in estimated 3.0000 s (1.5B iterations)
+Benchmarking angle_from_e6: Analyzing
+angle_from_e6           time:   [1.9235 ns 1.9429 ns 1.9596 ns]
+Found 6 outliers among 30 measurements (20.00%)
+  1 (3.33%) low severe
+  2 (6.67%) low mild
+  1 (3.33%) high mild
+  2 (6.67%) high severe
+
+Benchmarking angle_to_e6
+Benchmarking angle_to_e6: Warming up for 1.0000 s
+Benchmarking angle_to_e6: Collecting 30 samples in estimated 3.0000 s (251M iterations)
+Benchmarking angle_to_e6: Analyzing
+angle_to_e6             time:   [11.556 ns 11.753 ns 11.951 ns]
+Found 7 outliers among 30 measurements (23.33%)
+  3 (10.00%) low severe
+  1 (3.33%) low mild
+  1 (3.33%) high mild
+  2 (6.67%) high severe
+
+Benchmarking angle_from_degrees
+Benchmarking angle_from_degrees: Warming up for 1.0000 s
+Benchmarking angle_from_degrees: Collecting 30 samples in estimated 3.0000 s (1.6B iterations)
+Benchmarking angle_from_degrees: Analyzing
+angle_from_degrees      time:   [1.8837 ns 1.9092 ns 1.9382 ns]
+Found 6 outliers among 30 measurements (20.00%)
+  2 (6.67%) low mild
+  2 (6.67%) high mild
+  2 (6.67%) high severe
+
+Benchmarking angle_from_radians
+Benchmarking angle_from_radians: Warming up for 1.0000 s
+Benchmarking angle_from_radians: Collecting 30 samples in estimated 3.0000 s (1.5B iterations)
+Benchmarking angle_from_radians: Analyzing
+angle_from_radians      time:   [1.8465 ns 1.8595 ns 1.8754 ns]
+Found 1 outliers among 30 measurements (3.33%)
+  1 (3.33%) high mild
+
+Benchmarking chord_angle_from_angle
+Benchmarking chord_angle_from_angle: Warming up for 1.0000 s
+Benchmarking chord_angle_from_angle: Collecting 30 samples in estimated 3.0000 s (116M iterations)
+Benchmarking chord_angle_from_angle: Analyzing
+chord_angle_from_angle  time:   [23.833 ns 24.080 ns 24.400 ns]
+

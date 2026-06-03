@@ -1,0 +1,45 @@
+   Compiling crossbeam-utils v0.8.21
+   Compiling rayon-core v1.13.0
+   Compiling crossbeam-epoch v0.9.18
+   Compiling crossbeam-deque v0.8.6
+   Compiling rayon v1.12.0
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 14s
+     Running benches/wall/shape_index.rs (target/release/deps/wall_shape_index-43e1ce36b4ffc0da)
+Gnuplot not found, using plotters backend
+Benchmarking build_polyline_1000
+Benchmarking build_polyline_1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.2s, enable flat sampling, or reduce sample count to 60.
+Benchmarking build_polyline_1000: Collecting 100 samples in estimated 6.1547 s (5050 iterations)
+Benchmarking build_polyline_1000: Analyzing
+build_polyline_1000     time:   [1.2077 ms 1.2322 ms 1.2579 ms]
+                        change: [+67.633% +69.799% +72.052%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking build_polyline_10000
+Benchmarking build_polyline_10000: Warming up for 3.0000 s
+Benchmarking build_polyline_10000: Collecting 100 samples in estimated 5.3664 s (1000 iterations)
+Benchmarking build_polyline_10000: Analyzing
+build_polyline_10000    time:   [5.3063 ms 5.3402 ms 5.3784 ms]
+                        change: [+10.607% +12.445% +14.203%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 17 outliers among 100 measurements (17.00%)
+  1 (1.00%) low severe
+  8 (8.00%) high mild
+  8 (8.00%) high severe
+
+Benchmarking build_10000_polyline_shapes
+Benchmarking build_10000_polyline_shapes: Warming up for 3.0000 s
+Benchmarking build_10000_polyline_shapes: Collecting 100 samples in estimated 5.6886 s (700 iterations)
+Benchmarking build_10000_polyline_shapes: Analyzing
+build_10000_polyline_shapes
+                        time:   [7.9375 ms 8.0111 ms 8.0880 ms]
+                        change: [-1.0631% +0.2296% +1.5795%] (p = 0.73 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+

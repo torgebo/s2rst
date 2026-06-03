@@ -1,0 +1,65 @@
+# AUTHORS
+
+s2rst is a Rust port of Google's S2 Geometry library. This file credits the
+authors and contributors of this project and of the upstream implementations
+from which it was ported. Upstream attributions are retained per the Apache
+License, Version 2.0, section 4(c). See also NOTICE and LICENSE.
+
+Note on copyright: for the Google-developed libraries, Google Inc. (now Google
+LLC) holds the copyright. The individuals listed below are the named code
+authors/contributors — many of them Google employees whose work is owned by
+Google under its Contributor License Agreement.
+
+
+## s2rst (this project)
+
+  Torgeir Børresen <tb@starkad.no>
+
+
+## Upstream — C++: google/s2geometry  (Apache-2.0, Copyright Google Inc.)
+
+Copyright holders (from the upstream AUTHORS file):
+  Aurora Innovation
+  Dan Larkin-York <dan@arangodb.com>
+  Google Inc.
+  Koordinates Limited
+  Mike Playle <mike@mythik.co.uk>
+  Tiago Brito <tiago.brito@90poe.io>
+
+Contributors (from the upstream CONTRIBUTORS file):
+  Dan Larkin-York <dan@arangodb.com>
+  David Eustis <deustis@aurora.tech>
+  Eric Veach <ericv@google.com>
+  Jesse Rosenstock <jmr@google.com>
+  Julien Basch <julienbasch@google.com>
+  Mike Playle <mike@mythik.co.uk>
+  Phil Elson <pelson.pub@gmail.com>
+  Robert Coup <robert.coup@koordinates.com>
+  Tiago Brito <tiago.brito@90poe.io>
+  Zachary Burnett <zachary.r.burnett@gmail.com>
+
+Authors named in C++ source-file headers:
+  Eric Veach <ericv@google.com>
+  Jyrki Alakuijala <jyrki@google.com>
+  Sean McAllister <smcallis@google.com>
+
+
+## Upstream — Go: golang/geo  (Apache-2.0, Copyright Google Inc. / Google LLC, 2014–2025)
+
+The Go library ships no AUTHORS or CONTRIBUTORS file and uses no per-file author
+tags; individual contributors are recorded in the project's git history, with
+contributions governed by Google's Contributor License Agreement. Copyright is
+held by Google Inc. (now Google LLC).
+
+
+## Upstream — Java: google/s2-geometry-library-java  (Apache-2.0, Copyright Google Inc., 2005–2025)
+
+Authors named in Java source `@author` tags:
+  Daniel Bentley <dbentley@google.com>
+  Daniel Danciu <danieldanciu@google.com>
+  Eric Engle <eengle@google.com>
+  Eric Veach <ericv@google.com>          — original author (S2 originated in C++ util/geometry)
+  Kirill Levin <kirilll@google.com>
+  Norris Boyd <norris@google.com>
+  Pete Gillin <peteg@google.com>
+  Steven Hakusa <shakusa@google.com>

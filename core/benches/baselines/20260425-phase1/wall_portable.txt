@@ -1,0 +1,40 @@
+Benchmarking point_distance
+Benchmarking point_distance: Warming up for 3.0000 s
+Benchmarking point_distance: Collecting 100 samples in estimated 5.0001 s (194M iterations)
+Benchmarking point_distance: Analyzing
+point_distance          time:   [25.099 ns 25.323 ns 25.557 ns]
+Benchmarking point_cross
+Benchmarking point_cross: Warming up for 3.0000 s
+Benchmarking point_cross: Collecting 100 samples in estimated 5.0000 s (612M iterations)
+Benchmarking point_cross: Analyzing
+point_cross             time:   [8.0404 ns 8.1167 ns 8.1961 ns]
+Benchmarking point_normalize
+Benchmarking point_normalize: Warming up for 3.0000 s
+Benchmarking point_normalize: Collecting 100 samples in estimated 5.0000 s (577M iterations)
+Benchmarking point_normalize: Analyzing
+point_normalize         time:   [8.1253 ns 8.1937 ns 8.2745 ns]
+Benchmarking angle_from_e6
+Benchmarking angle_from_e6: Warming up for 3.0000 s
+Benchmarking angle_from_e6: Collecting 100 samples in estimated 5.0000 s (2.8B iterations)
+Benchmarking angle_from_e6: Analyzing
+Benchmarking angle_to_e6
+Benchmarking angle_to_e6: Warming up for 3.0000 s
+Benchmarking angle_to_e6: Collecting 100 samples in estimated 5.0000 s (470M iterations)
+Benchmarking angle_to_e6: Analyzing
+Benchmarking angle_from_degrees
+Benchmarking angle_from_degrees: Warming up for 3.0000 s
+Benchmarking angle_from_degrees: Collecting 100 samples in estimated 5.0000 s (2.8B iterations)
+Benchmarking angle_from_degrees: Analyzing
+angle_from_degrees      time:   [1.7770 ns 1.7942 ns 1.8101 ns]
+Benchmarking angle_from_radians
+Benchmarking angle_from_radians: Warming up for 3.0000 s
+Benchmarking angle_from_radians: Collecting 100 samples in estimated 5.0000 s (2.7B iterations)
+Benchmarking angle_from_radians: Analyzing
+angle_from_radians      time:   [1.8117 ns 1.8269 ns 1.8427 ns]
+Benchmarking chord_angle_from_angle
+Benchmarking chord_angle_from_angle: Warming up for 3.0000 s
+Benchmarking chord_angle_from_angle: Collecting 100 samples in estimated 5.0000 s (212M iterations)
+Benchmarking chord_angle_from_angle: Analyzing
+chord_angle_from_angle  time:   [23.335 ns 23.520 ns 23.710 ns]
+Benchmarking sign
+Benchmarking sign: Warming up for 3.0000 s

@@ -1,0 +1,26 @@
+s2rst — a Rust port of Google's S2 Geometry library
+Copyright 2026 Torgeir Børresen <tb@starkad.no>
+
+This product is a derivative work, ported from Google's S2 Geometry library, and
+is distributed under the Apache License, Version 2.0 (see LICENSE).
+
+It is derived from the following upstream implementations, each Copyright
+Google Inc. (now Google LLC) and licensed under the Apache License, Version 2.0:
+
+  * C++   — google/s2geometry
+  * Go    — golang/geo
+  * Java  — google/s2-geometry-library-java
+
+Authors and contributors of the upstream libraries are credited in the AUTHORS
+file, retained per Apache License 2.0 section 4(c).
+
+-------------------------------------------------------------------------------
+
+The following NOTICE is reproduced verbatim from the upstream C++ library
+(google/s2geometry), per Apache License 2.0 section 4(d):
+
+    S2 Geometry Library
+    Copyright 2017 Google Inc.  All Rights Reserved.
+
+    This product includes software developed at
+    Google (https://www.google.com/).

@@ -1,0 +1,339 @@
+[package]
+name = "s2rst"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+description = "A Rust port of Google's S2 spherical geometry library — points, regions, shapes, and a hierarchical cell index on the sphere."
+readme = "README.md"
+repository = "https://github.com/torgebo/s2rst"
+homepage = "https://github.com/torgebo/s2rst"
+documentation = "https://docs.rs/s2rst"
+authors = ["Torgeir Børresen <tb@starkad.no>"]
+keywords = ["geometry", "s2", "spherical", "geospatial", "spatial-index"]
+categories = ["science::geo", "mathematics", "algorithms"]
+exclude = ["tests/data/", "benches/baselines/", ".cargo/"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+# Disable the default libtest benchmark harness on the library target.
+# libtest would otherwise claim `cargo bench` CLI args
+# that Criterion tries to parse.
+[lib]
+bench = false
+
+[dependencies]
+num-bigint = { version = "0.4", features = [] }
+num-traits = "0.2"
+serde = { version = "1.0", features = ["derive"], optional = true }
+geo-types = { version = "0.7", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["plotters", "cargo_bench_support"] }
+iai-callgrind = "0.16.1"
+quickcheck = "1.0.3"
+quickcheck_macros = "1.1.0"
+rand = { version = "0.8", features = ["small_rng"] }
+rand_chacha = "0.3"
+serde_json = "1.0"
+
+[features]
+serde = ["dep:serde", "num-bigint/serde"]
+geo-types = ["dep:geo-types"]
+
+[[bench]]
+name = "cell_id"
+harness = false
+
+[[bench]]
+name = "cell"
+harness = false
+
+[[bench]]
+name = "point_angle"
+harness = false
+
+[[bench]]
+name = "edge_crossing"
+harness = false
+
+[[bench]]
+name = "predicates"
+harness = false
+
+[[bench]]
+name = "latlng"
+harness = false
+
+[[bench]]
+name = "region_coverer"
+harness = false
+
+[[bench]]
+name = "loop_polygon"
+harness = false
+
+[[bench]]
+name = "closest_edge_query"
+harness = false
+
+[[bench]]
+name = "density_tree"
+harness = false
+
+[[bench]]
+name = "boolean_operation"
+harness = false
+
+[[bench]]
+name = "builder"
+harness = false
+
+[[bench]]
+name = "cap"
+harness = false
+
+[[bench]]
+name = "cell_union"
+harness = false
+
+[[bench]]
+name = "closest_point_query"
+harness = false
+
+[[bench]]
+name = "furthest_edge_query"
+harness = false
+
+[[bench]]
+name = "polyline"
+harness = false
+
+[[bench]]
+name = "shape_index"
+harness = false
+
+[[bench]]
+name = "point_measures"
+harness = false
+
+[[bench]]
+name = "convex_hull"
+harness = false
+
+[[bench]]
+name = "encoding"
+harness = false
+
+[[bench]]
+name = "edge_distances"
+harness = false
+
+[[bench]]
+name = "closest_cell_query"
+harness = false
+
+[[bench]]
+name = "contains_point_query"
+harness = false
+
+[[bench]]
+name = "hausdorff_distance"
+harness = false
+
+[[bench]]
+name = "loop_operations"
+harness = false
+
+[[bench]]
+name = "latlng_rect_bounder"
+harness = false
+
+[[bench]]
+name = "value_lexicon"
+harness = false
+
+[[bench]]
+name = "sequence_lexicon"
+harness = false
+
+[[bench]]
+name = "polyline_alignment"
+harness = false
+
+[[bench]]
+name = "edge_clipping"
+harness = false
+
+[[bench]]
+name = "buffer_operation"
+harness = false
+
+[[bench]]
+name = "shape_index_region"
+harness = false
+
+[[bench]]
+name = "polygon"
+harness = false
+
+[[bench]]
+name = "winding_operation"
+harness = false
+
+[[bench]]
+name = "cell_iterator_join"
+harness = false
+
+[[bench]]
+name = "encoded_uint_vector"
+harness = false
+
+[[bench]]
+name = "point_compression"
+harness = false
+
+[[bench]]
+name = "coords"
+harness = false
+
+[[bench]]
+name = "shape_nesting_query"
+harness = false
+
+[[bench]]
+name = "validation_query"
+harness = false
+
+[[bench]]
+name = "cell_index"
+harness = false
+
+[[bench]]
+name = "builder_advanced"
+harness = false
+
+[[bench]]
+name = "r2_edge_clipper"
+harness = false
+
+[[bench]]
+name = "robust_cell_clipper"
+harness = false
+
+[[bench]]
+name = "shape_tracker"
+harness = false
+
+[[bench]]
+name = "uv_edge_clipper"
+harness = false
+
+# --- Wall-clock Criterion benches ---
+# These mirror the iai-callgrind benches by name with a `wall_` prefix so
+# `cargo bench --bench predicates` still invokes the iai-callgrind harness
+# and `cargo bench --bench wall_predicates` invokes the Criterion one.
+# Added progressively; start with the P0 hot paths.
+
+[[bench]]
+name = "wall_predicates"
+path = "benches/wall/predicates.rs"
+harness = false
+
+[[bench]]
+name = "wall_point_angle"
+path = "benches/wall/point_angle.rs"
+harness = false
+
+[[bench]]
+name = "wall_edge_crossing"
+path = "benches/wall/edge_crossing.rs"
+harness = false
+
+[[bench]]
+name = "wall_polyline"
+path = "benches/wall/polyline.rs"
+harness = false
+
+[[bench]]
+name = "wall_shape_index"
+path = "benches/wall/shape_index.rs"
+harness = false
+
+[lints.rust]
+unsafe_code = "forbid"
+unsafe_op_in_unsafe_fn = "warn"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+single_use_lifetimes = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_qualifications = "warn"
+unused_import_braces = "warn"
+non_ascii_idents = "warn"
+let_underscore_drop = "warn"
+future_incompatible = { level = "warn", priority = -1 }
+rust_2018_compatibility = { level = "warn", priority = -1 }
+rust_2021_compatibility = { level = "warn", priority = -1 }
+rust_2024_compatibility = { level = "warn", priority = -1 }
+
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+perf = { level = "warn", priority = -1 }
+
+# Geometry library: casts between numeric types are pervasive and intentional
+cast_sign_loss = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+
+# Geometry library: float comparisons, precision, and many arguments are normal
+float_cmp = "allow"
+excessive_precision = "allow"
+too_many_arguments = "allow"
+
+# Geometry code uses short variable names (a, b, c, p0, p1, ...)
+similar_names = "allow"
+many_single_char_names = "allow"
+
+# Too noisy / not appropriate yet
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+doc_markdown = "warn"
+unreadable_literal = "allow"
+module_name_repetitions = "allow"
+items_after_statements = "allow"
+bool_to_int_with_if = "allow"
+needless_pass_by_value = "allow"
+type_complexity = "allow"
+too_many_lines = "allow"
+cast_precision_loss = "allow"
+missing_fields_in_debug = "allow"
+unnecessary_wraps = "allow"
+iter_not_returning_iterator = "allow"
+struct_field_names = "allow"
+
+
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+as_underscore = "warn"
+ptr_as_ptr = "warn"
+
+missing_safety_doc = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+clone_on_ref_ptr = "warn"
+create_dir = "warn"
+exit = "warn"
+wildcard_enum_match_arm = "warn"
+unused_result_ok = "warn"
+

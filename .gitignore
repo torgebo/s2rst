@@ -1,0 +1,8 @@
+target
+
+# Profiling / perf outputs (see Makefile: perf, cachegrind, flamegraph, pgo)
+/perf.data
+/cachegrind.out
+/flamegraph.svg
+*.profraw
+*.profdata

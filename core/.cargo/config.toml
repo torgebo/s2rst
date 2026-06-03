@@ -1,0 +1,17 @@
+# Project-wide Cargo configuration for s2rst
+#
+# QUICKCHECK_TESTS: Number of iterations for each quickcheck property test.
+#   - Default (set here): 500 — good balance of coverage vs speed (~20s test suite)
+#   - Extended (CI nightly):  QUICKCHECK_TESTS=5000 cargo test
+#   - Miri (must forward env): QUICKCHECK_TESTS=2 MIRIFLAGS="-Zmiri-env-forward=QUICKCHECK_TESTS" cargo +nightly miri test
+#
+# With 224 quickcheck properties, iteration counts affect total test inputs:
+#   500  iterations → 112,000 inputs (~20s native)
+#   5000 iterations → 1,120,000 inputs (~3 min native)
+#   2    iterations → 448 inputs (minutes under Miri due to ~100-200x slowdown)
+#
+# To override locally without editing this file, set the env var before cargo:
+#   QUICKCHECK_TESTS=100 cargo test
+
+[env]
+QUICKCHECK_TESTS = "500"

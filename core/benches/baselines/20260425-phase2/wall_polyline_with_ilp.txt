@@ -1,0 +1,66 @@
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 04s
+     Running benches/wall/polyline.rs (target/release/deps/wall_polyline-b1d407f48bafd959)
+Gnuplot not found, using plotters backend
+Benchmarking length_100
+Benchmarking length_100: Warming up for 3.0000 s
+Benchmarking length_100: Collecting 100 samples in estimated 5.0161 s (1.1M iterations)
+Benchmarking length_100: Analyzing
+length_100              time:   [4.6998 µs 4.7620 µs 4.8299 µs]
+                        change: [+5.1770% +7.6920% +9.8000%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 12 outliers among 100 measurements (12.00%)
+  4 (4.00%) low mild
+  8 (8.00%) high mild
+
+Benchmarking length_1000
+Benchmarking length_1000: Warming up for 3.0000 s
+Benchmarking length_1000: Collecting 100 samples in estimated 5.0933 s (111k iterations)
+Benchmarking length_1000: Analyzing
+length_1000             time:   [45.263 µs 45.695 µs 46.120 µs]
+                        change: [-4.9564% -3.7352% -2.4423%] (p = 0.00 < 0.05)
+                        Performance has improved.
+
+Benchmarking centroid_100
+Benchmarking centroid_100: Warming up for 3.0000 s
+Benchmarking centroid_100: Collecting 100 samples in estimated 5.0010 s (4.6M iterations)
+Benchmarking centroid_100: Analyzing
+centroid_100            time:   [1.3904 µs 1.4702 µs 1.5520 µs]
+                        change: [+12.641% +17.865% +24.396%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 10 outliers among 100 measurements (10.00%)
+  9 (9.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking centroid_1000
+Benchmarking centroid_1000: Warming up for 3.0000 s
+Benchmarking centroid_1000: Collecting 100 samples in estimated 5.0331 s (460k iterations)
+Benchmarking centroid_1000: Analyzing
+centroid_1000           time:   [10.571 µs 10.668 µs 10.774 µs]
+                        change: [-2.7012% -1.5755% -0.4505%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking get_length_1000
+Benchmarking get_length_1000: Warming up for 3.0000 s
+Benchmarking get_length_1000: Collecting 100 samples in estimated 5.0341 s (111k iterations)
+Benchmarking get_length_1000: Analyzing
+get_length_1000         time:   [45.072 µs 45.638 µs 46.256 µs]
+                        change: [-7.8027% -6.2397% -4.7438%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking get_centroid_1000
+Benchmarking get_centroid_1000: Warming up for 3.0000 s
+Benchmarking get_centroid_1000: Collecting 100 samples in estimated 5.0499 s (444k iterations)
+Benchmarking get_centroid_1000: Analyzing
+get_centroid_1000       time:   [11.201 µs 11.339 µs 11.486 µs]
+                        change: [-1.9443% -0.5008% +0.9919%] (p = 0.52 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+

@@ -1,0 +1,160 @@
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 43s
+     Running benches/wall/edge_crossing.rs (target/release/deps/wall_edge_crossing-90e8aa6f7dddebd5)
+Gnuplot not found, using plotters backend
+Benchmarking crossing_sign
+Benchmarking crossing_sign: Warming up for 3.0000 s
+Benchmarking crossing_sign: Collecting 100 samples in estimated 5.0030 s (5.8M iterations)
+Benchmarking crossing_sign: Analyzing
+crossing_sign           time:   [871.24 ns 882.67 ns 893.65 ns]
+Found 25 outliers among 100 measurements (25.00%)
+  11 (11.00%) low mild
+  11 (11.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking crossing_sign_crossing
+Benchmarking crossing_sign_crossing: Warming up for 3.0000 s
+Benchmarking crossing_sign_crossing: Collecting 100 samples in estimated 5.0101 s (1.6M iterations)
+Benchmarking crossing_sign_crossing: Analyzing
+crossing_sign_crossing  time:   [3.1990 µs 3.2248 µs 3.2522 µs]
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking edge_crosser_chain
+Benchmarking edge_crosser_chain: Warming up for 3.0000 s
+Benchmarking edge_crosser_chain: Collecting 100 samples in estimated 5.0040 s (6.0M iterations)
+Benchmarking edge_crosser_chain: Analyzing
+edge_crosser_chain      time:   [831.23 ns 837.85 ns 844.19 ns]
+Found 37 outliers among 100 measurements (37.00%)
+  21 (21.00%) low severe
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  11 (11.00%) high severe
+
+Benchmarking edge_or_vertex_crossing
+Benchmarking edge_or_vertex_crossing: Warming up for 3.0000 s
+Benchmarking edge_or_vertex_crossing: Collecting 100 samples in estimated 5.0027 s (5.7M iterations)
+Benchmarking edge_or_vertex_crossing: Analyzing
+edge_or_vertex_crossing time:   [913.63 ns 933.62 ns 951.64 ns]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking intersection
+Benchmarking intersection: Warming up for 3.0000 s
+Benchmarking intersection: Collecting 100 samples in estimated 5.0008 s (5.4M iterations)
+Benchmarking intersection: Analyzing
+intersection            time:   [919.78 ns 927.59 ns 935.06 ns]
+Found 34 outliers among 100 measurements (34.00%)
+  13 (13.00%) low severe
+  6 (6.00%) high mild
+  15 (15.00%) high severe
+
+     Running benches/wall/point_angle.rs (target/release/deps/wall_point_angle-bc55e949004c5401)
+Gnuplot not found, using plotters backend
+Benchmarking point_distance
+Benchmarking point_distance: Warming up for 3.0000 s
+Benchmarking point_distance: Collecting 100 samples in estimated 5.0000 s (199M iterations)
+Benchmarking point_distance: Analyzing
+point_distance          time:   [24.867 ns 25.092 ns 25.318 ns]
+Found 40 outliers among 100 measurements (40.00%)
+  19 (19.00%) low severe
+  3 (3.00%) high mild
+  18 (18.00%) high severe
+
+Benchmarking point_cross
+Benchmarking point_cross: Warming up for 3.0000 s
+Benchmarking point_cross: Collecting 100 samples in estimated 5.0000 s (416M iterations)
+Benchmarking point_cross: Analyzing
+point_cross             time:   [11.753 ns 12.173 ns 12.581 ns]
+
+Benchmarking point_normalize
+Benchmarking point_normalize: Warming up for 3.0000 s
+Benchmarking point_normalize: Collecting 100 samples in estimated 5.0000 s (627M iterations)
+Benchmarking point_normalize: Analyzing
+point_normalize         time:   [7.8510 ns 7.9310 ns 8.0105 ns]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking angle_from_e6
+Benchmarking angle_from_e6: Warming up for 3.0000 s
+Benchmarking angle_from_e6: Collecting 100 samples in estimated 5.0000 s (2.8B iterations)
+Benchmarking angle_from_e6: Analyzing
+angle_from_e6           time:   [1.7799 ns 1.7948 ns 1.8087 ns]
+Found 28 outliers among 100 measurements (28.00%)
+  12 (12.00%) low severe
+  2 (2.00%) low mild
+  5 (5.00%) high mild
+  9 (9.00%) high severe
+
+Benchmarking angle_to_e6
+Benchmarking angle_to_e6: Warming up for 3.0000 s
+Benchmarking angle_to_e6: Collecting 100 samples in estimated 5.0000 s (442M iterations)
+Benchmarking angle_to_e6: Analyzing
+angle_to_e6             time:   [10.574 ns 10.679 ns 10.794 ns]
+Found 16 outliers among 100 measurements (16.00%)
+  6 (6.00%) low mild
+  8 (8.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking angle_from_degrees
+Benchmarking angle_from_degrees: Warming up for 3.0000 s
+Benchmarking angle_from_degrees: Collecting 100 samples in estimated 5.0000 s (2.8B iterations)
+Benchmarking angle_from_degrees: Analyzing
+angle_from_degrees      time:   [1.7814 ns 1.7955 ns 1.8092 ns]
+Found 34 outliers among 100 measurements (34.00%)
+  14 (14.00%) low severe
+  2 (2.00%) high mild
+  18 (18.00%) high severe
+
+Benchmarking angle_from_radians
+Benchmarking angle_from_radians: Warming up for 3.0000 s
+Benchmarking angle_from_radians: Collecting 100 samples in estimated 5.0000 s (2.7B iterations)
+Benchmarking angle_from_radians: Analyzing
+angle_from_radians      time:   [1.7880 ns 1.8049 ns 1.8219 ns]
+Found 43 outliers among 100 measurements (43.00%)
+  24 (24.00%) low severe
+  5 (5.00%) high mild
+  14 (14.00%) high severe
+
+Benchmarking chord_angle_from_angle
+Benchmarking chord_angle_from_angle: Warming up for 3.0000 s
+Benchmarking chord_angle_from_angle: Collecting 100 samples in estimated 5.0001 s (204M iterations)
+Benchmarking chord_angle_from_angle: Analyzing
+chord_angle_from_angle  time:   [23.196 ns 23.402 ns 23.608 ns]
+Found 35 outliers among 100 measurements (35.00%)
+  12 (12.00%) low severe
+  3 (3.00%) low mild
+  9 (9.00%) high mild
+  11 (11.00%) high severe
+
+     Running benches/wall/predicates.rs (target/release/deps/wall_predicates-b4693dfdeb63ea83)
+Gnuplot not found, using plotters backend
+Benchmarking sign
+Benchmarking sign: Warming up for 3.0000 s
+Benchmarking sign: Collecting 100 samples in estimated 5.0000 s (671M iterations)
+Benchmarking sign: Analyzing
+sign                    time:   [7.4540 ns 7.5339 ns 7.6162 ns]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking robust_sign
+Benchmarking robust_sign: Warming up for 3.0000 s
+Benchmarking robust_sign: Collecting 100 samples in estimated 5.0000 s (382M iterations)
+Benchmarking robust_sign: Analyzing
+robust_sign             time:   [13.810 ns 14.841 ns 15.931 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  9 (9.00%) high severe
+
+Benchmarking sign_near_collinear
+Benchmarking sign_near_collinear: Warming up for 3.0000 s
+Benchmarking sign_near_collinear: Collecting 100 samples in estimated 5.0000 s (646M iterations)
+Benchmarking sign_near_collinear: Analyzing
+sign_near_collinear     time:   [7.5812 ns 7.6732 ns 7.7817 ns]
+Found 26 outliers among 100 measurements (26.00%)
+  5 (5.00%) low severe
+  3 (3.00%) low mild
+  7 (7.00%) high mild
+  11 (11.00%) high severe
+

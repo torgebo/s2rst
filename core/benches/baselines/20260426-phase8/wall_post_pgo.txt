@@ -1,0 +1,258 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.23
+   Compiling quote v1.0.44
+   Compiling zmij v1.0.20
+   Compiling zerocopy v0.8.39
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.181
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.0
+   Compiling autocfg v1.5.0
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.149
+   Compiling regex-syntax v0.8.9
+   Compiling num-traits v0.2.19
+   Compiling aho-corasick v1.1.4
+   Compiling syn v2.0.114
+   Compiling proc-macro-error-attr2 v2.0.0
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling clap_lex v1.1.0
+   Compiling anstyle v1.0.14
+   Compiling regex-automata v0.4.14
+   Compiling ciborium-io v0.2.2
+   Compiling either v1.15.0
+   Compiling plotters-backend v0.3.7
+   Compiling itoa v1.0.17
+   Compiling iai-callgrind-runner v0.16.1
+   Compiling plotters-svg v0.3.7
+   Compiling itertools v0.10.5
+   Compiling clap_builder v4.6.0
+   Compiling num-integer v0.1.46
+   Compiling log v0.4.29
+   Compiling iai-callgrind v0.16.1
+   Compiling same-file v1.0.6
+   Compiling cast v0.3.0
+   Compiling num-bigint v0.4.6
+   Compiling criterion-plot v0.5.0
+   Compiling proc-macro-error2 v2.0.1
+   Compiling regex v1.12.3
+   Compiling walkdir v2.5.0
+   Compiling plotters v0.3.7
+   Compiling env_logger v0.8.4
+   Compiling clap v4.6.1
+   Compiling is-terminal v0.4.17
+   Compiling anes v0.1.6
+   Compiling oorandom v11.1.5
+   Compiling once_cell v1.21.3
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+   Compiling serde_derive v1.0.228
+   Compiling zerocopy-derive v0.8.39
+   Compiling derive_more-impl v2.1.1
+   Compiling quickcheck_macros v1.1.0
+   Compiling derive_more v2.1.1
+   Compiling bincode v1.3.3
+   Compiling tinytemplate v1.2.1
+   Compiling iai-callgrind-macros v0.6.1
+   Compiling half v2.7.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling ciborium-ll v0.2.2
+   Compiling rand_chacha v0.3.1
+   Compiling ciborium v0.2.2
+   Compiling rand v0.8.5
+   Compiling criterion v0.5.1
+   Compiling quickcheck v1.0.3
+    Finished `bench` profile [optimized + debuginfo] target(s) in 3m 13s
+     Running benches/wall/edge_crossing.rs (target/release/deps/wall_edge_crossing-24665c309b7a4de2)
+Gnuplot not found, using plotters backend
+Benchmarking crossing_sign
+Benchmarking crossing_sign: Warming up for 3.0000 s
+Benchmarking crossing_sign: Collecting 100 samples in estimated 5.0021 s (7.7M iterations)
+Benchmarking crossing_sign: Analyzing
+crossing_sign           time:   [613.48 ns 618.47 ns 624.61 ns]
+                        change: [-29.958% -29.229% -28.459%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 13 outliers among 100 measurements (13.00%)
+  2 (2.00%) low mild
+  7 (7.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking crossing_sign_crossing
+Benchmarking crossing_sign_crossing: Warming up for 3.0000 s
+Benchmarking crossing_sign_crossing: Collecting 100 samples in estimated 5.0117 s (2.2M iterations)
+Benchmarking crossing_sign_crossing: Analyzing
+crossing_sign_crossing  time:   [2.2508 µs 2.2768 µs 2.3056 µs]
+                        change: [-27.313% -26.234% -25.075%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking edge_crosser_chain
+Benchmarking edge_crosser_chain: Warming up for 3.0000 s
+Benchmarking edge_crosser_chain: Collecting 100 samples in estimated 5.0011 s (8.1M iterations)
+Benchmarking edge_crosser_chain: Analyzing
+edge_crosser_chain      time:   [597.84 ns 604.08 ns 611.25 ns]
+                        change: [-28.976% -28.305% -27.668%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking edge_or_vertex_crossing
+Benchmarking edge_or_vertex_crossing: Warming up for 3.0000 s
+Benchmarking edge_or_vertex_crossing: Collecting 100 samples in estimated 5.0041 s (5.5M iterations)
+Benchmarking edge_or_vertex_crossing: Analyzing
+edge_or_vertex_crossing time:   [718.77 ns 740.18 ns 766.61 ns]
+                        change: [-13.183% -10.092% -6.9331%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking intersection
+Benchmarking intersection: Warming up for 3.0000 s
+Benchmarking intersection: Collecting 100 samples in estimated 5.0024 s (8.4M iterations)
+Benchmarking intersection: Analyzing
+intersection            time:   [588.15 ns 593.18 ns 598.21 ns]
+                        change: [-36.425% -35.708% -34.888%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 28 outliers among 100 measurements (28.00%)
+  11 (11.00%) low severe
+  3 (3.00%) low mild
+  3 (3.00%) high mild
+  11 (11.00%) high severe
+
+     Running benches/wall/point_angle.rs (target/release/deps/wall_point_angle-c3295607296a868b)
+Gnuplot not found, using plotters backend
+Benchmarking point_distance
+Benchmarking point_distance: Warming up for 3.0000 s
+Benchmarking point_distance: Collecting 100 samples in estimated 5.0000 s (175M iterations)
+Benchmarking point_distance: Analyzing
+point_distance          time:   [27.573 ns 27.955 ns 28.413 ns]
+                        change: [+11.042% +12.410% +13.902%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 16 outliers among 100 measurements (16.00%)
+  8 (8.00%) low mild
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking point_cross
+Benchmarking point_cross: Warming up for 3.0000 s
+Benchmarking point_cross: Collecting 100 samples in estimated 5.0000 s (598M iterations)
+Benchmarking point_cross: Analyzing
+point_cross             time:   [8.2078 ns 8.2763 ns 8.3460 ns]
+                        change: [-33.946% -32.002% -29.957%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking point_normalize
+Benchmarking point_normalize: Warming up for 3.0000 s
+Benchmarking point_normalize: Collecting 100 samples in estimated 5.0000 s (619M iterations)
+Benchmarking point_normalize: Analyzing
+point_normalize         time:   [8.2153 ns 8.3000 ns 8.3965 ns]
+                        change: [+4.5786% +5.7587% +7.1437%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+
+Benchmarking angle_from_e6
+Benchmarking angle_from_e6: Warming up for 3.0000 s
+Benchmarking angle_from_e6: Collecting 100 samples in estimated 5.0000 s (2.0B iterations)
+Benchmarking angle_from_e6: Analyzing
+angle_from_e6           time:   [2.5113 ns 2.5345 ns 2.5587 ns]
+                        change: [+39.428% +40.815% +42.280%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 32 outliers among 100 measurements (32.00%)
+  8 (8.00%) low severe
+  7 (7.00%) low mild
+  10 (10.00%) high mild
+  7 (7.00%) high severe
+
+Benchmarking angle_to_e6
+Benchmarking angle_to_e6: Warming up for 3.0000 s
+Benchmarking angle_to_e6: Collecting 100 samples in estimated 5.0000 s (457M iterations)
+Benchmarking angle_to_e6: Analyzing
+angle_to_e6             time:   [10.728 ns 10.827 ns 10.923 ns]
+                        change: [+0.1528% +1.3052% +2.6078%] (p = 0.04 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking angle_from_degrees
+Benchmarking angle_from_degrees: Warming up for 3.0000 s
+Benchmarking angle_from_degrees: Collecting 100 samples in estimated 5.0000 s (2.7B iterations)
+Benchmarking angle_from_degrees: Analyzing
+angle_from_degrees      time:   [1.8015 ns 1.8139 ns 1.8305 ns]
+                        change: [-0.5051% +0.3656% +1.2542%] (p = 0.43 > 0.05)
+                        No change in performance detected.
+Found 39 outliers among 100 measurements (39.00%)
+  15 (15.00%) low severe
+  1 (1.00%) low mild
+  23 (23.00%) high severe
+
+Benchmarking angle_from_radians
+Benchmarking angle_from_radians: Warming up for 3.0000 s
+Benchmarking angle_from_radians: Collecting 100 samples in estimated 5.0000 s (2.8B iterations)
+Benchmarking angle_from_radians: Analyzing
+angle_from_radians      time:   [1.8133 ns 1.8327 ns 1.8526 ns]
+                        change: [-0.7369% +0.3154% +1.4095%] (p = 0.57 > 0.05)
+                        No change in performance detected.
+Found 18 outliers among 100 measurements (18.00%)
+  11 (11.00%) low mild
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking chord_angle_from_angle
+Benchmarking chord_angle_from_angle: Warming up for 3.0000 s
+Benchmarking chord_angle_from_angle: Collecting 100 samples in estimated 5.0000 s (212M iterations)
+Benchmarking chord_angle_from_angle: Analyzing
+chord_angle_from_angle  time:   [23.024 ns 23.266 ns 23.515 ns]
+                        change: [-1.9415% -0.8230% +0.3569%] (p = 0.15 > 0.05)
+                        No change in performance detected.
+Found 23 outliers among 100 measurements (23.00%)
+  15 (15.00%) low mild
+  3 (3.00%) high mild
+  5 (5.00%) high severe
+
+     Running benches/wall/predicates.rs (target/release/deps/wall_predicates-caa63c1280da277b)
+Gnuplot not found, using plotters backend
+Benchmarking sign
+Benchmarking sign: Warming up for 3.0000 s
+Benchmarking sign: Collecting 100 samples in estimated 5.0000 s (659M iterations)
+Benchmarking sign: Analyzing
+sign                    time:   [7.4410 ns 7.5190 ns 7.6013 ns]
+                        change: [-1.3521% -0.2497% +0.7860%] (p = 0.66 > 0.05)
+                        No change in performance detected.
+Found 34 outliers among 100 measurements (34.00%)
+  18 (18.00%) low severe
+  5 (5.00%) low mild
+  5 (5.00%) high mild
+  6 (6.00%) high severe
+
+Benchmarking robust_sign
+Benchmarking robust_sign: Warming up for 3.0000 s
+Benchmarking robust_sign: Collecting 100 samples in estimated 5.0000 s (379M iterations)
+Benchmarking robust_sign: Analyzing
+robust_sign             time:   [13.269 ns 13.616 ns 14.091 ns]
+                        change: [-5.4815% -1.8269% +1.6943%] (p = 0.33 > 0.05)
+                        No change in performance detected.
+Found 32 outliers among 100 measurements (32.00%)
+  6 (6.00%) low severe
+  3 (3.00%) low mild
+  6 (6.00%) high mild
+  17 (17.00%) high severe
+
+Benchmarking sign_near_collinear
+Benchmarking sign_near_collinear: Warming up for 3.0000 s
+Benchmarking sign_near_collinear: Collecting 100 samples in estimated 5.0000 s (667M iterations)
+Benchmarking sign_near_collinear: Analyzing
+sign_near_collinear     time:   [7.5498 ns 7.6128 ns 7.6857 ns]
+                        change: [-2.2942% -1.1573% -0.1296%] (p = 0.03 < 0.05)
+                        Change within noise threshold.
+Found 35 outliers among 100 measurements (35.00%)
+  15 (15.00%) low severe
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  15 (15.00%) high severe
+

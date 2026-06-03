@@ -1,0 +1,21 @@
+[workspace]
+resolver = "3"
+members = [
+    "core",
+    "python",
+    "wasm",
+]
+
+# Benchmarks need maximum codegen quality and line-table debug info so that
+# `perf annotate` / `cargo-show-asm` can map samples back to source.
+[profile.bench]
+lto = "fat"
+codegen-units = 1
+debug = "line-tables-only"
+
+# Release builds get thin LTO (faster link, negligible runtime delta for
+# this library's call graph) and single codegen unit for consistent
+# inlining decisions.
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,59 @@
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 36s
+     Running benches/wall/polyline.rs (target/release/deps/wall_polyline-b1d407f48bafd959)
+Gnuplot not found, using plotters backend
+Benchmarking length_100
+Benchmarking length_100: Warming up for 3.0000 s
+Benchmarking length_100: Collecting 100 samples in estimated 5.0176 s (1.1M iterations)
+Benchmarking length_100: Analyzing
+length_100              time:   [4.5013 µs 4.5643 µs 4.6376 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking length_1000
+Benchmarking length_1000: Warming up for 3.0000 s
+Benchmarking length_1000: Collecting 100 samples in estimated 5.0339 s (111k iterations)
+Benchmarking length_1000: Analyzing
+length_1000             time:   [45.632 µs 46.238 µs 46.916 µs]
+
+Benchmarking centroid_100
+Benchmarking centroid_100: Warming up for 3.0000 s
+Benchmarking centroid_100: Collecting 100 samples in estimated 5.0020 s (4.5M iterations)
+Benchmarking centroid_100: Analyzing
+centroid_100            time:   [1.1036 µs 1.1125 µs 1.1224 µs]
+Found 38 outliers among 100 measurements (38.00%)
+  19 (19.00%) low severe
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  13 (13.00%) high severe
+
+Benchmarking centroid_1000
+Benchmarking centroid_1000: Warming up for 3.0000 s
+Benchmarking centroid_1000: Collecting 100 samples in estimated 5.0553 s (460k iterations)
+Benchmarking centroid_1000: Analyzing
+centroid_1000           time:   [10.937 µs 11.053 µs 11.183 µs]
+Found 42 outliers among 100 measurements (42.00%)
+  20 (20.00%) low severe
+  1 (1.00%) high mild
+  21 (21.00%) high severe
+
+Benchmarking get_length_1000
+Benchmarking get_length_1000: Warming up for 3.0000 s
+Benchmarking get_length_1000: Collecting 100 samples in estimated 5.0053 s (111k iterations)
+Benchmarking get_length_1000: Analyzing
+get_length_1000         time:   [47.876 µs 48.579 µs 49.437 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking get_centroid_1000
+Benchmarking get_centroid_1000: Warming up for 3.0000 s
+Benchmarking get_centroid_1000: Collecting 100 samples in estimated 5.0278 s (444k iterations)
+Benchmarking get_centroid_1000: Analyzing
+get_centroid_1000       time:   [11.345 µs 11.475 µs 11.646 µs]
+Found 31 outliers among 100 measurements (31.00%)
+  18 (18.00%) low severe
+  6 (6.00%) high mild
+  7 (7.00%) high severe
+

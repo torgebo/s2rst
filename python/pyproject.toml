@@ -1,0 +1,49 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "s2rst"
+dynamic = ["version"]
+description = "Python bindings for s2rst, a Rust port of Google's S2 spherical geometry library."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "AUTHORS"]
+requires-python = ">=3.9"
+authors = [{ name = "Torgeir Børresen", email = "tb@starkad.no" }]
+keywords = ["geometry", "s2", "spherical", "geospatial", "spatial-index"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/torgebo/s2rst"
+Repository = "https://github.com/torgebo/s2rst"
+Documentation = "https://github.com/torgebo/s2rst#readme"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "hypothesis>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.4",
+]
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "s2rst._core"
+exclude = ["**/.gitignore"]

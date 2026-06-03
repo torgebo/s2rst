@@ -1,0 +1,31 @@
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 03s
+     Running benches/wall/shape_index.rs (target/release/deps/wall_shape_index-8a34e06b0a798d72)
+Gnuplot not found, using plotters backend
+Benchmarking build_polyline_1000
+Benchmarking build_polyline_1000: Warming up for 3.0000 s
+Benchmarking build_polyline_1000: Collecting 100 samples in estimated 7.6768 s (10k iterations)
+Benchmarking build_polyline_1000: Analyzing
+build_polyline_1000     time:   [704.34 µs 709.77 µs 715.87 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+
+Benchmarking build_polyline_10000
+Benchmarking build_polyline_10000: Warming up for 3.0000 s
+Benchmarking build_polyline_10000: Collecting 100 samples in estimated 5.2035 s (1000 iterations)
+Benchmarking build_polyline_10000: Analyzing
+build_polyline_10000    time:   [4.6836 ms 4.7492 ms 4.8209 ms]
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking build_10000_polyline_shapes
+Benchmarking build_10000_polyline_shapes: Warming up for 3.0000 s
+Benchmarking build_10000_polyline_shapes: Collecting 100 samples in estimated 5.6712 s (700 iterations)
+Benchmarking build_10000_polyline_shapes: Analyzing
+build_10000_polyline_shapes
+                        time:   [7.9289 ms 7.9927 ms 8.0651 ms]
+Found 13 outliers among 100 measurements (13.00%)
+  5 (5.00%) high mild
+  8 (8.00%) high severe
+

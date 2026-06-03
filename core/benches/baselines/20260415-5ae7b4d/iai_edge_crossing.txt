@@ -1,0 +1,41 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 32s
+     Running benches/edge_crossing.rs (target/release/deps/edge_crossing-c1ad1f2648c8f3bb)
+edge_crossing::edge_crossing_benchmarks::bench_crossing_sign
+  Instructions:                        3935|N/A                  (*********)
+  L1 Hits:                             5614|N/A                  (*********)
+  LL Hits:                                9|N/A                  (*********)
+  RAM Hits:                             145|N/A                  (*********)
+  Total read+write:                    5768|N/A                  (*********)
+  Estimated Cycles:                   10734|N/A                  (*********)
+edge_crossing::edge_crossing_benchmarks::bench_crossing_sign_crossing
+  Instructions:                       13265|N/A                  (*********)
+  L1 Hits:                            19680|N/A                  (*********)
+  LL Hits:                                9|N/A                  (*********)
+  RAM Hits:                             156|N/A                  (*********)
+  Total read+write:                   19845|N/A                  (*********)
+  Estimated Cycles:                   25185|N/A                  (*********)
+edge_crossing::edge_crossing_benchmarks::bench_edge_crosser_chain
+  Instructions:                        3931|N/A                  (*********)
+  L1 Hits:                             5608|N/A                  (*********)
+  LL Hits:                                9|N/A                  (*********)
+  RAM Hits:                             145|N/A                  (*********)
+  Total read+write:                    5762|N/A                  (*********)
+  Estimated Cycles:                   10728|N/A                  (*********)
+edge_crossing::edge_crossing_benchmarks::bench_edge_or_vertex_crossing
+  Instructions:                        3965|N/A                  (*********)
+  L1 Hits:                             5658|N/A                  (*********)
+  LL Hits:                               12|N/A                  (*********)
+  RAM Hits:                             150|N/A                  (*********)
+  Total read+write:                    5820|N/A                  (*********)
+  Estimated Cycles:                   10968|N/A                  (*********)
+edge_crossing::edge_crossing_benchmarks::bench_intersection
+  Instructions:                        4403|N/A                  (*********)
+  L1 Hits:                             6513|N/A                  (*********)
+  LL Hits:                                9|N/A                  (*********)
+  RAM Hits:                             113|N/A                  (*********)
+  Total read+write:                    6635|N/A                  (*********)
+  Estimated Cycles:                   10513|N/A                  (*********)
+
+Iai-Callgrind result: Ok. 5 without regressions; 0 regressed; 5 benchmarks finished in 4.69774s

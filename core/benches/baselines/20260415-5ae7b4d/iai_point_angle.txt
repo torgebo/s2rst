@@ -1,0 +1,62 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling s2rst v0.1.0 (/home/t/sources/s2rst_multi/1/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 13s
+     Running benches/point_angle.rs (target/release/deps/point_angle-263b2cb51263c9bf)
+point_angle::point_angle_benchmarks::bench_point_distance
+  Instructions:                         116|N/A                  (*********)
+  L1 Hits:                              129|N/A                  (*********)
+  LL Hits:                                1|N/A                  (*********)
+  RAM Hits:                              17|N/A                  (*********)
+  Total read+write:                     147|N/A                  (*********)
+  Estimated Cycles:                     729|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_point_cross
+  Instructions:                          39|N/A                  (*********)
+  L1 Hits:                               45|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                               6|N/A                  (*********)
+  Total read+write:                      51|N/A                  (*********)
+  Estimated Cycles:                     255|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_point_normalize
+  Instructions:                          30|N/A                  (*********)
+  L1 Hits:                               35|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                               4|N/A                  (*********)
+  Total read+write:                      39|N/A                  (*********)
+  Estimated Cycles:                     175|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_angle_from_e6
+  Instructions:                           9|N/A                  (*********)
+  L1 Hits:                               13|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                               3|N/A                  (*********)
+  Total read+write:                      16|N/A                  (*********)
+  Estimated Cycles:                     118|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_angle_to_e6
+  Instructions:                          43|N/A                  (*********)
+  L1 Hits:                               49|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                               8|N/A                  (*********)
+  Total read+write:                      57|N/A                  (*********)
+  Estimated Cycles:                     329|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_angle_from_degrees
+  Instructions:                           8|N/A                  (*********)
+  L1 Hits:                               13|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                               1|N/A                  (*********)
+  Total read+write:                      14|N/A                  (*********)
+  Estimated Cycles:                      48|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_angle_from_radians
+  Instructions:                           7|N/A                  (*********)
+  L1 Hits:                               11|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                               1|N/A                  (*********)
+  Total read+write:                      12|N/A                  (*********)
+  Estimated Cycles:                      46|N/A                  (*********)
+point_angle::point_angle_benchmarks::bench_chord_angle_from_angle
+  Instructions:                          96|N/A                  (*********)
+  L1 Hits:                              116|N/A                  (*********)
+  LL Hits:                                0|N/A                  (*********)
+  RAM Hits:                              18|N/A                  (*********)
+  Total read+write:                     134|N/A                  (*********)
+  Estimated Cycles:                     746|N/A                  (*********)
+
+Iai-Callgrind result: Ok. 8 without regressions; 0 regressed; 8 benchmarks finished in 9.46385s
