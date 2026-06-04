@@ -1,0 +1,107 @@
+# Quality gate that mirrors the local `make test` bar.
+#
+# This is intentionally separate from CI.yml (which only builds/publishes
+# Python wheels). The jobs here call the SAME Makefile targets developers run
+# locally, so CI and `make test` never drift. No publish/release/secrets steps
+# live here — those stay in CI.yml.
+name: test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # fmt + clippy + check + core tests + docs, all via the Makefile so the
+  # commands stay identical to `make test` locally.
+  rust:
+    name: rust (fmt, clippy, check, test, doc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check (workspace, all features)
+        run: make check
+      - name: rustfmt --check
+        run: make fmt-check
+      - name: clippy (warnings as errors)
+        run: make clippy
+      - name: core test suite
+        run: make test-core
+      - name: build docs (warnings as errors)
+        run: make doc
+
+  # Dependency license/advisory audit (cargo-deny, config in deny.toml).
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: cargo-deny check
+        run: make deny
+
+  # Python bindings: ruff lint/format, mypy + stubtest, pytest. `uv` builds the
+  # maturin extension itself, which needs the Rust toolchain (provided by the
+  # checked-in rust-toolchain.toml + the toolchain install below).
+  python:
+    name: python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: python test suite
+        run: make -C python test
+
+  # WASM bindings: wasm-pack test in Node.
+  wasm:
+    name: wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (stable, wasm target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+      - name: wasm test suite
+        run: make -C wasm test
+
+  # Minimum Supported Rust Version gate. rust-toolchain.toml pins `stable`, so a
+  # bare `cargo check` here would silently use stable and defeat this job. The
+  # explicit `cargo +1.88` override beats rust-toolchain.toml and pins the check
+  # to the declared MSRV (root Cargo.toml rust-version = "1.88").
+  msrv:
+    name: msrv (1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@1.88
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo +1.88 check (s2rst, all features)
+        run: cargo +1.88 check -p s2rst --all-features

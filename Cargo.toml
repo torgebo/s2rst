@@ -6,6 +6,9 @@ members = [
     "wasm",
 ]
 
+[workspace.package]
+rust-version = "1.88"
+
 # Benchmarks need maximum codegen quality and line-table debug info so that
 # `perf annotate` / `cargo-show-asm` can map samples back to source.
 [profile.bench]

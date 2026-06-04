@@ -1,0 +1,48 @@
+# Nightly deep fuzzing of the byte decoders with cargo-fuzz (coverage-guided +
+# AddressSanitizer). The fast, bounded robustness checks already run on every PR
+# in the `test` workflow via `cargo test` (core/tests/decoder_robustness.rs);
+# this lane runs the longer campaigns that are too slow for per-PR CI.
+name: fuzz
+
+on:
+  schedule:
+    # 04:17 UTC daily (off the hour to avoid the cron rush).
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - decode_uint_vector_u32
+          - decode_uint_vector_u64
+          - decode_string_vector
+          - decode_s2cell_id_vector
+          - decode_s2point_vector
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: Install cargo-fuzz
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Fuzz ${{ matrix.target }} (5 min)
+        working-directory: fuzz
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=300 -rss_limit_mb=4096
+      - name: Upload crash reproducer
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/
+          if-no-files-found: ignore

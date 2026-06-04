@@ -1411,6 +1411,10 @@ pub fn ordered_ccw(a: Point, b: Point, c: Point, o: Point) -> bool {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[path = "predicates_tests.rs"]
+mod predicates_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

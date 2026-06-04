@@ -1,0 +1,35 @@
+# Code-coverage ratchet. Runs the full s2rst test suite under
+# cargo-llvm-cov and fails if line coverage drops below the floor — a guard
+# against regressions, not a vanity badge. Separate from the `test` workflow
+# because the instrumented build + full suite is slow; it runs in parallel and
+# never blocks the fast checks.
+name: coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (stable + llvm-tools)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      # Floor is set a few points below the current ~93.5% line coverage. Raise
+      # it as coverage improves; never lower it (that is the ratchet).
+      - name: Measure coverage and enforce the floor
+        run: cargo llvm-cov -p s2rst --all-features --summary-only --fail-under-lines 92

@@ -1,2 +1,8 @@
 .hypothesis
 .venv
+
+# Build artifacts and caches
+*.so
+__pycache__/
+.pytest_cache/
+.ruff_cache/

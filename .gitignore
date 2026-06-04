@@ -6,3 +6,6 @@ target
 /flamegraph.svg
 *.profraw
 *.profdata
+
+# GitHub Actions logs downloaded locally
+logs_*.zip

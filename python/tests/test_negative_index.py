@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 
-"""Tier B3: negative indexing on __getitem__.
+"""negative indexing on __getitem__.
 
 Every sequence-like type now accepts Python-style negative indices on
 subscription (obj[-1] == obj[len-1]); out-of-range indices in either

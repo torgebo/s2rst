@@ -143,6 +143,7 @@ impl PyR1Interval {
     }
 
     /// Whether two intervals are equal within `max_error` (default 1e-15).
+    #[pyo3(signature = (other, max_error=None))]
     fn approx_eq(&self, other: &PyR1Interval, max_error: Option<f64>) -> bool {
         self.0.approx_eq_with(other.0, max_error.unwrap_or(1e-15))
     }
@@ -343,6 +344,7 @@ impl PyS1Interval {
     }
 
     /// Whether two intervals are equal within `max_error` (default 1e-15).
+    #[pyo3(signature = (other, max_error=None))]
     fn approx_eq(&self, other: &PyS1Interval, max_error: Option<f64>) -> bool {
         self.0.approx_eq_with(other.0, max_error.unwrap_or(1e-15))
     }

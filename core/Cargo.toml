@@ -2,7 +2,6 @@
 name = "s2rst"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
 license = "Apache-2.0"
 description = "A Rust port of Google's S2 spherical geometry library — points, regions, shapes, and a hierarchical cell index on the sphere."
 readme = "README.md"
@@ -13,6 +12,7 @@ authors = ["Torgeir Børresen <tb@starkad.no>"]
 keywords = ["geometry", "s2", "spherical", "geospatial", "spatial-index"]
 categories = ["science::geo", "mathematics", "algorithms"]
 exclude = ["tests/data/", "benches/baselines/", ".cargo/"]
+rust-version.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

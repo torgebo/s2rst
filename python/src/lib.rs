@@ -12,18 +12,28 @@
 use pyo3::prelude::*;
 
 mod angle;
+mod builder;
 mod cells;
+mod coverer;
+mod earth;
+mod encoding;
 mod geometry;
 mod hash_util;
+mod index;
 mod interval;
 mod points;
 mod regions;
 mod s2point;
 mod shapes;
+mod text;
 
 use angle::{PyAngle, PyChordAngle};
+use builder::PyS2Builder;
 use cells::{PyCell, PyCellId, PyCellUnion};
+use coverer::PyRegionCoverer;
+use earth::PyEarth;
 use geometry::{PyLoop, PyPolygon, PyPolyline};
+use index::PyShapeIndex;
 use interval::{PyR1Interval, PyS1Interval};
 use points::{PyMatrix3x3, PyR2Point, PyR2Rect, PyVector};
 use regions::{PyCap, PyRect};
@@ -71,5 +81,32 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLaxPolygon>()?;
     m.add_class::<PyPointVector>()?;
     m.add_class::<PyEdgeVectorShape>()?;
+    // Region coverer
+    m.add_class::<PyRegionCoverer>()?;
+    // Spatial index + queries
+    m.add_class::<PyShapeIndex>()?;
+    // Earth conversions / distances
+    m.add_class::<PyEarth>()?;
+    // text_format: parse / format
+    m.add_function(wrap_pyfunction!(text::parse_point, m)?)?;
+    m.add_function(wrap_pyfunction!(text::parse_points, m)?)?;
+    m.add_function(wrap_pyfunction!(text::parse_latlngs, m)?)?;
+    m.add_function(wrap_pyfunction!(text::make_loop, m)?)?;
+    m.add_function(wrap_pyfunction!(text::make_polygon, m)?)?;
+    m.add_function(wrap_pyfunction!(text::make_polyline, m)?)?;
+    m.add_function(wrap_pyfunction!(text::point_to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(text::points_to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(text::latlng_to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(text::loop_to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(text::polygon_to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(text::polyline_to_string, m)?)?;
+    // encoding: round-trip geometry to/from bytes
+    m.add_function(wrap_pyfunction!(encoding::encode, m)?)?;
+    m.add_function(wrap_pyfunction!(encoding::decode_polygon, m)?)?;
+    m.add_function(wrap_pyfunction!(encoding::decode_polyline, m)?)?;
+    m.add_function(wrap_pyfunction!(encoding::decode_loop, m)?)?;
+    m.add_function(wrap_pyfunction!(encoding::decode_cell_union, m)?)?;
+    // Geometry builder
+    m.add_class::<PyS2Builder>()?;
     Ok(())
 }

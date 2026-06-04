@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 
-"""Tier B1: __bool__ on collection types with semantic emptiness.
+"""__bool__ on collection types with semantic emptiness.
 
 `Loop`, `Polygon`, and `LaxPolygon` distinguish "empty" (no interior) from
 "full" (covers the sphere) independently of vertex/loop count, so they define

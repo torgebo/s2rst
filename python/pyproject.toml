@@ -39,6 +39,7 @@ test = [
 [dependency-groups]
 dev = [
     "ruff>=0.4",
+    "mypy>=1.0",
 ]
 
 [tool.maturin]

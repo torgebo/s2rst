@@ -1,0 +1,56 @@
+# Deep (coverage-guided, ASan) fuzzing layer for the s2rst byte decoders — the
+# nightly complement to the bounded `cargo test` suite in
+# `core/tests/decoder_robustness.rs`. Run with `cargo +nightly fuzz run <target>`.
+#
+# Standalone workspace (`[workspace]` below) so the cargo-fuzz crate, which needs
+# nightly + sanitizers, stays out of the main `cargo build`/CI matrix.
+[package]
+name = "s2rst-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+s2rst = { path = "../core" }
+
+[[bin]]
+name = "decode_uint_vector_u32"
+path = "fuzz_targets/decode_uint_vector_u32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_uint_vector_u64"
+path = "fuzz_targets/decode_uint_vector_u64.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_string_vector"
+path = "fuzz_targets/decode_string_vector.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_s2cell_id_vector"
+path = "fuzz_targets/decode_s2cell_id_vector.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_s2point_vector"
+path = "fuzz_targets/decode_s2point_vector.rs"
+test = false
+doc = false
+bench = false
+
+# Keep the fuzz crate out of the parent workspace.
+[workspace]

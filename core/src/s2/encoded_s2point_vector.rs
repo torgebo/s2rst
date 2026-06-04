@@ -454,7 +454,11 @@ fn decode_cell_ids_raw(byte0: u8, byte1: u8, r: &mut dyn Read) -> io::Result<Vec
                 if have_exceptions {
                     delta -= BLOCK_SIZE as u64;
                 }
-                let value = base + offset + delta;
+                // Upstream C++ computes this in wrapping unsigned arithmetic.
+                // Valid encodings never overflow; malformed input can, so wrap
+                // explicitly — this both matches the reference output and keeps
+                // the decoder panic-free on untrusted bytes (found by fuzzing).
+                let value = base.wrapping_add(offset).wrapping_add(delta);
                 points.push(value_to_point(value, level));
             }
         }

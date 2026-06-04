@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 
-"""Tier-A correctness tests: bounds checks on indexing methods.
+"""correctness tests: bounds checks on indexing methods.
 
 Each test fails (red) on the unfixed code — either with
 `pyo3_runtime.PanicException` (Rust panic crossing FFI) or with a silent

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 
-"""Tier B2: __copy__ / __deepcopy__ for every exposed value type.
+"""__copy__ / __deepcopy__ for every exposed value type.
 
 Before this, `copy.copy(x)` / `copy.deepcopy(x)` fell back to the pickle
 protocol and raised (no class implements __reduce__). Each type now defines

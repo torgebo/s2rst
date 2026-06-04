@@ -6,6 +6,7 @@ license = "Apache-2.0"
 description = "PyO3 bindings that build the s2rst Python extension module (s2rst._core); not published to crates.io."
 repository = "https://github.com/torgebo/s2rst"
 publish = false
+rust-version.workspace = true
 
 [lib]
 name = "_core"

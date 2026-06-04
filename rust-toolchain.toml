@@ -1,0 +1,11 @@
+# Pinned toolchain for local dev and CI: builds use the latest `stable`.
+#
+# The workspace MSRV (1.88, set in the root Cargo.toml [workspace.package]
+# rust-version and inherited by every crate) is NOT pinned here on purpose.
+# It is checked separately by the `msrv` job in .github/workflows/test.yml,
+# which runs `cargo +1.88 check`. The explicit `+1.88` toolchain override
+# beats this file; a bare `cargo check` would silently fall back to `stable`
+# and defeat the MSRV check.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

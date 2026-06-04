@@ -605,6 +605,7 @@ impl PyR2Rect {
     }
 
     /// Whether two rectangles are equal within `max_error` (default 1e-15).
+    #[pyo3(signature = (other, max_error=None))]
     fn approx_eq(&self, other: &PyR2Rect, max_error: Option<f64>) -> bool {
         self.0.approx_eq_with(other.0, max_error.unwrap_or(1e-15))
     }

@@ -1,0 +1,97 @@
+# Allowlist for `python -m mypy.stubtest s2rst._core` (see `make typecheck`).
+#
+# Every entry below is a *systematic, accepted* difference between the
+# hand-written `_core.pyi` stub and the PyO3-generated runtime module — not a
+# bug. stubtest still fails on anything NOT listed here (a renamed/removed
+# method, a new method missing from the stub, a changed return type, or a
+# malformed stub), which is the drift protection we want.
+#
+# Run with `--ignore-positional-only` (all PyO3 arguments are positional-only
+# at runtime, but the stub names them for readability), so those diffs do not
+# appear here.
+#
+# Accepted categories:
+#   * <Class>            — PyO3 classes are `@final` and disjoint bases at
+#                          runtime; the stub omits `@final`/`@disjoint_base`.
+#   * <Class>.__init__    \ PyO3 exposes construction via `__new__`; the stub
+#   * <Class>.__new__     / documents it as `__init__` (more readable).
+#   * __all__            — the runtime module defines `__all__`; the stub omits it.
+#
+# Follow-up (optional): adding `@final` to each stub class and declaring
+# `__all__` would shrink this list; the `__new__`/`__init__` entries are
+# inherent to the PyO3 idiom.
+s2rst._core.Angle
+s2rst._core.Cap
+s2rst._core.Cap.__init__
+s2rst._core.Cap.__new__
+s2rst._core.Cell
+s2rst._core.Cell.__init__
+s2rst._core.Cell.__new__
+s2rst._core.CellId
+s2rst._core.CellId.__init__
+s2rst._core.CellId.__new__
+s2rst._core.CellUnion
+s2rst._core.ChordAngle
+s2rst._core.Earth
+s2rst._core.Edge
+s2rst._core.Edge.__init__
+s2rst._core.Edge.__new__
+s2rst._core.EdgeVectorShape
+s2rst._core.LatLng
+s2rst._core.LatLng.__init__
+s2rst._core.LatLng.__new__
+s2rst._core.LaxLoop
+s2rst._core.LaxLoop.__init__
+s2rst._core.LaxLoop.__new__
+s2rst._core.LaxPolygon
+s2rst._core.LaxPolygon.__init__
+s2rst._core.LaxPolygon.__new__
+s2rst._core.LaxPolyline
+s2rst._core.LaxPolyline.__init__
+s2rst._core.LaxPolyline.__new__
+s2rst._core.Loop
+s2rst._core.Loop.__init__
+s2rst._core.Loop.__new__
+s2rst._core.Matrix3x3
+s2rst._core.Matrix3x3.__init__
+s2rst._core.Matrix3x3.__new__
+s2rst._core.PointVector
+s2rst._core.PointVector.__init__
+s2rst._core.PointVector.__new__
+s2rst._core.Polygon
+s2rst._core.Polygon.__init__
+s2rst._core.Polygon.__new__
+s2rst._core.Polyline
+s2rst._core.Polyline.__init__
+s2rst._core.Polyline.__new__
+s2rst._core.R1Interval
+s2rst._core.R1Interval.__init__
+s2rst._core.R1Interval.__new__
+s2rst._core.R2Point
+s2rst._core.R2Point.__init__
+s2rst._core.R2Point.__new__
+s2rst._core.R2Rect
+s2rst._core.R2Rect.__init__
+s2rst._core.R2Rect.__new__
+s2rst._core.Rect
+s2rst._core.Rect.__init__
+s2rst._core.Rect.__new__
+s2rst._core.ReferencePoint
+s2rst._core.RegionCoverer
+s2rst._core.RegionCoverer.__init__
+s2rst._core.RegionCoverer.__new__
+s2rst._core.S1Interval
+s2rst._core.S1Interval.__init__
+s2rst._core.S1Interval.__new__
+s2rst._core.S2Builder
+s2rst._core.S2Builder.__init__
+s2rst._core.S2Builder.__new__
+s2rst._core.S2Point
+s2rst._core.S2Point.__init__
+s2rst._core.S2Point.__new__
+s2rst._core.Shape
+s2rst._core.ShapeIndex
+s2rst._core.Vector
+s2rst._core.Vector.__init__
+s2rst._core.Vector.__new__
+s2rst._core.__all__
