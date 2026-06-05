@@ -64,4 +64,4 @@ from. See the bundled `LICENSE`, `NOTICE`, and `AUTHORS` files for the full text
 and attribution.
 
 s2rst is an independent port and is not affiliated with, endorsed by, or
-sponsored by Google; S2 is a trademark of Google LLC.
+sponsored by Google.

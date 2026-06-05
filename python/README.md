@@ -52,4 +52,4 @@ recognised as a typed package by mypy and pyright.
 Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 s2rst is an independent port and is not affiliated with, endorsed by, or
-sponsored by Google; S2 is a trademark of Google LLC.
+sponsored by Google.

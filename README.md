@@ -73,4 +73,4 @@ Licensed under the [Apache License, Version 2.0](LICENSE), the same license
 as the upstream S2 geometry library this project is derived from.
 
 s2rst is an independent port and is not affiliated with, endorsed by, or
-sponsored by Google; S2 is a trademark of Google LLC.
+sponsored by Google.
