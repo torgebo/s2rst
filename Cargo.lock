@@ -837,7 +837,7 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "s2rst"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "criterion",
  "geo-types",
@@ -854,7 +854,7 @@ dependencies = [
 
 [[package]]
 name = "s2rst-python"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "pyo3",
  "s2rst",
@@ -862,7 +862,7 @@ dependencies = [
 
 [[package]]
 name = "s2rst-wasm"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "js-sys",
  "s2rst",
