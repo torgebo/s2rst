@@ -10,7 +10,7 @@ on:
     branches:
       - master
     tags:
-      - '*'
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
   pull_request:
   workflow_dispatch:
 
@@ -170,7 +170,15 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v7
+      - name: Guard: tag matches workspace version
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER=$(cargo metadata --no-deps --format-version 1 \
+                  | jq -r '.packages[] | select(.name=="s2rst") | .version')
+          test "$TAG" = "$VER" || { echo "tag $TAG != workspace version $VER"; exit 1; }
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         with:

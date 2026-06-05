@@ -1,6 +1,6 @@
 [package]
 name = "s2rst-python"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 license = "Apache-2.0"
 description = "PyO3 bindings that build the s2rst Python extension module (s2rst._core); not published to crates.io."

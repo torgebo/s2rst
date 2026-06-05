@@ -1,6 +1,6 @@
 [package]
 name = "s2rst"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 license = "Apache-2.0"
 description = "A Rust port of Google's S2 spherical geometry library — points, regions, shapes, and a hierarchical cell index on the sphere."
