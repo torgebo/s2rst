@@ -45,3 +45,56 @@ def test_snap_level_produces_valid_polygon():
     poly = builder.build_polygon()
     assert poly.num_loops() == 1
     assert poly.area() > 0
+
+
+def _square():
+    return [_pt(0, 0), _pt(0, 2), _pt(2, 2), _pt(2, 0)]
+
+
+def test_build_lax_polygon():
+    b = s2rst.S2Builder()
+    b.add_loop_from_points(_square())
+    assert b.build_lax_polygon().num_loops() == 1
+
+
+def test_build_points():
+    b = s2rst.S2Builder()
+    for p in _square():
+        b.add_point(p)
+    assert len(b) == 4
+    pts = b.build_points()
+    assert len(pts) == 4
+    assert all(isinstance(p, s2rst.S2Point) for p in pts)
+
+
+def test_snap_function_e6():
+    b = s2rst.S2Builder(snap_function=s2rst.IntLatLngSnapFunction(6))
+    b.add_loop_from_points(_square())
+    poly = b.build_polygon()
+    assert poly.num_loops() == 1
+    # Every vertex lands on the E6 (micro-degree) grid, within float tolerance
+    # of the Point->LatLng round-trip.
+    for loop_ in poly:
+        for i in range(len(loop_)):
+            ll = s2rst.LatLng.from_point(loop_.vertex(i))
+            for deg in (ll.lat.degrees, ll.lng.degrees):
+                micro = deg * 1e6
+                assert abs(micro - round(micro)) < 0.02
+
+
+def test_snap_level_backcompat():
+    b = s2rst.S2Builder(snap_level=20)
+    b.add_loop_from_points(_square())
+    assert b.build_polygon().num_loops() == 1
+
+
+def test_cell_id_snap_function():
+    b = s2rst.S2Builder(snap_function=s2rst.S2CellIdSnapFunction(15))
+    b.add_loop_from_points(_square())
+    assert b.build_polygon().num_loops() == 1
+
+
+def test_option_flags():
+    b = s2rst.S2Builder(idempotent=False, simplify_edge_chains=True)
+    b.add_loop_from_points(_square())
+    assert b.build_polygon().num_loops() == 1

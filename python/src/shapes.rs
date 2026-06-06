@@ -197,6 +197,14 @@ impl ShapeKind {
     }
 }
 
+impl PyShape {
+    /// Run `f` with a `&dyn Shape` view of the inner shape (crate-internal,
+    /// used by the chain-interpolation query and shape utilities).
+    pub(crate) fn with_shape<T>(&self, f: impl FnOnce(&dyn Shape) -> T) -> T {
+        self.inner.with_shape(f)
+    }
+}
+
 #[pymethods]
 impl PyShape {
     fn __copy__(&self) -> Self {

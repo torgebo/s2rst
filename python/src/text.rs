@@ -12,7 +12,10 @@ use pyo3::prelude::*;
 use s2rst::s2::text_format;
 
 use crate::geometry::{PyLoop, PyPolygon, PyPolyline};
+use crate::index::PyShapeIndex;
+use crate::regions::PyRect;
 use crate::s2point::{PyLatLng, PyS2Point};
+use crate::shapes::{PyLaxPolygon, PyLaxPolyline};
 
 /// Run a parser that panics on malformed input, converting a panic into a
 /// `ValueError` instead of crashing the interpreter.
@@ -90,4 +93,43 @@ pub fn polygon_to_string(polygon: &PyPolygon) -> String {
 #[pyfunction]
 pub fn polyline_to_string(polyline: &PyPolyline) -> String {
     text_format::polyline_to_string(&polyline.0)
+}
+
+#[pyfunction]
+pub fn make_rect(s: &str) -> PyResult<PyRect> {
+    parse("rect", || PyRect(text_format::make_rect(s)))
+}
+
+#[pyfunction]
+pub fn make_lax_polyline(s: &str) -> PyResult<PyLaxPolyline> {
+    parse("lax polyline", || {
+        PyLaxPolyline(text_format::make_lax_polyline(s))
+    })
+}
+
+#[pyfunction]
+pub fn make_lax_polygon(s: &str) -> PyResult<PyLaxPolygon> {
+    parse("lax polygon", || {
+        PyLaxPolygon(text_format::make_lax_polygon(s))
+    })
+}
+
+#[pyfunction]
+pub fn make_index(s: &str) -> PyResult<PyShapeIndex> {
+    parse("index", || PyShapeIndex(text_format::make_index(s)))
+}
+
+#[pyfunction]
+pub fn index_to_string(index: &PyShapeIndex) -> String {
+    text_format::index_to_string(&index.0)
+}
+
+#[pyfunction]
+pub fn lax_polyline_to_string(polyline: &PyLaxPolyline) -> String {
+    text_format::lax_polyline_to_string(&polyline.0)
+}
+
+#[pyfunction]
+pub fn lax_polygon_to_string(polygon: &PyLaxPolygon) -> String {
+    text_format::lax_polygon_to_string(&polygon.0)
 }

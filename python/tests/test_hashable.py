@@ -95,7 +95,12 @@ def _edge_pair():
 
 
 # (factory, label) parametrization keeps test ids readable.
+def _vertex_model_pair():
+    return s2rst.VertexModel.SEMI_OPEN, s2rst.VertexModel.SEMI_OPEN
+
+
 _PAIRS = [
+    (_vertex_model_pair, "VertexModel"),
     (_angle_pair, "Angle"),
     (_chord_angle_pair, "ChordAngle"),
     (_r1_interval_pair, "R1Interval"),

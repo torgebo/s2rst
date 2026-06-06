@@ -7,7 +7,9 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use s2rst::s1::Angle;
+use s2rst::s2::builder::lax_polygon_layer::LaxPolygonLayer;
 use s2rst::s2::builder::layer::Layer;
+use s2rst::s2::builder::point_vector_layer::S2PointVectorLayer;
 use s2rst::s2::builder::polygon_layer::S2PolygonLayer;
 use s2rst::s2::builder::polyline_layer::S2PolylineLayer;
 use s2rst::s2::builder::snap::{IdentitySnapFunction, S2CellIdSnapFunction, SnapFunction};
@@ -15,10 +17,14 @@ use s2rst::s2::builder::{Options, S2Builder};
 use s2rst::s2::polyline::Polyline;
 use s2rst::s2::{Loop, Point};
 
+use crate::angle::PyAngle;
 use crate::geometry::{PyLoop, PyPolygon, PyPolyline};
 use crate::s2point::PyS2Point;
+use crate::shapes::PyLaxPolygon;
+use crate::snap::resolve_snap;
 
 enum Input {
+    Point(Point),
     Edge(Point, Point),
     Loop(Loop),
     Polyline(Polyline),
@@ -26,26 +32,57 @@ enum Input {
     PolylinePoints(Vec<Point>),
 }
 
-/// Assembles edges, loops, and polylines into snapped, topologically valid
-/// geometry. Add inputs, then call `build_polygon()` or `build_polyline()`.
+/// Assembles points, edges, loops, and polylines into snapped, topologically
+/// valid geometry. Add inputs, then call one of the `build_*()` methods.
 ///
-/// By default vertices are not snapped; pass `snap_level` to snap them to S2
-/// cell centers at that level (lower level = coarser snapping).
+/// Snapping is controlled by `snap_function` (an `IdentitySnapFunction`,
+/// `S2CellIdSnapFunction`, or `IntLatLngSnapFunction`); the legacy `snap_level`
+/// keyword is still accepted and maps to an `S2CellIdSnapFunction`.
 #[pyclass(name = "S2Builder")]
 pub struct PyS2Builder {
+    snap_function: Option<Py<PyAny>>,
     snap_level: Option<u8>,
+    split_crossing_edges: bool,
+    simplify_edge_chains: bool,
+    intersection_tolerance: Angle,
+    idempotent: bool,
     inputs: Vec<Input>,
 }
 
 #[pymethods]
 impl PyS2Builder {
     #[new]
-    #[pyo3(signature = (*, snap_level=None))]
-    fn new(snap_level: Option<u8>) -> Self {
+    #[pyo3(signature = (
+        *,
+        snap_function = None,
+        snap_level = None,
+        split_crossing_edges = false,
+        simplify_edge_chains = false,
+        intersection_tolerance = None,
+        idempotent = true,
+    ))]
+    fn new(
+        snap_function: Option<Py<PyAny>>,
+        snap_level: Option<u8>,
+        split_crossing_edges: bool,
+        simplify_edge_chains: bool,
+        intersection_tolerance: Option<PyAngle>,
+        idempotent: bool,
+    ) -> Self {
         PyS2Builder {
+            snap_function,
             snap_level,
+            split_crossing_edges,
+            simplify_edge_chains,
+            intersection_tolerance: intersection_tolerance.map(|a| a.0).unwrap_or(Angle::ZERO),
+            idempotent,
             inputs: Vec::new(),
         }
+    }
+
+    /// Add a single point (dimension-0 input).
+    fn add_point(&mut self, v: &PyS2Point) {
+        self.inputs.push(Input::Point(v.0));
     }
 
     /// Add a single directed edge.
@@ -82,13 +119,11 @@ impl PyS2Builder {
     }
 
     /// Assemble the added geometry into a `Polygon`.
-    fn build_polygon(&self) -> PyResult<PyPolygon> {
-        let mut builder = S2Builder::new(self.options());
+    fn build_polygon(&self, py: Python<'_>) -> PyResult<PyPolygon> {
+        let mut builder = S2Builder::new(self.options(py)?);
         builder.start_layer(Box::new(S2PolygonLayer::new()));
         self.feed(&mut builder);
-        let layers = builder
-            .build()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let layers = self.build(builder)?;
         take_layer::<S2PolygonLayer>(layers)?
             .take_output()
             .map(PyPolygon)
@@ -96,32 +131,71 @@ impl PyS2Builder {
     }
 
     /// Assemble the added geometry into a `Polyline`.
-    fn build_polyline(&self) -> PyResult<PyPolyline> {
-        let mut builder = S2Builder::new(self.options());
+    fn build_polyline(&self, py: Python<'_>) -> PyResult<PyPolyline> {
+        let mut builder = S2Builder::new(self.options(py)?);
         builder.start_layer(Box::new(S2PolylineLayer::new()));
         self.feed(&mut builder);
-        let layers = builder
-            .build()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let layers = self.build(builder)?;
         take_layer::<S2PolylineLayer>(layers)?
             .take_output()
             .map(PyPolyline)
             .ok_or_else(no_output)
     }
+
+    /// Assemble the added geometry into a `LaxPolygon`.
+    fn build_lax_polygon(&self, py: Python<'_>) -> PyResult<PyLaxPolygon> {
+        let mut builder = S2Builder::new(self.options(py)?);
+        builder.start_layer(Box::new(LaxPolygonLayer::new()));
+        self.feed(&mut builder);
+        let layers = self.build(builder)?;
+        take_layer::<LaxPolygonLayer>(layers)?
+            .take_output()
+            .map(PyLaxPolygon)
+            .ok_or_else(no_output)
+    }
+
+    /// Assemble the added points into a list of snapped points.
+    fn build_points(&self, py: Python<'_>) -> PyResult<Vec<PyS2Point>> {
+        let mut builder = S2Builder::new(self.options(py)?);
+        builder.start_layer(Box::new(S2PointVectorLayer::new()));
+        self.feed(&mut builder);
+        let layers = self.build(builder)?;
+        Ok(take_layer::<S2PointVectorLayer>(layers)?
+            .take_output()
+            .ok_or_else(no_output)?
+            .into_iter()
+            .map(PyS2Point)
+            .collect())
+    }
 }
 
 impl PyS2Builder {
-    fn options(&self) -> Options {
-        let snap: Box<dyn SnapFunction> = match self.snap_level {
-            Some(level) => Box::new(S2CellIdSnapFunction::new(level)),
-            None => Box::new(IdentitySnapFunction::new(Angle::ZERO)),
+    fn options(&self, py: Python<'_>) -> PyResult<Options> {
+        let snap: Box<dyn SnapFunction> = match &self.snap_function {
+            Some(obj) => resolve_snap(Some(obj.bind(py)))?,
+            None => match self.snap_level {
+                Some(level) => Box::new(S2CellIdSnapFunction::new(level)),
+                None => Box::new(IdentitySnapFunction::new(Angle::ZERO)),
+            },
         };
-        Options::new(snap)
+        let mut opts = Options::new(snap);
+        opts.split_crossing_edges = self.split_crossing_edges;
+        opts.simplify_edge_chains = self.simplify_edge_chains;
+        opts.intersection_tolerance = self.intersection_tolerance;
+        opts.idempotent = self.idempotent;
+        Ok(opts)
+    }
+
+    fn build(&self, mut builder: S2Builder) -> PyResult<Vec<Box<dyn Layer>>> {
+        builder
+            .build()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     fn feed(&self, builder: &mut S2Builder) {
         for input in &self.inputs {
             match input {
+                Input::Point(v) => builder.add_point(*v),
                 Input::Edge(v0, v1) => builder.add_edge(*v0, *v1),
                 Input::Loop(l) => builder.add_loop(l),
                 Input::Polyline(p) => builder.add_polyline(p),

@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyType};
 
 use s2rst::s2;
 use s2rst::s2::Region;
+use s2rst::s2::builder::snap::S2CellIdSnapFunction;
 use s2rst::s2::polyline::Polyline;
 
 use crate::angle::PyAngle;
@@ -379,6 +380,26 @@ impl PyLoop {
         self.0.intersects_loop(&other.0)
     }
 
+    /// Angular distance from `x` to the loop (0 if `x` is inside).
+    fn get_distance(&self, x: &PyS2Point) -> PyAngle {
+        PyAngle(self.0.get_distance(x.0))
+    }
+
+    /// Angular distance from `x` to the loop's boundary (even if `x` is inside).
+    fn get_distance_to_boundary(&self, x: &PyS2Point) -> PyAngle {
+        PyAngle(self.0.get_distance_to_boundary(x.0))
+    }
+
+    /// The closest point in the loop's interior+boundary to `x` (`x` if inside).
+    fn project_point(&self, x: &PyS2Point) -> PyS2Point {
+        PyS2Point(self.0.project_point(x.0))
+    }
+
+    /// The closest point on the loop's boundary to `x`.
+    fn project_to_boundary(&self, x: &PyS2Point) -> PyS2Point {
+        PyS2Point(self.0.project_to_boundary(x.0))
+    }
+
     // --- Mutation ---
 
     /// Ensure area <= 2*pi by possibly inverting vertex order.
@@ -644,6 +665,69 @@ impl PyPolygon {
     /// Whether this polygon intersects the other polygon.
     fn intersects_polygon(&self, other: &PyPolygon) -> bool {
         self.0.intersects_polygon(&other.0)
+    }
+
+    /// Angular distance from `x` to the polygon (0 if `x` is inside).
+    fn get_distance(&self, x: &PyS2Point) -> PyAngle {
+        PyAngle(self.0.get_distance(x.0))
+    }
+
+    /// Angular distance from `x` to the polygon's boundary (even if inside).
+    fn get_distance_to_boundary(&self, x: &PyS2Point) -> PyAngle {
+        PyAngle(self.0.get_distance_to_boundary(x.0))
+    }
+
+    /// The closest point in the polygon (interior+boundary) to `x`.
+    fn project_point(&self, x: &PyS2Point) -> PyS2Point {
+        PyS2Point(self.0.project_point(x.0))
+    }
+
+    /// The closest point on the polygon's boundary to `x`.
+    fn project_to_boundary(&self, x: &PyS2Point) -> PyS2Point {
+        PyS2Point(self.0.project_to_boundary(x.0))
+    }
+
+    /// The portions of `polyline` that lie inside this polygon.
+    fn intersect_with_polyline(&self, polyline: &PyPolyline) -> Vec<PyPolyline> {
+        let mut a = self.0.clone();
+        a.intersect_with_polyline(&polyline.0)
+            .into_iter()
+            .map(PyPolyline)
+            .collect()
+    }
+
+    /// The portions of `polyline` that lie outside this polygon.
+    fn subtract_from_polyline(&self, polyline: &PyPolyline) -> Vec<PyPolyline> {
+        let mut a = self.0.clone();
+        a.subtract_from_polyline(&polyline.0)
+            .into_iter()
+            .map(PyPolyline)
+            .collect()
+    }
+
+    /// The fraction of this polygon's boundary covered by `other`, and of
+    /// `other`'s boundary covered by this polygon, as `(self, other)`.
+    fn get_overlap_fractions(&self, other: &PyPolygon) -> (f64, f64) {
+        let mut a = self.0.clone();
+        let mut b = other.0.clone();
+        s2::Polygon::get_overlap_fractions(&mut a, &mut b)
+    }
+
+    /// A copy of `polygon` with all vertices snapped to S2 cell centers at the
+    /// given level.
+    #[classmethod]
+    fn snapped(_cls: &Bound<'_, PyType>, polygon: &PyPolygon, snap_level: u8) -> Self {
+        PyPolygon(s2::Polygon::snapped(&polygon.0, snap_level))
+    }
+
+    /// A simplified copy of `polygon`: vertices are snapped to S2 cell centers
+    /// at the given level and detail finer than that is removed.
+    #[classmethod]
+    fn simplified(_cls: &Bound<'_, PyType>, polygon: &PyPolygon, snap_level: u8) -> Self {
+        PyPolygon(s2::Polygon::simplified(
+            &polygon.0,
+            Box::new(S2CellIdSnapFunction::new(snap_level)),
+        ))
     }
 
     // --- Mutation ---

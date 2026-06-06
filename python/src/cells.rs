@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyType};
 
 use s2rst::s2;
 
+use crate::angle::PyAngle;
 use crate::regions::{PyCap, PyRect};
 use crate::s2point::{PyLatLng, PyS2Point};
 
@@ -542,6 +543,18 @@ impl PyCellUnion {
         PyCellUnion(s2::CellUnion::from_range(begin.0, end.0))
     }
 
+    /// A cell union covering the whole sphere (the six face cells).
+    #[classmethod]
+    fn whole_sphere(_cls: &Bound<'_, PyType>) -> Self {
+        PyCellUnion(s2::CellUnion::whole_sphere())
+    }
+
+    /// Create from an inclusive range [min_id, max_id] of leaf cells.
+    #[classmethod]
+    fn from_min_max(_cls: &Bound<'_, PyType>, min_id: &PyCellId, max_id: &PyCellId) -> Self {
+        PyCellUnion(s2::CellUnion::from_min_max(min_id.0, max_id.0))
+    }
+
     /// Number of cells in this union.
     fn num_cells(&self) -> usize {
         self.0.num_cells()
@@ -600,6 +613,59 @@ impl PyCellUnion {
     /// Replace large cells with smaller cells respecting min_level and level_mod.
     fn denormalize(&self, min_level: u8, level_mod: u8) -> Self {
         PyCellUnion(self.0.denormalize(min_level.into(), level_mod))
+    }
+
+    /// Whether this union contains no cells.
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The union of this cell union with another (normalized).
+    fn union(&self, other: &PyCellUnion) -> Self {
+        PyCellUnion(self.0.union(&other.0))
+    }
+
+    /// The intersection of this cell union with another (normalized).
+    fn intersection(&self, other: &PyCellUnion) -> Self {
+        PyCellUnion(self.0.intersection(&other.0))
+    }
+
+    /// The intersection of this cell union with a single cell.
+    fn intersection_with_cell_id(&self, id: &PyCellId) -> Self {
+        PyCellUnion(self.0.intersection_with_cell_id(id.0))
+    }
+
+    /// This cell union minus another (set difference).
+    fn difference(&self, other: &PyCellUnion) -> Self {
+        PyCellUnion(self.0.difference(&other.0))
+    }
+
+    /// Expand the union to include all neighbors at `expand_level` (in place).
+    fn expand_at_level(&mut self, expand_level: u8) {
+        self.0.expand_at_level(expand_level.into());
+    }
+
+    /// Expand the union so every point within `min_radius` is covered (in place).
+    ///
+    /// `max_level_diff` bounds how many levels finer than the existing cells the
+    /// expansion may go.
+    fn expand_by_radius(&mut self, min_radius: &PyAngle, max_level_diff: u8) {
+        self.0.expand_by_radius(min_radius.0, max_level_diff);
+    }
+
+    /// Area of the union in steradians, using each cell's average-area metric.
+    fn average_based_area(&self) -> f64 {
+        self.0.average_based_area()
+    }
+
+    /// Approximate area of the union in steradians (fast, small error).
+    fn approx_area(&self) -> f64 {
+        self.0.approx_area()
+    }
+
+    /// Exact area of the union in steradians.
+    fn exact_area(&self) -> f64 {
+        self.0.exact_area()
     }
 
     fn __len__(&self) -> usize {

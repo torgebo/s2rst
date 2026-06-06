@@ -100,4 +100,42 @@ impl PyEarth {
     fn distance_km_latlng(a: &PyLatLng, b: &PyLatLng) -> f64 {
         earth::get_distance_km_latlng(a.0, b.0)
     }
+
+    /// Convert a chord angle to a surface distance in meters.
+    #[staticmethod]
+    fn chord_angle_to_meters(cangle: &PyChordAngle) -> f64 {
+        earth::chord_angle_to_meters(cangle.0)
+    }
+    /// Convert a chord angle to a surface distance in kilometers.
+    #[staticmethod]
+    fn chord_angle_to_km(cangle: &PyChordAngle) -> f64 {
+        earth::chord_angle_to_km(cangle.0)
+    }
+    /// Convert a distance in kilometers to a chord angle.
+    #[staticmethod]
+    fn km_to_chord_angle(km: f64) -> PyChordAngle {
+        PyChordAngle(earth::km_to_chord_angle(km))
+    }
+    /// East-west distance in meters expressed as a longitude span (radians) at
+    /// the given latitude.
+    #[staticmethod]
+    fn meters_to_longitude_radians(meters: f64, latitude_radians: f64) -> f64 {
+        earth::meters_to_longitude_radians(meters, latitude_radians)
+    }
+    /// East-west distance in kilometers expressed as a longitude span (radians)
+    /// at the given latitude.
+    #[staticmethod]
+    fn km_to_longitude_radians(km: f64, latitude_radians: f64) -> f64 {
+        earth::km_to_longitude_radians(km, latitude_radians)
+    }
+    /// The haversine of an angle (radians): `sin^2(x / 2)`.
+    #[staticmethod]
+    fn haversine(radians: f64) -> f64 {
+        earth::haversine(radians)
+    }
+    /// The initial great-circle bearing (heading) from `a` to `b`.
+    #[staticmethod]
+    fn get_initial_bearing(a: &PyLatLng, b: &PyLatLng) -> PyAngle {
+        PyAngle(earth::get_initial_bearing(a.0, b.0))
+    }
 }

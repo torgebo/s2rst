@@ -40,3 +40,43 @@ def test_distance():
     assert math.isclose(
         s2rst.Earth.distance_km_latlng(paris, london), d_km, rel_tol=1e-9
     )
+
+
+def test_haversine():
+    assert s2rst.Earth.haversine(0.0) == 0.0
+    assert math.isclose(s2rst.Earth.haversine(math.pi), 1.0)
+    assert math.isclose(s2rst.Earth.haversine(math.pi / 2), 0.5)
+
+
+def test_initial_bearing():
+    origin = s2rst.LatLng.from_degrees(0, 0)
+    north = s2rst.LatLng.from_degrees(1, 0)
+    east = s2rst.LatLng.from_degrees(0, 1)
+    assert math.isclose(
+        s2rst.Earth.get_initial_bearing(origin, north).degrees, 0.0, abs_tol=1e-6
+    )
+    assert math.isclose(
+        s2rst.Earth.get_initial_bearing(origin, east).degrees, 90.0, abs_tol=1e-6
+    )
+
+
+def test_chord_angle_distance_round_trip():
+    for m in (1.0, 100.0, 1e5, 1e6):
+        ca = s2rst.Earth.meters_to_chord_angle(m)
+        assert math.isclose(s2rst.Earth.chord_angle_to_meters(ca), m, rel_tol=1e-6)
+    for km in (1.0, 50.0, 5000.0):
+        ca = s2rst.Earth.km_to_chord_angle(km)
+        assert math.isclose(s2rst.Earth.chord_angle_to_km(ca), km, rel_tol=1e-6)
+
+
+def test_longitude_radians_at_equator():
+    m = 100_000.0
+    assert math.isclose(
+        s2rst.Earth.meters_to_longitude_radians(m, 0.0),
+        s2rst.Earth.meters_to_radians(m),
+        rel_tol=1e-9,
+    )
+    # Away from the equator the same distance spans more longitude.
+    assert s2rst.Earth.meters_to_longitude_radians(
+        m, math.radians(60)
+    ) > s2rst.Earth.meters_to_longitude_radians(m, 0.0)

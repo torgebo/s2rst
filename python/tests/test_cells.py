@@ -3,7 +3,13 @@
 
 """Tests for CellId, Cell, CellUnion."""
 
+import math
+
 import pytest
+
+from hypothesis import given
+from hypothesis import strategies as st
+
 import s2rst
 
 
@@ -312,3 +318,85 @@ class TestCellUnion:
     def test_repr(self):
         cu = s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(0)])
         assert "CellUnion" in repr(cu)
+
+
+def _faces(ids):
+    return s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(i) for i in ids])
+
+
+class TestCellUnionSetOps:
+    def test_whole_sphere(self):
+        cu = s2rst.CellUnion.whole_sphere()
+        assert cu.num_cells() == 6
+        assert cu.exact_area() == pytest.approx(4 * math.pi, abs=1e-9)
+        assert cu.approx_area() == pytest.approx(4 * math.pi, rel=1e-2)
+
+    def test_single_face_area(self):
+        # The six faces tile the sphere equally → each is 4*pi/6 steradians.
+        cu = _faces([0])
+        assert cu.exact_area() == pytest.approx(4 * math.pi / 6, abs=1e-9)
+        assert cu.average_based_area() > 0.0
+
+    def test_union_disjoint_faces(self):
+        u = _faces([0]).union(_faces([1]))
+        assert u.num_cells() == 2
+        assert u.contains_union(_faces([0]))
+        assert u.contains_union(_faces([1]))
+
+    def test_intersection_disjoint_is_empty(self):
+        assert _faces([0]).intersection(_faces([1])).is_empty()
+
+    def test_intersection_with_cell_id(self):
+        face0 = s2rst.CellId.from_face(0)
+        child = face0.children()[0]
+        inter = _faces([0]).intersection_with_cell_id(child)
+        assert inter.num_cells() == 1
+        assert child in inter
+
+    def test_difference(self):
+        d = _faces([0, 1]).difference(_faces([1]))
+        assert d.contains_cell_id(s2rst.CellId.from_face(0))
+        assert not d.contains_cell_id(s2rst.CellId.from_face(1))
+
+    def test_difference_self_is_empty(self):
+        assert _faces([0, 1, 2]).difference(_faces([0, 1, 2])).is_empty()
+
+    def test_is_empty(self):
+        assert s2rst.CellUnion().is_empty()
+        assert not _faces([0]).is_empty()
+
+    def test_from_min_max_collapses_to_face(self):
+        face0 = s2rst.CellId.from_face(0)
+        cu = s2rst.CellUnion.from_min_max(face0.range_min(), face0.range_max())
+        assert cu.num_cells() == 1
+        assert cu.contains_cell_id(face0)
+
+    def test_expand_at_level_still_covers_origin(self):
+        cell = s2rst.CellId.from_face(2).child_begin_at_level(5)
+        cu = s2rst.CellUnion.from_cell_ids([cell])
+        p = cell.to_point()
+        assert cu.contains_point(p)
+        cu.expand_at_level(5)
+        assert cu.num_cells() >= 1
+        assert cu.contains_point(p)
+
+    def test_expand_by_radius_grows(self):
+        cell = s2rst.CellId.from_face(0).child_begin_at_level(12)
+        cu = s2rst.CellUnion.from_cell_ids([cell])
+        n0 = cu.num_cells()
+        cu.expand_by_radius(s2rst.Angle.from_degrees(1.0), 4)
+        assert cu.num_cells() >= n0
+        assert cu.contains_point(cell.to_point())
+
+    @given(
+        st.lists(st.integers(min_value=0, max_value=5), max_size=6, unique=True),
+        st.lists(st.integers(min_value=0, max_value=5), max_size=6, unique=True),
+    )
+    def test_set_algebra_invariants(self, fa, fb):
+        a, b = _faces(fa), _faces(fb)
+        u = a.union(b)
+        assert u.contains_union(a)
+        assert u.contains_union(b)
+        assert u == b.union(a)  # commutative
+        assert a.contains_union(a.intersection(b))  # intersection is a subset of a
+        assert a.difference(a).is_empty()

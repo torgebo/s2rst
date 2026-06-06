@@ -7,10 +7,12 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 use s2rst::s2::closest_edge_query::{ClosestEdgeQuery, PointTarget};
-use s2rst::s2::contains_point_query::{ContainsPointQuery, VertexModel};
+use s2rst::s2::contains_point_query::ContainsPointQuery;
 use s2rst::s2::shape_index::ShapeIndex;
+use s2rst::s2::shape_index_measures;
 
-use crate::angle::PyChordAngle;
+use crate::angle::{PyAngle, PyChordAngle};
+use crate::enums::PyVertexModel;
 use crate::geometry::{PyLoop, PyPolygon, PyPolyline};
 use crate::s2point::PyS2Point;
 use crate::shapes::{PyLaxLoop, PyLaxPolygon, PyLaxPolyline, PyPointVector};
@@ -18,7 +20,7 @@ use crate::shapes::{PyLaxLoop, PyLaxPolygon, PyLaxPolyline, PyPointVector};
 /// A spatial index over shapes (loops, polylines, polygons), enabling fast
 /// point-containment and nearest-edge queries — the heart of S2's query layer.
 #[pyclass(name = "ShapeIndex")]
-pub struct PyShapeIndex(ShapeIndex);
+pub struct PyShapeIndex(pub(crate) ShapeIndex);
 
 #[pymethods]
 impl PyShapeIndex {
@@ -70,14 +72,20 @@ impl PyShapeIndex {
         self.0.num_edges()
     }
 
-    /// Whether the indexed geometry contains `point` (semi-open vertex model).
-    fn contains_point(&self, point: &PyS2Point) -> bool {
-        ContainsPointQuery::new(&self.0, VertexModel::SemiOpen).contains(point.0)
+    /// Whether the indexed geometry contains `point`.
+    ///
+    /// `model` selects the boundary semantics (default semi-open).
+    #[pyo3(signature = (point, *, model = PyVertexModel::SemiOpen))]
+    fn contains_point(&self, point: &PyS2Point, model: PyVertexModel) -> bool {
+        ContainsPointQuery::new(&self.0, model.to_core()).contains(point.0)
     }
 
     /// The ids of the shapes whose interior contains `point`.
-    fn containing_shape_ids(&self, point: &PyS2Point) -> Vec<i32> {
-        ContainsPointQuery::new(&self.0, VertexModel::SemiOpen)
+    ///
+    /// `model` selects the boundary semantics (default semi-open).
+    #[pyo3(signature = (point, *, model = PyVertexModel::SemiOpen))]
+    fn containing_shape_ids(&self, point: &PyS2Point, model: PyVertexModel) -> Vec<i32> {
+        ContainsPointQuery::new(&self.0, model.to_core())
             .containing_shape_ids(point.0)
             .iter()
             .map(|id| id.0)
@@ -94,6 +102,32 @@ impl PyShapeIndex {
     fn is_distance_less_to_point(&self, point: &PyS2Point, limit: &PyChordAngle) -> bool {
         let query = ClosestEdgeQuery::new(&self.0);
         query.is_distance_less(&PointTarget::new(point.0), limit.0)
+    }
+
+    /// The dominant geometric dimension of the indexed shapes (0, 1, or 2), or
+    /// `None` if the index is empty.
+    fn get_dimension(&self) -> Option<usize> {
+        shape_index_measures::get_dimension(&self.0).map(|d| d.as_usize())
+    }
+
+    /// Total length of all polyline (dimension-1) geometry, as an `Angle`.
+    fn get_length(&self) -> PyAngle {
+        PyAngle(shape_index_measures::get_length(&self.0))
+    }
+
+    /// Total boundary length of all polygon (dimension-2) geometry.
+    fn get_perimeter(&self) -> PyAngle {
+        PyAngle(shape_index_measures::get_perimeter(&self.0))
+    }
+
+    /// Total area of all polygon geometry, in steradians.
+    fn get_area(&self) -> f64 {
+        shape_index_measures::get_area(&self.0)
+    }
+
+    /// The (measure-weighted, non-normalized) centroid of the indexed geometry.
+    fn get_centroid(&self) -> PyS2Point {
+        PyS2Point(shape_index_measures::get_centroid(&self.0))
     }
 
     fn __repr__(&self) -> String {

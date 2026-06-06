@@ -77,3 +77,46 @@ def test_distance_queries():
     assert not idx.is_distance_less_to_point(
         _point(0, 45), s2rst.ChordAngle.from_degrees(5)
     )
+
+
+def _indexed_loop(lat, lng, radius_deg=5.0, n=6):
+    loop = _regular_loop(lat, lng, radius_deg, n)
+    idx = s2rst.ShapeIndex()
+    sid = idx.add(loop)
+    idx.build()
+    return loop, idx, sid
+
+
+def test_contains_point_vertex_model():
+    loop, idx, _ = _indexed_loop(0, 0)
+    interior = _point(0, 0)
+    # Interior points are contained under every model.
+    for model in (
+        s2rst.VertexModel.OPEN,
+        s2rst.VertexModel.SEMI_OPEN,
+        s2rst.VertexModel.CLOSED,
+    ):
+        assert idx.contains_point(interior, model=model)
+    # A boundary vertex: closed contains it, open does not.
+    v = loop.vertex(0)
+    assert idx.contains_point(v, model=s2rst.VertexModel.CLOSED)
+    assert not idx.contains_point(v, model=s2rst.VertexModel.OPEN)
+    # The default is semi-open.
+    assert idx.contains_point(v) == idx.contains_point(
+        v, model=s2rst.VertexModel.SEMI_OPEN
+    )
+
+
+def test_containing_shape_ids_vertex_model():
+    loop, idx, sid = _indexed_loop(20, 30)
+    assert idx.containing_shape_ids(_point(20, 30)) == [sid]
+    v = loop.vertex(0)
+    assert idx.containing_shape_ids(v, model=s2rst.VertexModel.CLOSED) == [sid]
+    assert idx.containing_shape_ids(v, model=s2rst.VertexModel.OPEN) == []
+
+
+def test_vertex_model_enum():
+    assert s2rst.VertexModel.OPEN != s2rst.VertexModel.CLOSED
+    assert s2rst.VertexModel.SEMI_OPEN == s2rst.VertexModel.SEMI_OPEN
+    d = {s2rst.VertexModel.OPEN: 1, s2rst.VertexModel.CLOSED: 2}
+    assert d[s2rst.VertexModel.OPEN] == 1

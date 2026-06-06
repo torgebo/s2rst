@@ -4,7 +4,12 @@
 """Tests for Polyline, Loop, Polygon."""
 
 import math
+
 import pytest
+
+from hypothesis import given
+from hypothesis import strategies as st
+
 import s2rst
 
 
@@ -428,3 +433,59 @@ class TestPolygon:
         b = s2rst.Polygon([s2rst.Loop(b_pts)])
         u = s2rst.Polygon.destructive_union([a, b])
         assert u.num_loops() == 2
+
+
+def _point(lat, lng):
+    return s2rst.LatLng.from_degrees(lat, lng).to_point()
+
+
+class TestDistanceProjection:
+    def _loop(self):
+        return s2rst.Loop.make_regular(_point(0, 0), s2rst.Angle.from_degrees(5), 8)
+
+    def test_loop_distance(self):
+        loop = self._loop()
+        assert loop.get_distance(_point(0, 0)).radians == 0.0
+        assert loop.get_distance(_point(0, 30)).radians > 0
+        assert loop.get_distance_to_boundary(_point(0, 0)).radians > 0
+
+    def test_loop_project(self):
+        loop = self._loop()
+        inside = _point(0, 0)
+        assert loop.project_point(inside).approx_eq(inside)
+        # Projecting an outside point lands on the boundary.
+        proj = loop.project_point(_point(0, 30))
+        assert loop.get_distance_to_boundary(proj).radians == pytest.approx(0, abs=1e-9)
+
+    def test_polygon_distance_and_overlap(self):
+        poly = s2rst.Polygon([self._loop()])
+        assert poly.get_distance(_point(0, 0)).radians == 0.0
+        assert poly.get_distance(_point(0, 30)).radians > 0
+        assert poly.get_overlap_fractions(poly) == (1.0, 1.0)
+
+    def test_polygon_polyline_clip(self):
+        poly = s2rst.Polygon([self._loop()])
+        line = s2rst.Polyline([_point(0, -30), _point(0, 30)])
+        inside = poly.intersect_with_polyline(line)
+        outside = poly.subtract_from_polyline(line)
+        assert len(inside) >= 1
+        assert len(outside) >= 1
+        assert inside[0].length().radians < line.length().radians
+
+    def test_polygon_snapped_simplified(self):
+        poly = s2rst.Polygon([self._loop()])
+        assert s2rst.Polygon.snapped(poly, 20).num_loops() == 1
+        assert s2rst.Polygon.simplified(poly, 12).num_loops() in (0, 1)
+
+    @given(
+        lat=st.floats(min_value=-80, max_value=80),
+        lng=st.floats(min_value=-170, max_value=170),
+    )
+    def test_distance_le_boundary_distance(self, lat, lng):
+        loop = self._loop()
+        p = _point(lat, lng)
+        # Distance to the closed region is never more than distance to its boundary.
+        assert (
+            loop.get_distance(p).radians
+            <= loop.get_distance_to_boundary(p).radians + 1e-12
+        )
