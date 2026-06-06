@@ -33,7 +33,6 @@
 use std::f64::consts::{FRAC_PI_2, PI};
 
 use crate::s1::{self, ChordAngle};
-use crate::s2::Point;
 use crate::s2::builder::layer::Layer;
 use crate::s2::builder::snap::{IdentitySnapFunction, SnapFunction};
 use crate::s2::builder::{Options as BuilderOptions, S2Error, S2ErrorCode};
@@ -48,6 +47,7 @@ use crate::s2::shape::{Dimension, Shape};
 use crate::s2::shape_index::ShapeIndex;
 use crate::s2::shape_util;
 use crate::s2::winding_operation::{S2WindingOperation, WindingOptions, WindingRule};
+use crate::s2::{Point, Polygon};
 
 // ─── Error Constants ────────────────────────────────────────────────────────
 
@@ -857,6 +857,45 @@ impl ChordAngle {
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
+
+// ─── Convenience functions ───────────────────────────────────────────────────
+
+/// Drives a buffer operation, feeding input via `add`, and returns the result
+/// polygon (empty if the operation fails).
+fn run_buffer(options: BufferOptions, add: impl FnOnce(&mut S2BufferOperation)) -> Polygon {
+    use crate::s2::builder::polygon_layer::S2PolygonLayer;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let output = Rc::new(RefCell::new(Polygon::empty()));
+    let layer = S2PolygonLayer::new_legacy(Rc::clone(&output));
+    let mut op = S2BufferOperation::new(Box::new(layer), options);
+    add(&mut op);
+    // On failure the shared output cell is left as the empty polygon.
+    let _outcome = op.build();
+    output.borrow().clone()
+}
+
+/// Buffers a polygon by the radius configured in `options` (a positive radius
+/// expands, a negative radius contracts), returning the resulting polygon.
+pub fn buffer_polygon(polygon: &Polygon, options: BufferOptions) -> Polygon {
+    run_buffer(options, |op| op.add_shape(polygon))
+}
+
+/// Buffers a polyline's path into a polygon.
+pub fn buffer_polyline(vertices: &[Point], options: BufferOptions) -> Polygon {
+    run_buffer(options, |op| op.add_polyline(vertices))
+}
+
+/// Buffers a loop's boundary into a polygon.
+pub fn buffer_loop(vertices: &[Point], options: BufferOptions) -> Polygon {
+    run_buffer(options, |op| op.add_loop(vertices))
+}
+
+/// Buffers a single point into a disc-shaped polygon.
+pub fn buffer_point(point: Point, options: BufferOptions) -> Polygon {
+    run_buffer(options, |op| op.add_point(point))
+}
 
 #[cfg(test)]
 mod tests {

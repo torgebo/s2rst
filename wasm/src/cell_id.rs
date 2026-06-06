@@ -115,6 +115,75 @@ impl CellId {
         self.0.children().iter().map(|c| CellId(*c)).collect()
     }
 
+    // -- Hierarchy / range iteration (Tier 1.4) --------------------------------
+
+    /// Construct from a face, Hilbert-curve position (BigInt), and level.
+    #[wasm_bindgen(js_name = "fromFacePosLevel")]
+    pub fn from_face_pos_level(face: u8, pos: u64, level: u8) -> CellId {
+        CellId(s2rst::s2::CellId::from_face_pos_level(face, pos, level))
+    }
+
+    /// Position along the Hilbert curve within the cell's face (BigInt).
+    pub fn pos(&self) -> u64 {
+        self.0.pos()
+    }
+
+    /// The least-significant set bit of the id (BigInt).
+    pub fn lsb(&self) -> u64 {
+        self.0.lsb()
+    }
+
+    /// Which child (0–3) this cell is of its ancestor at `level`.
+    #[wasm_bindgen(js_name = "childPosition")]
+    pub fn child_position(&self, level: u8) -> u8 {
+        self.0.child_position(level)
+    }
+
+    /// First child (immediate). Use with `childEnd()` to iterate children.
+    #[wasm_bindgen(js_name = "childBegin")]
+    pub fn child_begin(&self) -> CellId {
+        CellId(self.0.child_begin())
+    }
+
+    /// Past-the-end child (immediate).
+    #[wasm_bindgen(js_name = "childEnd")]
+    pub fn child_end(&self) -> CellId {
+        CellId(self.0.child_end())
+    }
+
+    /// First descendant at `level`.
+    #[wasm_bindgen(js_name = "childBeginAtLevel")]
+    pub fn child_begin_at_level(&self, level: u8) -> CellId {
+        CellId(self.0.child_begin_at_level(level))
+    }
+
+    /// Past-the-end descendant at `level`.
+    #[wasm_bindgen(js_name = "childEndAtLevel")]
+    pub fn child_end_at_level(&self, level: u8) -> CellId {
+        CellId(self.0.child_end_at_level(level))
+    }
+
+    /// First cell id at `level` (across the whole sphere).
+    pub fn begin(level: u8) -> CellId {
+        CellId(s2rst::s2::CellId::begin(level))
+    }
+
+    /// Past-the-end cell id at `level` (across the whole sphere).
+    pub fn end(level: u8) -> CellId {
+        CellId(s2rst::s2::CellId::end(level))
+    }
+
+    /// Advance `steps` cells at this id's level (negative steps go back).
+    pub fn advance(&self, steps: i64) -> CellId {
+        CellId(self.0.advance(steps))
+    }
+
+    /// Advance `steps` cells at this id's level, wrapping around the curve.
+    #[wasm_bindgen(js_name = "advanceWrap")]
+    pub fn advance_wrap(&self, steps: i64) -> CellId {
+        CellId(self.0.advance_wrap(steps))
+    }
+
     /// The minimum cell id in this cell's range.
     #[wasm_bindgen(js_name = "rangeMin")]
     pub fn range_min(&self) -> CellId {
@@ -219,5 +288,24 @@ impl CellId {
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string_js(&self) -> String {
         self.0.to_token()
+    }
+
+    /// Encode to the S2 binary format (`Uint8Array`).
+    pub fn encode(&self) -> Vec<u8> {
+        use s2rst::s2::encoding::S2Encode;
+        let mut buf = Vec::new();
+        self.0
+            .encode(&mut buf)
+            .expect("encoding to a Vec is infallible");
+        buf
+    }
+
+    /// Decode from the S2 binary format. Throws on malformed data.
+    pub fn decode(bytes: &[u8]) -> Result<CellId, JsValue> {
+        use s2rst::s2::encoding::S2Decode;
+        let mut cur = std::io::Cursor::new(bytes);
+        s2rst::s2::CellId::decode(&mut cur)
+            .map(CellId)
+            .map_err(crate::error::js_err)
     }
 }

@@ -55,6 +55,26 @@ impl LatLng {
         LatLng(s2rst::s2::LatLng::from_e7(lat_e7, lng_e7))
     }
 
+    #[wasm_bindgen(js_name = "fromUnsignedE6")]
+    pub fn from_unsigned_e6(lat_e6: u32, lng_e6: u32) -> LatLng {
+        LatLng(s2rst::s2::LatLng::from_unsigned_e6(lat_e6, lng_e6))
+    }
+
+    #[wasm_bindgen(js_name = "fromUnsignedE7")]
+    pub fn from_unsigned_e7(lat_e7: u32, lng_e7: u32) -> LatLng {
+        LatLng(s2rst::s2::LatLng::from_unsigned_e7(lat_e7, lng_e7))
+    }
+
+    /// Component-wise sum (treats lat/lng as a 2-vector of angles).
+    pub fn add(&self, other: &LatLng) -> LatLng {
+        LatLng(self.0 + other.0)
+    }
+
+    /// Component-wise difference.
+    pub fn sub(&self, other: &LatLng) -> LatLng {
+        LatLng(self.0 - other.0)
+    }
+
     /// Invalid sentinel value.
     pub fn invalid() -> LatLng {
         LatLng(s2rst::s2::LatLng::invalid())
@@ -119,8 +139,10 @@ impl LatLng {
         self.0.to_string_in_degrees()
     }
 
+    /// Matches the core `Display` format: `[lat, lng]`. For the degrees-only
+    /// rendering use `toStringInDegrees()`.
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string_js(&self) -> String {
-        self.0.to_string_in_degrees()
+        self.0.to_string()
     }
 }

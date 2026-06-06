@@ -65,15 +65,26 @@ impl Cell {
         self.0.is_leaf()
     }
 
-    /// Return the k-th vertex (0–3) as a `Point`.
-    pub fn vertex(&self, k: usize) -> Point {
-        Point(self.0.vertex(k))
+    /// Return the k-th vertex (0–3) as a `Point`. Throws if `k > 3`.
+    pub fn vertex(&self, k: usize) -> Result<Point, JsValue> {
+        if k >= 4 {
+            return Err(crate::error::js_err(format!(
+                "cell vertex index {k} out of range (0..4)"
+            )));
+        }
+        Ok(Point(self.0.vertex(k)))
     }
 
-    /// Return the k-th edge normal (0–3) as a `Point`.
-    pub fn edge(&self, k: u8) -> Point {
-        let edge = s2rst::s2::CellEdge::ALL[k as usize];
-        Point(self.0.edge(edge))
+    /// Return the k-th edge normal (0–3) as a `Point`. Throws if `k` is out of range.
+    pub fn edge(&self, k: u8) -> Result<Point, JsValue> {
+        let edges = s2rst::s2::CellEdge::ALL;
+        let edge = *edges.get(k as usize).ok_or_else(|| {
+            crate::error::js_err(format!(
+                "cell edge index {k} out of range (0..{})",
+                edges.len()
+            ))
+        })?;
+        Ok(Point(self.0.edge(edge)))
     }
 
     /// The center of this cell.
@@ -111,6 +122,18 @@ impl Cell {
         self.0.contains_point(p.0)
     }
 
+    /// Whether this cell contains another cell (must be at the same or finer level).
+    #[wasm_bindgen(js_name = "containsCell")]
+    pub fn contains_cell(&self, other: &Cell) -> bool {
+        self.0.contains_cell(other.0)
+    }
+
+    /// Whether this cell intersects another cell.
+    #[wasm_bindgen(js_name = "intersectsCell")]
+    pub fn intersects_cell(&self, other: &Cell) -> bool {
+        self.0.intersects_cell(other.0)
+    }
+
     /// Bounding cap.
     #[wasm_bindgen(js_name = "capBound")]
     pub fn cap_bound(&self) -> Cap {
@@ -139,5 +162,18 @@ impl Cell {
     #[wasm_bindgen(js_name = "distanceToCell")]
     pub fn distance_to_cell(&self, other: &Cell) -> ChordAngle {
         ChordAngle(self.0.distance_to_cell(other.0))
+    }
+
+    /// The four child cells, or an empty array if this is a leaf cell.
+    pub fn children(&self) -> Vec<Cell> {
+        match self.0.children() {
+            Some(cs) => cs.iter().map(|c| Cell(*c)).collect(),
+            None => Vec::new(),
+        }
+    }
+
+    /// The cell's orientation (0–3), encoding its Hilbert-curve traversal.
+    pub fn orientation(&self) -> u8 {
+        self.0.orientation()
     }
 }

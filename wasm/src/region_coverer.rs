@@ -4,6 +4,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::cap::Cap;
+use crate::cell_id::CellId;
 use crate::cell_union::CellUnion;
 use crate::polygon::Polygon;
 use crate::rect::Rect;
@@ -91,5 +92,42 @@ impl RegionCoverer {
     #[wasm_bindgen(js_name = "interiorCoveringPolygon")]
     pub fn interior_covering_polygon(&self, polygon: &Polygon) -> CellUnion {
         CellUnion(self.0.interior_covering(&polygon.0))
+    }
+
+    /// Compute an interior covering for an `S2Loop`.
+    #[wasm_bindgen(js_name = "interiorCoveringLoop")]
+    pub fn interior_covering_loop(&self, loop_: &Loop) -> CellUnion {
+        CellUnion(self.0.interior_covering(&loop_.0))
+    }
+
+    /// Compute a covering for a `CellUnion`.
+    #[wasm_bindgen(js_name = "coveringCellUnion")]
+    pub fn covering_cell_union(&self, cu: &CellUnion) -> CellUnion {
+        CellUnion(self.0.covering(&cu.0))
+    }
+
+    /// A fast (non-optimal) covering for a `Cap` — cheaper but less tight.
+    #[wasm_bindgen(js_name = "fastCoveringCap")]
+    pub fn fast_covering_cap(&self, cap: &Cap) -> CellUnion {
+        CellUnion(self.0.fast_covering(&cap.0))
+    }
+
+    /// A fast (non-optimal) covering for a `Rect`.
+    #[wasm_bindgen(js_name = "fastCoveringRect")]
+    pub fn fast_covering_rect(&self, rect: &Rect) -> CellUnion {
+        CellUnion(self.0.fast_covering(&rect.0))
+    }
+
+    /// A fast (non-optimal) covering for a `Polygon`.
+    #[wasm_bindgen(js_name = "fastCoveringPolygon")]
+    pub fn fast_covering_polygon(&self, polygon: &Polygon) -> CellUnion {
+        CellUnion(self.0.fast_covering(&polygon.0))
+    }
+
+    /// Whether `covering` is canonical for this coverer's parameters.
+    #[wasm_bindgen(js_name = "isCanonical")]
+    pub fn is_canonical(&self, covering: Vec<CellId>) -> bool {
+        let ids: Vec<s2rst::s2::CellId> = covering.iter().map(|c| c.0).collect();
+        self.0.is_canonical(&ids)
     }
 }

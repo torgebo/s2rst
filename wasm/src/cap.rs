@@ -40,6 +40,12 @@ impl Cap {
         Cap(s2rst::s2::Cap::from_center_area(center.0, area))
     }
 
+    /// Cap from a center and height (1 − cos(radius)).
+    #[wasm_bindgen(js_name = "fromCenterHeight")]
+    pub fn from_center_height(center: &Point, height: f64) -> Cap {
+        Cap(s2rst::s2::Cap::from_center_height(center.0, height))
+    }
+
     /// The empty cap.
     pub fn empty() -> Cap {
         Cap(s2rst::s2::Cap::empty())
@@ -132,6 +138,24 @@ impl Cap {
     #[wasm_bindgen(js_name = "addPoint")]
     pub fn add_point(&self, p: &Point) -> Cap {
         Cap(self.0.add_point(p.0))
+    }
+
+    /// Whether the cap's interior (excluding boundary) contains the point.
+    #[wasm_bindgen(js_name = "interiorContainsPoint")]
+    pub fn interior_contains_point(&self, p: &Point) -> bool {
+        self.0.interior_contains_point(p.0)
+    }
+
+    /// Whether the cap's interior intersects another cap.
+    #[wasm_bindgen(js_name = "interiorIntersects")]
+    pub fn interior_intersects(&self, other: &Cap) -> bool {
+        self.0.interior_intersects(other.0)
+    }
+
+    /// The smallest cap containing both this cap and another.
+    #[wasm_bindgen(js_name = "addCap")]
+    pub fn add_cap(&self, other: &Cap) -> Cap {
+        Cap(self.0.add_cap(other.0))
     }
 
     /// Bounding cap (returns self).

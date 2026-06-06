@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use crate::angle::Angle;
 use crate::cap::Cap;
 use crate::cell::Cell;
-use crate::error::validation_error_to_js;
+use crate::error::{js_err, validation_error_to_js};
 use crate::point::Point;
 use crate::rect::Rect;
 
@@ -16,11 +16,17 @@ pub struct Loop(pub(crate) s2rst::s2::Loop);
 
 #[wasm_bindgen(js_class = "S2Loop")]
 impl Loop {
-    /// Create from an array of `Point` vertices.
+    /// Create from an array of `Point` vertices. Throws on an empty vertex list
+    /// (a 0-vertex loop traps in core; use `empty()`/`full()` for the sentinels).
     #[wasm_bindgen(constructor)]
-    pub fn new(vertices: Vec<Point>) -> Loop {
+    pub fn new(vertices: Vec<Point>) -> Result<Loop, JsValue> {
+        if vertices.is_empty() {
+            return Err(js_err(
+                "a loop requires at least one vertex; use S2Loop.empty() / S2Loop.full() for the sentinel loops",
+            ));
+        }
         let pts: Vec<s2rst::s2::Point> = vertices.iter().map(|p| p.0).collect();
-        Loop(s2rst::s2::Loop::new(pts))
+        Ok(Loop(s2rst::s2::Loop::new(pts)))
     }
 
     /// The empty loop.
@@ -55,9 +61,14 @@ impl Loop {
         self.0.num_vertices()
     }
 
-    /// Get the i-th vertex.
-    pub fn vertex(&self, i: usize) -> Point {
-        Point(self.0.vertex(i))
+    /// Get the i-th vertex. For a non-empty loop, indices wrap modulo the vertex
+    /// count (so `vertex(n)` == `vertex(0)`, matching S2 edge conventions).
+    /// Throws if the loop has no vertices (empty/full loops).
+    pub fn vertex(&self, i: usize) -> Result<Point, JsValue> {
+        if self.0.num_vertices() == 0 {
+            return Err(js_err("loop has no vertices"));
+        }
+        Ok(Point(self.0.vertex(i)))
     }
 
     /// All vertices.
@@ -75,6 +86,12 @@ impl Loop {
     #[wasm_bindgen(js_name = "isFullLoop")]
     pub fn is_full_loop(&self) -> bool {
         self.0.is_full_loop()
+    }
+
+    /// Whether this is the empty or the full loop (a sentinel loop).
+    #[wasm_bindgen(js_name = "isEmptyOrFull")]
+    pub fn is_empty_or_full(&self) -> bool {
+        self.0.is_empty_or_full()
     }
 
     /// Whether this loop represents a hole.
@@ -112,6 +129,13 @@ impl Loop {
     /// Centroid.
     pub fn centroid(&self) -> Point {
         Point(self.0.centroid())
+    }
+
+    /// Whether this loop contains the given point.
+    #[wasm_bindgen(js_name = "containsPoint")]
+    pub fn contains_point(&self, p: &Point) -> bool {
+        use s2rst::s2::Region;
+        self.0.contains_point(&p.0)
     }
 
     /// Turning angle (curvature).
@@ -181,5 +205,60 @@ impl Loop {
     #[wasm_bindgen(js_name = "containsOrigin")]
     pub fn contains_origin(&self) -> bool {
         self.0.contains_origin()
+    }
+
+    /// The i-th vertex in canonical orientation. Throws on a loop with no vertices.
+    #[wasm_bindgen(js_name = "orientedVertex")]
+    pub fn oriented_vertex(&self, i: usize) -> Result<Point, JsValue> {
+        if self.0.num_vertices() == 0 {
+            return Err(js_err("loop has no vertices"));
+        }
+        Ok(Point(self.0.oriented_vertex(i)))
+    }
+
+    /// Nesting depth (0 = shell, 1 = hole inside a shell, ...).
+    pub fn depth(&self) -> i32 {
+        self.0.depth()
+    }
+
+    /// Total geodesic curvature (turning angle) of the loop boundary.
+    #[wasm_bindgen(js_name = "getCurvature")]
+    pub fn get_curvature(&self) -> f64 {
+        self.0.get_curvature()
+    }
+
+    /// Maximum error of `getCurvature`.
+    #[wasm_bindgen(js_name = "getCurvatureMaxError")]
+    pub fn get_curvature_max_error(&self) -> f64 {
+        self.0.get_curvature_max_error()
+    }
+
+    /// Distance from a point to the loop boundary (ignoring the interior).
+    #[wasm_bindgen(js_name = "getDistanceToBoundary")]
+    pub fn get_distance_to_boundary(&self, x: &Point) -> Angle {
+        Angle(self.0.get_distance_to_boundary(x.0))
+    }
+
+    /// Project a point onto the loop boundary.
+    #[wasm_bindgen(js_name = "projectToBoundary")]
+    pub fn project_to_boundary(&self, x: &Point) -> Point {
+        Point(self.0.project_to_boundary(x.0))
+    }
+
+    /// Encode to the S2 binary format (`Uint8Array`).
+    pub fn encode(&self) -> Vec<u8> {
+        use s2rst::s2::encoding::S2Encode;
+        let mut buf = Vec::new();
+        self.0
+            .encode(&mut buf)
+            .expect("encoding to a Vec is infallible");
+        buf
+    }
+
+    /// Decode from the S2 binary format. Throws on malformed data.
+    pub fn decode(bytes: &[u8]) -> Result<Loop, JsValue> {
+        use s2rst::s2::encoding::S2Decode;
+        let mut cur = std::io::Cursor::new(bytes);
+        s2rst::s2::Loop::decode(&mut cur).map(Loop).map_err(js_err)
     }
 }

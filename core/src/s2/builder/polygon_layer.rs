@@ -74,8 +74,9 @@ pub struct S2PolygonLayer {
     label_set_ids: Option<LabelSetIds>,
     label_set_lexicon: Option<IdSetLexicon>,
     track_labels: bool,
-    /// Legacy shared output for backward-compatible test code.
-    #[cfg(test)]
+    /// Optional shared cell the output polygon is written to on `build`. Used by
+    /// convenience wrappers (e.g. buffering) that drive an operation owning this
+    /// layer and need to recover its result.
     legacy_output: Option<std::rc::Rc<std::cell::RefCell<Polygon>>>,
     #[cfg(test)]
     legacy_label_set_ids: Option<std::rc::Rc<std::cell::RefCell<LabelSetIds>>>,
@@ -92,7 +93,6 @@ impl S2PolygonLayer {
             label_set_ids: None,
             label_set_lexicon: None,
             track_labels: false,
-            #[cfg(test)]
             legacy_output: None,
             #[cfg(test)]
             legacy_label_set_ids: None,
@@ -109,7 +109,6 @@ impl S2PolygonLayer {
             label_set_ids: None,
             label_set_lexicon: None,
             track_labels: false,
-            #[cfg(test)]
             legacy_output: None,
             #[cfg(test)]
             legacy_label_set_ids: None,
@@ -129,7 +128,6 @@ impl S2PolygonLayer {
             label_set_ids: None,
             label_set_lexicon: None,
             track_labels: true,
-            #[cfg(test)]
             legacy_output: None,
             #[cfg(test)]
             legacy_label_set_ids: None,
@@ -269,15 +267,37 @@ impl Default for S2PolygonLayer {
     }
 }
 
-#[cfg(test)]
 impl S2PolygonLayer {
-    /// Legacy constructor for test backward compatibility.
-    pub fn new_legacy(output: std::rc::Rc<std::cell::RefCell<Polygon>>) -> Self {
+    /// Creates a layer that also writes its output polygon into the given shared
+    /// cell when `build` runs. Used by convenience wrappers (e.g. buffering) that
+    /// drive an operation owning the layer and need its result back.
+    pub(crate) fn new_legacy(output: std::rc::Rc<std::cell::RefCell<Polygon>>) -> Self {
         let mut s = Self::new();
         s.legacy_output = Some(output);
         s
     }
 
+    /// Syncs the built output into the shared `Rc<RefCell>` cell(s) if present.
+    fn sync_legacy(&self) {
+        if let (Some(output), Some(legacy)) = (&self.polygon, &self.legacy_output) {
+            *legacy.borrow_mut() = output.clone();
+        }
+        #[cfg(test)]
+        {
+            if let (Some(ids), Some(legacy)) = (&self.label_set_ids, &self.legacy_label_set_ids) {
+                *legacy.borrow_mut() = ids.clone();
+            }
+            if let (Some(lex), Some(legacy)) =
+                (&self.label_set_lexicon, &self.legacy_label_set_lexicon)
+            {
+                *legacy.borrow_mut() = lex.clone();
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+impl S2PolygonLayer {
     /// Legacy constructor with options for test backward compatibility.
     pub fn with_options_legacy(
         output: std::rc::Rc<std::cell::RefCell<Polygon>>,
@@ -300,20 +320,6 @@ impl S2PolygonLayer {
         s.legacy_label_set_ids = Some(label_set_ids);
         s.legacy_label_set_lexicon = Some(label_set_lexicon);
         s
-    }
-
-    /// Syncs output to legacy Rc<RefCell> if present.
-    fn sync_legacy(&self) {
-        if let (Some(output), Some(legacy)) = (&self.polygon, &self.legacy_output) {
-            *legacy.borrow_mut() = output.clone();
-        }
-        if let (Some(ids), Some(legacy)) = (&self.label_set_ids, &self.legacy_label_set_ids) {
-            *legacy.borrow_mut() = ids.clone();
-        }
-        if let (Some(lex), Some(legacy)) = (&self.label_set_lexicon, &self.legacy_label_set_lexicon)
-        {
-            *legacy.borrow_mut() = lex.clone();
-        }
     }
 }
 
@@ -350,7 +356,6 @@ impl Layer for S2PolygonLayer {
                 self.label_set_ids = Some(label_ids);
                 self.label_set_lexicon = Some(label_lexicon);
             }
-            #[cfg(test)]
             self.sync_legacy();
             return;
         }
@@ -358,7 +363,6 @@ impl Layer for S2PolygonLayer {
         if graph.options().edge_type == EdgeType::Directed {
             let edge_loops = graph.get_directed_loops(LoopType::Simple, error);
             if !error.is_ok() {
-                #[cfg(test)]
                 self.sync_legacy();
                 return;
             }
@@ -389,7 +393,6 @@ impl Layer for S2PolygonLayer {
         } else {
             let components = graph.get_undirected_components(LoopType::Simple, error);
             if !error.is_ok() {
-                #[cfg(test)]
                 self.sync_legacy();
                 return;
             }
@@ -440,7 +443,6 @@ impl Layer for S2PolygonLayer {
         }
 
         // Sync to legacy Rc<RefCell> output if present (test backward compat).
-        #[cfg(test)]
         self.sync_legacy();
     }
 

@@ -113,6 +113,48 @@ impl Rect {
         self.0.intersects(other.0)
     }
 
+    /// Whether the interior contains the given lat/lng.
+    #[wasm_bindgen(js_name = "interiorContainsLatLng")]
+    pub fn interior_contains_lat_lng(&self, ll: &LatLng) -> bool {
+        self.0.interior_contains_lat_lng(ll.0)
+    }
+
+    /// Whether the interior contains the given point.
+    #[wasm_bindgen(js_name = "interiorContainsPoint")]
+    pub fn interior_contains_point(&self, p: &Point) -> bool {
+        self.0.interior_contains_point(p.0)
+    }
+
+    /// Whether the interior contains another rect.
+    #[wasm_bindgen(js_name = "interiorContainsRect")]
+    pub fn interior_contains_rect(&self, other: &Rect) -> bool {
+        self.0.interior_contains(other.0)
+    }
+
+    /// Whether the interior intersects another rect.
+    #[wasm_bindgen(js_name = "interiorIntersects")]
+    pub fn interior_intersects(&self, other: &Rect) -> bool {
+        self.0.interior_intersects(other.0)
+    }
+
+    /// Whether the longitude interval is inverted (wraps the antimeridian).
+    #[wasm_bindgen(js_name = "isInverted")]
+    pub fn is_inverted(&self) -> bool {
+        self.0.is_inverted()
+    }
+
+    /// The polar-closure of this rect (extends longitude to full at the poles).
+    #[wasm_bindgen(js_name = "polarClosure")]
+    pub fn polar_closure(&self) -> Rect {
+        Rect(self.0.polar_closure())
+    }
+
+    /// Directed Hausdorff distance to another rect.
+    #[wasm_bindgen(js_name = "getDirectedHausdorffDistance")]
+    pub fn get_directed_hausdorff_distance(&self, other: &Rect) -> Angle {
+        Angle(self.0.get_directed_hausdorff_distance(other.0))
+    }
+
     /// Add a point, expanding the rect.
     #[wasm_bindgen(js_name = "addPoint")]
     pub fn add_point(&self, ll: &LatLng) -> Rect {
@@ -183,8 +225,9 @@ impl Rect {
         self.0.approx_eq(other.0)
     }
 
+    /// Matches the core `Display` format: `[Lo[lat, lng], Hi[lat, lng]]`.
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string_js(&self) -> String {
-        format!("{:?}", self.0)
+        self.0.to_string()
     }
 }

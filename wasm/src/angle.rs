@@ -56,6 +56,16 @@ impl Angle {
         Angle(s2rst::s1::Angle::from_e7(e7))
     }
 
+    #[wasm_bindgen(js_name = "fromUnsignedE6")]
+    pub fn from_unsigned_e6(e6: u32) -> Angle {
+        Angle(s2rst::s1::Angle::from_unsigned_e6(e6))
+    }
+
+    #[wasm_bindgen(js_name = "fromUnsignedE7")]
+    pub fn from_unsigned_e7(e7: u32) -> Angle {
+        Angle(s2rst::s1::Angle::from_unsigned_e7(e7))
+    }
+
     /// The angle in radians.
     #[wasm_bindgen(getter)]
     pub fn radians(&self) -> f64 {
@@ -260,12 +270,55 @@ impl ChordAngle {
         self.0.is_valid()
     }
 
+    #[wasm_bindgen(js_name = "fromE5")]
+    pub fn from_e5(e5: i32) -> ChordAngle {
+        ChordAngle(s2rst::s1::ChordAngle::from_e5(e5))
+    }
+
+    #[wasm_bindgen(js_name = "fromE6")]
+    pub fn from_e6(e6: i32) -> ChordAngle {
+        ChordAngle(s2rst::s1::ChordAngle::from_e6(e6))
+    }
+
+    #[wasm_bindgen(js_name = "fromE7")]
+    pub fn from_e7(e7: i32) -> ChordAngle {
+        ChordAngle(s2rst::s1::ChordAngle::from_e7(e7))
+    }
+
+    pub fn e5(&self) -> i32 {
+        self.0.e5()
+    }
+    pub fn e6(&self) -> i32 {
+        self.0.e6()
+    }
+    pub fn e7(&self) -> i32 {
+        self.0.e7()
+    }
+
     pub fn successor(&self) -> ChordAngle {
         ChordAngle(self.0.successor())
     }
 
     pub fn predecessor(&self) -> ChordAngle {
         ChordAngle(self.0.predecessor())
+    }
+
+    /// Add an absolute error bound, returning a (clamped) chord angle.
+    #[wasm_bindgen(js_name = "plusError")]
+    pub fn plus_error(&self, error: f64) -> ChordAngle {
+        ChordAngle(self.0.plus_error(error))
+    }
+
+    /// Maximum error (in chord-length²) when computing this from a point pair.
+    #[wasm_bindgen(js_name = "maxPointError")]
+    pub fn max_point_error(&self) -> f64 {
+        self.0.max_point_error()
+    }
+
+    /// Maximum error (in chord-length²) when converting from an `Angle`.
+    #[wasm_bindgen(js_name = "maxAngleError")]
+    pub fn max_angle_error(&self) -> f64 {
+        self.0.max_angle_error()
     }
 
     pub fn sin(&self) -> f64 {

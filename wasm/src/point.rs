@@ -13,8 +13,9 @@ pub struct Point(pub(crate) s2rst::s2::Point);
 
 #[wasm_bindgen]
 impl Point {
-    /// Create a point from (x, y, z) coordinates (need not be unit-length;
-    /// will be used as-is — call `normalize()` if needed).
+    /// Create a point from (x, y, z) coordinates. The vector is **normalized**
+    /// to unit length (S2 points are unit vectors), so any non-zero input
+    /// vector works; the zero vector yields the origin.
     #[wasm_bindgen(constructor)]
     pub fn new(x: f64, y: f64, z: f64) -> Point {
         Point(s2rst::s2::Point::from_coords(x, y, z))
@@ -87,6 +88,21 @@ impl Point {
         Point(self.0.point_cross(other.0))
     }
 
+    /// Vector sum (the result is generally not unit-length).
+    pub fn add(&self, other: &Point) -> Point {
+        Point(self.0 + other.0)
+    }
+
+    /// Vector difference (the result is generally not unit-length).
+    pub fn sub(&self, other: &Point) -> Point {
+        Point(self.0 - other.0)
+    }
+
+    /// Vector negation (antipodal point).
+    pub fn neg(&self) -> Point {
+        Point(-self.0)
+    }
+
     /// Convert to `LatLng`.
     #[wasm_bindgen(js_name = "toLatLng")]
     pub fn to_lat_lng(&self) -> LatLng {
@@ -99,9 +115,10 @@ impl Point {
         vec![self.0.x(), self.0.y(), self.0.z()]
     }
 
+    /// Matches the core `Display` format: `(x, y, z)` at 15-digit precision.
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string_js(&self) -> String {
-        format!("({}, {}, {})", self.0.x(), self.0.y(), self.0.z())
+        self.0.to_string()
     }
 }
 

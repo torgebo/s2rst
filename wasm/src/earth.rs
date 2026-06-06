@@ -3,7 +3,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::angle::Angle;
+use crate::angle::{Angle, ChordAngle};
 use crate::latlng::LatLng;
 use crate::point::Point;
 
@@ -83,4 +83,96 @@ pub fn square_meters_to_steradians(m2: f64) -> f64 {
 #[wasm_bindgen(js_name = "steradiansToSquareMeters")]
 pub fn steradians_to_square_meters(steradians: f64) -> f64 {
     s2rst::s2::earth::steradians_to_square_meters(steradians)
+}
+
+// -- Radians / ChordAngle / longitude conversions + constants (Tier 3.4) -----
+
+/// Convert meters to radians on Earth's surface.
+#[wasm_bindgen(js_name = "metersToRadians")]
+pub fn meters_to_radians(meters: f64) -> f64 {
+    s2rst::s2::earth::meters_to_radians(meters)
+}
+
+/// Convert radians to meters on Earth's surface.
+#[wasm_bindgen(js_name = "radiansToMeters")]
+pub fn radians_to_meters(radians: f64) -> f64 {
+    s2rst::s2::earth::radians_to_meters(radians)
+}
+
+/// Convert km to radians on Earth's surface.
+#[wasm_bindgen(js_name = "kmToRadians")]
+pub fn km_to_radians(km: f64) -> f64 {
+    s2rst::s2::earth::km_to_radians(km)
+}
+
+/// Convert radians to km on Earth's surface.
+#[wasm_bindgen(js_name = "radiansToKm")]
+pub fn radians_to_km(radians: f64) -> f64 {
+    s2rst::s2::earth::radians_to_km(radians)
+}
+
+/// Convert meters to a `ChordAngle`.
+#[wasm_bindgen(js_name = "metersToChordAngle")]
+pub fn meters_to_chord_angle(meters: f64) -> ChordAngle {
+    ChordAngle(s2rst::s2::earth::meters_to_chord_angle(meters))
+}
+
+/// Convert a `ChordAngle` to meters.
+#[wasm_bindgen(js_name = "chordAngleToMeters")]
+pub fn chord_angle_to_meters(cangle: &ChordAngle) -> f64 {
+    s2rst::s2::earth::chord_angle_to_meters(cangle.0)
+}
+
+/// Convert km to a `ChordAngle`.
+#[wasm_bindgen(js_name = "kmToChordAngle")]
+pub fn km_to_chord_angle(km: f64) -> ChordAngle {
+    ChordAngle(s2rst::s2::earth::km_to_chord_angle(km))
+}
+
+/// Convert a `ChordAngle` to km.
+#[wasm_bindgen(js_name = "chordAngleToKm")]
+pub fn chord_angle_to_km(cangle: &ChordAngle) -> f64 {
+    s2rst::s2::earth::chord_angle_to_km(cangle.0)
+}
+
+/// Longitude span (radians) of a given east-west distance in meters at a latitude.
+#[wasm_bindgen(js_name = "metersToLongitudeRadians")]
+pub fn meters_to_longitude_radians(meters: f64, latitude_radians: f64) -> f64 {
+    s2rst::s2::earth::meters_to_longitude_radians(meters, latitude_radians)
+}
+
+/// Longitude span (radians) of a given east-west distance in km at a latitude.
+#[wasm_bindgen(js_name = "kmToLongitudeRadians")]
+pub fn km_to_longitude_radians(km: f64, latitude_radians: f64) -> f64 {
+    s2rst::s2::earth::km_to_longitude_radians(km, latitude_radians)
+}
+
+/// The haversine of an angle (radians): `(1 − cos θ) / 2`.
+#[wasm_bindgen]
+pub fn haversine(radians: f64) -> f64 {
+    s2rst::s2::earth::haversine(radians)
+}
+
+/// Earth's mean radius in meters.
+#[wasm_bindgen(js_name = "radiusMeters")]
+pub fn radius_meters() -> f64 {
+    s2rst::s2::earth::RADIUS_METERS
+}
+
+/// Earth's mean radius in km.
+#[wasm_bindgen(js_name = "radiusKm")]
+pub fn radius_km() -> f64 {
+    s2rst::s2::earth::RADIUS_KM
+}
+
+/// Lowest land altitude on Earth, in meters.
+#[wasm_bindgen(js_name = "lowestAltitudeMeters")]
+pub fn lowest_altitude_meters() -> f64 {
+    s2rst::s2::earth::LOWEST_ALTITUDE_METERS
+}
+
+/// Highest land altitude on Earth, in meters.
+#[wasm_bindgen(js_name = "highestAltitudeMeters")]
+pub fn highest_altitude_meters() -> f64 {
+    s2rst::s2::earth::HIGHEST_ALTITUDE_METERS
 }

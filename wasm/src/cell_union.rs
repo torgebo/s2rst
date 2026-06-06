@@ -32,6 +32,24 @@ impl CellUnion {
         CellUnion(s2rst::s2::CellUnion::from_cell_ids(inner))
     }
 
+    /// Normalized union covering the leaf-cell range `[begin, end)`.
+    #[wasm_bindgen(js_name = "fromRange")]
+    pub fn from_range(begin: &CellId, end: &CellId) -> CellUnion {
+        CellUnion(s2rst::s2::CellUnion::from_range(begin.0, end.0))
+    }
+
+    /// Union covering the inclusive leaf-cell range `[min, max]`.
+    #[wasm_bindgen(js_name = "fromMinMax")]
+    pub fn from_min_max(min_id: &CellId, max_id: &CellId) -> CellUnion {
+        CellUnion(s2rst::s2::CellUnion::from_min_max(min_id.0, max_id.0))
+    }
+
+    /// Union covering the leaf-cell range `[begin, end)`.
+    #[wasm_bindgen(js_name = "fromBeginEnd")]
+    pub fn from_begin_end(begin: &CellId, end: &CellId) -> CellUnion {
+        CellUnion(s2rst::s2::CellUnion::from_begin_end(begin.0, end.0))
+    }
+
     /// Create from token strings (normalizes).
     #[wasm_bindgen(js_name = "fromTokens")]
     pub fn from_tokens(tokens: Vec<String>) -> CellUnion {
@@ -158,5 +176,24 @@ impl CellUnion {
     #[wasm_bindgen(js_name = "exactArea")]
     pub fn exact_area(&self) -> f64 {
         self.0.exact_area()
+    }
+
+    /// Encode to the S2 binary format (`Uint8Array`).
+    pub fn encode(&self) -> Vec<u8> {
+        use s2rst::s2::encoding::S2Encode;
+        let mut buf = Vec::new();
+        self.0
+            .encode(&mut buf)
+            .expect("encoding to a Vec is infallible");
+        buf
+    }
+
+    /// Decode from the S2 binary format. Throws on malformed data.
+    pub fn decode(bytes: &[u8]) -> Result<CellUnion, JsValue> {
+        use s2rst::s2::encoding::S2Decode;
+        let mut cur = std::io::Cursor::new(bytes);
+        s2rst::s2::CellUnion::decode(&mut cur)
+            .map(CellUnion)
+            .map_err(crate::error::js_err)
     }
 }
