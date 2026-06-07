@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.2"
+version = "0.3.0"
 rust-version = "1.88"
 
 [workspace.metadata.release]
