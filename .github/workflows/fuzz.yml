@@ -25,6 +25,9 @@ jobs:
           - decode_string_vector
           - decode_s2cell_id_vector
           - decode_s2point_vector
+          - decode_s2shape_index
+          - decode_polygon
+          - decode_points_compressed
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust nightly

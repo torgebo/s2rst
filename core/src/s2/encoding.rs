@@ -42,6 +42,12 @@ const MAX_ENCODED_LOOPS: u32 = 10_000_000;
 /// Maximum cells in a `CellUnion` for decode safety.
 const MAX_ENCODED_CELLS: u64 = 1_000_000;
 
+/// Upper bound on capacity reserved up-front from an untrusted element count.
+/// Caps speculative allocation so a tiny malformed input can't drive a huge
+/// `Vec::with_capacity`; the vector still grows on demand, so valid data of any
+/// size still decodes correctly.
+const MAX_PREALLOC: usize = 1 << 16;
+
 // ─── Traits ─────────────────────────────────────────────────────────────
 
 /// Binary encoding for S2 types.
@@ -141,7 +147,17 @@ impl S2Encode for CellId {
 
 impl S2Decode for CellId {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
-        Ok(CellId(read_u64(r)?))
+        let id = CellId(read_u64(r)?);
+        // The raw u64 is untrusted; an invalid id (face bits >= 6 or a malformed
+        // level mask) panics in `to_face_ij_orientation`/`CellUnion::normalize`.
+        // Both callers (CellUnion and Cell decode) require valid ids.
+        if !id.is_valid() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid cell id",
+            ));
+        }
+        Ok(id)
     }
 }
 
@@ -217,7 +233,7 @@ impl S2Decode for Rect {
         let lat_hi = read_f64(r)?;
         let lng_lo = read_f64(r)?;
         let lng_hi = read_f64(r)?;
-        Ok(Rect {
+        let rect = Rect {
             lat: r1::Interval {
                 lo: lat_lo,
                 hi: lat_hi,
@@ -226,7 +242,18 @@ impl S2Decode for Rect {
                 lo: lng_lo,
                 hi: lng_hi,
             },
-        })
+        };
+        // The components are raw `f64` from untrusted bytes; an out-of-range or
+        // NaN bound would violate the `S1Interval`/`Rect` invariants and panic in
+        // later geometry ops (e.g. `expand_for_subregions`). Reject here so the
+        // decoder returns `Err` instead of constructing an invalid `Rect`.
+        if !rect.is_valid() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid LatLngRect bounds",
+            ));
+        }
+        Ok(rect)
     }
 }
 
@@ -259,7 +286,7 @@ impl S2Decode for CellUnion {
                 format!("too many cells ({n}; max is {MAX_ENCODED_CELLS})"),
             ));
         }
-        let mut ids = Vec::with_capacity(n as usize);
+        let mut ids = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
         for _ in 0..n {
             ids.push(CellId::decode(r)?);
         }
@@ -311,7 +338,7 @@ fn decode_polyline_lossless(r: &mut dyn Read) -> io::Result<crate::s2::polyline:
             format!("too many vertices ({n}; max is {MAX_ENCODED_VERTICES})"),
         ));
     }
-    let mut vertices = Vec::with_capacity(n as usize);
+    let mut vertices = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
     for _ in 0..n {
         let x = read_f64(r)?;
         let y = read_f64(r)?;
@@ -437,17 +464,29 @@ impl S2Decode for Loop {
                 format!("too many vertices ({n}; max is {MAX_ENCODED_VERTICES})"),
             ));
         }
-        let mut vertices = Vec::with_capacity(n as usize);
+        let mut vertices = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
         for _ in 0..n {
             let x = read_f64(r)?;
             let y = read_f64(r)?;
             let z = read_f64(r)?;
             vertices.push(Point(crate::r3::Vector { x, y, z }));
         }
+        // Vertices are raw f64 from untrusted bytes; non-unit (or NaN) points
+        // break the spatial-index build in `from_decoded` (and every later
+        // geometry op assumes unit length). Reject here.
+        for v in &vertices {
+            if !v.is_unit() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "non-unit loop vertex",
+                ));
+            }
+        }
         let origin_inside = read_u8(r)? != 0;
         let depth = read_u32(r)? as i32;
         let bound = Rect::decode(r)?;
-        Ok(Loop::from_decoded(vertices, origin_inside, depth, bound))
+        Loop::from_decoded(vertices, origin_inside, depth, bound)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 }
 
@@ -518,12 +557,8 @@ pub(crate) fn decode_loop_compressed(r: &mut dyn Read, snap_level: Level) -> io:
         None
     };
 
-    Ok(Loop::from_decoded_compressed(
-        points,
-        origin_inside,
-        depth,
-        bound,
-    ))
+    Loop::from_decoded_compressed(points, origin_inside, depth, bound)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
 // ─── Polygon ────────────────────────────────────────────────────────────
@@ -550,7 +585,7 @@ fn decode_polygon_lossless(r: &mut dyn Read) -> io::Result<Polygon> {
             format!("too many loops ({nloops}; max is {MAX_ENCODED_LOOPS})"),
         ));
     }
-    let mut loops = Vec::with_capacity(nloops as usize);
+    let mut loops = Vec::with_capacity((nloops as usize).min(MAX_PREALLOC));
     for _ in 0..nloops {
         loops.push(Loop::decode(r)?);
     }
@@ -617,7 +652,7 @@ fn decode_polygon_compressed(r: &mut dyn Read) -> io::Result<Polygon> {
             format!("too many loops ({nloops}; max is {MAX_ENCODED_LOOPS})"),
         ));
     }
-    let mut loops = Vec::with_capacity(nloops as usize);
+    let mut loops = Vec::with_capacity((nloops as usize).min(MAX_PREALLOC));
     for _ in 0..nloops {
         let l = decode_loop_compressed(r, snap_level)?;
         if !l.is_empty_loop() && l.num_vertices() > 0 {

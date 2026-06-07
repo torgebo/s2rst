@@ -33,6 +33,11 @@ use crate::s2::coords::{
 };
 use crate::s2::encoding::{read_uvarint, write_uvarint};
 
+/// Upper bound on capacity reserved up-front from an untrusted point count, so a
+/// tiny malformed input can't drive a huge `Vec::with_capacity`. The vector
+/// still grows on demand, so valid data of any size still decodes correctly.
+const MAX_PREALLOC: usize = 1 << 16;
+
 // ─── S2XYZFaceSiTi ─────────────────────────────────────────────────────
 
 /// An `S2Point` together with its (face, si, ti) coordinates and cell level.
@@ -420,7 +425,7 @@ pub fn decode_points_compressed(
     let mut pi_coder = NthDerivativeCoder::new(DERIVATIVE_ENCODING_ORDER);
     let mut qi_coder = NthDerivativeCoder::new(DERIVATIVE_ENCODING_ORDER);
 
-    let mut points = Vec::with_capacity(num_points);
+    let mut points = Vec::with_capacity(num_points.min(MAX_PREALLOC));
     for i in 0..num_points {
         let (pi, qi) = if i == 0 {
             decode_first_point_fixed_length(r, level, &mut pi_coder, &mut qi_coder)?
@@ -454,7 +459,17 @@ pub fn decode_points_compressed(
         let y = f64::from_le_bytes(buf);
         r.read_exact(&mut buf)?;
         let z = f64::from_le_bytes(buf);
-        points[index] = Point(crate::r3::Vector { x, y, z });
+        let pt = Point(crate::r3::Vector { x, y, z });
+        // Off-center points are raw f64 from untrusted bytes; a NaN or non-unit
+        // point breaks bound computation (`LatLngRectBounder`) and the spatial
+        // index build in the compressed loop/polygon decoders. Reject here.
+        if !pt.is_unit() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "non-unit off-center point",
+            ));
+        }
+        points[index] = pt;
     }
 
     Ok(points)

@@ -222,12 +222,19 @@ impl Loop {
     }
 
     /// Creates a loop from pre-decoded fields. Used by binary decoding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoded vertices form a degenerate loop (fewer
+    /// than 3 vertices, or duplicate/antipodal adjacent vertices). Such loops
+    /// would panic the spatial-index build and the boundary predicates
+    /// (e.g. `ordered_ccw`), which assume non-degenerate geometry.
     pub(crate) fn from_decoded(
         vertices: Vec<Point>,
         origin_inside: bool,
         depth: i32,
         bound: Rect,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let mut l = Loop {
             vertices,
             origin_inside,
@@ -236,22 +243,30 @@ impl Loop {
             bound,
             index: ShapeIndex::new(),
         };
+        // Validate (vertex count, unit length, no degenerate edges) *before*
+        // building the index — the build assumes valid geometry.
+        l.validate()?;
         l.index.add(Box::new(LoopShape {
             vertices: l.vertices.clone(),
             origin_inside: l.origin_inside,
         }));
         l.index.build();
-        l
+        Ok(l)
     }
 
     /// Creates a loop from compressed-decoded fields. If `bound` is `None`,
     /// recomputes from vertices via `init_bound`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoded vertices form a degenerate loop (see
+    /// [`Loop::from_decoded`]).
     pub(crate) fn from_decoded_compressed(
         vertices: Vec<Point>,
         origin_inside: bool,
         depth: i32,
         bound: Option<Rect>,
-    ) -> Self {
+    ) -> Result<Self, String> {
         if let Some(b) = bound {
             Self::from_decoded(vertices, origin_inside, depth, b)
         } else {
@@ -263,13 +278,15 @@ impl Loop {
                 subregion_bound: Rect::empty(),
                 index: ShapeIndex::new(),
             };
+            // Validate before `init_bound`/index build (both assume valid geometry).
+            l.validate()?;
             l.init_bound();
             l.index.add(Box::new(LoopShape {
                 vertices: l.vertices.clone(),
                 origin_inside: l.origin_inside,
             }));
             l.index.build();
-            l
+            Ok(l)
         }
     }
 

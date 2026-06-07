@@ -20,11 +20,21 @@ use rand_chacha::ChaCha8Rng;
 
 use s2rst::s2::encoded_s2cell_id_vector::{decode_s2cell_id_vector, encode_s2cell_id_vector};
 use s2rst::s2::encoded_s2point_vector::{CodingHint, decode_s2point_vector, encode_s2point_vector};
+use s2rst::s2::encoded_s2shape_index::EncodedS2ShapeIndex;
 use s2rst::s2::encoded_string_vector::{decode_string_vector, encode_string_vector};
 use s2rst::s2::encoded_uint_vector::{
     decode_uint_vector_u32, decode_uint_vector_u64, encode_uint_vector_u32, encode_uint_vector_u64,
 };
-use s2rst::s2::{CellId, LatLng, Point};
+use s2rst::s2::encoding::{S2Decode, S2Encode};
+use s2rst::s2::lax_polygon::LaxPolygon;
+use s2rst::s2::lax_polyline::LaxPolyline;
+use s2rst::s2::point_compression::{
+    decode_points_compressed, encode_points_compressed, points_to_xyz_face_si_ti,
+};
+use s2rst::s2::point_vector::PointVector;
+use s2rst::s2::polyline::Polyline;
+use s2rst::s2::shape_index::ShapeIndex;
+use s2rst::s2::{Cap, Cell, CellId, CellUnion, LatLng, Loop, Point, Polygon, Rect};
 
 // ── input generators ───────────────────────────────────────────────────────
 
@@ -95,6 +105,20 @@ where
         let mut r = input;
         let _unused = decode(&mut r);
     }));
+    assert!(
+        res.is_ok(),
+        "{label} panicked on {}-byte input: {input:02x?}",
+        input.len()
+    );
+}
+
+/// Like [`no_panic`] but for decoders that consume a `&[u8]` directly (e.g. the
+/// shape-index initializer) rather than a `&mut dyn Read`.
+fn no_panic_bytes<F>(label: &str, decode: F, input: &[u8])
+where
+    F: Fn(&[u8]),
+{
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode(input)));
     assert!(
         res.is_ok(),
         "{label} panicked on {}-byte input: {input:02x?}",
@@ -307,4 +331,423 @@ fn regression_fuzz_crashes() {
         0x0d, 0x29, 0x29, 0x29, 0xb9, 0x00, 0x00, 0x07, 0x20,
     ];
     decode_by_label("", s2point_overflow);
+}
+
+/// Regression cases for the higher-level decoders, all found by the `fuzz/`
+/// cargo-fuzz layer and fixed by validating decoded values before constructing
+/// geometry. Each must now decode to `Err` (never panic).
+#[test]
+fn regression_high_level_crashes() {
+    // 1. `EncodedS2ShapeIndex::init` -> tagged `Polygon` decode -> an unvalidated
+    //    `Rect` bound (raw f64) -> `expand_for_subregions` -> `S1Interval::new`
+    //    assert. Fixed by validating the bound in `Rect::decode`.
+    let shape_index_bound: &[u8] = &[
+        0x2a, 0x08, 0x4a, 0x01, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0,
+        0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x8a, 0x01, 0x00, 0x00, 0x27, 0xdc, 0xf7, 0xff, 0xff, 0xff, 0xfc,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xc9, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0xde, 0xa1, 0x3f, 0x08,
+        0xe0, 0x10, 0x08, 0x01, 0x00,
+    ];
+    // 2. `EncodedS2ShapeIndex::init` -> per-cell decode -> i32 `shape_id`/`edge`
+    //    add overflow. Fixed with checked arithmetic in `decode_cell`/`decode_edges`.
+    let shape_index_overflow: &[u8] = &[
+        0x2a, 0x80, 0x00, 0xf0, 0x12, 0x2c, 0xef, 0x11, 0x30, 0x10, 0x12, 0x10, 0x10, 0x2c, 0xef,
+        0xe7, 0x11, 0x2a, 0x08, 0x4a, 0x02, 0x02, 0x04, 0x19, 0xff, 0x01, 0x00, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0x08, 0x12, 0x2c, 0xef, 0x11, 0x30, 0x10, 0x12, 0x10, 0x10,
+        0x2c, 0xef, 0xe7, 0x11, 0x2a, 0x08, 0x4a, 0x02, 0x02, 0x04, 0x19, 0xff, 0x01, 0x00, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x08, 0xff, 0xff, 0x10, 0x10, 0xff, 0xff, 0x10,
+        0x10,
+    ];
+    for input in [shape_index_bound, shape_index_overflow] {
+        no_panic_bytes(
+            "s2shape_index",
+            |b| {
+                let mut idx = EncodedS2ShapeIndex::new();
+                let _unused = idx.init(b);
+            },
+            input,
+        );
+    }
+
+    // 3. `Polygon::decode` (compressed) -> `decode_loop_compressed` ->
+    //    `from_decoded_compressed` -> `init_bound` with a NaN off-center point ->
+    //    `S1Interval::from_point_pair` assert. Fixed by validating off-center
+    //    points in `decode_points_compressed`.
+    let polygon_compressed_nan: &[u8] = &[
+        0x04, 0x03, 0x22, 0x0b, 0xc8, 0x05, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x10, 0x00, 0x01, 0x05, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x04, 0x03, 0x22, 0x80, 0x00,
+        0x00, 0x00, 0x00,
+    ];
+    no_panic(
+        "polygon",
+        |r| <Polygon as S2Decode>::decode(r),
+        polygon_compressed_nan,
+    );
+
+    // 4. `Polygon::decode` (compressed) -> `decode_loop_compressed` -> a
+    //    degenerate loop (duplicate vertices) -> `ordered_ccw` assert during the
+    //    index build. Fixed by validating the loop in `from_decoded[_compressed]`.
+    let polygon_compressed_degenerate: &[u8] = &[
+        0x04, 0x04, 0x02, 0x0a, 0x59, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x08, 0x04, 0x04, 0x0a, 0xdd, 0x01, 0x00, 0x00, 0x40, 0x00, 0x04, 0x00, 0x00,
+        0x00,
+    ];
+    no_panic(
+        "polygon",
+        |r| <Polygon as S2Decode>::decode(r),
+        polygon_compressed_degenerate,
+    );
+}
+
+// ── higher-level decoders ────────────────────────────────────────────────────
+
+/// `decode_points_compressed` is the arithmetic-heavy compressed point codec. It
+/// takes a level and a point count alongside the reader, so it can't join the
+/// uniform `for_each_decoder` sweep — fuzz it directly. The count is *capped*
+/// (mirroring `fuzz/fuzz_targets/decode_points_compressed.rs`) because this
+/// function, unlike the higher-level decoders, does not bound `num_points`
+/// itself; its callers do, before the up-front `Vec::with_capacity(num_points)`.
+#[test]
+fn compressed_points_robustness() {
+    let mut r = rng(0xE5);
+    let level = 20u8; // any valid S2 cell level (0..=30)
+
+    for _ in 0..100 {
+        // Valid data round-trips by count (compression may snap to cell centers).
+        let n = r.gen_range(1..32);
+        let points = rand_points(&mut r, n);
+        let xyz = points_to_xyz_face_si_ti(&points);
+        let mut buf = Vec::new();
+        encode_points_compressed(&mut buf, &xyz, level).unwrap();
+        let decoded = decode_points_compressed(&mut buf.as_slice(), level, points.len()).unwrap();
+        assert_eq!(decoded.len(), points.len());
+
+        // Every truncation of that valid encoding must not panic.
+        for cut in 0..=buf.len() {
+            no_panic(
+                "compressed_points",
+                |rr| decode_points_compressed(rr, level, points.len()),
+                &buf[..cut],
+            );
+        }
+    }
+
+    // Short random inputs, with the level and a capped count derived from the
+    // input prefix exactly as the fuzz target does.
+    for _ in 0..20_000 {
+        let len = r.gen_range(0..=64);
+        let bytes: Vec<u8> = (0..len).map(|_| r.r#gen()).collect();
+        if bytes.len() < 3 {
+            continue;
+        }
+        let lvl: u8 = bytes[0] % 31; // 0..=30
+        let num_points = (u16::from_le_bytes([bytes[1], bytes[2]]) % 4096) as usize;
+        no_panic(
+            "compressed_points",
+            |rr| decode_points_compressed(rr, lvl, num_points),
+            &bytes[3..],
+        );
+    }
+}
+
+/// Valid encodings of the higher-level decoders (`Polygon`, shape index) must
+/// round-trip, and every truncation of a valid encoding must decode without
+/// panicking (EOF mid-field → `Err`, never a panic).
+///
+/// Arbitrary / mutated-byte fuzzing of these two is intentionally left to the
+/// nightly `fuzz/` lane, which runs under `-rss_limit_mb`. A crafted count in
+/// these formats can drive a very large allocation — and, for shape-index edge
+/// counts, an unbounded one — which an in-process test with no memory cap cannot
+/// absorb. Truncating a *valid* encoding never inflates a count field, so it
+/// stays safe here.
+#[test]
+fn high_level_decoders_truncation() {
+    // Polygon: empty, full, and a small square shell (exercises the loop and
+    // vertex reading paths under truncation).
+    let square = Polygon::from_loops(vec![Loop::new(vec![
+        LatLng::from_degrees(-10.0, -10.0).to_point(),
+        LatLng::from_degrees(-10.0, 10.0).to_point(),
+        LatLng::from_degrees(10.0, 10.0).to_point(),
+        LatLng::from_degrees(10.0, -10.0).to_point(),
+    ])]);
+    for poly in [Polygon::empty(), Polygon::full(), square] {
+        let mut buf = Vec::new();
+        poly.encode(&mut buf).unwrap();
+        let decoded = <Polygon as S2Decode>::decode(&mut buf.as_slice()).unwrap();
+        assert_eq!(decoded.num_loops(), poly.num_loops());
+        for cut in 0..=buf.len() {
+            no_panic("polygon", |r| <Polygon as S2Decode>::decode(r), &buf[..cut]);
+        }
+    }
+
+    // Shape index: an empty index round-trips and every truncation is clean.
+    let mut index = ShapeIndex::new();
+    index.build();
+    let mut buf = Vec::new();
+    index.encode_to_writer(&mut buf).unwrap();
+    let mut enc = EncodedS2ShapeIndex::new();
+    enc.init(&buf).unwrap();
+    assert_eq!(enc.num_shape_ids(), 0);
+    for cut in 0..=buf.len() {
+        no_panic_bytes(
+            "s2shape_index",
+            |b| {
+                let mut idx = EncodedS2ShapeIndex::new();
+                let _unused = idx.init(b);
+            },
+            &buf[..cut],
+        );
+    }
+}
+
+// ── comprehensive panic survey across EVERY decoder ──────────────────────────
+
+/// Throw a diverse corpus (valid encodings of every type, their truncations and
+/// mutations, plus random and adversarial bytes) at EVERY decoder and assert
+/// none panics.
+///
+/// With the allocation caps in `encoding`/`shape_index_encoding`/
+/// `point_compression`, arbitrary bytes can no longer drive a large up-front
+/// allocation, so this whole sweep runs safely in-process. The test build keeps
+/// `debug_assert!`s enabled, so any decoded value that violates a geometry
+/// invariant surfaces as a (caught) panic and fails this test, naming the
+/// offending decoder and the exact bytes.
+#[test]
+fn no_decoder_panics_on_any_input() {
+    fn enc<T: S2Encode>(x: &T) -> Vec<u8> {
+        let mut b = Vec::new();
+        x.encode(&mut b).unwrap();
+        b
+    }
+
+    let mut r = rng(0x5A);
+
+    // A known-valid CCW square loop (same coordinates as the geo-interop tests).
+    let square: Vec<Point> = [(-10.0, -10.0), (-10.0, 10.0), (10.0, 10.0), (10.0, -10.0)]
+        .iter()
+        .map(|&(lat, lng)| LatLng::from_degrees(lat, lng).to_point())
+        .collect();
+    let pts = rand_points(&mut r, 6);
+    let cells = rand_cell_ids(&mut r, 6);
+
+    // A rich shape index: one of each tagged shape type.
+    let mut index = ShapeIndex::new();
+    index.add(Box::new(LaxPolyline::new(pts.clone())));
+    index.add(Box::new(PointVector::new(pts.clone())));
+    index.add(Box::new(LaxPolygon::from_loops(&[&square])));
+    index.build();
+    let mut si_bytes = Vec::new();
+    index.encode_to_writer(&mut si_bytes).unwrap();
+
+    // Valid encodings of every decodable type.
+    let mut seeds: Vec<Vec<u8>> = vec![
+        enc(&rand_point(&mut r)),
+        enc(&Cap::from_point(rand_point(&mut r))),
+        enc(&Rect::from_point_pair(
+            LatLng::from_degrees(-1.0, -2.0),
+            LatLng::from_degrees(3.0, 4.0),
+        )),
+        enc(&CellId::from_point(&rand_point(&mut r))),
+        enc(&CellUnion::from_cell_ids(cells.clone())),
+        enc(&Cell::from(CellId::from_point(&rand_point(&mut r)))),
+        enc(&Polyline::new(pts.clone())),
+        enc(&Loop::new(square.clone())),
+        enc(&Polygon::from_loops(vec![Loop::new(square.clone())])),
+        enc(&LaxPolyline::new(pts.clone())),
+        enc(&LaxPolygon::from_loops(&[&square])),
+        enc(&PointVector::new(pts.clone())),
+        si_bytes,
+        enc_u32_vec(&[1, 2, 3, 4]),
+        enc_u64_vec(&[1, 2, 3, 4]),
+        enc_string_vec(&[vec![1, 2], vec![3]]),
+        enc_cell_id_vec(&cells),
+        enc_point_vec(&pts, CodingHint::Fast),
+        enc_point_vec(&pts, CodingHint::Compact),
+    ];
+    // Compressed-points seed: 3-byte (level, count) prefix the decoder closure
+    // strips, then the encoded payload.
+    {
+        let xyz = points_to_xyz_face_si_ti(&pts);
+        let count = (pts.len() as u16).to_le_bytes();
+        let mut b = vec![20u8, count[0], count[1]];
+        encode_points_compressed(&mut b, &xyz, 20u8).unwrap();
+        seeds.push(b);
+    }
+
+    // Corpus: seeds, every truncation, mutations, random, and adversarial bytes.
+    let mut corpus: Vec<Vec<u8>> = Vec::new();
+    for s in &seeds {
+        corpus.push(s.clone());
+        for cut in 0..s.len() {
+            corpus.push(s[..cut].to_vec());
+        }
+    }
+    for _ in 0..2000 {
+        let base = &seeds[r.gen_range(0..seeds.len())];
+        let mut b = base.clone();
+        for _ in 0..r.gen_range(1..=6) {
+            if b.is_empty() {
+                b.push(r.r#gen());
+                continue;
+            }
+            match r.gen_range(0..4) {
+                0 => {
+                    let i = r.gen_range(0..b.len());
+                    b[i] ^= 1 << r.gen_range(0..8);
+                }
+                1 => {
+                    let i = r.gen_range(0..b.len());
+                    b[i] = r.r#gen();
+                }
+                2 => {
+                    let i = r.gen_range(0..=b.len());
+                    b.insert(i, r.r#gen());
+                }
+                _ => {
+                    let i = r.gen_range(0..b.len());
+                    b.remove(i);
+                }
+            }
+        }
+        corpus.push(b);
+    }
+    for _ in 0..10_000 {
+        let n = r.gen_range(0..=64);
+        corpus.push((0..n).map(|_| r.r#gen()).collect());
+    }
+    corpus.push(vec![]);
+    for b in 0u16..=255 {
+        corpus.push(vec![b as u8]);
+    }
+    for n in [1usize, 2, 4, 8, 10, 16, 32, 64] {
+        corpus.push(vec![0xFF; n]);
+    }
+
+    // Every decoder, wrapped so it consumes a `&[u8]` and may panic.
+    type Decoder = Box<dyn Fn(&[u8])>;
+    let decoders: Vec<(&str, Decoder)> = vec![
+        (
+            "uint_vector_u32",
+            Box::new(|b| drop(decode_uint_vector_u32(&mut &b[..]))),
+        ),
+        (
+            "uint_vector_u64",
+            Box::new(|b| drop(decode_uint_vector_u64(&mut &b[..]))),
+        ),
+        (
+            "string_vector",
+            Box::new(|b| drop(decode_string_vector(&mut &b[..]))),
+        ),
+        (
+            "s2cell_id_vector",
+            Box::new(|b| drop(decode_s2cell_id_vector(&mut &b[..]))),
+        ),
+        (
+            "s2point_vector",
+            Box::new(|b| drop(decode_s2point_vector(&mut &b[..]))),
+        ),
+        (
+            "point",
+            Box::new(|b| drop(<Point as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "cap",
+            Box::new(|b| drop(<Cap as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "rect",
+            Box::new(|b| drop(<Rect as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "cellid",
+            Box::new(|b| drop(<CellId as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "cellunion",
+            Box::new(|b| drop(<CellUnion as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "cell",
+            Box::new(|b| drop(<Cell as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "polyline",
+            Box::new(|b| drop(<Polyline as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "loop",
+            Box::new(|b| drop(<Loop as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "polygon",
+            Box::new(|b| drop(<Polygon as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "lax_polyline",
+            Box::new(|b| drop(<LaxPolyline as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "lax_polygon",
+            Box::new(|b| drop(<LaxPolygon as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "point_vector",
+            Box::new(|b| drop(<PointVector as S2Decode>::decode(&mut &b[..]))),
+        ),
+        (
+            "s2shape_index",
+            Box::new(|b| {
+                let mut idx = EncodedS2ShapeIndex::new();
+                drop(idx.init(b));
+            }),
+        ),
+        (
+            "points_compressed",
+            Box::new(|b| {
+                if b.len() >= 3 {
+                    let lvl = b[0] % 31;
+                    let n = (u16::from_le_bytes([b[1], b[2]]) % 4096) as usize;
+                    drop(decode_points_compressed(&mut &b[3..], lvl, n));
+                }
+            }),
+        ),
+    ];
+
+    // Run the survey: record the first panicking input per decoder, along with
+    // where it panicked (the hook captures the location into a thread-local;
+    // silencing stderr so a clean run isn't buried in backtraces).
+    thread_local! {
+        static LAST_PANIC: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+    }
+    let prev_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|info| {
+        let loc = info
+            .location()
+            .map_or_else(String::new, |l| format!("{}:{}", l.file(), l.line()));
+        LAST_PANIC.with(|c| *c.borrow_mut() = loc);
+    }));
+    let mut failures: Vec<(&str, String, Vec<u8>)> = Vec::new();
+    for (name, decode) in &decoders {
+        for input in &corpus {
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode(input)));
+            if res.is_err() {
+                let loc = LAST_PANIC.with(|c| c.borrow().clone());
+                failures.push((name, loc, input.clone()));
+                break;
+            }
+        }
+    }
+    std::panic::set_hook(prev_hook);
+
+    assert!(
+        failures.is_empty(),
+        "decoders panicked on crafted input:\n{}",
+        failures
+            .iter()
+            .map(|(n, loc, b)| format!("  {n} @ {loc}: {b:02x?}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
