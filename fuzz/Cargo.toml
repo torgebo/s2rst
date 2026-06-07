@@ -52,5 +52,26 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "decode_s2shape_index"
+path = "fuzz_targets/decode_s2shape_index.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_polygon"
+path = "fuzz_targets/decode_polygon.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_points_compressed"
+path = "fuzz_targets/decode_points_compressed.rs"
+test = false
+doc = false
+bench = false
+
 # Keep the fuzz crate out of the parent workspace.
 [workspace]

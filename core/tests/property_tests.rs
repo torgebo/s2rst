@@ -2130,11 +2130,15 @@ fn prop_point_decode_truncated(len: u8) -> bool {
 /// Decode from truncated data for `CellId` should not panic.
 #[quickcheck]
 fn prop_cellid_decode_truncated(len: u8) -> bool {
-    let full_buf = [0u8; 8];
+    // Encode a *valid* cell id: `CellId::decode` now rejects invalid ids, so an
+    // all-zero buffer (`CellId(0)`, not a valid cell) would `Err` even at full
+    // length. A valid id round-trips at full length and `Err`s when truncated.
+    let mut full_buf = Vec::new();
+    CellId::from_face(0u8).encode(&mut full_buf).unwrap();
     let truncated_len = (len as usize) % (full_buf.len() + 1);
     match CellId::decode(&mut &full_buf[..truncated_len]) {
-        Ok(_) => truncated_len == 8,
-        Err(_) => truncated_len < 8,
+        Ok(_) => truncated_len == full_buf.len(),
+        Err(_) => truncated_len < full_buf.len(),
     }
 }
 

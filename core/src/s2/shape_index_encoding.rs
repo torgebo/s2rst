@@ -53,6 +53,12 @@ use crate::s2::shape_index::{ClippedShape, ShapeIndex, ShapeIndexCell};
 /// Current encoding version for `ShapeIndex`.
 const SHAPE_INDEX_VERSION: u64 = 2;
 
+/// Upper bound on capacity reserved up-front from an untrusted element count
+/// (e.g. the per-cell edge count), so a tiny malformed input can't drive a huge
+/// `Vec::with_capacity`. The vector still grows on demand, so valid data of any
+/// size still decodes correctly.
+const MAX_PREALLOC: usize = 1 << 16;
+
 // ─── Shape type tags (matching C++) ─────────────────────────────────────
 
 /// No type tag; shape cannot be encoded.
@@ -269,19 +275,19 @@ fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> 
                 let next_val = read_uvarint(&mut r)?;
                 let num_edges = ((next_val & 15) + 1) as usize;
                 let shape_delta = (next_val >> 4) as i32;
-                clipped.shape_id = ShapeId(shape_id_base + shape_delta);
-                clipped.edges = (edge_id..edge_id + num_edges as i32).collect();
+                clipped.shape_id = ShapeId(add_i32(shape_id_base, shape_delta)?);
+                clipped.edges = (edge_id..add_i32(edge_id, num_edges as i32)?).collect();
             } else if (header & 7) == 7 {
                 // No edges.
                 clipped.contains_center = (header & 8) != 0;
                 let shape_delta = (header >> 4) as i32;
-                clipped.shape_id = ShapeId(shape_id_base + shape_delta);
+                clipped.shape_id = ShapeId(add_i32(shape_id_base, shape_delta)?);
             } else if (header & 3) == 1 {
                 // General case.
                 let num_edges = ((header >> 3) + 1) as usize;
                 clipped.contains_center = (header & 4) != 0;
                 let shape_delta = read_uvarint(&mut r)? as i32;
-                clipped.shape_id = ShapeId(shape_id_base + shape_delta);
+                clipped.shape_id = ShapeId(add_i32(shape_id_base, shape_delta)?);
                 clipped.edges = decode_edges(num_edges, &mut r)?;
             } else {
                 return Err(io::Error::new(
@@ -290,7 +296,7 @@ fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> 
                 ));
             }
 
-            shape_id_base = clipped.shape_id.0 + 1;
+            shape_id_base = add_i32(clipped.shape_id.0, 1)?;
             cell.shapes.push(clipped);
         }
     }
@@ -298,15 +304,26 @@ fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> 
     Ok(cell)
 }
 
+/// Adds two `i32`s from untrusted decoded data, returning `Err` on overflow
+/// (shape/edge ids and their deltas come straight off the wire).
+fn add_i32(a: i32, b: i32) -> io::Result<i32> {
+    a.checked_add(b).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "integer overflow in cell decode",
+        )
+    })
+}
+
 /// Decodes delta-encoded edge IDs.
 fn decode_edges(num_edges: usize, r: &mut dyn Read) -> io::Result<Vec<i32>> {
-    let mut edges = Vec::with_capacity(num_edges);
+    let mut edges = Vec::with_capacity(num_edges.min(MAX_PREALLOC));
     let mut prev = 0i32;
     for _ in 0..num_edges {
         let delta = read_uvarint(r)? as i32;
-        let edge = prev + delta;
+        let edge = add_i32(prev, delta)?;
         edges.push(edge);
-        prev = edge + 1;
+        prev = add_i32(edge, 1)?;
     }
     Ok(edges)
 }

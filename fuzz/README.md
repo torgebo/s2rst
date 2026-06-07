@@ -27,6 +27,9 @@ out of the main `cargo build` / CI matrix; it is built and run only on demand.
 | `decode_string_vector`    | `encoded_string_vector::decode_string_vector`     |
 | `decode_s2cell_id_vector` | `encoded_s2cell_id_vector::decode_s2cell_id_vector` |
 | `decode_s2point_vector`   | `encoded_s2point_vector::decode_s2point_vector`   |
+| `decode_s2shape_index`    | `encoded_s2shape_index::EncodedS2ShapeIndex::init` |
+| `decode_polygon`          | `<Polygon as encoding::S2Decode>::decode`         |
+| `decode_points_compressed`| `point_compression::decode_points_compressed`     |
 
 ## Running
 
