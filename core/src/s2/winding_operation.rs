@@ -49,7 +49,7 @@ use crate::s2::builder::graph::{
 use crate::s2::builder::graph_shape::GraphShape;
 use crate::s2::builder::layer::{IsFullPolygonPredicate, Layer};
 use crate::s2::builder::snap::{IdentitySnapFunction, SnapFunction};
-use crate::s2::builder::{InputEdgeId, InputEdgeIdSetId, Options, S2Builder, S2Error};
+use crate::s2::builder::{InputEdgeId, InputEdgeIdSetId, Options, S2Builder, S2Error, S2ErrorCode};
 use crate::s2::crossing_edge_query::CrossingEdgeQuery;
 use crate::s2::edge_crosser::EdgeCrosser;
 use crate::s2::edge_crossings::angle_contains_vertex;
@@ -217,11 +217,33 @@ impl S2WindingOperation {
         self.builder.add_loop_from_points(loop_vertices);
     }
 
-    /// Executes the operation.
+    /// Executes the operation and returns the result layer.
     ///
     /// `ref_p` — a reference point with known winding number.
     /// `ref_winding` — the winding number at `ref_p`.
     /// `rule` — determines which regions belong to the result.
+    ///
+    /// The boxed layer returned is the same `result_layer` passed to
+    /// [`new`](Self::new) after its output has been built. Downcast it with
+    /// [`Layer::into_any`] to the concrete layer type and call that type's
+    /// output accessor (e.g. `take_output()` / `into_output()`) to retrieve the
+    /// resulting geometry:
+    ///
+    /// ```
+    /// # use s2rst::s2::winding_operation::{S2WindingOperation, WindingOptions, WindingRule};
+    /// # use s2rst::s2::builder::layer::Layer;
+    /// # use s2rst::s2::builder::polygon_layer::S2PolygonLayer;
+    /// # use s2rst::s2::LatLng;
+    /// let mut op = S2WindingOperation::new(Box::new(S2PolygonLayer::new()), WindingOptions::new());
+    /// op.add_loop(&[
+    ///     LatLng::from_degrees(0.0, 0.0).to_point(),
+    ///     LatLng::from_degrees(0.0, 1.0).to_point(),
+    ///     LatLng::from_degrees(1.0, 1.0).to_point(),
+    /// ]);
+    /// let layer = op.build(LatLng::from_degrees(45.0, 45.0).to_point(), 0, WindingRule::Positive).unwrap();
+    /// let polygon = layer.into_any().downcast::<S2PolygonLayer>().unwrap().into_output();
+    /// ```
+    ///
     /// # Errors
     ///
     /// Returns an error if the underlying `S2Builder::build` fails.
@@ -230,7 +252,7 @@ impl S2WindingOperation {
         ref_p: Point,
         ref_winding: i32,
         rule: WindingRule,
-    ) -> Result<(), S2Error> {
+    ) -> Result<Box<dyn Layer>, S2Error> {
         // Add the reference point as a degenerate edge.
         self.ref_input_edge_id = InputEdgeId(self.builder.num_input_edges());
         self.builder.add_point(ref_p);
@@ -249,7 +271,20 @@ impl S2WindingOperation {
             .collect();
         *self.input_edges_shared.borrow_mut() = edges;
 
-        self.builder.build().map(|_layers| ())
+        // The builder owns a single layer: the WindingLayer wrapping the
+        // caller's result layer. Unwrap it and hand the result layer back so the
+        // caller can downcast it and extract the built output.
+        let mut layers = self.builder.build()?;
+        let winding_layer = layers
+            .pop()
+            .and_then(|layer| layer.into_any().downcast::<WindingLayer>().ok())
+            .ok_or_else(|| {
+                S2Error::new(
+                    S2ErrorCode::Internal,
+                    "winding operation lost its result layer",
+                )
+            })?;
+        Ok(winding_layer.result_layer)
     }
 }
 
@@ -615,6 +650,10 @@ impl Layer for WindingLayer {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[path = "winding_operation_tests.rs"]
+mod winding_operation_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::s1::Angle;
@@ -626,8 +665,6 @@ mod tests {
     use crate::s2::shape::Shape;
     use crate::s2::shape_index::ShapeIndex;
     use crate::s2::text_format;
-    use std::cell::RefCell;
-    use std::rc::Rc;
 
     /// Runs `S2WindingOperation` and verifies the result by computing symmetric
     /// difference with expected using `S2BooleanOperation`.
@@ -645,7 +682,6 @@ mod tests {
         expected_index.add(Box::new(expected_polygon));
 
         // Build the actual result.
-        let actual_output = Rc::new(RefCell::new(LaxPolygon::empty()));
         let mut winding_op = S2WindingOperation::new(Box::new(LaxPolygonLayer::new()), options);
 
         for loop_str in loop_strs {
@@ -657,28 +693,45 @@ mod tests {
         }
 
         let ref_point = text_format::parse_point(ref_point_str);
-        let result = winding_op.build(ref_point, ref_winding, rule);
-        assert!(result.is_ok(), "Build failed: {:?}", result.err());
+        let actual = take_lax_polygon(
+            winding_op
+                .build(ref_point, ref_winding, rule)
+                .expect("Build failed"),
+        );
 
         // Verify by computing symmetric difference (should be empty).
         let mut actual_index = ShapeIndex::new();
-        let actual = actual_output.borrow().clone();
-        actual_index.add(Box::new(actual));
+        actual_index.add(Box::new(actual.clone()));
 
-        let diff_output = Rc::new(RefCell::new(LaxPolygon::empty()));
         let mut diff_op = S2BooleanOperation::new(
             OpType::SymmetricDifference,
             Box::new(LaxPolygonLayer::new()),
             BooleanOptions::default(),
         );
-        diff_op
+        let diff_layers = diff_op
             .build(&mut actual_index, &mut expected_index)
             .expect("Diff failed");
+        let diff = diff_layers
+            .into_iter()
+            .next()
+            .map(take_lax_polygon)
+            .unwrap_or_else(LaxPolygon::empty);
         assert!(
-            diff_output.borrow().is_empty(),
+            diff.is_empty(),
             "Result differs from expected. Actual: {}",
-            text_format::lax_polygon_to_string(&actual_output.borrow()),
+            text_format::lax_polygon_to_string(&actual),
         );
+    }
+
+    /// Downcasts a built layer to a `LaxPolygonLayer` and takes its output,
+    /// returning the empty polygon if the layer produced none.
+    fn take_lax_polygon(layer: Box<dyn Layer>) -> LaxPolygon {
+        layer
+            .into_any()
+            .downcast::<LaxPolygonLayer>()
+            .expect("expected a LaxPolygonLayer")
+            .take_output()
+            .unwrap_or_else(LaxPolygon::empty)
     }
 
     fn expect_degenerate_winding_result(

@@ -549,13 +549,24 @@ pub fn contains_brute_force(shape: &dyn Shape, point: Point) -> bool {
 /// Converts a 0-dimensional shape into a list of points.
 ///
 /// Corresponds to C++ `s2shapeutil::ShapeToS2Points`.
-pub fn shape_to_points(shape: &dyn Shape) -> Vec<Point> {
-    debug_assert_eq!(shape.dimension(), Dimension::Point);
+///
+/// # Errors
+///
+/// Returns `Err(S2Error)` with [`S2ErrorCode::InvalidArgument`] if `shape` is
+/// not a dimension-0 (point) shape. Returning an error rather than asserting
+/// keeps this from panicking across an FFI/library boundary.
+pub fn shape_to_points(shape: &dyn Shape) -> Result<Vec<Point>, S2Error> {
+    if shape.dimension() != Dimension::Point {
+        return Err(S2Error::new(
+            S2ErrorCode::InvalidArgument,
+            "shape_to_points requires a dimension-0 (point) shape",
+        ));
+    }
     let mut points = Vec::with_capacity(shape.num_edges());
     for i in 0..shape.num_edges() {
         points.push(shape.edge(i).v0);
     }
-    points
+    Ok(points)
 }
 
 /// Converts a 1-dimensional shape (single chain) into a polyline vertex list.
@@ -1018,6 +1029,10 @@ pub fn build_polygon_boundaries(components: &[Vec<&dyn Shape>]) -> Vec<Vec<usize
 }
 
 #[cfg(test)]
+#[path = "shape_util_tests.rs"]
+mod shape_util_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::s2::shape::{Chain, ChainPosition, Edge, ReferencePoint};
@@ -1285,7 +1300,7 @@ mod tests {
     fn test_shape_to_points() {
         let index = crate::s2::text_format::make_index("0:0 | 1:1 | 2:2 # #");
         let shape = index.shape(0).unwrap();
-        let points = shape_to_points(shape);
+        let points = shape_to_points(shape).unwrap();
         assert_eq!(points.len(), 3);
     }
 
@@ -1825,7 +1840,7 @@ mod tests {
         let points = crate::s2::text_format::parse_points("11:11, 10:0, 5:5");
         let index = crate::s2::text_format::make_index("11:11 | 10:0 | 5:5 # #");
         let shape = index.shape(0).unwrap();
-        let extracted = shape_to_points(shape);
+        let extracted = shape_to_points(shape).unwrap();
         assert_eq!(extracted.len(), 3);
         for (i, pt) in extracted.iter().enumerate() {
             assert_eq!(*pt, points[i], "point mismatch at index {i}");

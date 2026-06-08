@@ -107,6 +107,12 @@ s2rst._core.ShapeIndex
 s2rst._core.OpType
 s2rst._core.PolygonModel
 s2rst._core.PolylineModel
+s2rst._core.EndCapStyle
+s2rst._core.PolylineSide
+s2rst._core.WindingRule
+s2rst._core.BufferOptions
+s2rst._core.BufferOptions.__init__
+s2rst._core.BufferOptions.__new__
 s2rst._core.IdentitySnapFunction
 s2rst._core.IdentitySnapFunction.__init__
 s2rst._core.IdentitySnapFunction.__new__

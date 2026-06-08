@@ -400,11 +400,13 @@ pub struct BreadthFirstTreeBuilder {
 
 impl BreadthFirstTreeBuilder {
     /// Creates a builder that targets `approximate_size_bytes` and stops at `max_level`.
-    pub fn new(approximate_size_bytes: i64, max_level: impl Into<Level>) -> Self {
-        let max_level = max_level.into().as_u8();
+    ///
+    /// `max_level` is clamped to `0..=`[`MAX_CELL_LEVEL`]; values above the
+    /// maximum cell level are treated as the maximum rather than panicking.
+    pub fn new(approximate_size_bytes: i64, max_level: u8) -> Self {
         Self {
             approximate_size_bytes,
-            max_level,
+            max_level: max_level.min(MAX_CELL_LEVEL),
             encoder: TreeEncoder::new(),
         }
     }
@@ -679,7 +681,7 @@ impl S2DensityTree {
         index: &ShapeIndex,
         weight_fn: F,
         approximate_size_bytes: i64,
-        max_level: impl Into<Level>,
+        max_level: u8,
     ) -> Result<(), S2Error> {
         let m = IndexCellWeightFunction::new(index, weight_fn);
         let mut b = BreadthFirstTreeBuilder::new(approximate_size_bytes, max_level);
@@ -688,6 +690,8 @@ impl S2DensityTree {
 
     /// Builds the tree from a shape index using vertex count as weight.
     ///
+    /// `max_level` is clamped to `0..=`[`MAX_CELL_LEVEL`].
+    ///
     /// # Errors
     ///
     /// Returns `Err(S2Error)` if the tree data is corrupt or decoding fails.
@@ -695,7 +699,7 @@ impl S2DensityTree {
         &mut self,
         index: &ShapeIndex,
         approximate_size_bytes: i64,
-        max_level: impl Into<Level>,
+        max_level: u8,
     ) -> Result<(), S2Error> {
         self.init_to_shape_density(
             index,
@@ -719,6 +723,8 @@ impl S2DensityTree {
     ///
     /// Corresponds to C++ `S2DensityTree::InitToFeatureDensity<T>`.
     ///
+    /// `max_level` is clamped to `0..=`[`MAX_CELL_LEVEL`].
+    ///
     /// # Errors
     ///
     /// Returns `Err(S2Error)` if the tree data is corrupt or decoding fails.
@@ -727,7 +733,7 @@ impl S2DensityTree {
         index: &ShapeIndex,
         feature_map: &FeatureMap,
         approximate_size_bytes: i64,
-        max_level: impl Into<Level>,
+        max_level: u8,
     ) -> Result<(), S2Error> {
         let mut m = FeatureCellWeightFunction::new(index, feature_map);
         let mut b = BreadthFirstTreeBuilder::new(approximate_size_bytes, max_level);
@@ -736,6 +742,8 @@ impl S2DensityTree {
 
     /// Builds a tree as the sum of the given trees, with an approximate size limit.
     ///
+    /// `max_level` is clamped to `0..=`[`MAX_CELL_LEVEL`].
+    ///
     /// # Errors
     ///
     /// Returns `Err(S2Error)` if the tree data is corrupt or decoding fails.
@@ -743,7 +751,7 @@ impl S2DensityTree {
         &mut self,
         trees: &[&S2DensityTree],
         approximate_size_bytes: i64,
-        max_level: impl Into<Level>,
+        max_level: u8,
     ) -> Result<(), S2Error> {
         let mut paths: Vec<DecodedPath> = trees.iter().map(|t| DecodedPath::new(t)).collect();
         let mut b = BreadthFirstTreeBuilder::new(approximate_size_bytes, max_level);
@@ -771,15 +779,17 @@ impl S2DensityTree {
 
     /// Builds a tree as the exact sum of the given trees.
     ///
+    /// `max_level` is clamped to `0..=`[`MAX_CELL_LEVEL`].
+    ///
     /// # Errors
     ///
     /// Returns `Err(S2Error)` if the tree data is corrupt or decoding fails.
     pub fn init_to_sum_density(
         &mut self,
         trees: &[&S2DensityTree],
-        max_level: impl Into<Level>,
+        max_level: u8,
     ) -> Result<(), S2Error> {
-        let max_level = max_level.into();
+        let max_level = Level::try_new(max_level).unwrap_or(Level::MAX);
         let mut error = S2Error::ok();
         let mut enc = TreeEncoder::new();
         for tree in trees {
@@ -1325,6 +1335,10 @@ fn varint_length64(mut v: u64) -> usize {
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+#[path = "density_tree_tests.rs"]
+mod density_tree_tests;
 
 #[cfg(test)]
 #[expect(clippy::print_stderr, reason = "test diagnostics")]
@@ -1991,7 +2005,7 @@ mod tests {
     #[test]
     fn test_sum_max_level() {
         let cell = CellId::from_face(5).children()[2].children()[1].children()[0];
-        for max_level in (0..=cell.level().as_u8()).map(Level::new) {
+        for max_level in 0..=cell.level().as_u8() {
             let mut b = BreadthFirstTreeBuilder::new(10000, max_level);
             let mut tree = S2DensityTree::new();
             let cell_copy = cell;

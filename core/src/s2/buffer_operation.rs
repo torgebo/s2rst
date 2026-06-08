@@ -236,6 +236,7 @@ impl BufferOptions {
 /// ```
 /// use s2rst::s1;
 /// use s2rst::s2::buffer_operation::{S2BufferOperation, BufferOptions};
+/// use s2rst::s2::builder::layer::Layer;
 /// use s2rst::s2::builder::polygon_layer::S2PolygonLayer;
 /// use s2rst::s2::LatLng;
 ///
@@ -244,9 +245,15 @@ impl BufferOptions {
 /// let options = BufferOptions::new(s1::Angle::from_degrees(1.0));
 /// let mut op = S2BufferOperation::new(Box::new(layer), options);
 /// op.add_point(LatLng::from_degrees(0.0, 0.0).to_point());
-/// // Note: S2BufferOperation internally owns the layer; extract
-/// // output by using a higher-level API or the layer extraction pattern.
-/// op.build().unwrap();
+/// // build() returns the result layer; downcast it to extract the polygon.
+/// let polygon = op
+///     .build()
+///     .unwrap()
+///     .into_any()
+///     .downcast::<S2PolygonLayer>()
+///     .unwrap()
+///     .into_output();
+/// assert!(!polygon.is_empty_polygon());
 /// ```
 #[derive(Debug)]
 pub struct S2BufferOperation {
@@ -766,13 +773,19 @@ impl S2BufferOperation {
         }
     }
 
-    /// Computes the buffered result and sends it to the output layer.
+    /// Computes the buffered result and returns the output layer.
+    ///
+    /// The boxed layer returned is the same `result_layer` passed to
+    /// [`new`](Self::new) after its output has been built. Downcast it with
+    /// [`Layer::into_any`] to the concrete layer type and call that type's
+    /// output accessor (e.g. `take_output()` / `into_output()`) to retrieve the
+    /// resulting polygon.
     ///
     /// # Errors
     ///
     /// Returns an error if the buffer operation fails (e.g., negative radius
     /// with multiple polygon layers).
-    pub fn build(&mut self) -> Result<(), S2Error> {
+    pub fn build(&mut self) -> Result<Box<dyn Layer>, S2Error> {
         if self.buffer_sign < 0 && self.num_polygon_layers > 1 {
             return Err(S2Error::new(
                 S2ErrorCode::FailedPrecondition,
@@ -896,6 +909,10 @@ pub fn buffer_loop(vertices: &[Point], options: BufferOptions) -> Polygon {
 pub fn buffer_point(point: Point, options: BufferOptions) -> Polygon {
     run_buffer(options, |op| op.add_point(point))
 }
+
+#[cfg(test)]
+#[path = "buffer_operation_tests.rs"]
+mod buffer_operation_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1197,66 +1214,63 @@ mod tests {
     /// Helper: verify that buffering with given input + options produces
     /// output that contains the input (for positive radius) or is contained
     /// by the input (for negative radius), using the containment test from C++.
-    fn test_buffer_containment(vertices: &[Point], buffer_radius: s1::Angle, error_fraction: f64) {
+    /// Downcasts a built layer to a `LaxPolygonLayer` and takes its output,
+    /// returning the empty polygon if the layer produced none.
+    fn take_lax_polygon(layer: Box<dyn Layer>) -> LaxPolygon {
+        layer
+            .into_any()
+            .downcast::<LaxPolygonLayer>()
+            .expect("expected a LaxPolygonLayer")
+            .take_output()
+            .unwrap_or_else(LaxPolygon::empty)
+    }
+
+    /// Computes the set difference `a - b` of two indexed regions and returns
+    /// the resulting polygon (empty when `a` is contained in `b`).
+    fn index_difference(a: &mut ShapeIndex, b: &mut ShapeIndex) -> LaxPolygon {
         use crate::s2::boolean_operation::{OpType, Options as BooleanOptions, S2BooleanOperation};
-        use crate::s2::builder::lax_polygon_layer::LaxPolygonLayer;
+
+        let mut op = S2BooleanOperation::new(
+            OpType::Difference,
+            Box::new(LaxPolygonLayer::new()),
+            BooleanOptions::default(),
+        );
+        let layers = op.build(a, b).expect("Difference failed");
+        layers
+            .into_iter()
+            .next()
+            .map(take_lax_polygon)
+            .unwrap_or_else(LaxPolygon::empty)
+    }
+
+    fn test_buffer_containment(vertices: &[Point], buffer_radius: s1::Angle, error_fraction: f64) {
         use crate::s2::lax_loop::LaxLoop;
-        use crate::s2::lax_polygon::LaxPolygon;
         use crate::s2::shape_index::ShapeIndex;
 
         let mut options = BufferOptions::new(buffer_radius);
         options.set_error_fraction(error_fraction);
         let max_error = options.max_error();
 
-        // Build the buffered output.
-        let output_poly = Rc::new(RefCell::new(LaxPolygon::empty()));
-        let layer = LaxPolygonLayer::new_legacy(Rc::clone(&output_poly));
-        let mut op = S2BufferOperation::new(Box::new(layer), options);
+        // Build the buffered output via the public output-extraction API.
+        let mut op = S2BufferOperation::new(Box::new(LaxPolygonLayer::new()), options);
         op.add_loop(vertices);
-        op.build().expect("Build failed");
+        let output = take_lax_polygon(op.build().expect("Build failed"));
 
-        let output = output_poly.borrow().clone();
+        let mut input_index = ShapeIndex::new();
+        input_index.add(Box::new(LaxLoop::new(vertices.to_vec())));
+        let mut output_index = ShapeIndex::new();
+        output_index.add(Box::new(output.clone()));
 
         if buffer_radius.radians() > max_error.radians() {
-            // Positive: output should contain input.
-            let mut input_index = ShapeIndex::new();
-            input_index.add(Box::new(LaxLoop::new(vertices.to_vec())));
-            let mut output_index = ShapeIndex::new();
-            output_index.add(Box::new(output.clone()));
-
-            let contains_output = Rc::new(RefCell::new(LaxPolygon::empty()));
-            let contains_layer = LaxPolygonLayer::new();
-            let mut contains_op = S2BooleanOperation::new(
-                OpType::Difference,
-                Box::new(contains_layer),
-                BooleanOptions::default(),
-            );
-            contains_op
-                .build(&mut input_index, &mut output_index)
-                .unwrap();
+            // Positive radius: output should contain input, so input - output = ∅.
             assert!(
-                contains_output.borrow().is_empty(),
+                index_difference(&mut input_index, &mut output_index).is_empty(),
                 "Output should contain input (positive buffer radius)",
             );
         } else if buffer_radius.radians() < -max_error.radians() {
-            // Negative: input should contain output.
-            let mut input_index = ShapeIndex::new();
-            input_index.add(Box::new(LaxLoop::new(vertices.to_vec())));
-            let mut output_index = ShapeIndex::new();
-            output_index.add(Box::new(output.clone()));
-
-            let contains_output = Rc::new(RefCell::new(LaxPolygon::empty()));
-            let contains_layer = LaxPolygonLayer::new();
-            let mut contains_op = S2BooleanOperation::new(
-                OpType::Difference,
-                Box::new(contains_layer),
-                BooleanOptions::default(),
-            );
-            contains_op
-                .build(&mut output_index, &mut input_index)
-                .unwrap();
+            // Negative radius: input should contain output, so output - input = ∅.
             assert!(
-                contains_output.borrow().is_empty(),
+                index_difference(&mut output_index, &mut input_index).is_empty(),
                 "Input should contain output (negative buffer radius)",
             );
         }

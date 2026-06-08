@@ -55,6 +55,30 @@ def test_repr():
     assert "ConvexHullQuery" in repr(s2rst.ConvexHullQuery())
 
 
+def test_handles_degenerate_and_non_finite_points():
+    # Non-finite points (a user can build one, e.g. S2Point(inf, ...), whose
+    # normalization yields NaN) are ignored rather than crashing the interpreter
+    # in core's exact predicates. Duplicate and collinear finite points are fine.
+    q = s2rst.ConvexHullQuery()
+    q.add_point(_point(0, 0))
+    q.add_point(_point(0, 0))  # duplicate
+    q.add_point(_point(0, 10))
+    q.add_point(_point(0, 20))  # collinear on the equator
+    q.add_point(_point(10, 5))
+    q.add_point(s2rst.S2Point(float("inf"), 0.0, 0.0))  # -> NaN, ignored
+    q.add_point(s2rst.S2Point(float("nan"), 1.0, 2.0))  # ignored
+    hull = q.convex_hull()  # must not raise
+    assert hull.num_vertices() >= 3
+    assert hull.area() > 0
+
+
+def test_only_non_finite_points_yields_empty_hull():
+    q = s2rst.ConvexHullQuery()
+    q.add_point(s2rst.S2Point(float("nan"), 0.0, 0.0))
+    q.add_point(s2rst.S2Point(float("inf"), float("-inf"), 0.0))
+    assert q.convex_hull().is_empty_loop()
+
+
 @given(
     pts=st.lists(
         st.tuples(

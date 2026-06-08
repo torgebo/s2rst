@@ -13,6 +13,7 @@ use pyo3::prelude::*;
 
 mod angle;
 mod boolean;
+mod buffer;
 mod builder;
 mod cell_query;
 mod cells;
@@ -47,8 +48,10 @@ mod term_index;
 mod tessellator;
 mod text;
 mod toolkit;
+mod winding;
 
 use angle::{PyAngle, PyChordAngle};
+use buffer::{PyBufferOptions, buffer_loop, buffer_point, buffer_polygon, buffer_polyline};
 use builder::PyS2Builder;
 use cell_query::{PyCellQueryResult, PyClosestCellQuery};
 use cells::{PyCell, PyCellId, PyCellUnion};
@@ -60,7 +63,10 @@ use density::{PyDensityClusterQuery, PyS2DensityTree};
 use earth::PyEarth;
 use edge_queries::{PyClosestEdgeQuery, PyEdgeQueryResult, PyFurthestEdgeQuery};
 use encoding_rich::{PyEncodedS2ShapeIndex, PySequenceLexicon, PyValueLexicon};
-use enums::{PyCrossingType, PyOpType, PyPolygonModel, PyPolylineModel, PyVertexModel};
+use enums::{
+    PyCrossingType, PyEndCapStyle, PyOpType, PyPolygonModel, PyPolylineModel, PyPolylineSide,
+    PyVertexModel, PyWindingRule,
+};
 use geometry::{PyLoop, PyPolygon, PyPolyline};
 use index::PyShapeIndex;
 use interval::{PyR1Interval, PyS1Interval};
@@ -84,6 +90,7 @@ use snap::{PyIdentitySnapFunction, PyIntLatLngSnapFunction, PyS2CellIdSnapFuncti
 use term_index::{PyRegionSharder, PyRegionTermIndexer};
 use tessellator::PyEdgeTessellator;
 use toolkit::{PyCrossing, PyDirection, PyEdgeCrosser, PyWedgeRel};
+use winding::winding_operation;
 
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -134,6 +141,9 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPolygonModel>()?;
     m.add_class::<PyPolylineModel>()?;
     m.add_class::<PyCrossingType>()?;
+    m.add_class::<PyEndCapStyle>()?;
+    m.add_class::<PyPolylineSide>()?;
+    m.add_class::<PyWindingRule>()?;
     // Snap functions
     m.add_class::<PyIdentitySnapFunction>()?;
     m.add_class::<PyS2CellIdSnapFunction>()?;
@@ -189,6 +199,14 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(boolean::intersects, m)?)?;
     m.add_function(wrap_pyfunction!(boolean::contains, m)?)?;
     m.add_function(wrap_pyfunction!(boolean::equals, m)?)?;
+    // Buffer operations (expand/contract by a radius)
+    m.add_class::<PyBufferOptions>()?;
+    m.add_function(wrap_pyfunction!(buffer_point, m)?)?;
+    m.add_function(wrap_pyfunction!(buffer_polyline, m)?)?;
+    m.add_function(wrap_pyfunction!(buffer_loop, m)?)?;
+    m.add_function(wrap_pyfunction!(buffer_polygon, m)?)?;
+    // Winding operation (N-way boolean via winding numbers)
+    m.add_function(wrap_pyfunction!(winding_operation, m)?)?;
     m.add_class::<PyRegionTermIndexer>()?;
     m.add_class::<PyRegionSharder>()?;
     m.add_class::<PyPolylineSimplifier>()?;

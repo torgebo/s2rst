@@ -339,15 +339,9 @@ pub fn get_v_axis(face: u8) -> PyResult<PyS2Point> {
 #[pyfunction]
 pub fn shape_to_points(shape: &PyShape) -> PyResult<Vec<PyS2Point>> {
     shape.with_shape(|s| {
-        if u8::from(s.dimension()) != 0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "shape_to_points requires a dimension-0 (point) shape",
-            ));
-        }
-        Ok(shape_util::shape_to_points(s)
-            .into_iter()
-            .map(PyS2Point)
-            .collect())
+        let pts = shape_util::shape_to_points(s)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(pts.into_iter().map(PyS2Point).collect::<Vec<_>>())
     })
 }
 

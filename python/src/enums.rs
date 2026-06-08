@@ -11,8 +11,10 @@
 use pyo3::prelude::*;
 
 use s2rst::s2::boolean_operation::{OpType, PolygonModel, PolylineModel};
+use s2rst::s2::buffer_operation::{EndCapStyle, PolylineSide};
 use s2rst::s2::contains_point_query::VertexModel;
 use s2rst::s2::crossing_edge_query::CrossingType;
+use s2rst::s2::winding_operation::WindingRule;
 
 /// Boundary semantics for point-in-polygon containment tests.
 ///
@@ -125,6 +127,78 @@ impl PyCrossingType {
         match self {
             PyCrossingType::Interior => CrossingType::Interior,
             PyCrossingType::All => CrossingType::All,
+        }
+    }
+}
+
+/// Whether a buffered polyline's end caps are round or flat.
+#[pyclass(eq, eq_int, hash, frozen, name = "EndCapStyle", module = "s2rst")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PyEndCapStyle {
+    #[pyo3(name = "ROUND")]
+    Round,
+    #[pyo3(name = "FLAT")]
+    Flat,
+}
+
+impl PyEndCapStyle {
+    pub(crate) fn to_core(self) -> EndCapStyle {
+        match self {
+            PyEndCapStyle::Round => EndCapStyle::Round,
+            PyEndCapStyle::Flat => EndCapStyle::Flat,
+        }
+    }
+}
+
+/// Which side(s) of a polyline are buffered.
+#[pyclass(eq, eq_int, hash, frozen, name = "PolylineSide", module = "s2rst")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PyPolylineSide {
+    #[pyo3(name = "LEFT")]
+    Left,
+    #[pyo3(name = "RIGHT")]
+    Right,
+    #[pyo3(name = "BOTH")]
+    Both,
+}
+
+impl PyPolylineSide {
+    pub(crate) fn to_core(self) -> PolylineSide {
+        match self {
+            PyPolylineSide::Left => PolylineSide::Left,
+            PyPolylineSide::Right => PolylineSide::Right,
+            PyPolylineSide::Both => PolylineSide::Both,
+        }
+    }
+}
+
+/// The winding rule selecting which regions belong to a winding operation's
+/// result.
+///
+/// - `POSITIVE`: winding number > 0 (N-way union).
+/// - `NEGATIVE`: winding number < 0.
+/// - `NON_ZERO`: winding number != 0.
+/// - `ODD`: winding number is odd (N-way symmetric difference).
+#[pyclass(eq, eq_int, hash, frozen, name = "WindingRule", module = "s2rst")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PyWindingRule {
+    #[pyo3(name = "POSITIVE")]
+    Positive,
+    #[pyo3(name = "NEGATIVE")]
+    Negative,
+    #[pyo3(name = "NON_ZERO")]
+    NonZero,
+    #[pyo3(name = "ODD")]
+    Odd,
+}
+
+impl PyWindingRule {
+    pub(crate) fn to_core(self) -> WindingRule {
+        match self {
+            PyWindingRule::Positive => WindingRule::Positive,
+            PyWindingRule::Negative => WindingRule::Negative,
+            PyWindingRule::NonZero => WindingRule::NonZero,
+            PyWindingRule::Odd => WindingRule::Odd,
         }
     }
 }

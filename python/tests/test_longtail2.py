@@ -95,3 +95,14 @@ def test_density_tree_and_clusters():
     coverings = s2rst.DensityClusterQuery(5).coverings(tree)
     assert len(coverings) >= 1
     assert all(isinstance(cu, s2rst.CellUnion) for cu in coverings)
+
+
+def test_density_tree_max_level_clamped():
+    # max_level above the maximum cell level (30) is clamped, not a panic.
+    index = _density_index()
+    clamped = s2rst.S2DensityTree()
+    clamped.init_to_vertex_density(index, 1_000_000, 200)
+    at_max = s2rst.S2DensityTree()
+    at_max.init_to_vertex_density(index, 1_000_000, 30)
+    assert not clamped.is_empty()
+    assert clamped.encoded_size() == at_max.encoded_size()

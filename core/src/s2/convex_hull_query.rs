@@ -61,7 +61,16 @@ impl ConvexHullQuery {
     }
 
     /// Adds a single point to the input geometry.
+    ///
+    /// Points with a non-finite (NaN or infinite) coordinate are silently
+    /// ignored: they are not valid locations on the sphere and would otherwise
+    /// reach the exact-predicate path, where converting a non-finite value to
+    /// `ExactFloat` panics. Dropping them leaves a defined hull of the
+    /// remaining valid points.
     pub fn add_point(&mut self, p: Point) {
+        if !is_finite(p) {
+            return;
+        }
         self.bound = self.bound.add_point(LatLng::from_point(p));
         self.points.push(p);
     }
@@ -158,6 +167,16 @@ impl Default for ConvexHullQuery {
     }
 }
 
+/// Returns `true` if every coordinate of `p` is finite (no NaN or infinity).
+///
+/// `Point` wraps a public `Vector`, so a caller can construct a non-finite
+/// point directly (e.g. `Point::from_coords(f64::INFINITY, 0.0, 0.0)`, whose
+/// normalization yields NaN). Such points are filtered out before they reach
+/// the exact geometric predicates, which panic on non-finite input.
+fn is_finite(p: Point) -> bool {
+    p.0.x.is_finite() && p.0.y.is_finite() && p.0.z.is_finite()
+}
+
 /// Andrew's monotone chain: selects the maximal subset of points such that
 /// the edge chain makes only left (CCW) turns.
 fn monotone_chain(points: &[Point]) -> Vec<Point> {
@@ -203,6 +222,10 @@ fn single_edge_loop(a: Point, b: Point) -> Loop {
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+#[path = "convex_hull_query_tests.rs"]
+mod convex_hull_query_tests;
 
 #[cfg(test)]
 mod tests {

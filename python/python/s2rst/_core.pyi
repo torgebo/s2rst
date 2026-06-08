@@ -2890,6 +2890,75 @@ def equals(
     ...
 
 # ---------------------------------------------------------------------------
+# buffer / winding operations
+# ---------------------------------------------------------------------------
+
+class BufferOptions:
+    """Options controlling a buffer operation.
+
+    ``radius`` is the buffer distance (a positive ``Angle`` expands, a negative
+    one contracts). ``error_fraction`` and ``circle_segments`` are two ways to
+    trade fidelity against output size; both are clamped to their valid ranges.
+    ``end_cap_style`` and ``polyline_side`` only affect polyline buffering.
+    """
+
+    def __init__(
+        self,
+        radius: Angle,
+        *,
+        error_fraction: float | None = None,
+        circle_segments: float | None = None,
+        end_cap_style: EndCapStyle = ...,
+        polyline_side: PolylineSide = ...,
+        snap_function: SnapFunction | None = None,
+    ) -> None: ...
+    @property
+    def radius(self) -> Angle:
+        """The buffer radius (positive expands, negative contracts)."""
+        ...
+
+    @property
+    def end_cap_style(self) -> EndCapStyle:
+        """The end cap style applied when buffering polylines."""
+        ...
+
+    @property
+    def polyline_side(self) -> PolylineSide:
+        """Which side(s) of a polyline are buffered."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+def buffer_point(point: S2Point, options: BufferOptions) -> Polygon:
+    """Buffer a single point into a disc-shaped Polygon."""
+    ...
+
+def buffer_polyline(polyline: Polyline, options: BufferOptions) -> Polygon:
+    """Buffer a polyline's path into a Polygon."""
+    ...
+
+def buffer_loop(loop_: Loop, options: BufferOptions) -> Polygon:
+    """Buffer a loop's boundary into a Polygon."""
+    ...
+
+def buffer_polygon(polygon: Polygon, options: BufferOptions) -> Polygon:
+    """Buffer a polygon (positive radius expands, negative contracts)."""
+    ...
+
+def winding_operation(
+    loops: list[list[S2Point]],
+    ref_point: S2Point,
+    ref_winding: int,
+    rule: WindingRule,
+    *,
+    snap_function: SnapFunction | None = None,
+    include_degeneracies: bool = False,
+) -> Polygon:
+    """Partition the sphere by winding number over ``loops`` and return the
+    region selected by ``rule`` as a Polygon."""
+    ...
+
+# ---------------------------------------------------------------------------
 # encoding: round-trip geometry to/from bytes
 # ---------------------------------------------------------------------------
 
@@ -3351,6 +3420,27 @@ class CrossingType:
 
     INTERIOR: ClassVar["CrossingType"]
     ALL: ClassVar["CrossingType"]
+
+class EndCapStyle:
+    """Whether a buffered polyline's end caps are round or flat."""
+
+    ROUND: ClassVar["EndCapStyle"]
+    FLAT: ClassVar["EndCapStyle"]
+
+class PolylineSide:
+    """Which side(s) of a polyline are buffered."""
+
+    LEFT: ClassVar["PolylineSide"]
+    RIGHT: ClassVar["PolylineSide"]
+    BOTH: ClassVar["PolylineSide"]
+
+class WindingRule:
+    """The winding rule selecting which regions belong to a winding result."""
+
+    POSITIVE: ClassVar["WindingRule"]
+    NEGATIVE: ClassVar["WindingRule"]
+    NON_ZERO: ClassVar["WindingRule"]
+    ODD: ClassVar["WindingRule"]
 
 class CrossingEdgeQuery:
     """Finds the edges in a ShapeIndex that a query edge crosses."""
