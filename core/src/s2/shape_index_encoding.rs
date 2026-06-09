@@ -421,6 +421,29 @@ impl ShapeIndex {
 
         // 3. Decode cell IDs and cells.
         let cell_ids = encoded_s2cell_id_vector::decode_s2cell_id_vector(r)?;
+        // The encoder emits valid cell IDs in strictly increasing order, and the
+        // query path relies on it: `seek` binary-searches the cell vector, while
+        // `range_min`/`range_max` (which compute `lsb() - 1`) and `center` (via
+        // `to_point`, which indexes the 6-entry face table) assume each ID is a
+        // valid S2 cell. Arbitrary bytes can decode to invalid or unordered IDs
+        // (e.g. id 0, whose `lsb()` is 0, underflowing `lsb() - 1`), so reject
+        // them here rather than letting a later query overflow or panic.
+        let mut prev: Option<CellId> = None;
+        for &cid in &cell_ids {
+            if !cid.is_valid() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "shape index contains an invalid cell id",
+                ));
+            }
+            if prev.is_some_and(|p| cid <= p) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "shape index cell ids must be strictly increasing",
+                ));
+            }
+            prev = Some(cid);
+        }
         let cell_data = encoded_string_vector::decode_string_vector(r)?;
         if cell_ids.len() != cell_data.len() {
             return Err(io::Error::new(
@@ -438,6 +461,34 @@ impl ShapeIndex {
         // Decode each cell.
         for (i, cid) in cell_ids.iter().enumerate() {
             let cell = decode_cell(&cell_data[i], num_shapes)?;
+            // A cell's clipped shapes carry a shape id and edge ids decoded from
+            // deltas, neither of which `decode_cell` range-checks. The query path
+            // (e.g. `ContainsPointQuery`) indexes `index.shape(shape_id)` and then
+            // `shape.edge(edge_id)` directly, so a negative or out-of-range id
+            // would panic (`ShapeId::as_usize` assert, or out-of-bounds). The
+            // encoder only ever emits in-range ids for a present shape, so reject
+            // anything else here. (Validating the shape id before `index.shape`
+            // also keeps that lookup below from tripping the same assert.)
+            for clipped in &cell.shapes {
+                let shape_id = clipped.shape_id.0;
+                if shape_id < 0 || shape_id as usize >= num_shapes {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "shape index cell references an out-of-range shape id",
+                    ));
+                }
+                let num_edges = index.shape(clipped.shape_id).map_or(0, Shape::num_edges);
+                if clipped
+                    .edges
+                    .iter()
+                    .any(|&e| e < 0 || (e as usize) >= num_edges)
+                {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "shape index cell references an out-of-range edge id",
+                    ));
+                }
+            }
             index.insert_cell(*cid, cell);
         }
         index.mark_built();

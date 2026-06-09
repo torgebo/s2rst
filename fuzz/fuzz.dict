@@ -1,0 +1,35 @@
+# libFuzzer dictionary for the s2rst byte decoders.
+#
+# Passed to every target via `-dict=fuzz.dict`. Entries that don't apply to a
+# given target are simply never useful mutations — a shared dict is safe.
+#
+# The highest-value entry is the S2DensityTree magic: `init` rejects any input
+# that doesn't start with this exact 14-byte prefix, so without it a fuzzer
+# (cold corpus) brute-forces ~2^112 bytes before reaching the decoder at all
+# (see fuzz/README.md, "magic prefix is a coverage wall").
+magic_density_tree="S2DensityTree0"
+
+# Encoding version bytes that gate the S2Decode dispatch in core/src/s2/encoding.rs.
+# A leading byte not in this set makes most decoders bail immediately.
+ver_lossless="\x01"
+ver_polyline_compressed="\x02"
+ver_polygon_compressed="\x04"
+ver_zero="\x00"
+
+# Common fixed-width little-endian counts/lengths the decoders read up front
+# (u32 vertex/loop counts, u64 cell counts). Seeding these lets the fuzzer flip
+# straight to small, valid-shaped sizes instead of discovering them byte by byte.
+u32_zero="\x00\x00\x00\x00"
+u32_one="\x01\x00\x00\x00"
+u32_two="\x02\x00\x00\x00"
+u64_one="\x01\x00\x00\x00\x00\x00\x00\x00"
+u64_two="\x02\x00\x00\x00\x00\x00\x00\x00"
+
+# All-ones words — exercise the overflow / too-many-elements rejection paths.
+u32_max="\xff\xff\xff\xff"
+u64_max="\xff\xff\xff\xff\xff\xff\xff\xff"
+
+# Varint bytes: continuation-bit set vs. terminal, plus a near-i64::MAX tail
+# (the shape used by the density-tree offset-overflow reproducers A/B).
+varint_continue="\x80"
+varint_max_tail="\xff\xff\xff\xff\xff\xff\xff\xff\x7f"

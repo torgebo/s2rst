@@ -73,5 +73,75 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "decode_density_tree"
+path = "fuzz_targets/decode_density_tree.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "density_tree_ops"
+path = "fuzz_targets/density_tree_ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_shape_index_eager"
+path = "fuzz_targets/decode_shape_index_eager.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_loop"
+path = "fuzz_targets/decode_loop.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_lax_polygon"
+path = "fuzz_targets/decode_lax_polygon.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_lax_polyline"
+path = "fuzz_targets/decode_lax_polyline.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_polyline"
+path = "fuzz_targets/decode_polyline.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_cell_union"
+path = "fuzz_targets/decode_cell_union.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_cell"
+path = "fuzz_targets/decode_cell.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_cap"
+path = "fuzz_targets/decode_cap.rs"
+test = false
+doc = false
+bench = false
+
 # Keep the fuzz crate out of the parent workspace.
 [workspace]

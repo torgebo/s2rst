@@ -2,6 +2,12 @@
 # AddressSanitizer). The fast, bounded robustness checks already run on every PR
 # in the `test` workflow via `cargo test` (core/tests/decoder_robustness.rs);
 # this lane runs the longer campaigns that are too slow for per-PR CI.
+#
+# Every target runs here (not just the original eight): the matrix below is the
+# full output of `cargo +nightly fuzz list`. Each leg restores its accumulated
+# corpus from the previous night's run via actions/cache and seeds a cold cache
+# from the committed fuzz/seeds/<target>/ inputs, so coverage compounds across
+# nights instead of restarting from zero every time.
 name: fuzz
 
 on:
@@ -28,6 +34,16 @@ jobs:
           - decode_s2shape_index
           - decode_polygon
           - decode_points_compressed
+          - decode_density_tree
+          - density_tree_ops
+          - decode_shape_index_eager
+          - decode_loop
+          - decode_lax_polygon
+          - decode_lax_polyline
+          - decode_polyline
+          - decode_cell_union
+          - decode_cell
+          - decode_cap
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust nightly
@@ -39,6 +55,17 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-fuzz
+      # Persist each target's coverage-guided corpus between nightly runs. The
+      # run_id in the key makes every run save a fresh entry; restore-keys does
+      # a prefix match to pull in the most recent prior corpus. Without this the
+      # 5-minute budget below would rediscover the same shallow coverage nightly.
+      - name: Restore corpus
+        uses: actions/cache@v4
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
       - name: Fuzz ${{ matrix.target }} (5 min)
         working-directory: fuzz
         # Pin the build target explicitly. cargo-fuzz is installed here via
@@ -47,7 +74,17 @@ jobs:
         # triple (x86_64-unknown-linux-musl). That target's std isn't installed
         # and musl's static libc is incompatible with -Zsanitizer=address, so
         # the harness fails to compile. Forcing the gnu host triple fixes both.
-        run: cargo +nightly fuzz run ${{ matrix.target }} --target x86_64-unknown-linux-gnu -- -max_total_time=300 -rss_limit_mb=4096
+        #
+        # Positional dirs: the (cached, writable) corpus first, then the
+        # committed read-only seeds — libFuzzer merges the seeds in on every run
+        # so a cold cache still clears coverage walls like the density-tree magic
+        # prefix. `-dict` biases mutations toward magic/version/count tokens.
+        run: |
+          mkdir -p corpus/${{ matrix.target }}
+          cargo +nightly fuzz run ${{ matrix.target }} \
+            --target x86_64-unknown-linux-gnu \
+            corpus/${{ matrix.target }} seeds/${{ matrix.target }} \
+            -- -dict=fuzz.dict -max_total_time=300 -rss_limit_mb=4096
       - name: Upload crash reproducer
         if: failure()
         uses: actions/upload-artifact@v4
