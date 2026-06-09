@@ -11,3 +11,6 @@ find_package(s2 CONFIG REQUIRED)
 
 add_executable(generate_cellid generate_cellid.cc)
 target_link_libraries(generate_cellid PRIVATE s2::s2)
+
+add_executable(generate_boolean_op generate_boolean_op.cc)
+target_link_libraries(generate_boolean_op PRIVATE s2::s2)

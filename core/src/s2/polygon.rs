@@ -1355,7 +1355,14 @@ impl PolygonShape {
 
         for l in &p.loops {
             let ne = l.num_edges();
-            loops_data.push((l.vertices().to_vec(), l.contains_origin()));
+            // Snapshot vertices in *oriented* order (hole loops reversed), so
+            // that every edge has the polygon interior on its left. This
+            // matches C++ S2Polygon::Shape, which reads `oriented_vertex()`.
+            let mut verts = l.vertices().to_vec();
+            if l.is_hole() {
+                verts.reverse();
+            }
+            loops_data.push((verts, l.contains_origin()));
             edges_per_loop.push(ne);
             total += ne;
             cumulative.push(total);
@@ -1440,8 +1447,12 @@ impl Shape for Polygon {
         debug_assert!(id < self.num_edges);
         let (loop_idx, edge_in_loop) = self.edge_to_loop(id);
         let l = &self.loops[loop_idx];
-        let next = (edge_in_loop + 1) % l.num_vertices();
-        Edge::new(l.vertex(edge_in_loop), l.vertex(next))
+        // Use oriented vertices (hole loops reversed) so the polygon interior
+        // is on the left of every edge, matching C++ S2Polygon::Shape::edge.
+        Edge::new(
+            l.oriented_vertex(edge_in_loop),
+            l.oriented_vertex(edge_in_loop + 1),
+        )
     }
 
     fn reference_point(&self) -> ReferencePoint {
@@ -1469,8 +1480,8 @@ impl Shape for Polygon {
         debug_assert!(chain_id < self.num_chains());
         let l = &self.loops[chain_id];
         debug_assert!(offset < l.num_vertices());
-        let next = (offset + 1) % l.num_vertices();
-        Edge::new(l.vertex(offset), l.vertex(next))
+        // Oriented vertices, matching C++ S2Polygon::Shape::chain_edge.
+        Edge::new(l.oriented_vertex(offset), l.oriented_vertex(offset + 1))
     }
 
     fn chain_position(&self, edge_id: usize) -> ChainPosition {
@@ -3731,8 +3742,10 @@ mod tests {
                 assert_eq!(polygon.chain(i).length, lp.num_vertices());
                 for j in 0..lp.num_vertices() {
                     let edge = polygon.edge(e);
-                    assert_eq!(edge.v0, lp.vertex(j));
-                    assert_eq!(edge.v1, lp.vertex((j + 1) % lp.num_vertices()));
+                    // C++ TestPolygonShape asserts oriented_vertex: hole-loop
+                    // edges are reversed so the interior is on the left.
+                    assert_eq!(edge.v0, lp.oriented_vertex(j));
+                    assert_eq!(edge.v1, lp.oriented_vertex(j + 1));
                     e += 1;
                 }
             }
@@ -3792,7 +3805,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug1() {
             // "Given edges do not form loops (indegree != outdegree)"
             let mut a = make_polygon_from_loops(vec![vec![
@@ -3864,7 +3876,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug2() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -3915,7 +3926,8 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
+        // Passes and matches the C++ reference exactly (1 loop / 20 vertices);
+        // see core/tests/cpp_boolean_op_diff.rs and BUG.md §2.
         fn test_bug3() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -4046,7 +4058,9 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
+        // Fixed by the hole-orientation fix (Shape impls now emit hole-loop
+        // edges via oriented_vertex, interior-on-left); matches the C++
+        // reference exactly. See BUG.md §2.
         fn test_bug4() {
             let mut a = make_polygon_from_loops(vec![
                 vec![
@@ -4151,7 +4165,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug5() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -4242,7 +4255,8 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
+        // Passes and matches the C++ reference exactly (1 loop / 18 vertices);
+        // see core/tests/cpp_boolean_op_diff.rs and BUG.md §2.
         fn test_bug6() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -4333,7 +4347,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug7() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -4653,7 +4666,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug8() {
             // "Loop 1: Edge 1 crosses edge 3" — C++ only logs, we check non-empty
             let mut a = make_polygon_from_loops(vec![vec![
@@ -4745,7 +4757,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug9() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -4796,7 +4807,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug10() {
             // "Inconsistent loop orientations detected" — C++ only logs, we check non-empty
             let mut a = make_polygon_from_loops(vec![vec![
@@ -5306,7 +5316,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug11() {
             let mut a = make_polygon_from_loops(vec![
                 vec![
@@ -5576,7 +5585,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "graph_edge_clipper near-degenerate edge case not yet fixed"]
         fn test_bug12() {
             let mut a = make_polygon_from_loops(vec![vec![
                 pt(
@@ -5630,7 +5638,6 @@ mod tests {
     // ─── Additional ported C++ tests ─────────────────────────────────────
 
     #[test]
-    #[ignore = "graph_edge_clipper near-degenerate edge case"]
     fn test_union_with_ambiguous_crossings() {
         // C++ UnionWithAmbgiuousCrossings — two nearly-overlapping triangles
         // whose edges have ambiguous crossing points. The union should be non-empty.
@@ -5943,3 +5950,7 @@ mod tests {
         assert!(back.is_empty_polygon());
     }
 }
+
+#[cfg(test)]
+#[path = "polygon_tests.rs"]
+mod polygon_tests;

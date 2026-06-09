@@ -49,6 +49,26 @@ impl IdSetLexicon {
         }
     }
 
+    /// Returns the set ID for a single-element set without needing a lexicon
+    /// instance (singletons are encoded inline, not stored).
+    ///
+    /// Mirrors C++ `IdSetLexicon::AddSingleton`. Note the *encoding* differs
+    /// from C++: C++ encodes singletons as the raw value itself, while this
+    /// port encodes them as `-(value + 1)`. Callers must therefore never push
+    /// raw values as set IDs — a line-for-line port of C++ code that does so
+    /// silently decodes to the wrong set here.
+    pub const fn add_singleton(value: i32) -> i32 {
+        -(value + 1)
+    }
+
+    /// Decodes a singleton set ID back to its single element.
+    ///
+    /// REQUIRES: `id` encodes a singleton (`id < 0` and `id != EMPTY_SET_ID`).
+    pub const fn singleton_value(id: i32) -> i32 {
+        debug_assert!(id < 0 && id != EMPTY_SET_ID);
+        -id - 1
+    }
+
     /// Adds a set and returns its ID. Identical sets return the same ID.
     pub fn add_set(&mut self, values: &[i32]) -> i32 {
         if values.is_empty() {
@@ -259,3 +279,7 @@ mod tests {
         id == EMPTY_SET_ID && lex.id_set(id).is_empty()
     }
 }
+
+#[cfg(test)]
+#[path = "id_set_lexicon_tests.rs"]
+mod id_set_lexicon_tests;

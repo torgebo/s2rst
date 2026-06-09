@@ -936,7 +936,14 @@ impl<'a> Impl<'a> {
                     let mut crossing = IndexCrossing::new(a.id, b.id);
                     if is_interior {
                         crossing.is_interior_crossing = true;
-                        if predicates::sign(a.edge.v0, a.edge.v1, b.edge.v0) {
+                        // Must use the exact orientation predicate here, matching
+                        // C++ `s2pred::Sign(...) > 0`. The fast `predicates::sign`
+                        // can return the wrong sign for near-degenerate crossings,
+                        // which inverts `left_to_right` and breaks the downstream
+                        // GraphEdgeClipper invariants (see BUG.md §2).
+                        if predicates::robust_sign(a.edge.v0, a.edge.v1, b.edge.v0)
+                            == predicates::Direction::CounterClockwise
+                        {
                             crossing.left_to_right = true;
                         }
                         if let Some(builder) = builder.as_mut() {
@@ -1271,7 +1278,13 @@ impl Layer for SharedEdgeClippingLayer {
                 [Vec::new(), Vec::new(), Vec::new()];
 
             for i in 0..new_edges.len() {
-                let d = input_dimensions[new_input_edge_ids[i] as usize].as_usize();
+                // The clipper emits singleton set ids; decode to the input
+                // edge id. (C++ indexes with the raw set id because its
+                // lexicon encodes singletons as the value itself.)
+                let input_id = crate::s2::builder::id_set_lexicon::IdSetLexicon::singleton_value(
+                    new_input_edge_ids[i],
+                );
+                let d = input_dimensions[input_id as usize].as_usize();
                 layer_edges[d].push(new_edges[i]);
                 layer_input_edge_ids[d].push(new_input_edge_ids[i]);
             }

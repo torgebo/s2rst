@@ -26,6 +26,7 @@
 use std::cmp::{max, min};
 
 use crate::s2::builder::graph::{Edge, EdgeId, Graph, VertexId};
+use crate::s2::builder::id_set_lexicon::IdSetLexicon;
 use crate::s2::builder::{InputEdgeId, InputEdgeIdSetId};
 use crate::s2::point_measures;
 use crate::s2::predicates;
@@ -177,7 +178,13 @@ impl<'a> GraphEdgeClipper<'a> {
 
     fn add_edge(&mut self, edge: Edge, input_edge_id: InputEdgeId) {
         self.new_edges.push(edge);
-        self.new_input_edge_ids.push(input_edge_id.0);
+        // C++ pushes the raw input edge id here because its IdSetLexicon
+        // encodes singleton sets as the value itself. This port's lexicon
+        // encodes singletons as -(value + 1), so the id must be encoded —
+        // otherwise the output layers decode the wrong (usually empty) set
+        // and lose the input-edge attribution entirely.
+        self.new_input_edge_ids
+            .push(IdSetLexicon::add_singleton(input_edge_id.0));
     }
 
     pub(super) fn run(&mut self) {

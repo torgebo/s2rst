@@ -846,18 +846,25 @@ mod tests {
         sorted.first().map_or(1e10, |s| s.0)
     }
 
-    fn get_cell_id_min_edge_sep_all_levels<F>(label: &str, objective: F) -> f64
+    fn get_cell_id_min_edge_sep_to_level<F>(label: &str, objective: F, max_level: u8) -> f64
     where
         F: Fn(u8, Angle, Angle, Angle) -> f64,
     {
         let mut best_score = 1e10_f64;
         let mut best_cells = BTreeSet::new();
         best_cells.insert(CellId::from_face(0));
-        for level in 0..=MAX_CELL_LEVEL {
+        for level in 0..=max_level {
             let score = get_cell_id_min_edge_sep(label, &objective, level, &mut best_cells);
             best_score = best_score.min(score);
         }
         best_score
+    }
+
+    fn get_cell_id_min_edge_sep_all_levels<F>(label: &str, objective: F) -> f64
+    where
+        F: Fn(u8, Angle, Angle, Angle) -> f64,
+    {
+        get_cell_id_min_edge_sep_to_level(label, objective, MAX_CELL_LEVEL)
     }
 
     #[test]
@@ -909,6 +916,41 @@ mod tests {
         assert!(
             (score - 0.219_666_695_288_891).abs() < RATIO_TOLERANCE,
             "S2CellId min_edge_vertex_sep / snap_radius = {score:.15}, expected ~0.219667"
+        );
+    }
+
+    // Fast, non-`#[ignore]`d smoke variants of the S2CellId edge-vertex search.
+    // The full-depth searches above are too slow for the default suite, so they
+    // are `#[ignore]`d; these run a shallow search (levels 0..=4) that still
+    // exercises the whole search machinery (`get_neighbors`, `get_circumradius`,
+    // `get_max_vertex_distance_cell`, `get_cell_id_min_edge_sep`). A shallow
+    // search samples a subset of configurations, so its minimum ratio can only
+    // be >= the true global worst case — which makes the production constants a
+    // valid lower bound and gives us a cheap regression guard on the search.
+    #[test]
+    fn test_cell_id_min_edge_vertex_separation_search_smoke() {
+        const SHALLOW_LEVEL: u8 = 4;
+
+        let for_level = get_cell_id_min_edge_sep_to_level(
+            "min_sep_for_level",
+            |level, edge_sep, _min_sr, _max_sr| edge_sep.radians() / metric::MIN_DIAG.value(level),
+            SHALLOW_LEVEL,
+        );
+        // Global worst case is ~0.397360; a shallow search stays at or above it.
+        assert!(
+            (0.39..1.0).contains(&for_level),
+            "shallow S2CellId edge_sep/min_diag = {for_level:.6}, expected in [0.39, 1.0)"
+        );
+
+        let ratio = get_cell_id_min_edge_sep_to_level(
+            "min_sep_snap_radius_ratio",
+            |_level, edge_sep, _min_sr, max_sr| edge_sep.radians() / max_sr.radians(),
+            SHALLOW_LEVEL,
+        );
+        // Global worst case is ~0.219667.
+        assert!(
+            (0.21..1.0).contains(&ratio),
+            "shallow S2CellId edge_sep/snap_radius = {ratio:.6}, expected in [0.21, 1.0)"
         );
     }
 
@@ -1133,7 +1175,7 @@ mod tests {
         scores.first().map_or(1e10, |s| s.0)
     }
 
-    fn get_latlng_min_edge_sep_all<F>(label: &str, objective: F) -> f64
+    fn get_latlng_min_edge_sep_steps<F>(label: &str, objective: F, num_exp_steps: usize) -> f64
     where
         F: Fn(i64, Angle, Angle) -> f64,
     {
@@ -1168,7 +1210,7 @@ mod tests {
 
         let mut scale = initial_scale;
         let mut target_scale: i64 = 180;
-        for _exp in 0..=10 {
+        for _exp in 0..num_exp_steps {
             while scale < target_scale {
                 scale = (scale as f64 * 1.8).min(target_scale as f64) as i64;
                 let score = get_latlng_min_edge_sep(label, &objective, scale, &mut best_configs);
@@ -1179,6 +1221,14 @@ mod tests {
             target_scale *= 10;
         }
         best_score
+    }
+
+    fn get_latlng_min_edge_sep_all<F>(label: &str, objective: F) -> f64
+    where
+        F: Fn(i64, Angle, Angle) -> f64,
+    {
+        // 0..=10 in the original search == 11 exponent steps.
+        get_latlng_min_edge_sep_steps(label, objective, 11)
     }
 
     #[test]
@@ -1206,6 +1256,37 @@ mod tests {
         assert!(
             (score - 0.222_222_126_756_717).abs() < RATIO_TOLERANCE,
             "IntLatLng min_edge_vertex_sep / snap_radius = {score:.15}, expected ~0.222222"
+        );
+    }
+
+    // Fast, non-`#[ignore]`d smoke variant of the IntLatLng edge-vertex search,
+    // mirroring `test_cell_id_min_edge_vertex_separation_search_smoke`. A single
+    // exponent step still walks the scale from 6 up to 180, calling
+    // `get_latlng_min_edge_sep` at each scale, which exercises the whole search.
+    #[test]
+    fn test_intlatlng_min_edge_vertex_separation_search_smoke() {
+        const SHALLOW_STEPS: usize = 1;
+
+        let for_level = get_latlng_min_edge_sep_steps(
+            "min_sep_for_level",
+            |scale, edge_sep, _max_sr| edge_sep.radians() / (std::f64::consts::PI / scale as f64),
+            SHALLOW_STEPS,
+        );
+        // Global worst case is ~0.277259.
+        assert!(
+            (0.27..1.0).contains(&for_level),
+            "shallow IntLatLng edge_sep/e_unit = {for_level:.6}, expected in [0.27, 1.0)"
+        );
+
+        let ratio = get_latlng_min_edge_sep_steps(
+            "min_sep_snap_radius_ratio",
+            |_scale, edge_sep, max_sr| edge_sep.radians() / max_sr.radians(),
+            SHALLOW_STEPS,
+        );
+        // Global worst case is ~0.222222.
+        assert!(
+            (0.21..1.0).contains(&ratio),
+            "shallow IntLatLng edge_sep/snap_radius = {ratio:.6}, expected in [0.21, 1.0)"
         );
     }
 
