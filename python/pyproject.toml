@@ -42,6 +42,23 @@ dev = [
     "mypy>=1.0",
 ]
 
+# By default uv only rebuilds the project (and thus the Rust extension) when
+# pyproject.toml changes, so edits to the Rust sources would leave a stale
+# _core.abi3.so installed and `make test` checking old code. List everything
+# the extension is compiled from so `uv sync`/`uv run` rebuild exactly when
+# needed: this crate, the s2rst core crate (path dependency), and the
+# workspace manifests (shared version/deps/profiles, locked versions).
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "src/**/*.rs" },
+    { file = "../core/Cargo.toml" },
+    { file = "../core/src/**/*.rs" },
+    { file = "../Cargo.toml" },
+    { file = "../Cargo.lock" },
+]
+
 [tool.maturin]
 manifest-path = "Cargo.toml"
 features = ["pyo3/extension-module"]
