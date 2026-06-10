@@ -363,6 +363,27 @@ impl Default for ReferencePoint {
 
 // ─── Shape trait ────────────────────────────────────────────────────────
 
+/// Iterates the vertices of one chain of a shape (C++
+/// `S2Shape::ChainVertexRange`): `length` vertices for point and polygon
+/// chains, `length + 1` for polyline chains (the closing vertex of an open
+/// chain is distinct).
+///
+/// The Rust port exposes this as a free function rather than C++'s nested
+/// iterator classes; `user_data()`/`mutable_user_data()` are deliberately
+/// not ported — attach data by wrapping a shape in your own type and
+/// downcasting via `Any` instead of through raw pointers.
+pub fn chain_vertices(shape: &dyn Shape, chain_id: usize) -> impl Iterator<Item = Point> + '_ {
+    let chain = shape.chain(chain_id);
+    let extra = usize::from(shape.dimension() == Dimension::Polyline && chain.length > 0);
+    (0..chain.length + extra).map(move |i| {
+        if i < chain.length {
+            shape.chain_edge(chain_id, i).v0
+        } else {
+            shape.chain_edge(chain_id, chain.length - 1).v1
+        }
+    })
+}
+
 /// The fundamental abstraction for geometry in the S2 library.
 ///
 /// All geometry is represented as a collection of edges. Edges are

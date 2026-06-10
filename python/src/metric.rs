@@ -14,7 +14,7 @@ use s2rst::s2::metric;
 /// equals `deriv * 2**(-dim * level)`. The named class attributes
 /// (`MIN_WIDTH`, `AVG_AREA`, ...) are the standard S2 cell metrics for the
 /// quadratic projection.
-#[pyclass(name = "Metric", module = "s2rst")]
+#[pyclass(from_py_object, name = "Metric", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyMetric(pub(crate) metric::Metric);
 

@@ -828,12 +828,12 @@ mod tests {
         for &s in &[0.0, 0.5, 1.0] {
             let u = st_to_uv(s);
             let want = 2.0 * s - 1.0;
-            assert!(float64_eq(u, want), "st_to_uv({s}) = {u}, want {want}",);
+            assert!(float64_eq(u, want), "st_to_uv({s}) = {u}, want {want}");
         }
         for &u in &[-1.0, 0.0, 1.0] {
             let s = uv_to_st(u);
             let want = 0.5 * (u + 1.0);
-            assert!(float64_eq(s, want), "uv_to_st({u}) = {s}, want {want}",);
+            assert!(float64_eq(s, want), "uv_to_st({u}) = {s}, want {want}");
         }
 
         // Check that uv_to_st and st_to_uv are inverses.
@@ -995,7 +995,7 @@ mod tests {
                         "face_xyz_to_uv({face}, {p:?}) = ({gu}, {gv}), want ({eu}, {ev})",
                     );
                 }
-                _ => panic!("face_xyz_to_uv({face}, {p:?}) = {got:?}, want {expected:?}",),
+                _ => panic!("face_xyz_to_uv({face}, {p:?}) = {got:?}, want {expected:?}"),
             }
         }
     }

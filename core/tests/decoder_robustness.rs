@@ -173,17 +173,16 @@ fn shape_index_query_no_panic(input: &[u8]) {
             if index.init(b).is_err() {
                 return;
             }
-            let idx = index.as_index();
-            for id in 0..idx.num_shape_ids() {
-                if let Some(shape) = idx.shape(id as i32) {
+            for id in 0..index.num_shape_ids() {
+                if let Some(shape) = index.shape(id as i32) {
                     let n = shape.num_edges();
                     for e in 0..n.min(4096) {
                         let _unused = shape.edge(e);
                     }
                 }
             }
-            let mut query = ContainsPointQuery::new(idx, VertexModel::SemiOpen);
-            let mut it = idx.iter();
+            let mut query = ContainsPointQuery::new(&index, VertexModel::SemiOpen);
+            let mut it = index.iter();
             let mut budget = 4096usize;
             while !it.done() && budget > 0 {
                 let _unused = query.contains(it.center());

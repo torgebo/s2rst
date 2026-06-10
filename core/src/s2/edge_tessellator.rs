@@ -29,7 +29,10 @@ const TESSELLATION_INTERPOLATION_FRACTION: f64 = 0.31215691082248312;
 const TESSELLATION_SCALE_FACTOR: f64 = 0.838_299_925_698_885_1;
 
 /// Minimum supported tolerance (~1 micrometer on the Earth's surface).
-const MIN_TESSELLATION_TOLERANCE: f64 = 1e-13;
+/// The smallest supported tessellation tolerance, in radians; smaller
+/// requested tolerances are clamped to this (C++
+/// `S2EdgeTessellator::kMinTolerance`).
+pub const MIN_TESSELLATION_TOLERANCE: f64 = 1e-13;
 
 /// Converts spherical geodesic edges to chains of projected edges (and
 /// vice versa) such that the maximum distance between the original edge

@@ -18,10 +18,11 @@
 use std::ops::ControlFlow;
 
 use crate::s2::Point;
+use crate::s2::cell_iterator::CellIterator;
 use crate::s2::edge_crosser::EdgeCrosser;
 use crate::s2::edge_crossings::{Crossing, vertex_crossing};
 use crate::s2::shape::{Dimension, Shape, ShapeEdge, ShapeEdgeId, ShapeId};
-use crate::s2::shape_index::{ClippedShape, ShapeIndex, ShapeIndexIterator};
+use crate::s2::shape_index::{ClippedShape, IndexCellAccess, ShapeIndex, ShapeIndexLike};
 
 /// Controls whether shapes contain their vertices.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -65,17 +66,24 @@ pub enum VertexModel {
 /// assert!(query.contains(LatLng::from_degrees(5.0, 5.0).to_point()));
 /// assert!(!query.contains(LatLng::from_degrees(20.0, 20.0).to_point()));
 /// ```
-#[derive(Debug)]
-pub struct ContainsPointQuery<'a> {
+pub struct ContainsPointQuery<'a, I: ShapeIndexLike = ShapeIndex> {
     model: VertexModel,
-    index: &'a ShapeIndex,
-    iter: ShapeIndexIterator<'a>,
+    index: &'a I,
+    iter: I::Iter<'a>,
 }
 
-impl<'a> ContainsPointQuery<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for ContainsPointQuery<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContainsPointQuery")
+            .field("model", &self.model)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> ContainsPointQuery<'a, I> {
     /// Creates a new query for the given index and vertex model.
     #[inline]
-    pub fn new(index: &'a ShapeIndex, model: VertexModel) -> Self {
+    pub fn new(index: &'a I, model: VertexModel) -> Self {
         ContainsPointQuery {
             model,
             index,
@@ -164,7 +172,7 @@ impl<'a> ContainsPointQuery<'a> {
     }
 
     /// Returns a reference to the underlying index.
-    pub fn index(&self) -> &'a ShapeIndex {
+    pub fn index(&self) -> &'a I {
         self.index
     }
 
@@ -265,11 +273,76 @@ impl<'a> ContainsPointQuery<'a> {
 
 // ─── Tests ──────────────────────────────────────────────────────────────
 
+/// Object-safe access to "which shapes contain this point", used by the
+/// distance-target machinery.
+///
+/// C++ `S2DistanceTarget::VisitContainingShapes` receives the abstract
+/// `S2ShapeIndex` base class; the Rust `ShapeIndexLike` trait is not
+/// dyn-compatible (it has a generic associated iterator type), so targets
+/// receive this minimal oracle instead. The vertex model is fixed to
+/// `SemiOpen`, matching every C++ call site of this machinery.
+pub trait ContainsPointOracle {
+    /// The ids of all shapes containing `p`.
+    fn containing_shape_ids(&mut self, p: Point) -> Vec<ShapeId>;
+}
+
+impl<I: ShapeIndexLike> ContainsPointOracle for ContainsPointQuery<'_, I> {
+    fn containing_shape_ids(&mut self, p: Point) -> Vec<ShapeId> {
+        self.containing_shape_ids(p)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::s2::LatLng;
     use crate::s2::shape::{Chain, ChainPosition, Edge, ReferencePoint};
+
+    /// Phase 2 spike validation: the query must work for ANY
+    /// `ShapeIndexLike`, not just the concrete `ShapeIndex`. This wrapper is
+    /// a stand-in for the planned lazy `EncodedS2ShapeIndex`.
+    #[derive(Debug)]
+    struct WrappedIndex(ShapeIndex);
+
+    impl ShapeIndexLike for WrappedIndex {
+        type Iter<'a> = crate::s2::shape_index::ShapeIndexIterator<'a>;
+
+        fn num_shape_ids(&self) -> usize {
+            self.0.num_shape_ids()
+        }
+        fn shape(&self, id: ShapeId) -> Option<&dyn Shape> {
+            self.0.shape(id)
+        }
+        fn iter(&self) -> Self::Iter<'_> {
+            self.0.iter()
+        }
+    }
+
+    #[test]
+    fn test_query_is_generic_over_index_trait() {
+        use crate::s2::lax_loop::LaxLoop;
+        let mut index = ShapeIndex::new();
+        index.add(Box::new(LaxLoop::new(vec![
+            LatLng::from_degrees(0.0, 0.0).to_point(),
+            LatLng::from_degrees(0.0, 10.0).to_point(),
+            LatLng::from_degrees(10.0, 10.0).to_point(),
+            LatLng::from_degrees(10.0, 0.0).to_point(),
+        ])));
+        index.build();
+        let wrapped = WrappedIndex(index);
+
+        // Explicitly NOT the default type parameter.
+        let mut query: ContainsPointQuery<'_, WrappedIndex> =
+            ContainsPointQuery::new(&wrapped, VertexModel::SemiOpen);
+        assert!(query.contains(LatLng::from_degrees(5.0, 5.0).to_point()));
+        assert!(!query.contains(LatLng::from_degrees(20.0, 20.0).to_point()));
+        assert_eq!(
+            query
+                .containing_shape_ids(LatLng::from_degrees(5.0, 5.0).to_point())
+                .len(),
+            1
+        );
+    }
 
     /// A simple point-set shape for testing.
     #[derive(Debug)]

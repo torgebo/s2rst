@@ -536,8 +536,8 @@ fn intersection_with_container_preserves_polygon_exactly() {
 
 /// Generalizes the robust-predicate fix: boolean ops on randomized
 /// near-degenerate sliver pairs (vertex separations down to ~1e-15, like the
-/// `test_bug*` inputs) must uphold the GraphEdgeClipper invariants — in debug
-/// builds the `multiplicity`/`lo <= hi` debug_asserts are active, so simply
+/// `test_bug*` inputs) must uphold the `GraphEdgeClipper` invariants — in debug
+/// builds the `multiplicity`/`lo <= hi` `debug_asserts` are active, so simply
 /// completing without panicking is the check — and any non-empty output must
 /// be a valid polygon.
 #[test]

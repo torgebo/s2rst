@@ -56,11 +56,13 @@ use std::collections::{BTreeSet, BinaryHeap, HashSet};
 use std::ops::ControlFlow;
 
 use crate::s1::ChordAngle;
+use crate::s2::cell_iterator::CellIterator;
+use crate::s2::contains_point_query::ContainsPointOracle;
 use crate::s2::coords::Level;
 use crate::s2::distance_target::DistanceTarget;
 use crate::s2::edge_distances;
 use crate::s2::shape::{Edge, ShapeId};
-use crate::s2::shape_index::ShapeIndex;
+use crate::s2::shape_index::{IndexCellAccess, ShapeIndex, ShapeIndexLike};
 use crate::s2::{Cap, Cell, CellId, CellUnion, Point};
 
 /// A result from a closest edge query.
@@ -193,7 +195,7 @@ pub trait Target: DistanceTarget {
     /// Returns `ControlFlow::Break(())` if the visitor stops early.
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) -> ControlFlow<()>;
 
@@ -256,12 +258,10 @@ impl Target for PointTarget {
     }
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) -> ControlFlow<()> {
-        use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
-        let mut query = ContainsPointQuery::new(index, VertexModel::SemiOpen);
-        for shape_id in query.containing_shape_ids(self.point) {
+        for shape_id in oracle.containing_shape_ids(self.point) {
             visitor(shape_id)?;
         }
         ControlFlow::Continue(())
@@ -322,13 +322,11 @@ impl Target for EdgeTarget {
     }
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) -> ControlFlow<()> {
         // Use the first endpoint for containment checking.
-        use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
-        let mut query = ContainsPointQuery::new(index, VertexModel::SemiOpen);
-        for shape_id in query.containing_shape_ids(self.a) {
+        for shape_id in oracle.containing_shape_ids(self.a) {
             visitor(shape_id)?;
         }
         ControlFlow::Continue(())
@@ -386,13 +384,11 @@ impl Target for CellTarget {
     }
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) -> ControlFlow<()> {
         let center = self.cell.center();
-        use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
-        let mut query = ContainsPointQuery::new(index, VertexModel::SemiOpen);
-        for shape_id in query.containing_shape_ids(center) {
+        for shape_id in oracle.containing_shape_ids(center) {
             visitor(shape_id)?;
         }
         ControlFlow::Continue(())
@@ -404,18 +400,23 @@ impl Target for CellTarget {
 /// This wraps a `ShapeIndex` and internally uses a `ClosestEdgeQuery` on the
 /// target index to dispatch distance computations. This is the most powerful
 /// target type, supporting distance between two arbitrary shape collections.
-#[derive(Debug)]
-pub struct ShapeIndexTarget<'a> {
-    index: &'a ShapeIndex,
+pub struct ShapeIndexTarget<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
     /// Whether to include polygon interiors in the target.
     pub include_interiors: bool,
     /// Whether the internal query should use brute force.
     pub use_brute_force: bool,
 }
 
-impl<'a> ShapeIndexTarget<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for ShapeIndexTarget<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShapeIndexTarget").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> ShapeIndexTarget<'a, I> {
     /// Creates a target from a `ShapeIndex`.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         ShapeIndexTarget {
             index,
             include_interiors: true,
@@ -447,7 +448,7 @@ impl<'a> ShapeIndexTarget<'a> {
     }
 }
 
-impl DistanceTarget for ShapeIndexTarget<'_> {
+impl<J: ShapeIndexLike> DistanceTarget for ShapeIndexTarget<'_, J> {
     fn cap_bound(&self) -> Cap {
         use crate::s2::region::Region;
         use crate::s2::shape_index_region::ShapeIndexRegion;
@@ -461,7 +462,7 @@ impl DistanceTarget for ShapeIndexTarget<'_> {
     }
 }
 
-impl Target for ShapeIndexTarget<'_> {
+impl<J: ShapeIndexLike> Target for ShapeIndexTarget<'_, J> {
     fn max_brute_force_index_size(&self) -> i32 {
         // C++ default for ShapeIndexTarget: uses the base class default (which
         // for closest is determined by the distance target base, returning -1
@@ -488,12 +489,11 @@ impl Target for ShapeIndexTarget<'_> {
     }
     fn visit_containing_shapes(
         &self,
-        query_index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) -> ControlFlow<()> {
         // For each shape in the target index, test whether any of its chain
         // start vertices are contained by shapes in the query index.
-        use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
 
         for shape_id in (0..self.index.num_shape_ids() as i32).map(ShapeId) {
             let Some(shape) = self.index.shape(shape_id) else {
@@ -508,8 +508,7 @@ impl Target for ShapeIndexTarget<'_> {
                 }
                 tested_point = true;
                 let v0 = shape.chain_edge(c, 0).v0;
-                let mut query = ContainsPointQuery::new(query_index, VertexModel::SemiOpen);
-                for qshape_id in query.containing_shape_ids(v0) {
+                for qshape_id in oracle.containing_shape_ids(v0) {
                     visitor(qshape_id)?;
                 }
             }
@@ -518,8 +517,7 @@ impl Target for ShapeIndexTarget<'_> {
                 if !ref_pt.contained {
                     continue;
                 }
-                let mut query = ContainsPointQuery::new(query_index, VertexModel::SemiOpen);
-                for qshape_id in query.containing_shape_ids(ref_pt.point) {
+                for qshape_id in oracle.containing_shape_ids(ref_pt.point) {
                     visitor(qshape_id)?;
                 }
             }
@@ -558,14 +556,19 @@ pub type ShapeFilter<'a> = Option<&'a dyn Fn(ShapeId) -> bool>;
 /// let result = query.find_closest_edge(&target);
 /// assert!(!result.is_empty());
 /// ```
-#[derive(Debug)]
-pub struct ClosestEdgeQuery<'a> {
-    index: &'a ShapeIndex,
+pub struct ClosestEdgeQuery<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
 }
 
-impl<'a> ClosestEdgeQuery<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for ClosestEdgeQuery<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClosestEdgeQuery").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> ClosestEdgeQuery<'a, I> {
     /// Creates a new closest edge query for the given index.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         ClosestEdgeQuery { index }
     }
 
@@ -618,7 +621,11 @@ impl<'a> ClosestEdgeQuery<'a> {
         if options.include_interiors {
             let max_results = options.max_results as usize;
             let mut shape_ids = Vec::new();
-            let _ = target.visit_containing_shapes(self.index, &mut |shape_id| {
+            let mut oracle = crate::s2::contains_point_query::ContainsPointQuery::new(
+                self.index,
+                crate::s2::contains_point_query::VertexModel::SemiOpen,
+            );
+            let _ = target.visit_containing_shapes(&mut oracle, &mut |shape_id| {
                 if filter.is_none() || filter.as_ref().is_some_and(|f| f(shape_id)) {
                     shape_ids.push(shape_id);
                 }
@@ -791,7 +798,7 @@ impl<'a> ClosestEdgeQuery<'a> {
     fn count_edges_up_to(&self, limit: i32) -> i32 {
         let mut count = 0i32;
         for id in 0..self.index.num_shape_ids() {
-            if let Some(shape) = self.index.shape(id as i32) {
+            if let Some(shape) = self.index.shape(ShapeId(id as i32)) {
                 count = count.saturating_add(shape.num_edges() as i32);
                 if count >= limit {
                     return count;
@@ -1107,7 +1114,7 @@ impl<'a> ClosestEdgeQuery<'a> {
         filter: &ShapeFilter<'_>,
         state: &mut QueryState,
         queue: &mut BinaryHeap<QueueEntry>,
-        _iter: &mut crate::s2::shape_index::ShapeIndexIterator<'_>,
+        _iter: &mut I::Iter<'_>,
     ) {
         if is_index_cell {
             if let Some(index_cell) = self.index.cell(id) {
@@ -1157,7 +1164,7 @@ impl<'a> ClosestEdgeQuery<'a> {
         filter: &ShapeFilter<'_>,
         state: &mut QueryState,
         queue: &mut BinaryHeap<QueueEntry>,
-        iter: &mut crate::s2::shape_index::ShapeIndexIterator<'_>,
+        iter: &mut I::Iter<'_>,
     ) {
         let is_index_cell = !iter.done() && iter.cell_id() == id;
         self.process_or_enqueue(id, is_index_cell, target, filter, state, queue, iter);
@@ -1349,6 +1356,35 @@ impl QueryState {
 )]
 mod tests {
     use super::*;
+
+    /// Phase 2: the query must work for any `ShapeIndexLike` implementor.
+    #[derive(Debug)]
+    struct WrappedIndex(ShapeIndex);
+
+    impl ShapeIndexLike for WrappedIndex {
+        type Iter<'a> = crate::s2::shape_index::ShapeIndexIterator<'a>;
+        fn num_shape_ids(&self) -> usize {
+            self.0.num_shape_ids()
+        }
+        fn shape(&self, id: ShapeId) -> Option<&dyn crate::s2::shape::Shape> {
+            self.0.shape(id)
+        }
+        fn iter(&self) -> Self::Iter<'_> {
+            self.0.iter()
+        }
+    }
+
+    #[test]
+    fn test_closest_edge_query_generic_over_index_trait() {
+        use crate::s2::text_format::make_index;
+        let index = WrappedIndex(make_index("# 0:0, 0:5, 5:5 #"));
+        let query: ClosestEdgeQuery<'_, WrappedIndex> = ClosestEdgeQuery::new(&index);
+        let target = PointTarget::new(crate::s2::text_format::parse_point("1:0"));
+        let result = query.find_closest_edge(&target);
+        assert!(!result.is_empty());
+        assert!(result.distance.to_angle().degrees() < 1.1);
+    }
+
     use crate::s2::{LatLng, Loop, Polygon};
 
     fn p(lat: f64, lng: f64) -> Point {

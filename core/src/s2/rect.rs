@@ -738,7 +738,21 @@ impl Rect {
     /// Reports whether the latitude and longitude intervals of the two
     /// rectangles are the same up to a small tolerance.
     pub fn approx_eq(self, other: Rect) -> bool {
-        self.lat.approx_eq_with(other.lat, 1e-15) && self.lng.approx_eq_with(other.lng, 1e-15)
+        self.approx_eq_with_tolerance(other, Angle::from_radians(1e-15))
+    }
+
+    /// Like [`Self::approx_eq`] with an explicit symmetric tolerance
+    /// (C++ `ApproxEquals(other, S1Angle max_error)`).
+    pub fn approx_eq_with_tolerance(self, other: Rect, max_error: Angle) -> bool {
+        let e = max_error.radians();
+        self.lat.approx_eq_with(other.lat, e) && self.lng.approx_eq_with(other.lng, e)
+    }
+
+    /// Like [`Self::approx_eq`] with separate latitude/longitude tolerances
+    /// given as a `LatLng` (C++ `ApproxEquals(other, S2LatLng max_error)`).
+    pub fn approx_eq_with_latlng_tolerance(self, other: Rect, max_error: LatLng) -> bool {
+        self.lat.approx_eq_with(other.lat, max_error.lat.radians())
+            && self.lng.approx_eq_with(other.lng, max_error.lng.radians())
     }
 }
 

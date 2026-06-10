@@ -595,6 +595,45 @@ pub fn shape_to_loop_vertices(shape: &dyn Shape) -> Vec<Vec<Point>> {
     loops
 }
 
+/// Builds a [`Polyline`](crate::s2::polyline::Polyline) from a
+/// single-chain dimension-1 shape (C++ `s2shapeutil::ShapeToS2Polyline`).
+pub fn shape_to_polyline(shape: &dyn Shape) -> crate::s2::polyline::Polyline {
+    debug_assert_eq!(shape.dimension(), Dimension::Polyline);
+    debug_assert_eq!(shape.num_chains(), 1);
+    crate::s2::polyline::Polyline::new(crate::s2::shape::chain_vertices(shape, 0).collect())
+}
+
+/// Builds one [`Polyline`](crate::s2::polyline::Polyline) per chain of a
+/// dimension-1 shape.
+pub fn shape_to_polylines(shape: &dyn Shape) -> Vec<crate::s2::polyline::Polyline> {
+    debug_assert_eq!(shape.dimension(), Dimension::Polyline);
+    (0..shape.num_chains())
+        .map(|c| {
+            crate::s2::polyline::Polyline::new(crate::s2::shape::chain_vertices(shape, c).collect())
+        })
+        .collect()
+}
+
+/// Builds a [`Polygon`](crate::s2::polygon::Polygon) from a dimension-2
+/// shape (C++ `s2shapeutil::ShapeToS2Polygon`): a single chain initializes
+/// directly, multiple chains use the oriented-loops construction.
+pub fn shape_to_polygon(shape: &dyn Shape) -> crate::s2::polygon::Polygon {
+    use crate::s2::polygon::Polygon;
+    use crate::s2::s2loop::Loop;
+    if shape.is_full() {
+        return Polygon::full();
+    }
+    debug_assert_eq!(shape.dimension(), Dimension::Polygon);
+    let loops: Vec<Loop> = (0..shape.num_chains())
+        .map(|c| Loop::new(crate::s2::shape::chain_vertices(shape, c).collect()))
+        .collect();
+    if loops.len() == 1 {
+        Polygon::from_loops(loops)
+    } else {
+        Polygon::from_oriented_loops(loops)
+    }
+}
+
 // ─── Edge counting ───────────────────────────────────────────────────────
 
 /// Returns the total number of edges across all shapes in an index.
@@ -1034,6 +1073,24 @@ mod shape_util_tests;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_shape_conversions_construct_real_types() {
+        use super::*;
+        use crate::s2::text_format::{make_index, make_lax_polygon};
+        let index = make_index("# 0:0, 0:5 | 1:1, 1:2, 2:2 # ");
+        let first = shape_to_polyline(index.shape(0).unwrap());
+        assert_eq!(first.len(), 2);
+        let lines = shape_to_polylines(index.shape(1).unwrap());
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].len(), 3);
+
+        let polygon = shape_to_polygon(&make_lax_polygon("0:0, 0:9, 9:9, 9:0; 1:1, 1:3, 3:3"));
+        assert_eq!(polygon.num_loops(), 2);
+        assert!(polygon.has_holes(), "hole orientation preserved");
+        let full = shape_to_polygon(&make_lax_polygon("full"));
+        assert!(full.is_full_polygon());
+    }
+
     use super::*;
     use crate::s2::shape::{Chain, ChainPosition, Edge, ReferencePoint};
     use crate::s2::{LatLng, Point};

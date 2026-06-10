@@ -310,6 +310,24 @@ const POLYLINE_LOSSLESS_VERSION: u8 = 1;
 /// Polyline compressed encoding version (C++ `kCurrentCompressedEncodingVersionNumber`).
 const POLYLINE_COMPRESSED_VERSION: u8 = 2;
 
+impl crate::s2::polyline::Polyline {
+    /// Encodes with the given coding hint, matching C++
+    /// `S2Polyline::Encode(encoder, hint)`: `Fast` writes the lossless
+    /// format; `Compact` snaps to the dominant cell level and writes the
+    /// compressed format when that is smaller (falling back to lossless
+    /// otherwise). Both decode via [`S2Decode`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the write fails.
+    pub fn encode_with_hint(&self, w: &mut dyn Write, hint: CodingHint) -> io::Result<()> {
+        match hint {
+            CodingHint::Fast => S2Encode::encode(self, w),
+            CodingHint::Compact => encode_polyline_compressed(self, w),
+        }
+    }
+}
+
 impl S2Encode for crate::s2::polyline::Polyline {
     /// Encodes in lossless format (matching C++ default `CodingHint::FAST`).
     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
@@ -382,7 +400,6 @@ fn decode_polyline_compressed(r: &mut dyn Read) -> io::Result<crate::s2::polylin
 /// Encodes a polyline in compressed format (version 2).
 ///
 /// This matches C++ `S2Polyline::Encode` with `CodingHint::COMPACT`.
-#[cfg(test)]
 pub(crate) fn encode_polyline_compressed(
     polyline: &crate::s2::polyline::Polyline,
     w: &mut dyn Write,
@@ -422,7 +439,6 @@ pub(crate) fn encode_polyline_compressed(
     }
 }
 
-#[cfg(test)]
 fn encode_polyline_compressed_inner(
     polyline: &crate::s2::polyline::Polyline,
     w: &mut dyn Write,
@@ -671,6 +687,23 @@ fn decode_polygon_compressed(r: &mut dyn Read) -> io::Result<Polygon> {
     Ok(Polygon::from_loops(loops))
 }
 
+impl Polygon {
+    /// Encodes with the given coding hint, matching C++
+    /// `S2Polygon::Encode(encoder, hint)`: `Fast` writes the lossless
+    /// format; `Compact` chooses the snapped compressed format when it is
+    /// smaller (the [`S2Encode`] default). Both decode via [`S2Decode`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the write fails.
+    pub fn encode_with_hint(&self, w: &mut dyn Write, hint: CodingHint) -> io::Result<()> {
+        match hint {
+            CodingHint::Fast => encode_polygon_lossless(self, w),
+            CodingHint::Compact => S2Encode::encode(self, w),
+        }
+    }
+}
+
 impl S2Encode for Polygon {
     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
         if self.num_vertices() == 0 {
@@ -903,6 +936,84 @@ impl S2Decode for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_polyline_encode_with_hint_round_trips() {
+        use crate::s2::cell_id::CellId;
+        use crate::s2::encoded_s2point_vector::CodingHint;
+        use crate::s2::polyline::Polyline;
+        // Snapped vertices (level-20 cell centers) compress well.
+        let snapped: Vec<_> = crate::s2::text_format::parse_points("0:0, 0:5, 5:5, 5:10")
+            .into_iter()
+            .map(|p| CellId::from_point(&p).parent_at_level(20u8).to_point())
+            .collect();
+        let polyline = Polyline::new(snapped);
+
+        let mut fast = Vec::new();
+        polyline
+            .encode_with_hint(&mut fast, CodingHint::Fast)
+            .unwrap();
+        let mut compact = Vec::new();
+        polyline
+            .encode_with_hint(&mut compact, CodingHint::Compact)
+            .unwrap();
+        assert!(
+            compact.len() < fast.len(),
+            "snapped polyline must compress ({} vs {})",
+            compact.len(),
+            fast.len()
+        );
+        for buf in [&fast, &compact] {
+            let decoded = Polyline::decode(&mut io::Cursor::new(buf.as_slice())).unwrap();
+            assert_eq!(decoded.len(), polyline.len());
+            for i in 0..polyline.len() {
+                assert_eq!(decoded.vertex(i), polyline.vertex(i));
+            }
+        }
+
+        // Unsnapped vertices: Compact falls back to lossless (same bytes).
+        let raw = Polyline::new(crate::s2::text_format::parse_points("0.1:0.2, 3.4:5.6"));
+        let mut a = Vec::new();
+        raw.encode_with_hint(&mut a, CodingHint::Fast).unwrap();
+        let mut b = Vec::new();
+        raw.encode_with_hint(&mut b, CodingHint::Compact).unwrap();
+        assert_eq!(a, b, "unsnappable input falls back to lossless");
+    }
+
+    #[test]
+    fn test_polygon_encode_with_hint_round_trips() {
+        use crate::s2::cell_id::CellId;
+        use crate::s2::encoded_s2point_vector::CodingHint;
+        use crate::s2::polygon::Polygon;
+        use crate::s2::s2loop::Loop;
+        let vertices: Vec<_> = crate::s2::text_format::parse_points("0:0, 0:5, 5:5, 5:0")
+            .into_iter()
+            .map(|p| CellId::from_point(&p).parent_at_level(16u8).to_point())
+            .collect();
+        let polygon = Polygon::from_loops(vec![Loop::new(vertices)]);
+
+        let mut fast = Vec::new();
+        polygon
+            .encode_with_hint(&mut fast, CodingHint::Fast)
+            .unwrap();
+        let mut compact = Vec::new();
+        polygon
+            .encode_with_hint(&mut compact, CodingHint::Compact)
+            .unwrap();
+        assert!(compact.len() < fast.len(), "snapped polygon must compress");
+        for buf in [&fast, &compact] {
+            let decoded = Polygon::decode(&mut io::Cursor::new(buf.as_slice())).unwrap();
+            assert_eq!(decoded.num_loops(), 1);
+            assert!(
+                decoded.boundary_equals(&polygon) || {
+                    // Compact snapping preserves vertices exactly (they are
+                    // already cell centers), so boundaries must match.
+                    false
+                }
+            );
+        }
+    }
+
     use crate::s2::LatLng;
 
     fn roundtrip_encode_decode<T: S2Encode + S2Decode + std::fmt::Debug>(val: &T) -> T {

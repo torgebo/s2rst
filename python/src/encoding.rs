@@ -28,7 +28,7 @@ pub fn encode<'py>(py: Python<'py>, obj: &Bound<'_, PyAny>) -> PyResult<Bound<'p
     let mut buf = Vec::new();
     macro_rules! try_encode {
         ($ty:ty) => {
-            if let Ok(o) = obj.downcast::<$ty>() {
+            if let Ok(o) = obj.cast::<$ty>() {
                 o.borrow().0.encode(&mut buf).map_err(|e| io_err(&e))?;
                 return Ok(PyBytes::new(py, &buf));
             }

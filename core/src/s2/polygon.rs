@@ -733,6 +733,53 @@ impl Polygon {
         Self::init_from_builder(polygon, S2Builder::new(opts))
     }
 
+    /// Builds the polygon describing the boundary of the given cell union
+    /// (C++ `S2Polygon::InitToCellUnionBorder`).
+    ///
+    /// Shared edges between adjacent cells of different sizes do not line up
+    /// exactly, so the cells are unioned with a snap radius of half the
+    /// minimum leaf-cell width — enough to merge shared edges without ever
+    /// merging distinct ones.
+    ///
+    /// # Panics
+    /// Debug builds assert that a borderless nonempty result covers the full
+    /// sphere (the only valid way to get one).
+    #[expect(clippy::expect_used, reason = "layer type is known at compile time")]
+    pub fn from_cell_union_border(cells: &crate::s2::cell_union::CellUnion) -> Polygon {
+        use crate::s2::builder::Options;
+        use crate::s2::builder::snap::IdentitySnapFunction;
+        use crate::s2::metric::MIN_WIDTH;
+
+        let snap_radius = 0.5 * MIN_WIDTH.value(crate::s2::coords::MAX_CELL_LEVEL);
+        let mut builder = S2Builder::new(Options::new(Box::new(IdentitySnapFunction::new(
+            Angle::from_radians(snap_radius),
+        ))));
+        builder.start_layer(Box::new(S2PolygonLayer::new()));
+        for &id in cells.cell_ids() {
+            builder.add_loop(&Loop::from_cell(&Cell::from_cell_id(id)));
+        }
+        let mut result = match builder.build() {
+            Ok(mut layers) => layers
+                .remove(0)
+                .into_any()
+                .downcast::<S2PolygonLayer>()
+                .expect("wrong layer type")
+                .into_output(),
+            Err(_) => Polygon::empty(),
+        };
+        // No loops means either an empty union or all six faces (the union
+        // of everything has no boundary): distinguish via coverage.
+        if result.num_loops() == 0 && !cells.cell_ids().is_empty() {
+            debug_assert_eq!(
+                cells.leaf_cells_covered(),
+                6i64 << (2 * u32::from(crate::s2::coords::MAX_CELL_LEVEL)),
+                "no-boundary result requires the full sphere"
+            );
+            result.invert();
+        }
+        result
+    }
+
     /// Runs the given polygon through an `S2Builder`, returning the result.
     #[expect(clippy::expect_used, reason = "layer type is known at compile time")]
     fn init_from_builder(polygon: &Polygon, mut builder: S2Builder) -> Polygon {
@@ -1083,9 +1130,7 @@ impl Polygon {
             let mut found = false;
             for j in 0..b.num_loops() {
                 let b_loop = &b.loops[j];
-                if b_loop.depth() == a_loop.depth()
-                    && b_loop.boundary_approx_eq(a_loop, Angle::from_radians(0.0))
-                {
+                if b_loop.depth() == a_loop.depth() && b_loop.boundary_equals(a_loop) {
                     found = true;
                     break;
                 }
@@ -3399,6 +3444,40 @@ mod tests {
         }
 
         /// C++ TEST(S2Polygon, `OverlapFractions`)
+        #[test]
+        fn test_from_cell_union_border() {
+            use crate::s2::cell_union::CellUnion;
+            use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
+            use crate::s2::shape_index::ShapeIndex;
+
+            // Empty union -> empty polygon.
+            assert!(
+                Polygon::from_cell_union_border(&CellUnion::from_cell_ids(vec![]).clone())
+                    .is_empty_polygon()
+            );
+
+            // A face cell's four children: border == the face boundary, and the
+            // polygon contains the face center plus every cell center.
+            let children = CellId::from_face(2).children().to_vec();
+            let union = CellUnion::from_verbatim(children.clone());
+            let border = Polygon::from_cell_union_border(&union);
+            assert!(!border.is_empty_polygon());
+            let mut index = ShapeIndex::new();
+            index.add(Box::new(
+                crate::s2::lax_polygon::LaxPolygon::from_polygon_ref(&border),
+            ));
+            let mut q = ContainsPointQuery::new(&index, VertexModel::SemiOpen);
+            assert!(q.contains(CellId::from_face(2).to_point()));
+            for id in children {
+                assert!(q.contains(id.to_point()), "must contain {id:?} center");
+            }
+            assert!(!q.contains(CellId::from_face(4).to_point()));
+
+            // All six faces -> the full polygon.
+            let all = CellUnion::from_verbatim((0..6).map(CellId::from_face).collect());
+            assert!(Polygon::from_cell_union_border(&all).is_full_polygon());
+        }
+
         #[test]
         fn test_overlap_fractions() {
             // Both empty → (1.0, 1.0)

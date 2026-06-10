@@ -55,6 +55,12 @@ pub struct Polyline {
 }
 
 impl Polyline {
+    /// Creates a polyline from latitude/longitude positions
+    /// (C++ `S2Polyline(absl::Span<const S2LatLng>)`).
+    pub fn from_latlngs(vertices: Vec<LatLng>) -> Self {
+        Self::new(vertices.into_iter().map(LatLng::to_point).collect())
+    }
+
     /// Creates a new `Polyline` from a list of vertices.
     pub fn new(vertices: Vec<Point>) -> Self {
         Polyline { vertices }
@@ -325,7 +331,9 @@ impl Polyline {
         } else {
             next_vertex
         };
-        predicates::sign(point, self.vertex(nv), self.vertex(nv - 1))
+        // C++ uses the robust s2pred::Sign here.
+        predicates::robust_sign(point, self.vertex(nv), self.vertex(nv - 1))
+            == predicates::Direction::CounterClockwise
     }
 
     /// Reports whether this polyline intersects the given polyline. If the

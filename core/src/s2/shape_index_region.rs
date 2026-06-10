@@ -17,32 +17,40 @@
 use std::ops::ControlFlow;
 
 use crate::r2;
+use crate::s2::cell_iterator::CellIterator;
 use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
 use crate::s2::coords::Level;
 use crate::s2::edge_clipping::{self, FACE_CLIP_ERROR_UV_COORD, INTERSECTS_RECT_ERROR_UV_DIST};
 use crate::s2::shape::{Dimension, ShapeId};
-use crate::s2::shape_index::{CellRelation, ClippedShape, ShapeIndex};
+use crate::s2::shape_index::{
+    CellRelation, ClippedShape, IndexCellAccess, ShapeIndex, ShapeIndexLike,
+};
 use crate::s2::{Cap, Cell, CellId, CellUnion, Point, Rect, Region};
 
 /// A [`ShapeIndex`] wrapped to implement the [`Region`] trait.
 ///
 /// Provides bounding methods and point/cell containment tests based on
 /// the indexed geometry.
-#[derive(Debug)]
-pub struct ShapeIndexRegion<'a> {
-    index: &'a ShapeIndex,
+pub struct ShapeIndexRegion<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
 }
 
-impl<'a> ShapeIndexRegion<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for ShapeIndexRegion<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShapeIndexRegion").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> ShapeIndexRegion<'a, I> {
     /// Creates a new `ShapeIndexRegion` for the given index.
     ///
     /// The index must already be built.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         ShapeIndexRegion { index }
     }
 
     /// Returns the underlying index.
-    pub fn index(&self) -> &'a ShapeIndex {
+    pub fn index(&self) -> &'a I {
         self.index
     }
 
@@ -54,7 +62,7 @@ impl<'a> ShapeIndexRegion<'a> {
         let mut it = self.index.iter();
 
         // Find the last CellId in the index.
-        it.end();
+        it.finish();
         if !it.prev() {
             return Vec::new(); // Empty index.
         }
@@ -106,12 +114,7 @@ impl<'a> ShapeIndexRegion<'a> {
     ///
     /// Corresponds to C++ `S2ShapeIndexRegion::Contains(clipped, p)`, which
     /// delegates to `S2ContainsPointQuery::ShapeContains(cell_id, clipped, p)`.
-    fn clipped_contains(
-        index: &ShapeIndex,
-        clipped: &ClippedShape,
-        cell_center: Point,
-        p: Point,
-    ) -> bool {
+    fn clipped_contains(index: &I, clipped: &ClippedShape, cell_center: Point, p: Point) -> bool {
         let q = ContainsPointQuery::new(index, VertexModel::SemiOpen);
         q.shape_contains_impl(clipped, cell_center, p)
     }
@@ -120,7 +123,7 @@ impl<'a> ShapeIndexRegion<'a> {
     /// interior of the target cell.
     ///
     /// Corresponds to C++ `S2ShapeIndexRegion::AnyEdgeIntersects`.
-    fn any_edge_intersects(index: &ShapeIndex, clipped: &ClippedShape, target: &Cell) -> bool {
+    fn any_edge_intersects(index: &I, clipped: &ClippedShape, target: &Cell) -> bool {
         let max_error = FACE_CLIP_ERROR_UV_COORD + INTERSECTS_RECT_ERROR_UV_DIST;
         let bound = target
             .bound_uv()
@@ -211,7 +214,7 @@ impl<'a> ShapeIndexRegion<'a> {
     }
 }
 
-impl Region for ShapeIndexRegion<'_> {
+impl<I: ShapeIndexLike> Region for ShapeIndexRegion<'_, I> {
     fn cap_bound(&self) -> Cap {
         let ids = self.compute_cell_union_bound();
         let cu = CellUnion::from_cell_ids(ids);

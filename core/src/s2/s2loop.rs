@@ -493,10 +493,9 @@ impl Loop {
         let origin = Point::origin();
         let mut inside = self.origin_inside;
         let mut crosser = EdgeCrosser::new(origin, p);
-        let n = self.vertices.len();
-        for i in 0..n {
-            let next = (i + 1) % n;
-            inside ^= crosser.edge_or_vertex_crossing(self.vertices[i], self.vertices[next]);
+        let span = crate::s2::point_span::PointLoopSpan::new(&self.vertices);
+        for i in 0..span.len() {
+            inside ^= crosser.edge_or_vertex_crossing(span[i], span[i + 1]);
         }
         inside
     }
@@ -524,12 +523,13 @@ impl Loop {
                 return Err(format!("vertex {i} is not unit length: {norm}"));
             }
         }
-        for i in 0..self.vertices.len() {
-            let next = (i + 1) % self.vertices.len();
-            if self.vertices[i] == self.vertices[next] {
+        let span = crate::s2::point_span::PointLoopSpan::new(&self.vertices);
+        for i in 0..span.len() {
+            let next = (i + 1) % span.len();
+            if span[i] == span[i + 1] {
                 return Err(format!("vertices {i} and {next} are identical"));
             }
-            if self.vertices[i] == Point(-self.vertices[next].0) {
+            if span[i] == Point(-span[i + 1].0) {
                 return Err(format!("vertices {i} and {next} are antipodal"));
             }
         }
@@ -811,6 +811,32 @@ impl Loop {
     /// `self`'s vertices within the given tolerance.
     ///
     /// Corresponds to C++ `S2Loop::BoundaryApproxEquals`.
+    /// Reports whether the two loops have the same boundary: identical
+    /// vertices in the same cyclic order (any rotation). The empty and full
+    /// loops only equal themselves. (C++ `S2Loop::BoundaryEquals`.)
+    pub fn boundary_equals(&self, b: &Loop) -> bool {
+        if self.num_vertices() != b.num_vertices() {
+            return false;
+        }
+        // Empty/full loops share a vertex count of 1; compare kinds exactly.
+        if self.is_empty_or_full() {
+            return self.is_empty_loop() == b.is_empty_loop();
+        }
+        let n = self.num_vertices();
+        for offset in 0..n {
+            if self.vertex(offset) == b.vertex(0) {
+                // Vertex locations are not necessarily unique; verify the
+                // whole rotation before accepting this offset.
+                if (0..n).all(|i| self.vertex((offset + i) % n) == b.vertex(i)) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Reports whether the two loop boundaries are equal within `max_error`
+    /// under some cyclic rotation (C++ `BoundaryApproxEquals`).
     pub fn boundary_approx_eq(&self, b: &Loop, max_error: Angle) -> bool {
         if self.num_vertices() != b.num_vertices() {
             return false;
@@ -2181,6 +2207,24 @@ mod tests {
         let b = Loop::new(vec![p(40.0, 40.0), p(40.0, 50.0), p(50.0, 40.0)]);
         let max_error = Angle::from_degrees(1.0);
         assert!(!a.boundary_near(&b, max_error));
+    }
+
+    #[test]
+    fn test_boundary_equals_rotations_and_mismatches() {
+        use crate::s2::text_format::make_loop;
+        let l = make_loop("0:0, 0:5, 5:5");
+        let rotated = make_loop("0:5, 5:5, 0:0");
+        let reversed = make_loop("5:5, 0:5, 0:0");
+        let other = make_loop("0:0, 0:5, 5:6");
+        assert!(l.boundary_equals(&l));
+        assert!(l.boundary_equals(&rotated), "cyclic rotation is equal");
+        assert!(!l.boundary_equals(&reversed), "orientation matters");
+        assert!(!l.boundary_equals(&other));
+        // Empty/full sentinels only equal themselves.
+        assert!(Loop::empty().boundary_equals(&Loop::empty()));
+        assert!(Loop::full().boundary_equals(&Loop::full()));
+        assert!(!Loop::empty().boundary_equals(&Loop::full()));
+        assert!(!l.boundary_equals(&Loop::empty()));
     }
 
     #[test]

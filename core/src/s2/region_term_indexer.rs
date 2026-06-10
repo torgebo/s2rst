@@ -117,12 +117,30 @@ impl RegionTermIndexer {
     ///
     /// These terms should be stored in the database for each document.
     pub fn get_index_terms(&self, region: &dyn Region) -> Vec<String> {
+        self.get_index_terms_with_prefix(region, "")
+    }
+
+    /// Like [`Self::get_index_terms`], with every term prepended by `prefix`.
+    ///
+    /// The prefix distinguishes S2 terms from other terms in a shared index
+    /// and must match between indexing and querying.
+    /// C++: `GetIndexTerms(const S2Region&, string_view prefix)`.
+    pub fn get_index_terms_with_prefix(&self, region: &dyn Region, prefix: &str) -> Vec<String> {
         let covering = self.get_covering(region);
-        self.get_index_terms_for_covering(&covering)
+        self.get_index_terms_for_covering_with_prefix(&covering, prefix)
     }
 
     /// Generates index terms for a point.
     pub fn get_index_terms_for_point(&self, point: Point) -> Vec<String> {
+        self.get_index_terms_for_point_with_prefix(point, "")
+    }
+
+    /// Like [`Self::get_index_terms_for_point`], with every term prepended by `prefix`.
+    ///
+    /// The prefix distinguishes S2 terms from other terms in a shared
+    /// index and must match between indexing and querying.
+    /// C++: the `prefix` parameter of the corresponding method.
+    pub fn get_index_terms_for_point_with_prefix(&self, point: Point, prefix: &str) -> Vec<String> {
         let cell_id = CellId::from_point(&point);
         let level = self.true_max_level();
         let id = cell_id.parent_at_level(level);
@@ -131,7 +149,7 @@ impl RegionTermIndexer {
         // Ancestor terms: the cell and all its ancestors down to min_level.
         let mut current = id;
         while current.level() >= self.options.min_level {
-            terms.push(self.ancestor_term(current));
+            terms.push(self.ancestor_term(current, prefix));
             if current.level() == 0 {
                 break;
             }
@@ -140,7 +158,7 @@ impl RegionTermIndexer {
 
         // Covering term (unless point-only).
         if !self.options.index_contains_points_only {
-            terms.push(self.covering_term(id));
+            terms.push(self.covering_term(id, prefix));
         }
 
         terms
@@ -150,24 +168,42 @@ impl RegionTermIndexer {
     ///
     /// Look up each term in the database and union the results.
     pub fn get_query_terms(&self, region: &dyn Region) -> Vec<String> {
+        self.get_query_terms_with_prefix(region, "")
+    }
+
+    /// Like [`Self::get_query_terms`], with every term prepended by `prefix`.
+    ///
+    /// The prefix distinguishes S2 terms from other terms in a shared index
+    /// and must match between indexing and querying.
+    /// C++: `GetQueryTerms(const S2Region&, string_view prefix)`.
+    pub fn get_query_terms_with_prefix(&self, region: &dyn Region, prefix: &str) -> Vec<String> {
         let covering = self.get_covering(region);
-        self.get_query_terms_for_covering(&covering)
+        self.get_query_terms_for_covering_with_prefix(&covering, prefix)
     }
 
     /// Generates query terms for a point.
     pub fn get_query_terms_for_point(&self, point: Point) -> Vec<String> {
+        self.get_query_terms_for_point_with_prefix(point, "")
+    }
+
+    /// Like [`Self::get_query_terms_for_point`], with every term prepended by `prefix`.
+    ///
+    /// The prefix distinguishes S2 terms from other terms in a shared
+    /// index and must match between indexing and querying.
+    /// C++: the `prefix` parameter of the corresponding method.
+    pub fn get_query_terms_for_point_with_prefix(&self, point: Point, prefix: &str) -> Vec<String> {
         let cell_id = CellId::from_point(&point);
         let level = self.true_max_level();
         let id = cell_id.parent_at_level(level);
         let mut terms = Vec::new();
 
         // Ancestor term at the point's level.
-        terms.push(self.ancestor_term(id));
+        terms.push(self.ancestor_term(id, prefix));
 
         // Covering terms for all ancestors.
         let mut current = id;
         while current.level() >= self.options.min_level {
-            terms.push(self.covering_term(current));
+            terms.push(self.covering_term(current, prefix));
             if current.level() == 0 {
                 break;
             }
@@ -179,6 +215,19 @@ impl RegionTermIndexer {
 
     /// Generates index terms from a pre-computed canonical cell covering.
     pub fn get_index_terms_for_covering(&self, covering: &CellUnion) -> Vec<String> {
+        self.get_index_terms_for_covering_with_prefix(covering, "")
+    }
+
+    /// Like [`Self::get_index_terms_for_covering`], with every term prepended by `prefix`.
+    ///
+    /// The prefix distinguishes S2 terms from other terms in a shared
+    /// index and must match between indexing and querying.
+    /// C++: the `prefix` parameter of the corresponding method.
+    pub fn get_index_terms_for_covering_with_prefix(
+        &self,
+        covering: &CellUnion,
+        prefix: &str,
+    ) -> Vec<String> {
         let true_max = self.true_max_level();
         let mut terms = Vec::new();
 
@@ -194,7 +243,7 @@ impl RegionTermIndexer {
             let mut current = id;
             while current.level() >= self.options.min_level {
                 if !self.options.optimize_for_space || current == id {
-                    terms.push(self.ancestor_term(current));
+                    terms.push(self.ancestor_term(current, prefix));
                 }
                 if current.level() == 0 {
                     break;
@@ -204,7 +253,7 @@ impl RegionTermIndexer {
 
             // Covering term (unless at true_max_level or point-only).
             if !self.options.index_contains_points_only && id.level() < true_max {
-                terms.push(self.covering_term(id));
+                terms.push(self.covering_term(id, prefix));
             }
         }
 
@@ -215,6 +264,19 @@ impl RegionTermIndexer {
 
     /// Generates query terms from a pre-computed canonical cell covering.
     pub fn get_query_terms_for_covering(&self, covering: &CellUnion) -> Vec<String> {
+        self.get_query_terms_for_covering_with_prefix(covering, "")
+    }
+
+    /// Like [`Self::get_query_terms_for_covering`], with every term prepended by `prefix`.
+    ///
+    /// The prefix distinguishes S2 terms from other terms in a shared
+    /// index and must match between indexing and querying.
+    /// C++: the `prefix` parameter of the corresponding method.
+    pub fn get_query_terms_for_covering_with_prefix(
+        &self,
+        covering: &CellUnion,
+        prefix: &str,
+    ) -> Vec<String> {
         let _true_max = self.true_max_level();
         let mut terms = Vec::new();
 
@@ -227,13 +289,13 @@ impl RegionTermIndexer {
                 (level - self.options.min_level) % self.options.level_mod as u8
             );
             // Ancestor term at this cell's level.
-            terms.push(self.ancestor_term(id));
+            terms.push(self.ancestor_term(id, prefix));
 
             // Covering terms for all ancestors.
             if !self.options.index_contains_points_only {
                 let mut current = id;
                 while current.level() >= self.options.min_level {
-                    terms.push(self.covering_term(current));
+                    terms.push(self.covering_term(current, prefix));
                     if current.level() == 0 {
                         break;
                     }
@@ -246,7 +308,7 @@ impl RegionTermIndexer {
                 let mut current = id;
                 while current.level() > self.options.min_level {
                     current = current.parent();
-                    terms.push(self.ancestor_term(current));
+                    terms.push(self.ancestor_term(current, prefix));
                 }
             }
         }
@@ -266,12 +328,12 @@ impl RegionTermIndexer {
     }
 
     #[expect(clippy::unused_self, reason = "matches C++ method signature")]
-    fn ancestor_term(&self, id: CellId) -> String {
-        id.to_token()
+    fn ancestor_term(&self, id: CellId, prefix: &str) -> String {
+        format!("{prefix}{}", id.to_token())
     }
 
-    fn covering_term(&self, id: CellId) -> String {
-        format!("{}{}", self.options.marker_character, id.to_token())
+    fn covering_term(&self, id: CellId, prefix: &str) -> String {
+        format!("{prefix}{}{}", self.options.marker_character, id.to_token())
     }
 }
 
@@ -286,6 +348,61 @@ mod tests {
     use super::*;
     use crate::s2::cap::Cap;
     use crate::s2::text_format;
+
+    #[test]
+    fn test_prefix_prepended_to_every_term() {
+        // Prefixed terms must be exactly the unprefixed terms with the prefix
+        // prepended, for both point and region variants (C++ `prefix` param).
+        let indexer = RegionTermIndexer::new();
+        let p = text_format::parse_point("10:20");
+        let plain = indexer.get_index_terms_for_point(p);
+        let prefixed = indexer.get_index_terms_for_point_with_prefix(p, "s2:");
+        assert_eq!(
+            prefixed,
+            plain.iter().map(|t| format!("s2:{t}")).collect::<Vec<_>>()
+        );
+
+        let cap = Cap::from_center_angle(
+            text_format::parse_point("40:70"),
+            crate::s1::Angle::from_degrees(1.0),
+        );
+        let plain = indexer.get_query_terms(&cap);
+        let prefixed = indexer.get_query_terms_with_prefix(&cap, "g_");
+        assert_eq!(
+            prefixed,
+            plain.iter().map(|t| format!("g_{t}")).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_prefix_precedes_covering_marker() {
+        // The marker character sits between the prefix and the token:
+        // prefix + marker + token (C++ GetTerm with StrCat(prefix, marker, ..)).
+        let indexer = RegionTermIndexer::new();
+        let p = text_format::parse_point("0:0");
+        let terms = indexer.get_index_terms_for_point_with_prefix(p, "x");
+        assert!(terms.iter().any(|t| t.starts_with("x$")));
+        assert!(terms.iter().all(|t| t.starts_with('x')));
+    }
+
+    #[test]
+    fn test_index_and_query_prefixes_match() {
+        // A point indexed with a prefix must be found by a query using the
+        // same prefix (terms intersect), and not without it.
+        let indexer = RegionTermIndexer::new();
+        let p = text_format::parse_point("5:5");
+        let index_terms = indexer.get_index_terms_for_point_with_prefix(p, "pre");
+        let query_terms = indexer.get_query_terms_for_point_with_prefix(p, "pre");
+        assert!(
+            query_terms.iter().any(|t| index_terms.contains(t)),
+            "same-prefix index and query terms must intersect"
+        );
+        let unprefixed_query = indexer.get_query_terms_for_point(p);
+        assert!(
+            !unprefixed_query.iter().any(|t| index_terms.contains(t)),
+            "prefixed index terms must not match unprefixed queries"
+        );
+    }
 
     #[test]
     fn test_default_options() {

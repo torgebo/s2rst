@@ -22,7 +22,7 @@ fn bench_sign(c: &mut Criterion) {
             let p1 = black_box(Point::from_coords(-3.0, -1.0, 4.0).normalize());
             let p2 = black_box(Point::from_coords(2.0, -1.0, -3.0).normalize());
             let p3 = black_box(Point::from_coords(1.0, -2.0, 0.0).normalize());
-            predicates::sign(p1, p2, p3)
+            predicates::simple_ccw(p1, p2, p3)
         });
     });
 }
@@ -44,7 +44,7 @@ fn bench_sign_near_collinear(c: &mut Criterion) {
             let p1 = black_box(Point::from_coords(1.0, 0.0, 0.0));
             let p2 = black_box(Point::from_coords(1.0, 1e-15, 0.0).normalize());
             let p3 = black_box(Point::from_coords(1.0, 0.0, 1e-15).normalize());
-            predicates::sign(p1, p2, p3)
+            predicates::simple_ccw(p1, p2, p3)
         });
     });
 }

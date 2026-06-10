@@ -381,7 +381,7 @@ mod tests {
         // Check that origin is not too close to the north pole (≥ 50km).
         let earth_radius_km = 6371.01;
         let dist = origin.z().acos() * earth_radius_km;
-        assert!(dist >= 50.0, "origin too close to north pole: {dist}km",);
+        assert!(dist >= 50.0, "origin too close to north pole: {dist}km");
     }
 
     #[test]
@@ -1362,7 +1362,7 @@ mod point_property_tests {
         let q = Point::from_coords(0.0, 1.0, 0.0);
         let d = p.distance(q).radians();
         let sa = p.stable_angle(q).radians();
-        assert!((d - sa).abs() < 1e-14, "distance={d}, stable_angle={sa}",);
+        assert!((d - sa).abs() < 1e-14, "distance={d}, stable_angle={sa}");
     }
 
     #[test]

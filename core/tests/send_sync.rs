@@ -81,6 +81,7 @@ fn s2_shape_types() {
 #[test]
 fn s2_shape_index_types() {
     is_ssu::<s2rst::s2::shape_index::ShapeIndex>();
+    is_ssu::<s2rst::s2::encoded_s2shape_index::EncodedS2ShapeIndex>();
     is_ssu::<s2rst::s2::shape_index::ShapeIndexCell>();
     is_ssu::<s2rst::s2::shape_index::ClippedShape>();
     is_ssu::<s2rst::s2::shape_index::CellRelation>();

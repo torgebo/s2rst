@@ -108,13 +108,31 @@ pub fn update_min_interior_distance(
 /// `distance_fraction`. All points must be unit length.
 #[inline]
 pub fn project(x: Point, a: Point, b: Point) -> Point {
-    let a_xb = a.point_cross(b);
-    // Find the closest point to X along the great circle through AB.
-    let p = x.0 - a_xb.0 * (x.0.dot(a_xb.0) / a_xb.0.norm2());
+    // Port of the current C++ S2::Project (s2edge_distances.cc): a robust
+    // projection via RobustCrossProd plus robust orientation tests for the
+    // interior check (the previous revision used the naive projection and
+    // SimpleCCW, which misbehave on nearly-degenerate input).
+    if x == a || x == b {
+        return x;
+    }
+
+    // Find the closest point to X along the great circle through AB. Using
+    // "n" rather than a_cross_b in the final cross product avoids the
+    // possibility of underflow (per the C++ comment).
+    let n = Point(a.point_cross(b).0.normalize());
+    let p = Point(
+        edge_crossings::robust_cross_prod(n, x)
+            .0
+            .cross(n.0)
+            .normalize(),
+    );
 
     // If this point is on the edge AB, then it's the closest point.
-    if predicates::sign(a_xb, a, Point(p)) && predicates::sign(Point(p), b, a_xb) {
-        return Point(p.normalize());
+    use crate::s2::predicates::{Direction, robust_sign};
+    if robust_sign(p, n, a) == Direction::CounterClockwise
+        && robust_sign(p, n, b) == Direction::Clockwise
+    {
+        return p;
     }
 
     // Otherwise, the closest point is either A or B.
@@ -624,8 +642,18 @@ mod tests {
         let a = Point::from_coords(1.0, 0.0, 0.0);
         let b = Point::from_coords(0.0, 1.0, 0.0);
         let p = project(x, a, b);
-        // Should be one of the endpoints.
-        assert!(p == a || p == b, "projected point should be an endpoint");
+        // X is perpendicular to the edge plane, so EVERY point of AB is
+        // equidistant (90 degrees); any point on the edge is a valid answer.
+        // (The pre-modernization implementation happened to return an
+        // endpoint; current C++ returns an interior point here.)
+        assert!(
+            (x.distance(p).radians() - std::f64::consts::FRAC_PI_2).abs() < 1e-15,
+            "projection must be 90 degrees from the pole"
+        );
+        assert!(
+            p.0.dot(a.point_cross(b).0.normalize()).abs() < 1e-15,
+            "projection must lie on the edge's great circle"
+        );
 
         // Project a point that is close to the interior of the edge.
         let mid = Point::from_coords(1.0, 1.0, 0.01);
@@ -717,7 +745,7 @@ mod tests {
         let b = Point::from_coords(0.0, 1.0, 0.0);
         // At distance 0 from A should give A.
         let p = point_on_line(a, b, Angle::ZERO);
-        assert!(p.approx_eq(a), "point_on_line(a, b, 0) = {p}, want ≈ {a}",);
+        assert!(p.approx_eq(a), "point_on_line(a, b, 0) = {p}, want ≈ {a}");
     }
 
     #[test]

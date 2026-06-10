@@ -86,6 +86,21 @@ pub fn sample_point_from_cap(rng: &mut impl Rng, cap: &Cap) -> Point {
 
 /// Returns a random cell id at the given level. The distribution is uniform
 /// over the space of cell ids, but only approximately uniform over the sphere.
+/// Samples a point uniformly at random from the given lat/lng rectangle
+/// (C++ `s2random::SamplePoint(bitgen, S2LatLngRect)`).
+pub fn sample_point_in_rect(rng: &mut impl Rng, rect: &crate::s2::Rect) -> Point {
+    // Sample the cosine of the latitude uniformly to get an area-uniform
+    // distribution over the sphere band, then a uniform longitude.
+    let z1 = rect.lat.lo.sin();
+    let z2 = rect.lat.hi.sin();
+    let z = z1 + (z2 - z1) * rng.r#gen::<f64>();
+    let lat = z.asin();
+    let lng = rect.lng.lo + rect.lng.length() * rng.r#gen::<f64>();
+    crate::s2::LatLng::from_radians(lat, lng).to_point()
+}
+
+/// Returns a random cell id at the given level (uniformly over the
+/// face/position space).
 pub fn random_cell_id_at_level(rng: &mut impl Rng, level: impl Into<Level>) -> CellId {
     let face: u8 = rng.gen_range(0..6);
     let pos: u64 = rng.gen_range(0..(1u64 << (2 * u32::from(MAX_CELL_LEVEL) + 1)));

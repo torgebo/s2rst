@@ -26,8 +26,8 @@
 use crate::s1::ChordAngle;
 use crate::s2::Point;
 use crate::s2::edge_distances;
-use crate::s2::shape::{Dimension, Edge};
-use crate::s2::shape_index::ShapeIndex;
+use crate::s2::shape::{Dimension, Edge, ShapeId};
+use crate::s2::shape_index::{ShapeIndex, ShapeIndexLike};
 use crate::s2::shape_util;
 
 // ─── Options ────────────────────────────────────────────────────────────
@@ -276,19 +276,24 @@ impl DistanceTarget for EdgeTarget {
 /// // Distance should be small (about 1 degree).
 /// assert!(result.distance.to_angle().degrees() < 2.0);
 /// ```
-#[derive(Debug)]
-pub struct ClosestEdgeQuery<'a> {
-    index: &'a ShapeIndex,
+pub struct ClosestEdgeQuery<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
 }
 
-impl<'a> ClosestEdgeQuery<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for ClosestEdgeQuery<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClosestEdgeQuery").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> ClosestEdgeQuery<'a, I> {
     /// Creates a new closest edge query for the given index.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         ClosestEdgeQuery { index }
     }
 
     /// Returns the underlying index.
-    pub fn index(&self) -> &ShapeIndex {
+    pub fn index(&self) -> &I {
         self.index
     }
 
@@ -340,7 +345,7 @@ impl<'a> ClosestEdgeQuery<'a> {
             && let Some(p) = target.interior_point()
         {
             for shape_id in 0..self.index.len() as i32 {
-                let Some(shape) = self.index.shape(shape_id) else {
+                let Some(shape) = self.index.shape(ShapeId(shape_id)) else {
                     continue;
                 };
                 if shape.dimension() == Dimension::Polygon
@@ -360,7 +365,7 @@ impl<'a> ClosestEdgeQuery<'a> {
 
         // Brute force: test every edge in every shape.
         for shape_id in 0..self.index.len() as i32 {
-            let Some(shape) = self.index.shape(shape_id) else {
+            let Some(shape) = self.index.shape(ShapeId(shape_id)) else {
                 continue;
             };
             for edge_id in 0..shape.num_edges() as i32 {
@@ -403,14 +408,19 @@ impl<'a> ClosestEdgeQuery<'a> {
 // ─── Furthest Edge Query ────────────────────────────────────────────────
 
 /// Finds the furthest edges in a [`ShapeIndex`] from a given target.
-#[derive(Debug)]
-pub struct FurthestEdgeQuery<'a> {
-    index: &'a ShapeIndex,
+pub struct FurthestEdgeQuery<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
 }
 
-impl<'a> FurthestEdgeQuery<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for FurthestEdgeQuery<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FurthestEdgeQuery").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> FurthestEdgeQuery<'a, I> {
     /// Creates a new furthest edge query for the given index.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         FurthestEdgeQuery { index }
     }
 
@@ -423,7 +433,7 @@ impl<'a> FurthestEdgeQuery<'a> {
         };
 
         for shape_id in 0..self.index.len() as i32 {
-            let Some(shape) = self.index.shape(shape_id) else {
+            let Some(shape) = self.index.shape(ShapeId(shape_id)) else {
                 continue;
             };
             for edge_id in 0..shape.num_edges() as i32 {

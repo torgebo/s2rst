@@ -25,12 +25,11 @@ fuzz_target!(|data: &[u8]| {
     if index.init(data).is_err() {
         return;
     }
-    let idx = index.as_index();
 
     // Materialize every shape's edges (bounded). Decode caps the edge counts, so
     // the `.min` is belt-and-suspenders against a pathological-but-legal count.
-    for id in 0..idx.num_shape_ids() {
-        if let Some(shape) = idx.shape(id as i32) {
+    for id in 0..index.num_shape_ids() {
+        if let Some(shape) = index.shape(id as i32) {
             let n = shape.num_edges();
             for e in 0..n.min(4096) {
                 let _ = shape.edge(e);
@@ -39,8 +38,8 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // Query point-containment at each cell center (bounded).
-    let mut query = ContainsPointQuery::new(idx, VertexModel::SemiOpen);
-    let mut it = idx.iter();
+    let mut query = ContainsPointQuery::new(&index, VertexModel::SemiOpen);
+    let mut it = index.iter();
     let mut budget = 4096usize;
     while !it.done() && budget > 0 {
         let _ = query.contains(it.center());

@@ -18,7 +18,9 @@
 )]
 use std::io::{self, Read, Write};
 
-use super::encoded_uint_vector::{decode_uint_vector_u64, encode_uint_vector_u64};
+use super::encoded_uint_vector::{
+    EncodedUintVector, decode_uint_vector_u64, encode_uint_vector_u64,
+};
 
 // ─── Encoding ───────────────────────────────────────────────────────────
 
@@ -107,8 +109,154 @@ impl StringVectorBuilder {
 
 // ─── Tests ──────────────────────────────────────────────────────────────
 
+/// A lazy view over an encoded string vector: O(1) access to each byte
+/// string directly in the encoded buffer, no copying.
+///
+/// Port of C++ `s2coding::EncodedStringVector` (Phase 3). Each element is a
+/// sub-slice of the original buffer — the natural carrier for the encoded
+/// shape index, whose per-shape bytes are stored exactly this way.
+#[derive(Clone, Copy, Debug)]
+pub struct EncodedStringVector<'a> {
+    /// Cumulative end offsets (entry i = end of string i).
+    offsets: EncodedUintVector<'a, u64>,
+    /// The concatenated string bytes.
+    data: &'a [u8],
+}
+
+impl<'a> EncodedStringVector<'a> {
+    /// Parses the offsets header and bounds-checks the string bytes.
+    /// Returns the view plus the remaining unconsumed bytes.
+    ///
+    /// # Errors
+    /// Returns `InvalidData`/`UnexpectedEof` on malformed or truncated input,
+    /// including non-monotonic offsets discovered up front.
+    pub fn init(data: &'a [u8]) -> io::Result<(Self, &'a [u8])> {
+        let (offsets, rest) = EncodedUintVector::<u64>::init(data)?;
+        let total = if offsets.is_empty() {
+            0
+        } else {
+            offsets.get(offsets.len() - 1)
+        };
+        if total > rest.len() as u64 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "string vector truncated",
+            ));
+        }
+        let (strings, rest) = rest.split_at(total as usize);
+        Ok((
+            EncodedStringVector {
+                offsets,
+                data: strings,
+            },
+            rest,
+        ))
+    }
+
+    /// The number of strings.
+    pub fn len(&self) -> usize {
+        self.offsets.len()
+    }
+
+    /// True if the vector has no elements.
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
+    }
+
+    /// The bytes of string `i`, borrowed from the encoded buffer (O(1)).
+    ///
+    /// # Errors
+    /// Returns `InvalidData` if the stored offsets are non-monotonic.
+    ///
+    /// # Panics
+    /// Panics if `i >= len()`.
+    pub fn get(&self, i: usize) -> io::Result<&'a [u8]> {
+        let start = if i == 0 { 0 } else { self.offsets.get(i - 1) } as usize;
+        let end = self.offsets.get(i) as usize;
+        if start > end || end > self.data.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "non-monotonic string offsets",
+            ));
+        }
+        Ok(&self.data[start..end])
+    }
+
+    /// The byte range of string `i` within [`Self::data_len`] bytes of
+    /// string data (offsets relative to the data block).
+    ///
+    /// # Errors
+    /// Returns `InvalidData` if the stored offsets are non-monotonic.
+    ///
+    /// # Panics
+    /// Panics if `i >= len()`.
+    pub fn range(&self, i: usize) -> io::Result<(usize, usize)> {
+        let start = if i == 0 { 0 } else { self.offsets.get(i - 1) } as usize;
+        let end = self.offsets.get(i) as usize;
+        if start > end || end > self.data.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "non-monotonic string offsets",
+            ));
+        }
+        Ok((start, end))
+    }
+
+    /// The total length of the string data block.
+    pub fn data_len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Materializes the whole vector (copies each string).
+    ///
+    /// # Errors
+    /// Returns `InvalidData` if the stored offsets are non-monotonic.
+    pub fn decode(&self) -> io::Result<Vec<Vec<u8>>> {
+        (0..self.len()).map(|i| Ok(self.get(i)?.to_vec())).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_lazy_view_matches_eager() {
+        use super::*;
+        let cases: Vec<Vec<&[u8]>> = vec![
+            vec![],
+            vec![b""],
+            vec![b"hello", b"", b"world", b"!"],
+            vec![[0u8; 300].as_slice(), b"x"],
+        ];
+        for strings in cases {
+            let mut buf = Vec::new();
+            encode_string_vector(&strings, &mut buf).unwrap();
+            buf.extend_from_slice(b"TAIL");
+            let (view, rest) = EncodedStringVector::init(&buf).unwrap();
+            assert_eq!(rest, b"TAIL");
+            assert_eq!(view.len(), strings.len());
+            for (i, s) in strings.iter().enumerate() {
+                assert_eq!(view.get(i).unwrap(), *s, "string {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_lazy_view_truncation_and_bad_offsets() {
+        use super::*;
+        let strings: Vec<&[u8]> = vec![b"abc", b"defg"];
+        let mut buf = Vec::new();
+        encode_string_vector(&strings, &mut buf).unwrap();
+        for cut in 0..buf.len() {
+            assert!(EncodedStringVector::init(&buf[..cut]).is_err() || cut > 0);
+        }
+        // Non-monotonic offsets: offsets [5, 2] with 5 bytes of data.
+        let mut bad = Vec::new();
+        encode_uint_vector_u64(&[5, 2], &mut bad).unwrap();
+        bad.extend_from_slice(b"hello");
+        let (view, _) = EncodedStringVector::init(&bad).unwrap();
+        assert!(view.get(1).is_err(), "non-monotonic offsets must error");
+    }
+
     use super::*;
 
     #[test]

@@ -1206,7 +1206,7 @@ mod tests {
         let mut options = BufferOptions::new(s1::Angle::from_degrees(1.0));
         options.set_polyline_side(PolylineSide::Right);
         let result = do_buffer(|op| op.add_polyline(&polyline), options);
-        assert!(!result.is_empty(), "One-sided buffer should produce output",);
+        assert!(!result.is_empty(), "One-sided buffer should produce output");
     }
 
     // ─── C++ ported: more comprehensive tests ──────────────────────────
@@ -1239,8 +1239,7 @@ mod tests {
         layers
             .into_iter()
             .next()
-            .map(take_lax_polygon)
-            .unwrap_or_else(LaxPolygon::empty)
+            .map_or_else(LaxPolygon::empty, take_lax_polygon)
     }
 
     fn test_buffer_containment(vertices: &[Point], buffer_radius: s1::Angle, error_fraction: f64) {
@@ -1324,7 +1323,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "graph_edge_clipper multiplicity assertion with near-degenerate zigzag"]
     fn test_zigzag_loop() {
         // Buffer a zigzag loop.
         let vertices: Vec<Point> = [

@@ -34,6 +34,7 @@
     reason = "usize -> i32 for ShapeId — always in range"
 )]
 use std::collections::BTreeMap;
+use std::sync::OnceLock;
 
 use crate::r1;
 use crate::r2;
@@ -220,11 +221,30 @@ impl InteriorTracker {
 
 // ─── ShapeIndex ─────────────────────────────────────────────────────────
 
+/// Construction options for a [`ShapeIndex`]
+/// (C++ `MutableS2ShapeIndex::Options`).
+#[derive(Clone, Debug)]
+pub struct ShapeIndexOptions {
+    /// The maximum number of edges per cell (default 10); cells with more
+    /// edges are subdivided.
+    pub max_edges_per_cell: usize,
+}
+
+impl Default for ShapeIndexOptions {
+    fn default() -> Self {
+        ShapeIndexOptions {
+            max_edges_per_cell: 10,
+        }
+    }
+}
+
 /// Spatial index for a set of [`Shape`]s.
 ///
-/// After adding shapes with [`add`](ShapeIndex::add), call
-/// [`build`](ShapeIndex::build) to construct the index. Once built, the
-/// index is immutable and can be queried via iterators.
+/// After adding shapes with [`add`](ShapeIndex::add), the spatial
+/// decomposition is built lazily on the first query (or explicitly via
+/// [`build`](ShapeIndex::build)). Shapes can be removed again with
+/// [`release`](ShapeIndex::release); any mutation invalidates the
+/// decomposition, which is rebuilt on the next query.
 ///
 /// # Examples
 ///
@@ -262,29 +282,142 @@ impl InteriorTracker {
 pub struct ShapeIndex {
     shapes: Vec<Option<Box<dyn Shape>>>,
     max_edges_per_cell: usize,
+    /// Optional shared memory accounting (see [`Self::set_memory_tracker`]).
+    memory_tracker:
+        Option<std::sync::Arc<std::sync::Mutex<crate::s2::memory_tracker::S2MemoryTracker>>>,
+    /// The spatial decomposition, built lazily on first query after any
+    /// mutation (every mutator takes `&mut self` and resets this lock, so a
+    /// populated lock is always in sync with `shapes`). `OnceLock` makes the
+    /// first build safe under concurrent queries (C++ uses lock-free reads
+    /// plus a build mutex for the same purpose).
+    built: OnceLock<BuiltState>,
+}
+
+/// The built spatial decomposition (cells in `CellId` order plus contents).
+#[derive(Debug, Default)]
+struct BuiltState {
     cell_map: BTreeMap<CellId, ShapeIndexCell>,
     cells: Vec<CellId>,
-    built: bool,
 }
 
 impl ShapeIndex {
     /// Creates a new empty `ShapeIndex`.
     pub fn new() -> Self {
+        Self::with_options(ShapeIndexOptions::default())
+    }
+
+    /// Creates a new empty `ShapeIndex` with the given options.
+    pub fn with_options(options: ShapeIndexOptions) -> Self {
         ShapeIndex {
             shapes: Vec::new(),
-            max_edges_per_cell: 10,
-            cell_map: BTreeMap::new(),
-            cells: Vec::new(),
-            built: false,
+            max_edges_per_cell: options.max_edges_per_cell,
+            memory_tracker: None,
+            built: OnceLock::new(),
         }
     }
 
+    /// The construction options.
+    pub fn options(&self) -> ShapeIndexOptions {
+        ShapeIndexOptions {
+            max_edges_per_cell: self.max_edges_per_cell,
+        }
+    }
+
+    /// Attaches a shared memory tracker. The index tallies the (approximate)
+    /// size of its built decomposition when it is created and un-tallies it
+    /// when released, so the index participates in the same budget as the
+    /// builder and boolean/buffer operations.
+    ///
+    /// This is accounting only: unlike C++, an exceeded limit does not abort
+    /// an in-progress build (recorded in `PLAN_LACKING.md`; revisit on demand).
+    pub fn set_memory_tracker(
+        &mut self,
+        tracker: Option<
+            std::sync::Arc<std::sync::Mutex<crate::s2::memory_tracker::S2MemoryTracker>>,
+        >,
+    ) {
+        self.release_built();
+        self.memory_tracker = tracker;
+    }
+
+    /// Approximate bytes used by the index structure (the shapes table and
+    /// the built decomposition). Like C++ `SpaceUsed`, the shapes themselves
+    /// are not included.
+    pub fn space_used(&self) -> usize {
+        let mut bytes = size_of::<Self>();
+        bytes += self.shapes.capacity() * size_of::<Option<Box<dyn Shape>>>();
+        if let Some(b) = self.built.get() {
+            bytes += Self::built_bytes(b);
+        }
+        bytes
+    }
+
+    /// Approximate heap size of a built decomposition.
+    fn built_bytes(b: &BuiltState) -> usize {
+        let mut bytes = b.cells.capacity() * size_of::<CellId>();
+        for cell in b.cell_map.values() {
+            // Map entry (key + value + node overhead) plus owned vectors.
+            bytes += size_of::<CellId>() + size_of::<ShapeIndexCell>() + 4 * size_of::<usize>();
+            bytes += cell.shapes.capacity() * size_of::<ClippedShape>();
+            for clipped in &cell.shapes {
+                bytes += clipped.edges.capacity() * size_of::<i32>();
+            }
+        }
+        bytes
+    }
+
+    /// Resets the built state, un-tallying it from the tracker if attached.
+    fn release_built(&mut self) {
+        if let Some(b) = self.built.get()
+            && let Some(tracker) = &self.memory_tracker
+            && let Ok(mut t) = tracker.lock()
+        {
+            let _within_budget = t.tally(-(Self::built_bytes(b) as i64));
+        }
+        self.built = OnceLock::new();
+    }
+
     /// Adds a shape to the index and returns the assigned shape ID.
+    ///
+    /// The spatial decomposition is rebuilt lazily on the next query (or
+    /// explicit [`Self::build`]).
     pub fn add(&mut self, shape: Box<dyn Shape>) -> ShapeId {
         let id = ShapeId::new(self.shapes.len() as i32);
         self.shapes.push(Some(shape));
-        self.built = false;
+        self.release_built();
         id
+    }
+
+    /// Removes the shape with the given id and returns it (or `None` if the
+    /// id is out of range or already removed).
+    ///
+    /// Shape ids are never reused: the slot stays as a gap, and
+    /// [`Self::shape`] returns `None` for it, exactly like C++
+    /// `MutableS2ShapeIndex::Release`.
+    pub fn release(&mut self, id: impl Into<ShapeId>) -> Option<Box<dyn Shape>> {
+        let id = id.into();
+        let shape = self.shapes.get_mut(id.as_usize())?.take()?;
+        self.release_built();
+        Some(shape)
+    }
+
+    /// Removes and returns all shapes (including `None` gap slots, so
+    /// positions correspond to the previous shape ids). The index becomes
+    /// empty and id assignment restarts at 0. (C++ `ReleaseAll`.)
+    pub fn release_all(&mut self) -> Vec<Option<Box<dyn Shape>>> {
+        self.release_built();
+        std::mem::take(&mut self.shapes)
+    }
+
+    /// Removes (and drops) all shapes. (C++ `Clear`.)
+    pub fn clear(&mut self) {
+        drop(self.release_all());
+    }
+
+    /// Releases the built spatial decomposition to reclaim memory; it is
+    /// rebuilt on the next query. (C++ `Minimize`.)
+    pub fn minimize(&mut self) {
+        self.release_built();
     }
 
     /// Returns the shape with the given ID, or `None`.
@@ -320,13 +453,30 @@ impl ShapeIndex {
             .sum()
     }
 
-    /// Builds the index. Must be called before querying.
+    /// Builds the index now if it is stale.
+    ///
+    /// Calling this is optional: queries build the index lazily on first
+    /// access (and the lazy build is safe under concurrent queries). An
+    /// explicit call is still useful to control *when* the work happens.
     pub fn build(&mut self) {
-        if self.built {
-            return;
-        }
-        self.cell_map.clear();
-        self.cells.clear();
+        let _built = self.ensure_built();
+    }
+
+    /// Returns the built decomposition, building it on first access.
+    fn ensure_built(&self) -> &BuiltState {
+        self.built.get_or_init(|| {
+            let state = self.build_state();
+            if let Some(tracker) = &self.memory_tracker
+                && let Ok(mut t) = tracker.lock()
+            {
+                let _within_budget = t.tally(Self::built_bytes(&state) as i64);
+            }
+            state
+        })
+    }
+
+    fn build_state(&self) -> BuiltState {
+        let mut state = BuiltState::default();
 
         let mut tracker = InteriorTracker::new();
         let mut all_edges: Vec<Vec<FaceEdge>> = (0..6).map(|_| Vec::new()).collect();
@@ -353,18 +503,19 @@ impl ShapeIndex {
                 face,
                 &face_edges,
                 &mut tracker,
-                &mut self.cell_map,
-                &mut self.cells,
+                &mut state.cell_map,
+                &mut state.cells,
                 max_edges,
             );
         }
 
-        self.built = true;
+        state
     }
 
     /// Returns the index cell for the given `CellId`, if present.
+    /// Builds the index lazily if needed.
     pub fn cell(&self, id: CellId) -> Option<&ShapeIndexCell> {
-        self.cell_map.get(&id)
+        self.ensure_built().cell_map.get(&id)
     }
 
     /// Returns an iterator positioned at the first cell.
@@ -392,19 +543,19 @@ impl ShapeIndex {
     pub fn add_option(&mut self, shape: Option<Box<dyn Shape>>) -> i32 {
         let id = self.shapes.len() as i32;
         self.shapes.push(shape);
-        self.built = false;
+        self.release_built();
         id
     }
 
-    /// Directly inserts a cell into the cell map (used during decode).
-    pub fn insert_cell(&mut self, id: CellId, cell: ShapeIndexCell) {
-        self.cell_map.insert(id, cell);
-        self.cells.push(id);
-    }
-
-    /// Marks the index as built (used after decoding).
-    pub fn mark_built(&mut self) {
-        self.built = true;
+    /// Installs a pre-built decomposition (used by the wire decoder, which
+    /// reads cells directly instead of rebuilding them).
+    pub(crate) fn install_decoded_cells(&mut self, cells: Vec<(CellId, ShapeIndexCell)>) {
+        let mut state = BuiltState::default();
+        for (id, cell) in cells {
+            state.cells.push(id);
+            state.cell_map.insert(id, cell);
+        }
+        self.built = OnceLock::from(state);
     }
 
     // ─── Build internals ────────────────────────────────────────────
@@ -746,21 +897,24 @@ impl Default for ShapeIndex {
 /// Cells are visited in increasing order of [`CellId`].
 #[derive(Clone, Debug)]
 pub struct ShapeIndexIterator<'a> {
-    index: &'a ShapeIndex,
+    built: &'a BuiltState,
     position: usize,
 }
 
 impl<'a> ShapeIndexIterator<'a> {
     #[inline]
     fn new(index: &'a ShapeIndex, position: usize) -> Self {
-        ShapeIndexIterator { index, position }
+        ShapeIndexIterator {
+            built: index.ensure_built(),
+            position,
+        }
     }
 
     /// Returns the `CellId` of the current cell, or `CellId::sentinel()` if done.
     #[inline]
     pub fn cell_id(&self) -> CellId {
-        if self.position < self.index.cells.len() {
-            self.index.cells[self.position]
+        if self.position < self.built.cells.len() {
+            self.built.cells[self.position]
         } else {
             CellId::sentinel()
         }
@@ -769,8 +923,8 @@ impl<'a> ShapeIndexIterator<'a> {
     /// Returns the current index cell.
     #[inline]
     pub fn index_cell(&self) -> Option<&'a ShapeIndexCell> {
-        if self.position < self.index.cells.len() {
-            self.index.cell_map.get(&self.index.cells[self.position])
+        if self.position < self.built.cells.len() {
+            self.built.cell_map.get(&self.built.cells[self.position])
         } else {
             None
         }
@@ -786,7 +940,7 @@ impl<'a> ShapeIndexIterator<'a> {
     /// Reports whether the iterator is past the last cell.
     #[inline]
     pub fn done(&self) -> bool {
-        self.position >= self.index.cells.len()
+        self.position >= self.built.cells.len()
     }
 
     /// Advances to the next cell.
@@ -814,13 +968,13 @@ impl<'a> ShapeIndexIterator<'a> {
     /// Positions the iterator past the last cell.
     #[inline]
     pub fn end(&mut self) {
-        self.position = self.index.cells.len();
+        self.position = self.built.cells.len();
     }
 
     /// Positions the iterator at the first cell with ID >= `target`.
     #[inline]
     pub fn seek(&mut self, target: CellId) {
-        self.position = self.index.cells.partition_point(|&id| id < target);
+        self.position = self.built.cells.partition_point(|&id| id < target);
     }
 
     /// Positions the iterator at the cell containing the given point.
@@ -854,6 +1008,135 @@ impl<'a> ShapeIndexIterator<'a> {
             return CellRelation::Indexed;
         }
         CellRelation::Disjoint
+    }
+}
+
+/// The abstract-cell-iterator view of a [`ShapeIndexIterator`].
+///
+/// The inherent methods stay available (and are what the trait impl
+/// delegates to); this impl is what lets generic code — joins, queries over
+/// any [`ShapeIndexLike`] — drive the iterator.
+impl crate::s2::cell_iterator::CellIterator for ShapeIndexIterator<'_> {
+    fn cell_id(&self) -> CellId {
+        self.cell_id()
+    }
+    fn done(&self) -> bool {
+        self.done()
+    }
+    fn begin(&mut self) {
+        self.begin();
+    }
+    fn finish(&mut self) {
+        self.end();
+    }
+    fn next(&mut self) {
+        self.next();
+    }
+    fn prev(&mut self) -> bool {
+        self.prev()
+    }
+    fn seek(&mut self, target: CellId) {
+        self.seek(target);
+    }
+    fn center(&self) -> Point {
+        self.center()
+    }
+    // Keep the tuned inherent versions rather than the trait defaults.
+    fn locate_point(&mut self, p: Point) -> bool {
+        self.locate_point(p)
+    }
+    fn locate_cell_id(&mut self, target: CellId) -> CellRelation {
+        self.locate_cell_id(target)
+    }
+}
+
+/// Access to the contents of an iterator's current cell.
+///
+/// The returned reference borrows the *index* (lifetime `'a`), not the
+/// iterator, so contents can be held across `next()`/`seek()` calls — the
+/// access pattern every query relies on. Future implementations that decode
+/// cells lazily must cache decoded cells inside the index (e.g. per-cell
+/// `OnceLock`) to satisfy this lifetime.
+pub trait IndexCellAccess<'a> {
+    /// The contents of the current cell, or `None` when done.
+    fn index_cell(&self) -> Option<&'a ShapeIndexCell>;
+}
+
+impl<'a> IndexCellAccess<'a> for ShapeIndexIterator<'a> {
+    fn index_cell(&self) -> Option<&'a ShapeIndexCell> {
+        self.index_cell()
+    }
+}
+
+/// The abstract shape-index interface: anything that owns shapes and can
+/// iterate the cells of their spatial decomposition.
+///
+/// Port of the abstract C++ `S2ShapeIndex` base class, reduced to the
+/// surface the queries actually consume. `ShapeIndex` is the mutable
+/// in-memory implementation; a lazy `EncodedS2ShapeIndex` is the planned
+/// second implementor. Queries are generic over this trait (with
+/// `ShapeIndex` as the default type parameter, so existing signatures are
+/// unchanged).
+pub trait ShapeIndexLike {
+    /// The iterator type over this index's cells.
+    type Iter<'a>: crate::s2::cell_iterator::CellIterator + IndexCellAccess<'a>
+    where
+        Self: 'a;
+
+    /// One more than the highest shape id ever assigned.
+    fn num_shape_ids(&self) -> usize;
+
+    /// The shape with the given id, or `None` for removed/gap ids.
+    fn shape(&self, id: ShapeId) -> Option<&dyn Shape>;
+
+    /// A new iterator positioned at the first cell.
+    fn iter(&self) -> Self::Iter<'_>;
+
+    /// The number of live (non-removed) shapes.
+    fn len(&self) -> usize {
+        (0..self.num_shape_ids())
+            .filter(|&i| self.shape(ShapeId(i as i32)).is_some())
+            .count()
+    }
+
+    /// True if the index contains no live shapes.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The contents of the cell with the given id, if that exact cell exists.
+    fn cell(&self, id: CellId) -> Option<&ShapeIndexCell> {
+        use crate::s2::cell_iterator::CellIterator as _;
+        let mut it = self.iter();
+        it.seek(id);
+        if !it.done() && it.cell_id() == id {
+            it.index_cell()
+        } else {
+            None
+        }
+    }
+}
+
+impl ShapeIndexLike for ShapeIndex {
+    type Iter<'a> = ShapeIndexIterator<'a>;
+
+    fn num_shape_ids(&self) -> usize {
+        self.num_shape_ids()
+    }
+    fn shape(&self, id: ShapeId) -> Option<&dyn Shape> {
+        self.shape(id)
+    }
+    fn iter(&self) -> ShapeIndexIterator<'_> {
+        self.iter()
+    }
+    fn len(&self) -> usize {
+        self.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+    fn cell(&self, id: CellId) -> Option<&ShapeIndexCell> {
+        self.cell(id)
     }
 }
 
@@ -1204,6 +1487,165 @@ fn clip_and_push(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn polyline_shape(s: &str) -> Box<dyn Shape> {
+        Box::new(crate::s2::lax_polyline::LaxPolyline::new(
+            crate::s2::text_format::parse_points(s),
+        ))
+    }
+
+    fn polygon_index_unbuilt(s: &str) -> ShapeIndex {
+        let mut index = ShapeIndex::new();
+        index.add(Box::new(crate::s2::text_format::make_lax_polygon(s)));
+        index
+    }
+
+    #[test]
+    fn test_options_roundtrip() {
+        let index = ShapeIndex::with_options(ShapeIndexOptions {
+            max_edges_per_cell: 4,
+        });
+        assert_eq!(index.options().max_edges_per_cell, 4);
+        assert_eq!(index.max_edges_per_cell(), 4);
+    }
+
+    #[test]
+    fn test_memory_tracker_accounting() {
+        use crate::s2::memory_tracker::S2MemoryTracker;
+        use std::sync::{Arc, Mutex};
+        let tracker = Arc::new(Mutex::new(S2MemoryTracker::new()));
+        let mut index = ShapeIndex::new();
+        index.set_memory_tracker(Some(Arc::clone(&tracker)));
+        index.add(polyline_shape("0:0, 0:1, 1:1, 2:2"));
+        assert_eq!(
+            tracker.lock().unwrap().usage_bytes(),
+            0,
+            "nothing built yet"
+        );
+
+        index.build();
+        let after_build = tracker.lock().unwrap().usage_bytes();
+        assert!(after_build > 0, "built decomposition tallied");
+
+        index.minimize();
+        assert_eq!(
+            tracker.lock().unwrap().usage_bytes(),
+            0,
+            "released decomposition un-tallied"
+        );
+
+        index.build();
+        drop(index.release(0));
+        assert_eq!(
+            tracker.lock().unwrap().usage_bytes(),
+            0,
+            "mutation un-tallies the stale decomposition"
+        );
+    }
+
+    #[test]
+    fn test_queries_build_lazily_without_explicit_build() {
+        // Phase 4 stage 2: no build() call anywhere.
+        let index = polygon_index_unbuilt("0:0, 0:10, 10:10, 10:0");
+        let mut q = crate::s2::contains_point_query::ContainsPointQuery::new(
+            &index,
+            crate::s2::contains_point_query::VertexModel::SemiOpen,
+        );
+        assert!(q.contains(crate::s2::text_format::parse_point("5:5")));
+        assert!(!q.contains(crate::s2::text_format::parse_point("20:20")));
+    }
+
+    #[test]
+    fn test_release_semantics() {
+        let mut index = ShapeIndex::new();
+        let id0 = index.add(polyline_shape("0:0, 0:1"));
+        let id1 = index.add(polyline_shape("1:0, 1:1"));
+
+        // Query before removal sees both shapes.
+        assert_eq!(index.len(), 2);
+
+        let released = index.release(id0).expect("shape 0 present");
+        assert_eq!(released.num_edges(), 1);
+        assert!(index.release(id0).is_none(), "already released");
+
+        // Id semantics: the gap stays, ids are never reused.
+        assert_eq!(index.num_shape_ids(), 2);
+        assert!(index.shape(id0).is_none());
+        assert!(index.shape(id1).is_some());
+        let id2 = index.add(polyline_shape("2:0, 2:1"));
+        assert_eq!(id2.0, 2, "released ids must not be reused");
+
+        // The rebuilt decomposition no longer references the removed shape.
+        for (_, cell) in &index {
+            assert!(cell.find_by_shape_id(id0).is_none());
+        }
+        assert!(index.iter().count() > 0);
+    }
+
+    #[test]
+    fn test_release_all_and_clear() {
+        let mut index = ShapeIndex::new();
+        index.add(polyline_shape("0:0, 0:1"));
+        let removed = index.release(0);
+        assert!(removed.is_some());
+        index.add(polyline_shape("1:0, 1:1"));
+
+        let all = index.release_all();
+        assert_eq!(all.len(), 2, "gap slots included");
+        assert!(all[0].is_none());
+        assert!(all[1].is_some());
+        assert_eq!(index.num_shape_ids(), 0);
+
+        let id = index.add(polyline_shape("2:0, 2:1"));
+        assert_eq!(id.0, 0, "id assignment restarts after release_all");
+        index.clear();
+        assert_eq!(index.num_shape_ids(), 0);
+    }
+
+    #[test]
+    fn test_mutation_invalidates_and_rebuilds() {
+        let mut index = ShapeIndex::new();
+        let id0 = index.add(polyline_shape("0:0, 0:1"));
+        // First query builds.
+        assert!(index.iter().count() > 0);
+        // Mutate: removal makes the old decomposition stale.
+        drop(index.release(id0));
+        assert_eq!(index.iter().count(), 0, "rebuild reflects the removal");
+        index.add(polyline_shape("3:3, 3:4"));
+        assert!(index.iter().count() > 0, "rebuild reflects the addition");
+    }
+
+    #[test]
+    fn test_minimize_releases_and_rebuilds() {
+        let mut index = polygon_index_unbuilt("0:0, 0:10, 10:10, 10:0");
+        let n = index.iter().count();
+        assert!(n > 0);
+        index.minimize();
+        assert_eq!(
+            index.iter().count(),
+            n,
+            "identical decomposition after minimize"
+        );
+    }
+
+    #[test]
+    fn test_concurrent_first_query_builds_once() {
+        // Phase 4: concurrent lazy first build must be safe (OnceLock).
+        let index = polygon_index_unbuilt("0:0, 0:10, 10:10, 10:0");
+        let inside = crate::s2::text_format::parse_point("5:5");
+        std::thread::scope(|s| {
+            for _ in 0..8 {
+                s.spawn(|| {
+                    let mut q = crate::s2::contains_point_query::ContainsPointQuery::new(
+                        &index,
+                        crate::s2::contains_point_query::VertexModel::SemiOpen,
+                    );
+                    assert!(q.contains(inside));
+                });
+            }
+        });
+    }
+
     use crate::s2::LatLng;
     use crate::s2::shape::{Chain, ChainPosition, ReferencePoint};
 
@@ -1868,7 +2310,13 @@ mod tests {
             .collect();
         index.add(Box::new(Polyline::new(pts)));
         index.build();
-        // After building, the index should have cells.
+        // After building, the index reports a plausible nonzero size that
+        // shrinks when the decomposition is released.
+        let built_size = index.space_used();
+        assert!(built_size > size_of::<ShapeIndex>());
+        index.minimize();
+        assert!(index.space_used() < built_size);
+        index.build();
         let mut count = 0;
         let mut it = index.iter();
         while !it.done() {

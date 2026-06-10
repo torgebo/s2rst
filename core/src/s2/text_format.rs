@@ -101,6 +101,19 @@ pub fn make_loop(s: &str) -> Loop {
 /// Loops are separated by semicolons. Supports `"empty"` (or `""`) and
 /// `"full"` as special values.
 pub fn make_polygon(s: &str) -> Polygon {
+    internal_make_polygon(s, true)
+}
+
+/// Like [`make_polygon`], but the loops are used verbatim: no loop is
+/// inverted, so orientations are preserved exactly as written.
+///
+/// C++: `MakeVerbatimPolygon` (`MakePolygon` normalizes each loop so that it
+/// encloses at most half of the sphere; this variant does not).
+pub fn make_verbatim_polygon(s: &str) -> Polygon {
+    internal_make_polygon(s, false)
+}
+
+fn internal_make_polygon(s: &str, normalize_loops: bool) -> Polygon {
     let s = s.trim();
     if s.is_empty() || s.eq_ignore_ascii_case("empty") {
         return Polygon::empty();
@@ -116,7 +129,11 @@ pub fn make_polygon(s: &str) -> Polygon {
             if part.is_empty() {
                 return None;
             }
-            Some(make_loop(part))
+            let mut l = make_loop(part);
+            if normalize_loops {
+                l.normalize();
+            }
+            Some(l)
         })
         .collect();
 
@@ -244,6 +261,12 @@ pub fn loop_to_string(loop_: &Loop) -> String {
 
 /// Formats a `Polygon` as a semicolon-separated string of loops.
 pub fn polygon_to_string(polygon: &Polygon) -> String {
+    polygon_to_string_with_separator(polygon, "; ")
+}
+
+/// Like [`polygon_to_string`] with a custom loop separator (C++ exposes the
+/// same parameter, e.g. ";\n" for one loop per line).
+pub fn polygon_to_string_with_separator(polygon: &Polygon, loop_separator: &str) -> String {
     if polygon.is_empty_polygon() {
         return "empty".to_string();
     }
@@ -253,11 +276,19 @@ pub fn polygon_to_string(polygon: &Polygon) -> String {
     (0..polygon.num_loops())
         .map(|i| loop_to_string(polygon.loop_at(i)))
         .collect::<Vec<_>>()
-        .join("; ")
+        .join(loop_separator)
 }
 
 /// Formats a `LaxPolygon` as a semicolon-separated string of loops.
 pub fn lax_polygon_to_string(polygon: &crate::s2::lax_polygon::LaxPolygon) -> String {
+    lax_polygon_to_string_with_separator(polygon, "; ")
+}
+
+/// Like [`lax_polygon_to_string`] with a custom loop separator.
+pub fn lax_polygon_to_string_with_separator(
+    polygon: &crate::s2::lax_polygon::LaxPolygon,
+    loop_separator: &str,
+) -> String {
     if polygon.num_loops() == 0 {
         return "empty".to_string();
     }
@@ -271,7 +302,96 @@ pub fn lax_polygon_to_string(polygon: &crate::s2::lax_polygon::LaxPolygon) -> St
             points_to_string(&verts)
         })
         .collect::<Vec<_>>()
-        .join("; ")
+        .join(loop_separator)
+}
+
+/// Parses a `CellId` from the `face/child-path` debug-string form produced by
+/// [`cell_id_to_string`] (e.g. `"3/"` for a face cell, `"3/0123"` for its
+/// descendants).
+///
+/// # Panics
+/// Panics on malformed input, like the other `make_*` helpers (C++ `MakeCellId`
+/// returns a Status; the `OrDie` style matches this module's conventions).
+#[expect(
+    clippy::expect_used,
+    reason = "OrDie-style debug helper; invalid input is a test-authoring bug"
+)]
+pub fn make_cell_id(s: &str) -> crate::s2::cell_id::CellId {
+    crate::s2::cell_id::CellId::from_debug_string(s)
+        .expect("invalid S2CellId (want face/child-path debug-string form)")
+}
+
+/// Formats a `CellId` in the `face/child-path` debug-string form accepted by
+/// [`make_cell_id`].
+pub fn cell_id_to_string(id: crate::s2::cell_id::CellId) -> String {
+    id.to_debug_string()
+}
+
+/// Parses a `CellUnion` from comma-separated [`make_cell_id`] tokens. The
+/// result is normalized (C++ `MakeCellUnion` uses the normalizing
+/// constructor).
+///
+/// # Panics
+/// Panics on malformed input (see [`make_cell_id`]).
+pub fn make_cell_union(s: &str) -> crate::s2::cell_union::CellUnion {
+    let ids = s.split(',').map(|part| make_cell_id(part.trim())).collect();
+    crate::s2::cell_union::CellUnion::from_cell_ids(ids)
+}
+
+/// Formats a `CellUnion` as comma-separated [`cell_id_to_string`] tokens.
+pub fn cell_union_to_string(cell_union: &crate::s2::cell_union::CellUnion) -> String {
+    cell_union
+        .cell_ids()
+        .iter()
+        .map(|id| cell_id_to_string(*id))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Formats a `Rect` as `"lat_lo:lng_lo, lat_hi:lng_hi"`, the form accepted by
+/// [`make_rect`].
+pub fn rect_to_string(rect: &Rect) -> String {
+    format!(
+        "{}, {}",
+        latlng_to_string(rect.lo()),
+        latlng_to_string(rect.hi())
+    )
+}
+
+/// Formats any [`Shape`](crate::s2::shape::Shape) by walking its chains, with
+/// the same dimension markers used by [`make_index`] sections: polylines are
+/// wrapped in `"# ... #"`, polygons prefixed with `"## "`, points suffixed
+/// with `" ##"`; polygon chains are separated by `"; "`, others by `" | "`.
+pub fn shape_to_string(shape: &dyn crate::s2::shape::Shape) -> String {
+    use crate::s2::shape::Dimension;
+    let dim = shape.dimension();
+    let separator = if dim == Dimension::Polygon {
+        "; "
+    } else {
+        " | "
+    };
+
+    let mut out = String::new();
+    if dim == Dimension::Polyline {
+        out.push_str("# ");
+    }
+    if dim == Dimension::Polygon {
+        out.push_str("## ");
+    }
+    for chain_id in 0..shape.num_chains() {
+        if chain_id > 0 {
+            out.push_str(separator);
+        }
+        let vertices: Vec<Point> = crate::s2::shape::chain_vertices(shape, chain_id).collect();
+        out.push_str(&points_to_string(&vertices));
+    }
+    if dim == Dimension::Polyline {
+        out.push_str(" #");
+    }
+    if dim == Dimension::Point {
+        out.push_str(" ##");
+    }
+    out
 }
 
 /// Creates a `LaxPolyline` from a text representation.
@@ -941,5 +1061,84 @@ mod tests {
         assert_eq!(latlngs[0], LatLng::from_degrees(-20.0, 150.0));
         assert_eq!(latlngs[1], LatLng::from_degrees(-20.0, 151.0));
         assert_eq!(latlngs[2], LatLng::from_degrees(-19.0, 150.0));
+    }
+
+    #[test]
+    fn test_cell_id_round_trip() {
+        // C++ TEST(MakeCellId, ValidInput) / ToString(S2CellId)
+        use crate::s2::cell_id::CellId;
+        assert_eq!(make_cell_id("3/"), CellId::from_face(3));
+        assert_eq!(make_cell_id("3/2"), CellId::from_face(3).children()[2]);
+        for s in ["0/", "5/123", "2/0000"] {
+            assert_eq!(cell_id_to_string(make_cell_id(s)), s);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid S2CellId")]
+    fn test_cell_id_invalid_panics() {
+        // C++ TEST(MakeCellId, InvalidInput)
+        let _ = make_cell_id("9/0");
+    }
+
+    #[test]
+    fn test_cell_union_round_trip_and_normalization() {
+        // C++ TEST(MakeCellUnion, ValidInput): the result is normalized.
+        let cu = make_cell_union("3/, 4/0123");
+        assert_eq!(cell_union_to_string(&cu), "3/, 4/0123");
+        // All four children collapse into the parent on normalization.
+        let collapsed = make_cell_union("1/0, 1/1, 1/2, 1/3");
+        assert_eq!(cell_union_to_string(&collapsed), "1/");
+    }
+
+    #[test]
+    fn test_rect_to_string_round_trip() {
+        let rect = make_rect("-10:20, 30:40");
+        assert_eq!(rect_to_string(&rect), "-10:20, 30:40");
+    }
+
+    #[test]
+    fn test_make_polygon_normalizes_make_verbatim_does_not() {
+        // A clockwise triangle encloses more than half the sphere; C++
+        // MakePolygon inverts it (Normalize), MakeVerbatimPolygon keeps it.
+        let cw = "0:0, 10:10, 0:10";
+        let ccw = "0:0, 0:10, 10:10";
+        let verbatim_cw = make_verbatim_polygon(cw);
+        let normalized_cw = make_polygon(cw);
+        assert_eq!(verbatim_cw.num_loops(), 1);
+        assert_eq!(normalized_cw.num_loops(), 1);
+        assert!(
+            !verbatim_cw.loop_at(0).is_normalized(),
+            "verbatim must keep the clockwise loop"
+        );
+        assert!(
+            normalized_cw.loop_at(0).is_normalized(),
+            "make_polygon must normalize the clockwise loop"
+        );
+        // For an already-CCW loop the two agree.
+        assert_eq!(
+            polygon_to_string(&make_polygon(ccw)),
+            polygon_to_string(&make_verbatim_polygon(ccw))
+        );
+    }
+
+    #[test]
+    fn test_shape_to_string_dimension_markers() {
+        // Polygon shape: "## " prefix, "; " loop separator.
+        let polygon = make_lax_polygon("0:0, 0:5, 5:0; 1:1, 4:1, 1:4");
+        assert_eq!(shape_to_string(&polygon), "## 0:0, 0:5, 5:0; 1:1, 4:1, 1:4");
+        // Polyline shape: wrapped in "# ... #".
+        let polyline = make_lax_polyline("0:0, 0:5, 5:5");
+        assert_eq!(shape_to_string(&polyline), "# 0:0, 0:5, 5:5 #");
+        // Point shape: " ##" suffix, " | " separator.
+        let points = crate::s2::point_vector::PointVector::new(parse_points("0:0, 1:1"));
+        assert_eq!(shape_to_string(&points), "0:0 | 1:1 ##");
+    }
+
+    #[test]
+    fn test_polygon_to_string_separator() {
+        let polygon = make_polygon("0:0, 0:5, 5:0; 1:1, 4:1, 1:4");
+        let s = polygon_to_string_with_separator(&polygon, ";\n");
+        assert_eq!(s.lines().count(), 2, "two loops on two lines: {s:?}");
     }
 }

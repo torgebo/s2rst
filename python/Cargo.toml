@@ -16,9 +16,12 @@ crate-type = ["cdylib"]
 # abi3 (stable ABI, floor = Python 3.9): build ONE forward-compatible wheel per
 # platform that runs on CPython 3.9+ (including 3.14 and later), rather than a
 # wheel per Python version. Keeps the CI/release matrix small and immune to new
-# Python releases (the per-version build broke on runners that shipped 3.14,
-# which pyo3 0.24 cannot target). Cost is a small per-call FFI overhead —
-# negligible here, where the work happens in the Rust core. CI builds with a
-# single `-i 3.13` interpreter; the abi3 feature emits one `cp39-abi3` wheel.
-pyo3 = { version = "0.24", features = ["extension-module", "abi3-py39"] }
+# Python releases. Cost is a small per-call FFI overhead — negligible here,
+# where the work happens in the Rust core. CI builds with a single `-i 3.13`
+# interpreter; the abi3 feature emits one `cp39-abi3` wheel.
+#
+# pyo3 0.29 (the 0.24 -> 0.29 bump closed RUSTSEC-2026-0176/0177; the API
+# changes were `downcast` -> `cast`, `Python::with_gil` -> `Python::attach`,
+# `PyObject` -> `Py<PyAny>`, and explicit `from_py_object` on `Clone` pyclasses).
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py39"] }
 s2rst = { path = "../core" }

@@ -24,6 +24,9 @@ use crate::s2::{Cap, Cell, CellId, Point, Rect};
 
 /// A union of possibly overlapping regions.
 #[derive(Debug)]
+/// Unlike C++ there are no `Init`/`Release`/`mutable_region` mutators:
+/// rebuild the container from its parts instead (the regions are plain
+/// boxed values).
 pub struct RegionUnion {
     regions: Vec<Box<dyn Region>>,
 }

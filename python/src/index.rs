@@ -34,7 +34,7 @@ impl PyShapeIndex {
     fn add(&mut self, shape: &Bound<'_, PyAny>) -> PyResult<i32> {
         macro_rules! try_add {
             ($ty:ty) => {
-                if let Ok(s) = shape.downcast::<$ty>() {
+                if let Ok(s) = shape.cast::<$ty>() {
                     return Ok(self.0.add(Box::new(s.borrow().0.clone())).0);
                 }
             };

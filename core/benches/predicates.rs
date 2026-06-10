@@ -18,7 +18,7 @@ fn bench_sign() -> bool {
     let p1 = black_box(Point::from_coords(-3.0, -1.0, 4.0).normalize());
     let p2 = black_box(Point::from_coords(2.0, -1.0, -3.0).normalize());
     let p3 = black_box(Point::from_coords(1.0, -2.0, 0.0).normalize());
-    black_box(predicates::sign(p1, p2, p3))
+    black_box(predicates::simple_ccw(p1, p2, p3))
 }
 
 #[library_benchmark]
@@ -35,7 +35,7 @@ fn bench_sign_near_collinear() -> bool {
     let p1 = black_box(Point::from_coords(1.0, 0.0, 0.0));
     let p2 = black_box(Point::from_coords(1.0, 1e-15, 0.0).normalize());
     let p3 = black_box(Point::from_coords(1.0, 0.0, 1e-15).normalize());
-    black_box(predicates::sign(p1, p2, p3))
+    black_box(predicates::simple_ccw(p1, p2, p3))
 }
 
 library_benchmark_group!(

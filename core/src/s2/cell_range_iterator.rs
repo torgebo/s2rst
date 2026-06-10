@@ -12,23 +12,43 @@
 //!
 //! Corresponds to C++ `s2cell_range_iterator.h`.
 
-use crate::s2::shape_index::{CellRelation, ShapeIndex, ShapeIndexCell, ShapeIndexIterator};
+use crate::s2::cell_iterator::CellIterator;
+use crate::s2::shape_index::{
+    CellRelation, IndexCellAccess, ShapeIndex, ShapeIndexCell, ShapeIndexIterator, ShapeIndexLike,
+};
 use crate::s2::{CellId, Point};
 
-/// A wrapper around [`ShapeIndexIterator`] that caches the min/max leaf cell
+/// A wrapper around any [`CellIterator`] that caches the min/max leaf cell
 /// ranges, enabling efficient spatial join operations.
+///
+/// Generic over the underlying iterator (C++ `S2CellRangeIterator<T>`);
+/// `CellRangeIterator<ShapeIndexIterator>` is the common case and keeps its
+/// [`Self::new`] constructor.
 #[derive(Clone, Debug)]
-pub struct CellRangeIterator<'a> {
-    it: ShapeIndexIterator<'a>,
+pub struct CellRangeIterator<I> {
+    it: I,
     range_min: CellId,
     range_max: CellId,
 }
 
-impl<'a> CellRangeIterator<'a> {
+/// Creates a range iterator over any [`ShapeIndexLike`] (C++
+/// `MakeS2CellRangeIterator`).
+pub fn make_range_iterator<I: ShapeIndexLike>(index: &I) -> CellRangeIterator<I::Iter<'_>> {
+    CellRangeIterator::wrap(index.iter())
+}
+
+impl<'a> CellRangeIterator<ShapeIndexIterator<'a>> {
     /// Creates a new range iterator for the given index, positioned at the
     /// first cell.
     pub fn new(index: &'a ShapeIndex) -> Self {
-        let it = index.iter();
+        CellRangeIterator::wrap(index.iter())
+    }
+}
+
+impl<I: CellIterator> CellRangeIterator<I> {
+    /// Wraps an existing cell iterator (at any position) and positions the
+    /// range cache on its current cell.
+    pub fn wrap(it: I) -> Self {
         let mut ri = CellRangeIterator {
             it,
             range_min: CellId::sentinel(),
@@ -58,8 +78,12 @@ impl<'a> CellRangeIterator<'a> {
         self.it.done()
     }
 
-    /// Returns the current index cell, if any.
-    pub fn index_cell(&self) -> Option<&'a ShapeIndexCell> {
+    /// Returns the current index cell, if any (available when the wrapped
+    /// iterator exposes cell contents, e.g. a [`ShapeIndexIterator`]).
+    pub fn index_cell<'a>(&self) -> Option<&'a ShapeIndexCell>
+    where
+        I: IndexCellAccess<'a>,
+    {
         self.it.index_cell()
     }
 
@@ -90,14 +114,15 @@ impl<'a> CellRangeIterator<'a> {
 
     /// Positions past the last cell.
     pub fn finish(&mut self) {
-        self.it.end();
+        self.it.finish();
         self.refresh();
     }
 
-    /// Locates the cell containing the given point.
-    pub fn locate_point(&mut self, target: Point) {
-        self.it.locate_point(target);
+    /// Locates the cell containing the given point. Returns true if found.
+    pub fn locate_point(&mut self, target: Point) -> bool {
+        let found = self.it.locate_point(target);
         self.refresh();
+        found
     }
 
     /// Locates the cell containing or adjacent to the given cell ID.
@@ -112,7 +137,7 @@ impl<'a> CellRangeIterator<'a> {
     /// If the current cell does not overlap "target", it is possible that the
     /// previous cell is the one we are looking for.  This can only happen when
     /// the previous cell contains "target" but has a smaller `S2CellId`.
-    pub fn seek_to(&mut self, target: &CellRangeIterator<'_>) {
+    pub fn seek_to<J: CellIterator>(&mut self, target: &CellRangeIterator<J>) {
         self.it.seek(target.range_min);
         if (self.it.done() || self.it.cell_id().range_min() > target.range_max)
             && self.it.prev()
@@ -124,7 +149,7 @@ impl<'a> CellRangeIterator<'a> {
     }
 
     /// Seeks to the first cell whose range starts after `target`.
-    pub fn seek_beyond(&mut self, target: &CellRangeIterator<'_>) {
+    pub fn seek_beyond<J: CellIterator>(&mut self, target: &CellRangeIterator<J>) {
         self.it.seek(target.range_max.next());
         if !self.it.done() && self.it.cell_id().range_min() <= target.range_max {
             self.it.next();
@@ -136,7 +161,7 @@ impl<'a> CellRangeIterator<'a> {
     ///
     /// Returns -1 if `self` precedes `other`, +1 if `self` follows, or 0
     /// if they overlap.
-    pub fn relation(&self, other: &CellRangeIterator<'_>) -> i32 {
+    pub fn relation<J: CellIterator>(&self, other: &CellRangeIterator<J>) -> i32 {
         if self.range_max < other.range_min {
             -1
         } else if self.range_min > other.range_max {
@@ -158,7 +183,7 @@ impl<'a> CellRangeIterator<'a> {
     }
 }
 
-impl<'a> Iterator for CellRangeIterator<'a> {
+impl<'a> Iterator for CellRangeIterator<ShapeIndexIterator<'a>> {
     type Item = (CellId, &'a ShapeIndexCell);
 
     fn next(&mut self) -> Option<Self::Item> {

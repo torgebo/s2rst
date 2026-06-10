@@ -27,7 +27,7 @@ fn cell_edge_from_index(k: u8) -> PyResult<s2::CellEdge> {
 // ---------------------------------------------------------------------------
 
 /// A 64-bit identifier for a cell in the S2 cell decomposition.
-#[pyclass(name = "CellId", module = "s2rst")]
+#[pyclass(from_py_object, name = "CellId", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyCellId(pub(crate) s2::CellId);
 
@@ -346,7 +346,7 @@ impl PyCellId {
 // ---------------------------------------------------------------------------
 
 /// A concrete S2 cell with precomputed geometric bounds.
-#[pyclass(name = "Cell", module = "s2rst")]
+#[pyclass(from_py_object, name = "Cell", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyCell(pub(crate) s2::Cell);
 
@@ -510,7 +510,7 @@ impl PyCell {
 // ---------------------------------------------------------------------------
 
 /// A set of S2 cells, automatically normalized (sorted, deduplicated, merged).
-#[pyclass(name = "CellUnion", module = "s2rst")]
+#[pyclass(from_py_object, name = "CellUnion", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyCellUnion(pub(crate) s2::CellUnion);
 

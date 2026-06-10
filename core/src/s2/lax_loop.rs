@@ -112,11 +112,209 @@ impl std::ops::Deref for LaxLoop {
     }
 }
 
+// ─── Variants ───────────────────────────────────────────────────────────
+
+/// A closed ring treated as one-dimensional geometry: the same edges as a
+/// [`LaxLoop`] but with no interior (C++ `S2LaxClosedPolylineShape`).
+#[derive(Debug)]
+pub struct LaxClosedPolyline {
+    vertices: Vec<Point>,
+}
+
+impl LaxClosedPolyline {
+    /// Creates a closed polyline from the given ring of vertices.
+    pub fn new(vertices: Vec<Point>) -> Self {
+        LaxClosedPolyline { vertices }
+    }
+
+    /// The number of vertices.
+    pub fn num_vertices(&self) -> usize {
+        self.vertices.len()
+    }
+
+    /// Vertex `i`.
+    pub fn vertex(&self, i: usize) -> Point {
+        self.vertices[i]
+    }
+}
+
+impl Shape for LaxClosedPolyline {
+    fn num_edges(&self) -> usize {
+        self.vertices.len()
+    }
+
+    fn edge(&self, id: usize) -> Edge {
+        debug_assert!(id < self.num_edges());
+        let next = if id + 1 == self.vertices.len() {
+            0
+        } else {
+            id + 1
+        };
+        Edge::new(self.vertices[id], self.vertices[next])
+    }
+
+    fn reference_point(&self) -> ReferencePoint {
+        ReferencePoint::new(Point::origin(), false)
+    }
+
+    fn num_chains(&self) -> usize {
+        usize::min(1, self.vertices.len())
+    }
+
+    fn chain(&self, _chain_id: usize) -> Chain {
+        Chain::new(0, self.vertices.len())
+    }
+
+    fn chain_edge(&self, _chain_id: usize, offset: usize) -> Edge {
+        debug_assert!(offset < self.num_edges());
+        self.edge(offset)
+    }
+
+    fn chain_position(&self, edge_id: usize) -> ChainPosition {
+        debug_assert!(edge_id < self.num_edges());
+        ChainPosition::new(0, edge_id)
+    }
+
+    fn dimension(&self) -> Dimension {
+        Dimension::Polyline
+    }
+}
+
+/// A loop whose vertices are indices into a shared vertex array, so many
+/// loops over one mesh share storage (C++ `S2VertexIdLaxLoopShape`).
+#[derive(Debug)]
+pub struct VertexIdLaxLoop {
+    vertex_ids: Vec<u32>,
+    vertices: std::sync::Arc<[Point]>,
+}
+
+impl VertexIdLaxLoop {
+    /// Creates a loop from vertex indices into the shared array.
+    ///
+    /// # Panics
+    /// Panics if any index is out of range for `vertices` (checked up
+    /// front so accessors stay panic-free thereafter).
+    pub fn new(vertex_ids: Vec<u32>, vertices: std::sync::Arc<[Point]>) -> Self {
+        assert!(
+            vertex_ids.iter().all(|&id| (id as usize) < vertices.len()),
+            "vertex id out of range"
+        );
+        VertexIdLaxLoop {
+            vertex_ids,
+            vertices,
+        }
+    }
+
+    /// The number of loop vertices.
+    pub fn num_vertices(&self) -> usize {
+        self.vertex_ids.len()
+    }
+
+    /// The shared-array index of loop vertex `i`.
+    pub fn vertex_id(&self, i: usize) -> u32 {
+        self.vertex_ids[i]
+    }
+
+    /// Loop vertex `i`.
+    pub fn vertex(&self, i: usize) -> Point {
+        self.vertices[self.vertex_ids[i] as usize]
+    }
+}
+
+impl Shape for VertexIdLaxLoop {
+    fn num_edges(&self) -> usize {
+        self.vertex_ids.len()
+    }
+
+    fn edge(&self, id: usize) -> Edge {
+        debug_assert!(id < self.num_edges());
+        let next = if id + 1 == self.vertex_ids.len() {
+            0
+        } else {
+            id + 1
+        };
+        Edge::new(self.vertex(id), self.vertex(next))
+    }
+
+    fn reference_point(&self) -> ReferencePoint {
+        reference_point_for_shape(self)
+    }
+
+    fn num_chains(&self) -> usize {
+        usize::min(1, self.vertex_ids.len())
+    }
+
+    fn chain(&self, _chain_id: usize) -> Chain {
+        Chain::new(0, self.vertex_ids.len())
+    }
+
+    fn chain_edge(&self, _chain_id: usize, offset: usize) -> Edge {
+        debug_assert!(offset < self.num_edges());
+        self.edge(offset)
+    }
+
+    fn chain_position(&self, edge_id: usize) -> ChainPosition {
+        debug_assert!(edge_id < self.num_edges());
+        ChainPosition::new(0, edge_id)
+    }
+
+    fn dimension(&self) -> Dimension {
+        Dimension::Polygon
+    }
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_lax_closed_polyline_has_no_interior() {
+        use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
+        use crate::s2::shape_index::ShapeIndex;
+        use crate::s2::text_format::{parse_point, parse_points};
+        let ring = parse_points("0:0, 0:5, 5:5, 5:0");
+        let closed = LaxClosedPolyline::new(ring.clone());
+        assert_eq!(closed.dimension(), Dimension::Polyline);
+        assert_eq!(closed.num_edges(), 4, "closed: one edge per vertex");
+        assert_eq!(closed.edge(3).v1, closed.vertex(0), "wraps to start");
+
+        let mut index = ShapeIndex::new();
+        index.add(Box::new(closed));
+        let mut q = ContainsPointQuery::new(&index, VertexModel::SemiOpen);
+        assert!(
+            !q.contains(parse_point("2:2")),
+            "a closed polyline contains nothing"
+        );
+        // The same ring as a LaxLoop (dimension 2) does contain the point.
+        let mut index2 = ShapeIndex::new();
+        index2.add(Box::new(LaxLoop::new(ring)));
+        let mut q2 = ContainsPointQuery::new(&index2, VertexModel::SemiOpen);
+        assert!(q2.contains(parse_point("2:2")));
+    }
+
+    #[test]
+    fn test_vertex_id_lax_loop_shares_storage() {
+        use crate::s2::text_format::parse_points;
+        let mesh: std::sync::Arc<[Point]> = parse_points("0:0, 0:5, 5:5, 5:0, 2:2").into();
+        let outer = VertexIdLaxLoop::new(vec![0, 1, 2, 3], std::sync::Arc::clone(&mesh));
+        assert_eq!(outer.num_vertices(), 4);
+        assert_eq!(outer.vertex(1), mesh[1]);
+        assert_eq!(outer.vertex_id(3), 3);
+        assert_eq!(outer.edge(3).v1, mesh[0], "wraps to start");
+        assert_eq!(outer.dimension(), Dimension::Polygon);
+        let r = outer.reference_point();
+        assert!(r.contained || !r.contained, "reference point computed");
+    }
+
+    #[test]
+    #[should_panic(expected = "vertex id out of range")]
+    fn test_vertex_id_lax_loop_rejects_bad_ids() {
+        let mesh: std::sync::Arc<[Point]> = crate::s2::text_format::parse_points("0:0, 0:5").into();
+        let _unused = VertexIdLaxLoop::new(vec![0, 7], mesh);
+    }
+
     use crate::s2::LatLng;
 
     fn p(lat: f64, lng: f64) -> Point {

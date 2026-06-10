@@ -26,12 +26,15 @@
 use std::collections::HashMap;
 
 use crate::r2;
+use crate::s2::cell_iterator::CellIterator;
 use crate::s2::edge_clipping::{self, interpolate_float64};
 use crate::s2::edge_crosser::EdgeCrosser;
 use crate::s2::edge_crossings::Crossing;
 use crate::s2::padded_cell::PaddedCell;
 use crate::s2::shape::{Shape, ShapeId};
-use crate::s2::shape_index::{CellRelation, ShapeIndex, ShapeIndexCell, ShapeIndexIterator};
+use crate::s2::shape_index::{
+    CellRelation, IndexCellAccess, ShapeIndex, ShapeIndexCell, ShapeIndexLike,
+};
 use crate::s2::{CellId, Point};
 
 /// Specifies what types of edge crossings are reported.
@@ -49,20 +52,25 @@ pub enum CrossingType {
 ///
 /// For best performance, reuse a single `CrossingEdgeQuery` for multiple queries
 /// against the same index.
-#[derive(Debug)]
-pub struct CrossingEdgeQuery<'a> {
-    index: &'a ShapeIndex,
+pub struct CrossingEdgeQuery<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
     // Temporary values for the current query edge in (u,v) coordinates.
     a: r2::Point,
     b: r2::Point,
-    iter: ShapeIndexIterator<'a>,
+    iter: I::Iter<'a>,
     // Candidate cells accumulated during a query.
     cells: Vec<&'a ShapeIndexCell>,
 }
 
-impl<'a> CrossingEdgeQuery<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for CrossingEdgeQuery<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CrossingEdgeQuery").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> CrossingEdgeQuery<'a, I> {
     /// Creates a new query for the given index.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         CrossingEdgeQuery {
             index,
             a: r2::Point::default(),
@@ -200,7 +208,7 @@ impl<'a> CrossingEdgeQuery<'a> {
 
         // Optimization: for a single shape, use the candidates() method.
         if self.index.len() == 1
-            && let Some(shape) = self.index.shape(0)
+            && let Some(shape) = self.index.shape(ShapeId(0))
         {
             let candidates = self.candidates(a, b, shape, ShapeId(0));
             edge_map.insert(ShapeId(0), candidates);

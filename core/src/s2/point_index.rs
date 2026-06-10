@@ -14,6 +14,7 @@
 // C++ ref: s2point_index.h
 
 use std::collections::BTreeMap;
+use std::ops::Bound;
 
 use crate::s2::{CellId, Point};
 
@@ -296,5 +297,80 @@ mod tests {
         iter.finish();
         assert!(iter.prev()); // go to last
         assert!(!iter.done());
+    }
+}
+
+/// A [`CellIterator`](crate::s2::cell_iterator::CellIterator) over the leaf
+/// cells of an [`S2PointIndex`], enabling generic joins against other cell
+/// containers (C++ `S2PointIndex::Iterator` implements `S2CellIterator`).
+#[derive(Debug)]
+pub struct PointIndexCellIterator<'a, D: Clone> {
+    map: &'a BTreeMap<CellId, Vec<PointData<D>>>,
+    current: Option<CellId>,
+}
+
+impl<D: Clone> Clone for PointIndexCellIterator<'_, D> {
+    fn clone(&self) -> Self {
+        PointIndexCellIterator {
+            map: self.map,
+            current: self.current,
+        }
+    }
+}
+
+impl<D: Clone> S2PointIndex<D> {
+    /// Returns a cell iterator positioned at the first leaf cell.
+    pub fn cell_iterator(&self) -> PointIndexCellIterator<'_, D> {
+        PointIndexCellIterator {
+            map: &self.map,
+            current: self.map.keys().next().copied(),
+        }
+    }
+}
+
+impl<D: Clone> crate::s2::cell_iterator::CellIterator for PointIndexCellIterator<'_, D> {
+    fn cell_id(&self) -> CellId {
+        #[expect(
+            clippy::expect_used,
+            reason = "trait contract: cell_id() must not be called when done()"
+        )]
+        self.current.expect("cell_id() called on done iterator")
+    }
+    fn done(&self) -> bool {
+        self.current.is_none()
+    }
+    fn begin(&mut self) {
+        self.current = self.map.keys().next().copied();
+    }
+    fn finish(&mut self) {
+        self.current = None;
+    }
+    fn next(&mut self) {
+        if let Some(cur) = self.current {
+            self.current = self
+                .map
+                .range((Bound::Excluded(cur), Bound::Unbounded))
+                .next()
+                .map(|(&id, _)| id);
+        }
+    }
+    fn prev(&mut self) -> bool {
+        match self.current {
+            // Past the end: move to the last cell if any.
+            None => {
+                self.current = self.map.keys().next_back().copied();
+                self.current.is_some()
+            }
+            Some(cur) => match self.map.range(..cur).next_back() {
+                Some((&id, _)) => {
+                    self.current = Some(id);
+                    true
+                }
+                None => false,
+            },
+        }
+    }
+    fn seek(&mut self, target: CellId) {
+        self.current = self.map.range(target..).next().map(|(&id, _)| id);
     }
 }

@@ -19,6 +19,9 @@ use crate::s2::{Cap, Cell, CellId, Point, Rect, Region};
 ///
 /// An intersection of no regions covers the entire sphere.
 #[derive(Debug)]
+/// Unlike C++ there are no `Init`/`Release`/`mutable_region` mutators:
+/// rebuild the container from its parts instead (the regions are plain
+/// boxed values).
 pub struct RegionIntersection {
     regions: Vec<Box<dyn Region>>,
 }

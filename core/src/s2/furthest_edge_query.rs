@@ -27,10 +27,11 @@
 use std::ops::ControlFlow;
 
 use crate::s1::ChordAngle;
+use crate::s2::contains_point_query::ContainsPointOracle;
 use crate::s2::distance_target::DistanceTarget;
 use crate::s2::edge_distances;
 use crate::s2::shape::{Edge, ShapeId};
-use crate::s2::shape_index::ShapeIndex;
+use crate::s2::shape_index::{ShapeIndex, ShapeIndexLike};
 use crate::s2::{Cap, Cell, Point};
 
 /// A result from a furthest edge query.
@@ -171,7 +172,7 @@ pub trait Target: DistanceTarget {
     /// Corresponds to C++ `S2MaxDistanceTarget::VisitContainingShapeIds`.
     fn visit_containing_shapes(
         &self,
-        _index: &ShapeIndex,
+        _oracle: &mut dyn ContainsPointOracle,
         _visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) {
         // Default: do nothing. Subtypes override.
@@ -212,18 +213,13 @@ impl Target for PointTarget {
 
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) {
         // For furthest-edge queries, visit polygons whose interior contains
         // the antipode of the target point. Matches C++
         // S2MaxDistancePointTarget::VisitContainingShapeIds.
-        use crate::s2::contains_point_query::ContainsPointQuery;
-        let mut query = ContainsPointQuery::new(
-            index,
-            crate::s2::contains_point_query::VertexModel::SemiOpen,
-        );
-        for shape_id in query.containing_shape_ids(-self.point) {
+        for shape_id in oracle.containing_shape_ids(-self.point) {
             if visitor(shape_id).is_break() {
                 break;
             }
@@ -284,19 +280,14 @@ impl Target for EdgeTarget {
 
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) {
         // Only need to test one endpoint. If the tested vertex antipode is
         // not contained, the full edge antipode is not contained; if it is
         // contained, the edge at least intersects the polygon.
         // Matches C++ S2MaxDistanceEdgeTarget::VisitContainingShapeIds.
-        use crate::s2::contains_point_query::ContainsPointQuery;
-        let mut query = ContainsPointQuery::new(
-            index,
-            crate::s2::contains_point_query::VertexModel::SemiOpen,
-        );
-        for shape_id in query.containing_shape_ids(-self.a) {
+        for shape_id in oracle.containing_shape_ids(-self.a) {
             if visitor(shape_id).is_break() {
                 break;
             }
@@ -348,16 +339,11 @@ impl DistanceTarget for CellTarget {
 impl Target for CellTarget {
     fn visit_containing_shapes(
         &self,
-        index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) {
         // Matches C++ S2MaxDistanceCellTarget::VisitContainingShapeIds.
-        use crate::s2::contains_point_query::ContainsPointQuery;
-        let mut query = ContainsPointQuery::new(
-            index,
-            crate::s2::contains_point_query::VertexModel::SemiOpen,
-        );
-        for shape_id in query.containing_shape_ids(-self.cell.center()) {
+        for shape_id in oracle.containing_shape_ids(-self.cell.center()) {
             if visitor(shape_id).is_break() {
                 break;
             }
@@ -395,18 +381,23 @@ impl Target for CellTarget {
 }
 
 /// Target: find furthest edges from any edge in another `ShapeIndex`.
-#[derive(Debug)]
-pub struct ShapeIndexTarget<'a> {
-    index: &'a ShapeIndex,
+pub struct ShapeIndexTarget<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
     /// Whether to include polygon interiors in the target.
     pub include_interiors: bool,
     /// Whether the internal query should use brute force.
     pub use_brute_force: bool,
 }
 
-impl<'a> ShapeIndexTarget<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for ShapeIndexTarget<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShapeIndexTarget").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> ShapeIndexTarget<'a, I> {
     /// Creates a target from a `ShapeIndex`.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         ShapeIndexTarget {
             index,
             include_interiors: true,
@@ -438,7 +429,7 @@ impl<'a> ShapeIndexTarget<'a> {
     }
 }
 
-impl DistanceTarget for ShapeIndexTarget<'_> {
+impl<J: ShapeIndexLike> DistanceTarget for ShapeIndexTarget<'_, J> {
     fn cap_bound(&self) -> Cap {
         use crate::s2::region::Region;
         use crate::s2::shape_index_region::ShapeIndexRegion;
@@ -450,7 +441,7 @@ impl DistanceTarget for ShapeIndexTarget<'_> {
     }
 }
 
-impl Target for ShapeIndexTarget<'_> {
+impl<J: ShapeIndexLike> Target for ShapeIndexTarget<'_, J> {
     fn max_brute_force_index_size(&self) -> i32 {
         // C++: break-even ~30/100/130 for point cloud/fractal/regular.
         70
@@ -458,7 +449,7 @@ impl Target for ShapeIndexTarget<'_> {
 
     fn visit_containing_shapes(
         &self,
-        query_index: &ShapeIndex,
+        oracle: &mut dyn ContainsPointOracle,
         visitor: &mut dyn FnMut(ShapeId) -> ControlFlow<()>,
     ) {
         // For each shape in the target index, test chain start vertices
@@ -479,7 +470,7 @@ impl Target for ShapeIndexTarget<'_> {
                 tested_point = true;
                 let v0 = shape.chain_edge(c, 0).v0;
                 let pt = PointTarget::new(v0);
-                pt.visit_containing_shapes(query_index, visitor);
+                pt.visit_containing_shapes(oracle, visitor);
             }
             if !tested_point {
                 // Handle full polygons with no edges.
@@ -488,7 +479,7 @@ impl Target for ShapeIndexTarget<'_> {
                     continue;
                 }
                 let pt = PointTarget::new(ref_pt.point);
-                pt.visit_containing_shapes(query_index, visitor);
+                pt.visit_containing_shapes(oracle, visitor);
             }
         }
     }
@@ -512,14 +503,19 @@ impl Target for ShapeIndexTarget<'_> {
 }
 
 /// Query to find furthest edges in a `ShapeIndex` from a given target.
-#[derive(Debug)]
-pub struct FurthestEdgeQuery<'a> {
-    index: &'a ShapeIndex,
+pub struct FurthestEdgeQuery<'a, I: ShapeIndexLike = ShapeIndex> {
+    index: &'a I,
 }
 
-impl<'a> FurthestEdgeQuery<'a> {
+impl<I: ShapeIndexLike> std::fmt::Debug for FurthestEdgeQuery<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FurthestEdgeQuery").finish_non_exhaustive()
+    }
+}
+
+impl<'a, I: ShapeIndexLike> FurthestEdgeQuery<'a, I> {
     /// Creates a new furthest edge query for the given index.
-    pub fn new(index: &'a ShapeIndex) -> Self {
+    pub fn new(index: &'a I) -> Self {
         FurthestEdgeQuery { index }
     }
 
@@ -565,7 +561,11 @@ impl<'a> FurthestEdgeQuery<'a> {
         if options.include_interiors {
             let max_results = options.max_results as usize;
             let mut shape_ids = Vec::new();
-            target.visit_containing_shapes(self.index, &mut |shape_id| {
+            let mut oracle = crate::s2::contains_point_query::ContainsPointQuery::new(
+                self.index,
+                crate::s2::contains_point_query::VertexModel::SemiOpen,
+            );
+            target.visit_containing_shapes(&mut oracle, &mut |shape_id| {
                 shape_ids.push(shape_id);
                 if shape_ids.len() < max_results {
                     ControlFlow::Continue(())

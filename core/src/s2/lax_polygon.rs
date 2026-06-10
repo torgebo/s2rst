@@ -260,9 +260,384 @@ impl Shape for LaxPolygon {
 
 // ─── Tests ──────────────────────────────────────────────────────────────
 
+// ─── Encoded (lazy) variant ─────────────────────────────────────────────
+
+/// A lax polygon served directly from its encoded bytes.
+///
+/// Port of C++ `EncodedS2LaxPolygonShape` (Phase 3): vertices stay encoded
+/// (one decoded per access), loop boundaries are read from the lazy cumulative
+/// loop-starts vector. Owns its buffer (`Arc<[u8]>`), so it is a `'static`
+/// [`Shape`] storable in any index.
+///
+/// Structure is validated by [`Self::init`]; `CELL_IDS` vertex payloads are
+/// validated lazily and malformed payloads yield arbitrary points (see
+/// [`EncodedLaxPolyline`](crate::s2::lax_polyline::EncodedLaxPolyline) for
+/// the same policy).
+#[derive(Clone, Debug)]
+pub struct EncodedLaxPolygon {
+    data: std::sync::Arc<[u8]>,
+    /// Start of the whole encoded shape (version byte).
+    shape_start: usize,
+    points_start: usize,
+    points_end: usize,
+    starts_start: usize,
+    starts_end: usize,
+    num_loops: usize,
+    num_vertices: usize,
+}
+
+impl EncodedLaxPolygon {
+    /// Wraps the encoded polygon starting at `offset` within `data`.
+    /// Returns the shape and the number of bytes it occupies.
+    ///
+    /// # Errors
+    /// Returns `InvalidData`/`UnexpectedEof` if the structure is malformed
+    /// or truncated (including a loop-starts table of the wrong length).
+    pub fn init(data: std::sync::Arc<[u8]>, offset: usize) -> std::io::Result<(Self, usize)> {
+        use crate::s2::encoded_s2point_vector::EncodedS2PointVector;
+        use crate::s2::encoded_uint_vector::EncodedUintVector;
+        let bad = |msg: &str| std::io::Error::new(std::io::ErrorKind::InvalidData, msg.to_string());
+
+        let slice = data.get(offset..).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "offset out of bounds")
+        })?;
+        let mut cursor = slice;
+        let version = *cursor
+            .first()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "empty"))?;
+        if version != 1 {
+            return Err(bad(&format!("unsupported LaxPolygon version {version}")));
+        }
+        cursor = &cursor[1..];
+        let num_loops_raw = crate::s2::encoding::read_uvarint(&mut cursor)?;
+        // Same guard as the eager decoder (C++ kMaxEncodedLoops).
+        if num_loops_raw > 10_000_000 {
+            return Err(bad("too many loops in LaxPolygon"));
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "guarded above: num_loops_raw <= 10_000_000"
+        )]
+        let num_loops = num_loops_raw as usize;
+
+        let points_start = offset + (slice.len() - cursor.len());
+        let (points, rest) = EncodedS2PointVector::init(cursor)?;
+        let num_vertices = points.len();
+        let points_end = points_start + (cursor.len() - rest.len());
+        cursor = rest;
+
+        let (starts_start, starts_end) = if num_loops > 1 {
+            let s = points_end;
+            let (starts, rest2) = EncodedUintVector::<u32>::init(cursor)?;
+            if starts.len() != num_loops + 1 {
+                return Err(bad("loop starts table has wrong length"));
+            }
+            // Validate the whole table: monotonic from 0 to num_vertices.
+            // edge()/chain() use these entries as vertex indices and
+            // lower_bound() requires sorted input, so garbage here would
+            // otherwise become an out-of-bounds access at query time.
+            if starts.get(0) != 0 {
+                return Err(bad("loop starts must begin at 0"));
+            }
+            for k in 0..num_loops {
+                if starts.get(k) > starts.get(k + 1) {
+                    return Err(bad("loop starts must be non-decreasing"));
+                }
+            }
+            if starts.get(num_loops) as usize != num_vertices {
+                return Err(bad("loop starts do not cover all vertices"));
+            }
+            let e = s + (cursor.len() - rest2.len());
+            cursor = rest2;
+            (s, e)
+        } else {
+            if num_loops == 1 && num_vertices == 0 {
+                // The full polygon: one empty loop. Fine.
+            }
+            (points_end, points_end)
+        };
+
+        let consumed = slice.len() - cursor.len();
+        Ok((
+            EncodedLaxPolygon {
+                data,
+                shape_start: offset,
+                points_start,
+                points_end,
+                starts_start,
+                starts_end,
+                num_loops,
+                num_vertices,
+            },
+            consumed,
+        ))
+    }
+
+    fn points(&self) -> crate::s2::encoded_s2point_vector::EncodedS2PointVector<'_> {
+        #[expect(
+            clippy::expect_used,
+            reason = "structure was validated by init(); re-parsing cannot fail"
+        )]
+        crate::s2::encoded_s2point_vector::EncodedS2PointVector::init(
+            &self.data[self.points_start..self.points_end],
+        )
+        .expect("validated by init")
+        .0
+    }
+
+    fn loop_starts(&self) -> crate::s2::encoded_uint_vector::EncodedUintVector<'_, u32> {
+        debug_assert!(self.num_loops > 1);
+        #[expect(
+            clippy::expect_used,
+            reason = "structure was validated by init(); re-parsing cannot fail"
+        )]
+        crate::s2::encoded_uint_vector::EncodedUintVector::<u32>::init(
+            &self.data[self.starts_start..self.starts_end],
+        )
+        .expect("validated by init")
+        .0
+    }
+
+    /// Cumulative start of loop `i` (index `num_loops` = total vertices).
+    fn cumulative(&self, i: usize) -> usize {
+        if self.num_loops == 1 {
+            if i == 0 { 0 } else { self.num_vertices }
+        } else {
+            self.loop_starts().get(i) as usize
+        }
+    }
+
+    /// The number of loops.
+    pub fn num_loops(&self) -> usize {
+        self.num_loops
+    }
+
+    /// The total number of vertices across all loops.
+    pub fn num_vertices(&self) -> usize {
+        self.num_vertices
+    }
+
+    /// The number of vertices in loop `i`.
+    pub fn num_loop_vertices(&self, i: usize) -> usize {
+        self.cumulative(i + 1) - self.cumulative(i)
+    }
+
+    /// Decodes vertex `j` of loop `i`.
+    ///
+    /// # Panics
+    /// Panics on out-of-range indices.
+    pub fn loop_vertex(&self, i: usize, j: usize) -> Point {
+        self.vertex_at(self.cumulative(i) + j)
+    }
+
+    fn vertex_at(&self, i: usize) -> Point {
+        // Malformed lazily-validated payloads degrade to an arbitrary point
+        // (matching C++'s non-validating decoders) so index queries and
+        // fuzzing never panic; validate untrusted bytes eagerly instead.
+        self.points().get(i).unwrap_or_default()
+    }
+}
+
+impl Shape for EncodedLaxPolygon {
+    fn num_edges(&self) -> usize {
+        self.num_vertices
+    }
+
+    fn edge(&self, id: usize) -> Edge {
+        let next_id = id + 1;
+        if self.num_loops == 1 {
+            let next = if next_id == self.num_vertices {
+                0
+            } else {
+                next_id
+            };
+            return Edge::new(self.vertex_at(id), self.vertex_at(next));
+        }
+        let starts = self.loop_starts();
+        // First loop whose cumulative start exceeds `id`.
+        let next_loop = starts.lower_bound(u32::try_from(id + 1).unwrap_or(u32::MAX));
+        let next = if next_id == starts.get(next_loop) as usize {
+            starts.get(next_loop - 1) as usize
+        } else {
+            next_id
+        };
+        Edge::new(self.vertex_at(id), self.vertex_at(next))
+    }
+
+    fn reference_point(&self) -> ReferencePoint {
+        reference_point_for_shape(self)
+    }
+
+    fn num_chains(&self) -> usize {
+        self.num_loops
+    }
+
+    fn chain(&self, chain_id: usize) -> Chain {
+        let start = self.cumulative(chain_id);
+        Chain::new(start, self.cumulative(chain_id + 1) - start)
+    }
+
+    fn chain_edge(&self, chain_id: usize, offset: usize) -> Edge {
+        let n = self.num_loop_vertices(chain_id);
+        let next = if offset + 1 == n { 0 } else { offset + 1 };
+        let base = self.cumulative(chain_id);
+        Edge::new(self.vertex_at(base + offset), self.vertex_at(base + next))
+    }
+
+    fn chain_position(&self, edge_id: usize) -> ChainPosition {
+        if self.num_loops == 1 {
+            return ChainPosition::new(0, edge_id);
+        }
+        let starts = self.loop_starts();
+        let chain_id = starts.lower_bound(u32::try_from(edge_id + 1).unwrap_or(u32::MAX)) - 1;
+        ChainPosition::new(chain_id, edge_id - starts.get(chain_id) as usize)
+    }
+
+    fn dimension(&self) -> Dimension {
+        Dimension::Polygon
+    }
+
+    fn type_tag(&self) -> u32 {
+        5 // Same wire identity as S2LaxPolygonShape::kTypeTag.
+    }
+
+    fn encode_tagged(
+        &self,
+        w: &mut dyn std::io::Write,
+        _hint: crate::s2::encoded_s2point_vector::CodingHint,
+    ) -> std::io::Result<()> {
+        // Already encoded: re-emit the original bytes regardless of hint.
+        // (starts_end equals points_end for single-loop polygons.)
+        crate::s2::encoding::write_uvarint(w, u64::from(self.type_tag()))?;
+        w.write_all(&self.data[self.shape_start..self.starts_end])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_shape_equiv(encoded: &EncodedLaxPolygon, plain: &LaxPolygon, ctx: &str) {
+        assert_eq!(encoded.num_loops(), plain.num_loops(), "{ctx} num_loops");
+        assert_eq!(encoded.num_vertices(), plain.num_vertices(), "{ctx} nv");
+        assert_eq!(encoded.num_edges(), plain.num_edges(), "{ctx} ne");
+        assert_eq!(encoded.num_chains(), plain.num_chains(), "{ctx} nc");
+        assert_eq!(encoded.dimension(), plain.dimension());
+        assert_eq!(encoded.type_tag(), plain.type_tag());
+        for c in 0..plain.num_chains() {
+            assert_eq!(encoded.chain(c), plain.chain(c), "{ctx} chain {c}");
+            assert_eq!(
+                encoded.num_loop_vertices(c),
+                plain.num_loop_vertices(c),
+                "{ctx} loop {c} nv"
+            );
+            for j in 0..plain.num_loop_vertices(c) {
+                assert_eq!(
+                    encoded.loop_vertex(c, j),
+                    plain.loop_vertex(c, j),
+                    "{ctx} loop_vertex({c},{j})"
+                );
+                assert_eq!(
+                    encoded.chain_edge(c, j),
+                    plain.chain_edge(c, j),
+                    "{ctx} chain_edge({c},{j})"
+                );
+            }
+        }
+        for e in 0..plain.num_edges() {
+            assert_eq!(encoded.edge(e), plain.edge(e), "{ctx} edge {e}");
+            assert_eq!(
+                encoded.chain_position(e),
+                plain.chain_position(e),
+                "{ctx} chain_position {e}"
+            );
+        }
+        assert_eq!(
+            encoded.reference_point(),
+            plain.reference_point(),
+            "{ctx} reference_point"
+        );
+    }
+
+    #[test]
+    fn test_encoded_lax_polygon_matches_decoded() {
+        use crate::s2::text_format::make_lax_polygon;
+        let cases = [
+            "0:0, 0:5, 5:5, 5:0",                          // single loop
+            "0:0, 0:9, 9:9, 9:0; 1:1, 3:1, 1:3",           // shell + hole
+            "0:0, 0:9, 9:9; 1:1, 3:1, 1:3; 5:5, 7:5, 5:7", // three loops
+            "full",
+        ];
+        for s in cases {
+            let plain = make_lax_polygon(s);
+            for hint in [
+                crate::s2::encoded_s2point_vector::CodingHint::Fast,
+                crate::s2::encoded_s2point_vector::CodingHint::Compact,
+            ] {
+                let mut buf = Vec::new();
+                plain.encode_with_hint(&mut buf, hint).unwrap();
+                buf.extend_from_slice(b"@@");
+                let data: std::sync::Arc<[u8]> = buf.into();
+                let (encoded, consumed) =
+                    EncodedLaxPolygon::init(std::sync::Arc::clone(&data), 0).unwrap();
+                assert_eq!(consumed, data.len() - 2, "{s} {hint:?}");
+                assert_shape_equiv(&encoded, &plain, &format!("{s} {hint:?}"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_encoded_lax_polygon_served_by_queries() {
+        // Encoded multi-loop polygon answering containment + distance
+        // queries without materialization.
+        use crate::s2::closest_edge_query::{ClosestEdgeQuery, PointTarget};
+        use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
+        use crate::s2::shape_index::ShapeIndex;
+        use crate::s2::text_format::{make_lax_polygon, parse_point};
+
+        let plain = make_lax_polygon("0:0, 0:9, 9:9, 9:0; 3:3, 6:3, 6:6, 3:6");
+        let mut buf = Vec::new();
+        plain
+            .encode_with_hint(
+                &mut buf,
+                crate::s2::encoded_s2point_vector::CodingHint::Compact,
+            )
+            .unwrap();
+        let data: std::sync::Arc<[u8]> = buf.into();
+        let (encoded, _) = EncodedLaxPolygon::init(data, 0).unwrap();
+
+        let mut index = ShapeIndex::new();
+        index.add(Box::new(encoded));
+        index.build();
+
+        let mut q = ContainsPointQuery::new(&index, VertexModel::SemiOpen);
+        assert!(q.contains(parse_point("1:1")), "inside the shell");
+        assert!(!q.contains(parse_point("4:4")), "inside the hole");
+        assert!(!q.contains(parse_point("20:20")), "outside");
+
+        let query = ClosestEdgeQuery::new(&index);
+        let result = query.find_closest_edge(&PointTarget::new(parse_point("4:4")));
+        assert!(!result.is_empty());
+        assert!(result.distance.to_angle().degrees() < 1.1);
+    }
+
+    #[test]
+    fn test_encoded_lax_polygon_truncation_never_panics() {
+        use crate::s2::text_format::make_lax_polygon;
+        let plain = make_lax_polygon("0:0, 0:9, 9:9, 9:0; 1:1, 3:1, 1:3");
+        let mut buf = Vec::new();
+        plain
+            .encode_with_hint(
+                &mut buf,
+                crate::s2::encoded_s2point_vector::CodingHint::Fast,
+            )
+            .unwrap();
+        for cut in 0..buf.len() {
+            let data: std::sync::Arc<[u8]> = buf[..cut].to_vec().into();
+            drop(EncodedLaxPolygon::init(data, 0)); // must never panic
+        }
+    }
+
     use crate::s2::LatLng;
 
     fn p(lat: f64, lng: f64) -> Point {

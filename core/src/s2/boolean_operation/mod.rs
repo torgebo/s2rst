@@ -936,11 +936,12 @@ impl<'a> Impl<'a> {
                     let mut crossing = IndexCrossing::new(a.id, b.id);
                     if is_interior {
                         crossing.is_interior_crossing = true;
-                        // Must use the exact orientation predicate here, matching
-                        // C++ `s2pred::Sign(...) > 0`. The fast `predicates::sign`
-                        // can return the wrong sign for near-degenerate crossings,
-                        // which inverts `left_to_right` and breaks the downstream
-                        // GraphEdgeClipper invariants (see BUG.md §2).
+                        // Must use the robust orientation predicate here,
+                        // matching C++ `s2pred::Sign(...) > 0`. The fast
+                        // `simple_ccw` can return the wrong sign for
+                        // near-degenerate crossings, which inverts
+                        // `left_to_right` and breaks edge-chain linking in
+                        // GetCrossedVertexIndex.
                         if predicates::robust_sign(a.edge.v0, a.edge.v1, b.edge.v0)
                             == predicates::Direction::CounterClockwise
                         {
@@ -3469,7 +3470,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "GetCrossedVertexIndex edge case not yet handled"]
     fn test_get_crossed_vertex_index_bug1() {
         use crate::r3::Vector;
         use crate::s2::Point;
@@ -3525,7 +3525,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "GetCrossedVertexIndex edge case not yet handled"]
     fn test_get_crossed_vertex_index_bug2() {
         use crate::r3::Vector;
         use crate::s2::Point;
@@ -3865,7 +3864,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "GetCrossedVertexIndex edge case not yet handled"]
     fn test_get_crossed_vertex_index_bug6() {
         use crate::r3::Vector;
         use crate::s2::Point;

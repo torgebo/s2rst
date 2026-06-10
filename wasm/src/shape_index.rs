@@ -110,7 +110,7 @@ impl ShapeIndex {
     #[wasm_bindgen(js_name = "getDistanceToPoint")]
     pub fn get_distance_to_point(&self, point: &Point) -> ChordAngle {
         let idx = self.inner.borrow();
-        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&idx);
+        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&*idx);
         let target = s2rst::s2::closest_edge_query::PointTarget::new(point.0);
         ChordAngle(query.get_distance(&target))
     }
@@ -119,7 +119,7 @@ impl ShapeIndex {
     #[wasm_bindgen(js_name = "isDistanceLessToPoint")]
     pub fn is_distance_less_to_point(&self, point: &Point, limit: &ChordAngle) -> bool {
         let idx = self.inner.borrow();
-        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&idx);
+        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&*idx);
         let target = s2rst::s2::closest_edge_query::PointTarget::new(point.0);
         query.is_distance_less(&target, limit.0)
     }
@@ -129,7 +129,7 @@ impl ShapeIndex {
     pub fn contains_point(&self, p: &Point) -> bool {
         let idx = self.inner.borrow();
         let mut q = s2rst::s2::contains_point_query::ContainsPointQuery::new(
-            &idx,
+            &*idx,
             s2rst::s2::contains_point_query::VertexModel::SemiOpen,
         );
         q.contains(p.0)
@@ -140,7 +140,7 @@ impl ShapeIndex {
     pub fn containing_shape_ids(&self, p: &Point) -> Vec<i32> {
         let idx = self.inner.borrow();
         let mut q = s2rst::s2::contains_point_query::ContainsPointQuery::new(
-            &idx,
+            &*idx,
             s2rst::s2::contains_point_query::VertexModel::SemiOpen,
         );
         q.containing_shape_ids(p.0).iter().map(|id| id.0).collect()
@@ -183,7 +183,7 @@ impl ShapeIndex {
     ) -> Vec<EdgeResult> {
         self.inner.borrow_mut().build();
         let idx = self.inner.borrow();
-        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&idx);
+        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&*idx);
         let target = s2rst::s2::closest_edge_query::PointTarget::new(point.0);
         query
             .find_closest_edges(&target, &closest_options(max_results, max_distance_radians))
@@ -203,7 +203,7 @@ impl ShapeIndex {
     ) -> Vec<EdgeResult> {
         self.inner.borrow_mut().build();
         let idx = self.inner.borrow();
-        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&idx);
+        let query = s2rst::s2::closest_edge_query::ClosestEdgeQuery::new(&*idx);
         let target = s2rst::s2::closest_edge_query::EdgeTarget::new(a.0, b.0);
         query
             .find_closest_edges(&target, &closest_options(max_results, max_distance_radians))
@@ -219,7 +219,7 @@ impl ShapeIndex {
         let vm = parse_vertex_model(model)?;
         self.inner.borrow_mut().build();
         let idx = self.inner.borrow();
-        let mut q = s2rst::s2::contains_point_query::ContainsPointQuery::new(&idx, vm);
+        let mut q = s2rst::s2::contains_point_query::ContainsPointQuery::new(&*idx, vm);
         Ok(q.contains(p.0))
     }
 
@@ -236,7 +236,7 @@ impl ShapeIndex {
         let ct = parse_crossing_type(cross_type)?;
         self.inner.borrow_mut().build();
         let idx = self.inner.borrow();
-        let mut q = s2rst::s2::crossing_edge_query::CrossingEdgeQuery::new(&idx);
+        let mut q = s2rst::s2::crossing_edge_query::CrossingEdgeQuery::new(&*idx);
         let mut out = Vec::new();
         for (shape_id, edges) in q.crossings_edge_map(a.0, b.0, ct) {
             for edge_id in edges {
@@ -258,7 +258,7 @@ impl ShapeIndex {
     pub fn furthest_edges_to_point(&self, point: &Point, max_results: i32) -> Vec<EdgeResult> {
         self.inner.borrow_mut().build();
         let idx = self.inner.borrow();
-        let query = s2rst::s2::furthest_edge_query::FurthestEdgeQuery::new(&idx);
+        let query = s2rst::s2::furthest_edge_query::FurthestEdgeQuery::new(&*idx);
         let target = s2rst::s2::furthest_edge_query::PointTarget::new(point.0);
         query
             .find_furthest_edges(&target, &furthest_options(max_results))
@@ -277,7 +277,7 @@ impl ShapeIndex {
     ) -> Vec<EdgeResult> {
         self.inner.borrow_mut().build();
         let idx = self.inner.borrow();
-        let query = s2rst::s2::furthest_edge_query::FurthestEdgeQuery::new(&idx);
+        let query = s2rst::s2::furthest_edge_query::FurthestEdgeQuery::new(&*idx);
         let target = s2rst::s2::furthest_edge_query::EdgeTarget::new(a.0, b.0);
         query
             .find_furthest_edges(&target, &furthest_options(max_results))

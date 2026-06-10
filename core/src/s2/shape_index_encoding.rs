@@ -103,7 +103,7 @@ fn encode_tagged_shape(shape: &dyn Shape, hint: CodingHint, w: &mut dyn Write) -
 }
 
 /// Decodes a shape from its tagged representation.
-fn decode_tagged_shape(data: &[u8]) -> io::Result<Box<dyn Shape>> {
+pub(crate) fn decode_tagged_shape(data: &[u8]) -> io::Result<Box<dyn Shape>> {
     let mut r = Cursor::new(data);
     let tag = read_uvarint(&mut r)? as u32;
     match tag {
@@ -204,7 +204,41 @@ fn encode_edges(clipped: &ClippedShape, w: &mut dyn Write) -> io::Result<()> {
 }
 
 /// Decodes a `ShapeIndexCell` from the compact C++ format.
-fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> {
+/// Decodes one tagged shape from `data[start..end]`, producing LAZY shapes
+/// for the lax types (tags 4/5) — they borrow the `Arc` and decode vertices
+/// on access — and eager decodes for the remaining tags (Phase 3 step 3,
+/// the `ShapeFactory` role).
+pub(crate) fn decode_tagged_shape_lazy(
+    data: &std::sync::Arc<[u8]>,
+    start: usize,
+    end: usize,
+) -> io::Result<Box<dyn Shape>> {
+    let slice = data
+        .get(start..end)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "shape range out of bounds"))?;
+    let mut cursor = slice;
+    let tag = read_uvarint(&mut cursor)? as u32;
+    let payload_offset = start + (slice.len() - cursor.len());
+    match tag {
+        LAX_POLYLINE_TYPE_TAG => {
+            let (shape, _) = crate::s2::lax_polyline::EncodedLaxPolyline::init(
+                std::sync::Arc::clone(data),
+                payload_offset,
+            )?;
+            Ok(Box::new(shape))
+        }
+        LAX_POLYGON_TYPE_TAG => {
+            let (shape, _) = crate::s2::lax_polygon::EncodedLaxPolygon::init(
+                std::sync::Arc::clone(data),
+                payload_offset,
+            )?;
+            Ok(Box::new(shape))
+        }
+        _ => decode_tagged_shape(slice),
+    }
+}
+
+pub(crate) fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> {
     let mut r = Cursor::new(data);
     let mut cell = ShapeIndexCell::default();
 
@@ -459,6 +493,7 @@ impl ShapeIndex {
         }
 
         // Decode each cell.
+        let mut decoded_cells = Vec::with_capacity(cell_ids.len());
         for (i, cid) in cell_ids.iter().enumerate() {
             let cell = decode_cell(&cell_data[i], num_shapes)?;
             // A cell's clipped shapes carry a shape id and edge ids decoded from
@@ -489,9 +524,9 @@ impl ShapeIndex {
                     ));
                 }
             }
-            index.insert_cell(*cid, cell);
+            decoded_cells.push((*cid, cell));
         }
-        index.mark_built();
+        index.install_decoded_cells(decoded_cells);
 
         Ok(index)
     }

@@ -78,11 +78,18 @@ fn remainder(x: f64, y: f64) -> f64 {
 ///
 /// By default (`x_scale` = π), coordinates are in radians with x in [-π, π]
 /// and y in [-π/2, π/2].
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlateCarreeProjection {
     x_wrap: f64,
     to_radians: f64,
     from_radians: f64,
+}
+
+impl Default for PlateCarreeProjection {
+    /// The C++ default: coordinates in radians (`x_scale = PI`).
+    fn default() -> Self {
+        Self::new(PI)
+    }
 }
 
 impl PlateCarreeProjection {
@@ -138,16 +145,28 @@ impl Projection for PlateCarreeProjection {
 ///
 /// The x-axis is finite and wraps, while the y-axis is infinite (poles
 /// have y = ±∞).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MercatorProjection {
     x_wrap: f64,
     to_radians: f64,
     from_radians: f64,
 }
 
+impl Default for MercatorProjection {
+    /// The C++ default: coordinates in radians (`max_lng = PI`).
+    fn default() -> Self {
+        Self::new(PI)
+    }
+}
+
 impl MercatorProjection {
     /// Creates a new Mercator projection where the longitude axis spans
     /// [-`max_lng`, `max_lng`]. For degrees, use `max_lng = 180`.
+    ///
+    /// Note that the projected y-coordinate diverges at the poles
+    /// (latitude ±90° maps to y = ±∞); edges that approach the poles should
+    /// be clipped before tessellating in this projection, exactly as the
+    /// C++ documentation advises.
     pub fn new(max_lng: f64) -> Self {
         MercatorProjection {
             x_wrap: 2.0 * max_lng,
@@ -219,8 +238,8 @@ mod tests {
         let proj = PlateCarreeProjection::new(180.0);
         let ll = LatLng::from_degrees(45.0, 90.0);
         let pt = proj.from_lat_lng(ll);
-        assert!(float64_near(pt.x, 90.0, 1e-10), "x = {}, want 90", pt.x,);
-        assert!(float64_near(pt.y, 45.0, 1e-10), "y = {}, want 45", pt.y,);
+        assert!(float64_near(pt.x, 90.0, 1e-10), "x = {}, want 90", pt.x);
+        assert!(float64_near(pt.y, 45.0, 1e-10), "y = {}, want 45", pt.y);
     }
 
     #[test]

@@ -29,7 +29,7 @@ impl Clone for PyData {
         PyData(
             self.0
                 .as_ref()
-                .map(|o| Python::with_gil(|py| o.clone_ref(py))),
+                .map(|o| Python::attach(|py| o.clone_ref(py))),
         )
     }
 }
@@ -37,7 +37,7 @@ impl Clone for PyData {
 impl PartialEq for PyData {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
-            (Some(a), Some(b)) => Python::with_gil(|py| a.bind(py).eq(b.bind(py)).unwrap_or(false)),
+            (Some(a), Some(b)) => Python::attach(|py| a.bind(py).eq(b.bind(py)).unwrap_or(false)),
             (None, None) => true,
             _ => false,
         }
@@ -118,7 +118,7 @@ impl PyS2PointIndexIter {
         slf
     }
 
-    fn __next__(&mut self, py: Python<'_>) -> Option<(PyS2Point, PyObject)> {
+    fn __next__(&mut self, py: Python<'_>) -> Option<(PyS2Point, Py<PyAny>)> {
         if self.idx >= self.items.len() {
             return None;
         }
@@ -166,7 +166,7 @@ impl PyPointQueryResult {
 
     /// The data object stored at the matched point (or `None`).
     #[getter]
-    fn data(&self, py: Python<'_>) -> PyObject {
+    fn data(&self, py: Python<'_>) -> Py<PyAny> {
         self.data
             .as_ref()
             .map(|o| o.clone_ref(py))
@@ -190,16 +190,16 @@ impl PyPointQueryResult {
 macro_rules! dispatch_target_mut {
     ($obj:expr, $build:expr) => {{
         let obj: &Bound<'_, PyAny> = $obj;
-        if let Ok(p) = obj.downcast::<PyS2Point>() {
+        if let Ok(p) = obj.cast::<PyS2Point>() {
             let mut t = cpq::PointTarget::new(p.borrow().0);
             Ok($build(&mut t))
         } else if let Ok((a, b)) = obj.extract::<(PyS2Point, PyS2Point)>() {
             let mut t = cpq::EdgeTarget::new(a.0, b.0);
             Ok($build(&mut t))
-        } else if let Ok(c) = obj.downcast::<PyCell>() {
+        } else if let Ok(c) = obj.cast::<PyCell>() {
             let mut t = cpq::CellTarget::new(c.borrow().0);
             Ok($build(&mut t))
-        } else if let Ok(ix) = obj.downcast::<PyShapeIndex>() {
+        } else if let Ok(ix) = obj.cast::<PyShapeIndex>() {
             let ix_ref = ix.borrow();
             let mut t = cpq::ShapeIndexTarget::new(&ix_ref.0);
             Ok($build(&mut t))

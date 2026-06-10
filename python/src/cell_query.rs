@@ -71,19 +71,19 @@ impl PyCellQueryResult {
 macro_rules! dispatch_cell_target {
     ($obj:expr, $build:expr) => {{
         let obj: &Bound<'_, PyAny> = $obj;
-        if let Ok(p) = obj.downcast::<PyS2Point>() {
+        if let Ok(p) = obj.cast::<PyS2Point>() {
             let mut t = ccq::PointTarget::new(p.borrow().0);
             Ok($build(&mut t))
         } else if let Ok((a, b)) = obj.extract::<(PyS2Point, PyS2Point)>() {
             let mut t = ccq::EdgeTarget::new(a.0, b.0);
             Ok($build(&mut t))
-        } else if let Ok(c) = obj.downcast::<PyCell>() {
+        } else if let Ok(c) = obj.cast::<PyCell>() {
             let mut t = ccq::CellTarget::new(c.borrow().0);
             Ok($build(&mut t))
-        } else if let Ok(cu) = obj.downcast::<PyCellUnion>() {
+        } else if let Ok(cu) = obj.cast::<PyCellUnion>() {
             let mut t = ccq::CellUnionTarget::new(cu.borrow().0.clone());
             Ok($build(&mut t))
-        } else if let Ok(ix) = obj.downcast::<PyShapeIndex>() {
+        } else if let Ok(ix) = obj.cast::<PyShapeIndex>() {
             let ix_ref = ix.borrow();
             let mut t = ccq::ShapeIndexTarget::new(&ix_ref.0);
             Ok($build(&mut t))

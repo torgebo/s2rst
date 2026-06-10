@@ -1591,8 +1591,8 @@ impl S2Builder {
     /// would be more efficient, but this suffices for typical use cases.
     fn add_edge_crossings(&mut self) {
         // Collect crossings before mutating input_vertices to avoid
-        // aliasing issues (same as C++).
-        let mut new_vertices: Vec<(Point, usize, usize)> = Vec::new();
+        // reallocating it during the scan (same as C++).
+        let mut new_vertices: Vec<Point> = Vec::new();
         let num_edges = self.input_edges.len();
 
         for i in 0..num_edges {
@@ -1606,26 +1606,27 @@ impl S2Builder {
 
                 if edge_crossings::crossing_sign(a0, a1, b0, b1) == edge_crossings::Crossing::Cross
                 {
-                    new_vertices.push((edge_crossings::intersection(a0, a1, b0, b1), i, j));
+                    new_vertices.push(edge_crossings::intersection(a0, a1, b0, b1));
                 }
             }
         }
 
-        // Add intersection points as new input vertices and record which edges
-        // they belong to, so compute_edge_chains can route edges through them.
-        let base = self.input_vertices.len();
-        for (idx, (pt, edge_i, edge_j)) in new_vertices.iter().enumerate() {
-            self.input_vertices.push(*pt);
-            let vert_idx = base + idx;
-            self.edge_crossing_vertices
-                .entry(*edge_i)
-                .or_default()
-                .push(vert_idx);
-            self.edge_crossing_vertices
-                .entry(*edge_j)
-                .or_default()
-                .push(vert_idx);
+        if new_vertices.is_empty() {
+            return;
         }
+
+        // The input geometry must be modified to resolve the crossings, so
+        // snapping is needed (C++ `s2builder.cc` sets `snapping_needed_ =
+        // true` here). Without this, Phase 2.7 (`add_extra_sites`) is skipped
+        // and the crossing edges are never routed through the intersection
+        // sites — the output keeps the self-crossing.
+        self.snapping_needed = true;
+
+        // Add the intersection points as new input vertices. They become
+        // Voronoi sites and `add_extra_sites` routes the crossing edges
+        // through them — no separate per-edge bookkeeping is required (and
+        // C++ keeps none).
+        self.input_vertices.extend_from_slice(&new_vertices);
     }
 
     /// Builds the graph for each layer using `snap_edge()` and calls `layer.build()`.

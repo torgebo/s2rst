@@ -76,6 +76,17 @@ impl CellUnion {
         CellUnion(ids)
     }
 
+    /// Creates a union from cell ids that are already known to satisfy the
+    /// normalized invariant (sorted, non-overlapping, no four-sibling runs),
+    /// skipping the normalization pass (C++ `FromNormalized`).
+    ///
+    /// Debug builds assert the invariant.
+    pub fn from_normalized(ids: Vec<CellId>) -> Self {
+        let u = Self::from_verbatim(ids);
+        debug_assert!(u.is_normalized(), "input must already be normalized");
+        u
+    }
+
     /// Creates a cell union from a half-open range of leaf cells `[begin, end)`.
     pub fn from_range(begin: CellId, end: CellId) -> Self {
         let mut ids = Vec::new();
@@ -531,6 +542,57 @@ impl<'a> IntoIterator for &'a CellUnion {
     type IntoIter = std::slice::Iter<'a, CellId>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+/// A [`CellIterator`](crate::s2::cell_iterator::CellIterator) over the cells
+/// of a `CellUnion`, enabling generic joins and range iteration against
+/// other cell containers (C++ `S2CellUnion::Iterator`).
+///
+/// Requires the union's invariant (sorted, disjoint cells), which holds for
+/// every normalized union; a [`CellUnion::from_verbatim`] union must satisfy
+/// it for iteration to be meaningful.
+#[derive(Clone, Debug)]
+pub struct CellUnionCellIterator<'a> {
+    ids: &'a [CellId],
+    pos: usize,
+}
+
+impl CellUnion {
+    /// Returns a positioned cell iterator over this union's cells.
+    pub fn cell_iterator(&self) -> CellUnionCellIterator<'_> {
+        CellUnionCellIterator {
+            ids: self.cell_ids(),
+            pos: 0,
+        }
+    }
+}
+
+impl crate::s2::cell_iterator::CellIterator for CellUnionCellIterator<'_> {
+    fn cell_id(&self) -> CellId {
+        self.ids[self.pos]
+    }
+    fn done(&self) -> bool {
+        self.pos >= self.ids.len()
+    }
+    fn begin(&mut self) {
+        self.pos = 0;
+    }
+    fn finish(&mut self) {
+        self.pos = self.ids.len();
+    }
+    fn next(&mut self) {
+        self.pos += 1;
+    }
+    fn prev(&mut self) -> bool {
+        if self.pos == 0 {
+            return false;
+        }
+        self.pos -= 1;
+        true
+    }
+    fn seek(&mut self, target: CellId) {
+        self.pos = self.ids.partition_point(|&id| id < target);
     }
 }
 

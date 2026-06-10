@@ -104,11 +104,16 @@ impl From<i32> for Direction {
 
 /// Returns true if the points A, B, C are strictly counterclockwise.
 ///
+/// Port of C++ `S2::SimpleCCW` — a fast, NON-robust test evaluated in plain
+/// double arithmetic. It can return the wrong answer for nearly-collinear
+/// points. C++ `s2pred::Sign` is [`robust_sign`], not this function; use that
+/// wherever the C++ code calls `s2pred::Sign`.
+///
 /// Due to numerical errors, situations may arise that are mathematically
 /// impossible. However, the implementation guarantees:
-/// If `sign(a,b,c)`, then `!sign(c,b,a)` for all a,b,c.
+/// If `simple_ccw(a,b,c)`, then `!simple_ccw(c,b,a)` for all a,b,c.
 #[inline]
-pub fn sign(a: Point, b: Point, c: Point) -> bool {
+pub fn simple_ccw(a: Point, b: Point, c: Point) -> bool {
     // We compute (C × A) · B instead of (A × B) · C to ensure that
     // ABC and CBA are not both CCW.
     c.0.cross(a.0).dot(b.0) > 0.0
@@ -1430,8 +1435,8 @@ mod tests {
         let a = Point::from_coords(1.0, 0.0, 0.0);
         let b = Point::from_coords(0.0, 1.0, 0.0);
         let c = Point::from_coords(0.0, 0.0, 1.0);
-        assert!(sign(a, b, c));
-        assert!(!sign(c, b, a));
+        assert!(simple_ccw(a, b, c));
+        assert!(!simple_ccw(c, b, a));
     }
 
     #[test]

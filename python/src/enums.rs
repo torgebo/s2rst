@@ -22,7 +22,15 @@ use s2rst::s2::winding_operation::WindingRule;
 /// - `SEMI_OPEN`: exactly one of each pair of adjacent cells owns a shared
 ///   boundary point (so a partition of the sphere has no double-counting).
 /// - `CLOSED`: boundary points *are* contained.
-#[pyclass(eq, eq_int, hash, frozen, name = "VertexModel", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "VertexModel",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyVertexModel {
     #[pyo3(name = "OPEN")]
@@ -44,7 +52,15 @@ impl PyVertexModel {
 }
 
 /// The set operation performed by a boolean operation.
-#[pyclass(eq, eq_int, hash, frozen, name = "OpType", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "OpType",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyOpType {
     #[pyo3(name = "UNION")]
@@ -69,7 +85,15 @@ impl PyOpType {
 }
 
 /// Whether polygon boundaries are treated as part of the interior.
-#[pyclass(eq, eq_int, hash, frozen, name = "PolygonModel", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "PolygonModel",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyPolygonModel {
     #[pyo3(name = "OPEN")]
@@ -91,7 +115,15 @@ impl PyPolygonModel {
 }
 
 /// Whether polyline endpoints are treated as part of the polyline.
-#[pyclass(eq, eq_int, hash, frozen, name = "PolylineModel", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "PolylineModel",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyPolylineModel {
     #[pyo3(name = "OPEN")]
@@ -113,7 +145,15 @@ impl PyPolylineModel {
 }
 
 /// Which edge crossings a `CrossingEdgeQuery` reports.
-#[pyclass(eq, eq_int, hash, frozen, name = "CrossingType", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "CrossingType",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyCrossingType {
     #[pyo3(name = "INTERIOR")]
@@ -132,7 +172,15 @@ impl PyCrossingType {
 }
 
 /// Whether a buffered polyline's end caps are round or flat.
-#[pyclass(eq, eq_int, hash, frozen, name = "EndCapStyle", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "EndCapStyle",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyEndCapStyle {
     #[pyo3(name = "ROUND")]
@@ -151,7 +199,15 @@ impl PyEndCapStyle {
 }
 
 /// Which side(s) of a polyline are buffered.
-#[pyclass(eq, eq_int, hash, frozen, name = "PolylineSide", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "PolylineSide",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyPolylineSide {
     #[pyo3(name = "LEFT")]
@@ -179,7 +235,15 @@ impl PyPolylineSide {
 /// - `NEGATIVE`: winding number < 0.
 /// - `NON_ZERO`: winding number != 0.
 /// - `ODD`: winding number is odd (N-way symmetric difference).
-#[pyclass(eq, eq_int, hash, frozen, name = "WindingRule", module = "s2rst")]
+#[pyclass(
+    from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "WindingRule",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyWindingRule {
     #[pyo3(name = "POSITIVE")]

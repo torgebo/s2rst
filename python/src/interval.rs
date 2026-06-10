@@ -13,7 +13,7 @@ use crate::hash_util::hash_f64s;
 // ---------------------------------------------------------------------------
 
 /// A closed interval [lo, hi] on the real line.
-#[pyclass(name = "R1Interval", module = "s2rst")]
+#[pyclass(from_py_object, name = "R1Interval", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyR1Interval(pub(crate) r1::Interval);
 
@@ -188,7 +188,7 @@ impl PyR1Interval {
 ///
 /// Points are in [-pi, pi]. The interval can be "inverted" (lo > hi),
 /// meaning it passes through the point (-1, 0).
-#[pyclass(name = "S1Interval", module = "s2rst")]
+#[pyclass(from_py_object, name = "S1Interval", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyS1Interval(pub(crate) s1::Interval);
 

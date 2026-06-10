@@ -160,9 +160,197 @@ fn byte_length_u64(v: u64) -> usize {
 
 // ─── Tests ──────────────────────────────────────────────────────────────
 
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for u32 {}
+    impl Sealed for u64 {}
+}
+
+/// Unsigned integer types storable in an [`EncodedUintVector`].
+pub trait EncodableUint: Copy + Ord + sealed::Sealed {
+    /// `sizeof(T)` — the divisor/mask in the encoded size word.
+    const SIZE: u64;
+    /// Converts from the decoded little-endian value.
+    fn from_u64(v: u64) -> Self;
+}
+
+impl EncodableUint for u32 {
+    const SIZE: u64 = 4;
+    fn from_u64(v: u64) -> Self {
+        v as u32
+    }
+}
+
+impl EncodableUint for u64 {
+    const SIZE: u64 = 8;
+    fn from_u64(v: u64) -> Self {
+        v
+    }
+}
+
+/// A lazy view over an encoded uint vector: O(1) random access and binary
+/// search directly on the encoded bytes, no up-front materialization.
+///
+/// Port of C++ `EncodedUintVector<T>` — the first of the Phase 3 lazy
+/// decoders. The eager `decode_uint_vector_*` functions remain as
+/// conveniences for callers that want the whole vector.
+#[derive(Clone, Copy, Debug)]
+pub struct EncodedUintVector<'a, T> {
+    /// The element bytes (exactly `count * len_bytes` long).
+    data: &'a [u8],
+    /// Bytes per element (1..=sizeof(T)).
+    len_bytes: usize,
+    count: usize,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<'a, T: EncodableUint> EncodedUintVector<'a, T> {
+    /// Parses the vector header and bounds-checks the element bytes.
+    /// Returns the view plus the remaining unconsumed bytes.
+    ///
+    /// # Errors
+    /// Returns `InvalidData`/`UnexpectedEof` on malformed or truncated input.
+    pub fn init(data: &'a [u8]) -> io::Result<(Self, &'a [u8])> {
+        let mut cursor = data;
+        let size_len = read_uvarint(&mut cursor)?;
+        let count = size_len / T::SIZE;
+        let len_bytes = ((size_len & (T::SIZE - 1)) + 1) as usize;
+        let total = count.checked_mul(len_bytes as u64).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidData, "uint vector size overflow")
+        })?;
+        if total > cursor.len() as u64 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "uint vector truncated",
+            ));
+        }
+        let (elems, rest) = cursor.split_at(total as usize);
+        Ok((
+            EncodedUintVector {
+                data: elems,
+                len_bytes,
+                count: count as usize,
+                _marker: std::marker::PhantomData,
+            },
+            rest,
+        ))
+    }
+
+    /// The number of elements.
+    pub fn len(&self) -> usize {
+        self.count
+    }
+
+    /// True if the vector has no elements.
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Decodes element `i` (O(1)).
+    ///
+    /// # Panics
+    /// Panics if `i >= len()`.
+    pub fn get(&self, i: usize) -> T {
+        assert!(
+            i < self.count,
+            "index {i} out of bounds (len {})",
+            self.count
+        );
+        let off = i * self.len_bytes;
+        T::from_u64(get_uint_with_length(
+            &self.data[off..off + self.len_bytes],
+            self.len_bytes,
+        ))
+    }
+
+    /// The index of the first element `>= target`, or `len()` if none.
+    /// Requires the elements to be sorted (as all S2 uses are).
+    pub fn lower_bound(&self, target: T) -> usize {
+        let (mut lo, mut hi) = (0usize, self.count);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if self.get(mid) < target {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    /// Materializes the whole vector.
+    pub fn decode(&self) -> Vec<T> {
+        (0..self.count).map(|i| self.get(i)).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_lazy_view_matches_eager_decode() {
+        for vals in [
+            vec![],
+            vec![0u64],
+            vec![1, 2, 3, 4, 5],
+            vec![0xDEAD_BEEF_CAFE, u64::MAX, 0, 42],
+        ] {
+            let mut buf = Vec::new();
+            encode_uint_vector_u64(&vals, &mut buf).unwrap();
+            let (view, rest) = EncodedUintVector::<u64>::init(&buf).unwrap();
+            assert!(rest.is_empty());
+            assert_eq!(view.len(), vals.len());
+            assert_eq!(view.decode(), vals);
+            for (i, &v) in vals.iter().enumerate() {
+                assert_eq!(view.get(i), v);
+            }
+        }
+        // u32 with trailing data left over.
+        let vals: Vec<u32> = vec![7, 8, 9];
+        let mut buf = Vec::new();
+        encode_uint_vector_u32(&vals, &mut buf).unwrap();
+        buf.extend_from_slice(b"tail");
+        let (view, rest) = EncodedUintVector::<u32>::init(&buf).unwrap();
+        assert_eq!(view.decode(), vals);
+        assert_eq!(rest, b"tail");
+    }
+
+    #[test]
+    fn test_lazy_lower_bound() {
+        let vals: Vec<u64> = (0..100).map(|i| i * 10).collect();
+        let mut buf = Vec::new();
+        encode_uint_vector_u64(&vals, &mut buf).unwrap();
+        let (view, _) = EncodedUintVector::<u64>::init(&buf).unwrap();
+        for target in [0u64, 1, 10, 55, 990, 991, 100_000] {
+            assert_eq!(
+                view.lower_bound(target),
+                vals.partition_point(|&v| v < target),
+                "lower_bound({target})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_lazy_view_truncated_input_errors() {
+        let vals: Vec<u64> = vec![1, 2, 3];
+        let mut buf = Vec::new();
+        encode_uint_vector_u64(&vals, &mut buf).unwrap();
+        for cut in 0..buf.len() {
+            // Some prefixes are valid SHORTER vectors only if the header
+            // changes; with a fixed header, element truncation must error.
+            if cut > 0 {
+                let r = EncodedUintVector::<u64>::init(&buf[..cut]);
+                if cut < buf.len() {
+                    assert!(r.is_err(), "cut={cut} should fail");
+                }
+            }
+        }
+        // Oversized declared count must not allocate or panic.
+        let mut huge = Vec::new();
+        write_uvarint(&mut huge, !7).unwrap();
+        assert!(EncodedUintVector::<u64>::init(&huge).is_err());
+    }
 
     fn roundtrip_u64(input: &[u64], expected_bytes: usize) {
         let mut buf = Vec::new();

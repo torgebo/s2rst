@@ -93,7 +93,7 @@ impl PyRegionCoverer {
     fn cover(&self, region: &Bound<'_, PyAny>, interior: bool) -> PyResult<CellUnion> {
         macro_rules! try_cover {
             ($ty:ty) => {
-                if let Ok(r) = region.downcast::<$ty>() {
+                if let Ok(r) = region.cast::<$ty>() {
                     let r = r.borrow();
                     return Ok(if interior {
                         self.0.interior_covering(&r.0)

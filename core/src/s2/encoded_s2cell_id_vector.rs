@@ -28,6 +28,7 @@ use std::io::{self, Read, Write};
 
 use crate::s2::cell_id::CellId;
 use crate::s2::encoded_uint_vector;
+use crate::s2::encoded_uint_vector::EncodedUintVector;
 
 // ─── Encode ─────────────────────────────────────────────────────────────
 
@@ -167,11 +168,167 @@ fn decode_base_shift(r: &mut dyn Read) -> io::Result<(u64, u32)> {
     Ok((base, shift))
 }
 
+// ─── Lazy view ──────────────────────────────────────────────────────────
+
+/// A lazy view over an encoded `S2CellId` vector: O(1) random access and
+/// binary search directly on the encoded bytes.
+///
+/// Port of C++ `EncodedS2CellIdVector` (Phase 3). The eager
+/// [`decode_s2cell_id_vector`] remains for whole-vector materialization.
+#[derive(Clone, Copy, Debug)]
+pub struct EncodedS2CellIdVector<'a> {
+    deltas: EncodedUintVector<'a, u64>,
+    base: u64,
+    shift: u32,
+}
+
+impl<'a> EncodedS2CellIdVector<'a> {
+    /// Parses the header and bounds-checks the delta bytes. Returns the view
+    /// plus the remaining unconsumed bytes.
+    ///
+    /// # Errors
+    /// Returns `InvalidData`/`UnexpectedEof` on malformed or truncated input.
+    pub fn init(data: &'a [u8]) -> io::Result<(Self, &'a [u8])> {
+        let mut cursor = data;
+        let (base, shift) = decode_base_shift(&mut cursor)?;
+        let (deltas, rest) = EncodedUintVector::<u64>::init(cursor)?;
+        Ok((
+            EncodedS2CellIdVector {
+                deltas,
+                base,
+                shift,
+            },
+            rest,
+        ))
+    }
+
+    /// The number of cell ids.
+    pub fn len(&self) -> usize {
+        self.deltas.len()
+    }
+
+    /// True if the vector has no elements.
+    pub fn is_empty(&self) -> bool {
+        self.deltas.is_empty()
+    }
+
+    /// Decodes element `i` (O(1)).
+    ///
+    /// # Panics
+    /// Panics if `i >= len()`.
+    pub fn get(&self, i: usize) -> CellId {
+        CellId(
+            self.base
+                .wrapping_add(self.deltas.get(i).wrapping_shl(self.shift)),
+        )
+    }
+
+    /// The index of the first cell id `>= target`, or `len()` if none.
+    /// Requires the elements to be sorted (as all S2 uses are).
+    pub fn lower_bound(&self, target: CellId) -> usize {
+        let t = target.0;
+        if t <= self.base {
+            return 0;
+        }
+        let diff = t - self.base;
+        let mut delta = diff >> self.shift;
+        // Round up: any remainder means the target sits between
+        // representable values, so the first id >= target has delta + 1.
+        if self.shift > 0 && diff & ((1u64 << self.shift) - 1) != 0 {
+            delta += 1;
+        }
+        self.deltas.lower_bound(delta)
+    }
+
+    /// Materializes the whole vector.
+    pub fn decode(&self) -> Vec<CellId> {
+        (0..self.len()).map(|i| self.get(i)).collect()
+    }
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_lazy_view_matches_eager_decode() {
+        use crate::s2::testing;
+        let cases: Vec<Vec<CellId>> = vec![
+            vec![],
+            vec![CellId::from_face(0)],
+            CellId::from_face(2).children().to_vec(),
+            {
+                // Mixed levels, sorted.
+                let mut v: Vec<CellId> = (0..6).map(CellId::from_face).collect();
+                v.extend(CellId::from_face(3).children());
+                v.sort();
+                v
+            },
+            {
+                // Many leaf-ish cells (deterministic).
+                use rand::SeedableRng;
+                let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+                let mut v: Vec<CellId> = (0..500)
+                    .map(|_| testing::random_cell_id(&mut rng))
+                    .collect();
+                v.sort();
+                v
+            },
+        ];
+        for vals in cases {
+            let mut buf = Vec::new();
+            encode_s2cell_id_vector(&vals, &mut buf).unwrap();
+            let (view, rest) = EncodedS2CellIdVector::init(&buf).unwrap();
+            assert!(rest.is_empty());
+            assert_eq!(view.len(), vals.len());
+            assert_eq!(view.decode(), vals, "lazy decode mismatch");
+            for (i, &v) in vals.iter().enumerate() {
+                assert_eq!(view.get(i), v, "get({i})");
+            }
+        }
+    }
+
+    #[test]
+    fn test_lazy_lower_bound_matches_partition_point() {
+        use crate::s2::testing;
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(7);
+        let mut vals: Vec<CellId> = (0..300)
+            .map(|_| testing::random_cell_id(&mut rng))
+            .collect();
+        vals.sort();
+        vals.dedup();
+        let mut buf = Vec::new();
+        encode_s2cell_id_vector(&vals, &mut buf).unwrap();
+        let (view, _) = EncodedS2CellIdVector::init(&buf).unwrap();
+        // Probe with the values themselves, their neighbors, and extremes.
+        let mut probes: Vec<CellId> = vals.clone();
+        probes.extend(vals.iter().map(|c| CellId(c.0.wrapping_sub(1))));
+        probes.extend(vals.iter().map(|c| CellId(c.0.wrapping_add(1))));
+        probes.push(CellId(0));
+        probes.push(CellId(u64::MAX));
+        for t in probes {
+            assert_eq!(
+                view.lower_bound(t),
+                vals.partition_point(|&v| v < t),
+                "lower_bound({t:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_lazy_view_truncation_safety() {
+        let vals: Vec<CellId> = CellId::from_face(1).children().to_vec();
+        let mut buf = Vec::new();
+        encode_s2cell_id_vector(&vals, &mut buf).unwrap();
+        for cut in 0..buf.len() {
+            // Either a clean error or (for some prefixes) a SHORTER valid
+            // parse — never a panic. Just exercise it.
+            drop(EncodedS2CellIdVector::init(&buf[..cut]));
+        }
+    }
 
     /// Encodes `cell_ids`, verifies encoded size equals `expected_bytes`,
     /// then decodes and verifies the result matches the input.

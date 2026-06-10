@@ -16,38 +16,58 @@
 use crate::s1::ChordAngle;
 use crate::s2::CellId;
 use crate::s2::cell::Cell;
+use crate::s2::cell_iterator::CellIterator;
 use crate::s2::cell_range_iterator::CellRangeIterator;
 use crate::s2::cell_union::CellUnion;
-use crate::s2::shape_index::{CellRelation, ShapeIndex};
+use crate::s2::shape_index::{CellRelation, ShapeIndex, ShapeIndexIterator};
 
 /// Maximum number of cross-terms before we recurse.
 const MAX_CROSS_PRODUCT: usize = 25;
 const COVER_LIMIT: usize = MAX_CROSS_PRODUCT / 2;
 
-/// Performs an inner join on two [`ShapeIndex`] iterators.
+/// Performs an inner join on two cell iterators.
 ///
-/// Finds all pairs of cells (one from each index) that overlap or are within
+/// Finds all pairs of cells (one from each side) that overlap or are within
 /// a given tolerance distance. For each pair, calls a visitor closure.
+///
+/// Generic over any two [`CellIterator`]s (C++ `S2CellIteratorJoin<A, B>`):
+/// `ShapeIndex` against `ShapeIndex`, `CellUnion` against `ShapeIndex`, a
+/// point index against either, etc. The iterators must be `Clone` because
+/// the tolerant join makes multiple scanning passes (C++ copies its
+/// iterators the same way).
 #[derive(Debug)]
-pub struct S2CellIteratorJoin<'a> {
-    index_a: &'a ShapeIndex,
-    index_b: &'a ShapeIndex,
+pub struct S2CellIteratorJoin<A, B> {
+    iter_a: A,
+    iter_b: B,
     tolerance: ChordAngle,
     /// Reusable storage for matched cells.
     matched_cells: Vec<Cell>,
 }
 
-impl<'a> S2CellIteratorJoin<'a> {
-    /// Creates a new join with zero tolerance (exact overlap only).
+impl<'a> S2CellIteratorJoin<ShapeIndexIterator<'a>, ShapeIndexIterator<'a>> {
+    /// Creates a new join of two shape indexes with zero tolerance (exact
+    /// overlap only).
     pub fn new(a: &'a ShapeIndex, b: &'a ShapeIndex) -> Self {
         Self::with_tolerance(a, b, ChordAngle::ZERO)
     }
 
-    /// Creates a new join with the given tolerance distance.
+    /// Creates a new join of two shape indexes with the given tolerance.
     pub fn with_tolerance(a: &'a ShapeIndex, b: &'a ShapeIndex, tolerance: ChordAngle) -> Self {
+        Self::from_iterators_with_tolerance(a.iter(), b.iter(), tolerance)
+    }
+}
+
+impl<A: CellIterator + Clone, B: CellIterator + Clone> S2CellIteratorJoin<A, B> {
+    /// Creates a join over two arbitrary cell iterators, zero tolerance.
+    pub fn from_iterators(a: A, b: B) -> Self {
+        Self::from_iterators_with_tolerance(a, b, ChordAngle::ZERO)
+    }
+
+    /// Creates a join over two arbitrary cell iterators with a tolerance.
+    pub fn from_iterators_with_tolerance(a: A, b: B, tolerance: ChordAngle) -> Self {
         S2CellIteratorJoin {
-            index_a: a,
-            index_b: b,
+            iter_a: a,
+            iter_b: b,
             tolerance,
             matched_cells: Vec::new(),
         }
@@ -62,7 +82,7 @@ impl<'a> S2CellIteratorJoin<'a> {
     /// Returns `false` if the visitor ever returned `false`, `true` otherwise.
     pub fn join<F>(&mut self, mut visitor: F) -> bool
     where
-        F: FnMut(&CellRangeIterator<'a>, &CellRangeIterator<'a>) -> bool,
+        F: FnMut(&CellRangeIterator<A>, &CellRangeIterator<B>) -> bool,
     {
         if self.tolerance == ChordAngle::ZERO {
             self.exact_join(&mut visitor)
@@ -74,10 +94,10 @@ impl<'a> S2CellIteratorJoin<'a> {
     /// Performs an exact inner join (zero tolerance).
     fn exact_join<F>(&mut self, visitor: &mut F) -> bool
     where
-        F: FnMut(&CellRangeIterator<'a>, &CellRangeIterator<'a>) -> bool,
+        F: FnMut(&CellRangeIterator<A>, &CellRangeIterator<B>) -> bool,
     {
-        let mut iter_a = CellRangeIterator::new(self.index_a);
-        let mut iter_b = CellRangeIterator::new(self.index_b);
+        let mut iter_a = CellRangeIterator::wrap(self.iter_a.clone());
+        let mut iter_b = CellRangeIterator::wrap(self.iter_b.clone());
 
         while !iter_a.done() && !iter_b.done() {
             let order = iter_a.relation(&iter_b);
@@ -120,16 +140,16 @@ impl<'a> S2CellIteratorJoin<'a> {
     /// Performs a tolerant join (non-zero tolerance).
     fn tolerant_join<F>(&mut self, visitor: &mut F) -> bool
     where
-        F: FnMut(&CellRangeIterator<'a>, &CellRangeIterator<'a>) -> bool,
+        F: FnMut(&CellRangeIterator<A>, &CellRangeIterator<B>) -> bool,
     {
-        let covering_a = Self::compute_covering(self.index_a);
-        let covering_b = Self::compute_covering(self.index_b);
+        let covering_a = Self::compute_covering(&self.iter_a);
+        let covering_b = Self::compute_covering(&self.iter_b);
         self.process_nearby(&covering_a, &covering_b, visitor)
     }
 
-    /// Computes a coarse covering of the index's cell range.
-    fn compute_covering(index: &ShapeIndex) -> Vec<Cell> {
-        let mut iter = CellRangeIterator::new(index);
+    /// Computes a coarse covering of one side's cell range.
+    fn compute_covering<I: CellIterator + Clone>(proto: &I) -> Vec<Cell> {
+        let mut iter = CellRangeIterator::wrap(proto.clone());
         if iter.done() {
             return vec![];
         }
@@ -147,7 +167,7 @@ impl<'a> S2CellIteratorJoin<'a> {
     /// Filters cell pairs within tolerance and processes them.
     fn process_nearby<F>(&mut self, cells_a: &[Cell], cells_b: &[Cell], visitor: &mut F) -> bool
     where
-        F: FnMut(&CellRangeIterator<'a>, &CellRangeIterator<'a>) -> bool,
+        F: FnMut(&CellRangeIterator<A>, &CellRangeIterator<B>) -> bool,
     {
         let mut nearby_cells = Vec::new();
         for cell_a in cells_a {
@@ -171,9 +191,9 @@ impl<'a> S2CellIteratorJoin<'a> {
     /// Otherwise subdivides and recurses.
     fn process_cell_pairs<F>(&mut self, cell_a: &Cell, cells_b: &[Cell], visitor: &mut F) -> bool
     where
-        F: FnMut(&CellRangeIterator<'a>, &CellRangeIterator<'a>) -> bool,
+        F: FnMut(&CellRangeIterator<A>, &CellRangeIterator<B>) -> bool,
     {
-        let mut iter_a = CellRangeIterator::new(self.index_a);
+        let mut iter_a = CellRangeIterator::wrap(self.iter_a.clone());
         let num_covered_a = Self::estimate_covered_cells(&mut iter_a, cell_a.id());
 
         if num_covered_a == 0 {
@@ -190,7 +210,7 @@ impl<'a> S2CellIteratorJoin<'a> {
         };
 
         // Scan cells_b: prune empty cells and subdivide large ones.
-        let mut iter_b = CellRangeIterator::new(self.index_b);
+        let mut iter_b = CellRangeIterator::wrap(self.iter_b.clone());
         let mut subdivided = false;
         let mut subdivided_b: Vec<Cell> = Vec::new();
         for cell_b in cells_b {
@@ -219,7 +239,7 @@ impl<'a> S2CellIteratorJoin<'a> {
 
         // Pre-compute the B cells to avoid replicating work in the inner loop.
         self.matched_cells.clear();
-        let mut scan_iter_b = CellRangeIterator::new(self.index_b);
+        let mut scan_iter_b = CellRangeIterator::wrap(self.iter_b.clone());
         for cell_b in cells_b {
             Self::scan_cell_range(&mut scan_iter_b, cell_b.id(), |iter| {
                 self.matched_cells.push(Cell::from(iter.id()));
@@ -227,7 +247,7 @@ impl<'a> S2CellIteratorJoin<'a> {
             });
         }
 
-        let mut scan_iter_a = CellRangeIterator::new(self.index_a);
+        let mut scan_iter_a = CellRangeIterator::wrap(self.iter_a.clone());
         let tolerance = self.tolerance;
         let matched_cells = &self.matched_cells;
 
@@ -245,7 +265,7 @@ impl<'a> S2CellIteratorJoin<'a> {
                 if !success {
                     break;
                 }
-                let mut visit_iter_b = CellRangeIterator::new(self.index_b);
+                let mut visit_iter_b = CellRangeIterator::wrap(self.iter_b.clone());
                 Self::scan_cell_range(&mut visit_iter_b, cell_b.id(), |iter_b_inner| {
                     if idx < matched_cells.len()
                         && sub_cell_a.distance_to_cell(matched_cells[idx]) <= tolerance
@@ -263,9 +283,13 @@ impl<'a> S2CellIteratorJoin<'a> {
     }
 
     /// Positions iterator and visits every position that intersects a given `CellId`.
-    fn scan_cell_range<F>(iter: &mut CellRangeIterator<'a>, id: CellId, mut visitor: F) -> bool
+    fn scan_cell_range<I: CellIterator, F>(
+        iter: &mut CellRangeIterator<I>,
+        id: CellId,
+        mut visitor: F,
+    ) -> bool
     where
-        F: FnMut(&CellRangeIterator<'a>) -> bool,
+        F: FnMut(&CellRangeIterator<I>) -> bool,
     {
         iter.locate_cell_id(id);
         while !iter.done() && iter.id().intersects(id) {
@@ -278,7 +302,10 @@ impl<'a> S2CellIteratorJoin<'a> {
     }
 
     /// Estimates how many index cells are covered by the given cell.
-    fn estimate_covered_cells(iter: &mut CellRangeIterator<'_>, cell: CellId) -> usize {
+    fn estimate_covered_cells<I: CellIterator>(
+        iter: &mut CellRangeIterator<I>,
+        cell: CellId,
+    ) -> usize {
         match iter.locate_cell_id(cell) {
             CellRelation::Disjoint => 0,
             CellRelation::Indexed => 1,
@@ -302,6 +329,89 @@ impl<'a> S2CellIteratorJoin<'a> {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    /// Phase 2 keystone test: join heterogeneous containers — a plain
+    /// `CellUnion` against a `ShapeIndex` — through the generic join.
+    #[test]
+    fn test_heterogeneous_join_cell_union_vs_shape_index() {
+        use crate::s2::lax_loop::LaxLoop;
+        use crate::s2::text_format::parse_points;
+
+        let mut index = ShapeIndex::new();
+        index.add(Box::new(LaxLoop::new(parse_points(
+            "0:0, 0:10, 10:10, 10:0",
+        ))));
+        index.build();
+        let index_cells = collect_cells(&index);
+        assert!(!index_cells.is_empty());
+
+        // A union of the level-4 ancestors of some index cells plus a far
+        // away cell that must not match.
+        let mut ids: Vec<CellId> = index_cells
+            .iter()
+            .take(3)
+            .map(|id| id.parent_at_level(id.level().min(crate::s2::coords::Level::new(4))))
+            .collect();
+        ids.push(CellId::from_face(5)); // far away (no geometry there)
+        let union = CellUnion::from_cell_ids(ids);
+
+        let mut pairs = Vec::new();
+        let mut join = S2CellIteratorJoin::from_iterators(union.cell_iterator(), index.iter());
+        assert!(join.join(|a, b| {
+            pairs.push((a.id(), b.id()));
+            true
+        }));
+
+        // Brute force: every (union cell, index cell) pair whose leaf
+        // ranges overlap must be reported, and nothing else.
+        let mut expected = Vec::new();
+        for &u in union.cell_ids() {
+            for &i in &index_cells {
+                if u.range_min() <= i.range_max() && i.range_min() <= u.range_max() {
+                    expected.push((u, i));
+                }
+            }
+        }
+        assert!(!expected.is_empty(), "test must exercise real overlaps");
+        assert_eq!(pairs, expected);
+        // The far-away face-5 cell produced no pairs.
+        assert!(
+            pairs
+                .iter()
+                .all(|&(u, _)| u.face() != crate::s2::coords::Face::from_u8(5))
+        );
+    }
+
+    /// A point index joined against a cell union via the same generic join.
+    #[test]
+    fn test_heterogeneous_join_point_index_vs_cell_union() {
+        use crate::s2::point_index::S2PointIndex;
+        use crate::s2::text_format::parse_point;
+
+        let mut pindex = S2PointIndex::new();
+        pindex.add(parse_point("1:1"), 1);
+        pindex.add(parse_point("2:2"), 2);
+        pindex.add(parse_point("60:60"), 3);
+
+        // A union covering only the 0..10 degree region.
+        let covering = CellUnion::from_cell_ids(vec![
+            CellId::from_point(&parse_point("1:1")).parent_at_level(4),
+            CellId::from_point(&parse_point("2:2")).parent_at_level(4),
+        ]);
+
+        let mut matched = Vec::new();
+        let mut join =
+            S2CellIteratorJoin::from_iterators(pindex.cell_iterator(), covering.cell_iterator());
+        assert!(join.join(|a, _b| {
+            matched.push(a.id());
+            true
+        }));
+
+        // The two nearby points match; the 60:60 point does not.
+        assert_eq!(matched.len(), 2);
+        let far = CellId::from_point(&parse_point("60:60"));
+        assert!(matched.iter().all(|&id| id != far));
+    }
 
     /// Collect all cell IDs from a `ShapeIndex`.
     fn collect_cells(index: &ShapeIndex) -> Vec<CellId> {

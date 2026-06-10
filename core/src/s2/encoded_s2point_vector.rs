@@ -32,9 +32,9 @@ use std::io::{self, Read, Write};
 use crate::r3::Vector;
 use crate::s2::Point;
 use crate::s2::coords::{self, Face, MAX_CELL_LEVEL};
-use crate::s2::encoded_string_vector::{self, StringVectorBuilder};
+use crate::s2::encoded_string_vector::{self, EncodedStringVector, StringVectorBuilder};
 use crate::s2::encoded_uint_vector;
-use crate::s2::encoding::write_uvarint;
+use crate::s2::encoding::{read_uvarint, write_uvarint};
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -739,9 +739,333 @@ fn get_block_code(values: &[u64], base: u64, have_exceptions: bool) -> BlockCode
 
 // ─── Tests ──────────────────────────────────────────────────────────────
 
+// ─── Lazy view ──────────────────────────────────────────────────────────
+
+/// A lazy view over an encoded `S2Point` vector: per-point access directly
+/// on the encoded bytes.
+///
+/// Port of C++ `EncodedS2PointVector` (Phase 3). UNCOMPRESSED points are
+/// read in place (O(1)); `CELL_IDS` points decode one 16-value block header
+/// per access via the lazy [`EncodedStringVector`] of blocks. The eager
+/// [`decode_s2point_vector`] remains for whole-vector materialization; the
+/// two share the same per-block layout (see `decode_cell_ids_raw`).
+#[derive(Clone, Copy, Debug)]
+pub struct EncodedS2PointVector<'a> {
+    repr: Repr<'a>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Repr<'a> {
+    Uncompressed {
+        /// Exactly `count * 24` bytes of raw little-endian points.
+        data: &'a [u8],
+        count: usize,
+    },
+    CellIds {
+        blocks: EncodedStringVector<'a>,
+        base: u64,
+        level: i32,
+        have_exceptions: bool,
+        last_block_count: usize,
+    },
+}
+
+impl<'a> EncodedS2PointVector<'a> {
+    /// Parses the header and bounds-checks the fixed-size parts. Returns the
+    /// view plus the remaining unconsumed bytes.
+    ///
+    /// # Errors
+    /// Returns `InvalidData`/`UnexpectedEof` on malformed or truncated input.
+    /// `CELL_IDS` block payloads are validated lazily, on access.
+    pub fn init(data: &'a [u8]) -> io::Result<(Self, &'a [u8])> {
+        let mut cursor = data;
+        let format = *cursor
+            .first()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "empty point vector"))?
+            & ((1 << ENCODING_FORMAT_BITS) - 1);
+        match format {
+            0 => {
+                let size_format = read_uvarint(&mut cursor)?;
+                let count = (size_format >> ENCODING_FORMAT_BITS) as usize;
+                if count > MAX_DECODE_POINTS {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "too many points",
+                    ));
+                }
+                let bytes = count
+                    .checked_mul(24)
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "size overflow"))?;
+                if bytes > cursor.len() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "point vector truncated",
+                    ));
+                }
+                let (points, rest) = cursor.split_at(bytes);
+                Ok((
+                    EncodedS2PointVector {
+                        repr: Repr::Uncompressed {
+                            data: points,
+                            count,
+                        },
+                    },
+                    rest,
+                ))
+            }
+            1 => {
+                if cursor.len() < 2 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "point vector header truncated",
+                    ));
+                }
+                let (byte0, byte1) = (cursor[0], cursor[1]);
+                cursor = &cursor[2..];
+                let have_exceptions = (byte0 & 8) != 0;
+                let last_block_count = ((byte0 >> 4) + 1) as usize;
+                let base_bytes = (byte1 & 7) as usize;
+                let level = i32::from(byte1 >> 3);
+                if level > i32::from(MAX_CELL_LEVEL) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("invalid level {level}"),
+                    ));
+                }
+                if base_bytes > cursor.len() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "point vector base truncated",
+                    ));
+                }
+                let raw_base =
+                    encoded_uint_vector::get_uint_with_length(&cursor[..base_bytes], base_bytes);
+                cursor = &cursor[base_bytes..];
+                let base = raw_base << base_shift(level, (base_bytes * 8) as i32);
+                let (blocks, rest) = EncodedStringVector::init(cursor)?;
+                Ok((
+                    EncodedS2PointVector {
+                        repr: Repr::CellIds {
+                            blocks,
+                            base,
+                            level,
+                            have_exceptions,
+                            last_block_count,
+                        },
+                    },
+                    rest,
+                ))
+            }
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("unknown S2PointVector format {format}"),
+            )),
+        }
+    }
+
+    /// The number of points.
+    pub fn len(&self) -> usize {
+        match &self.repr {
+            Repr::Uncompressed { count, .. } => *count,
+            Repr::CellIds {
+                blocks,
+                last_block_count,
+                ..
+            } => {
+                if blocks.is_empty() {
+                    0
+                } else {
+                    BLOCK_SIZE * (blocks.len() - 1) + last_block_count
+                }
+            }
+        }
+    }
+
+    /// True if the vector has no points.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Decodes point `i`.
+    ///
+    /// # Errors
+    /// Returns `InvalidData` if the (lazily validated) block payload is
+    /// malformed.
+    ///
+    /// # Panics
+    /// Panics if `i >= len()`.
+    pub fn get(&self, i: usize) -> io::Result<Point> {
+        assert!(
+            i < self.len(),
+            "index {i} out of bounds (len {})",
+            self.len()
+        );
+        match &self.repr {
+            Repr::Uncompressed { data, .. } => Ok(read_point_from_bytes(data, i * 24)),
+            Repr::CellIds {
+                blocks,
+                base,
+                level,
+                have_exceptions,
+                last_block_count,
+            } => {
+                let bi = i >> BLOCK_SHIFT;
+                let j = i & (BLOCK_SIZE - 1);
+                let block_size = if bi == blocks.len() - 1 {
+                    *last_block_count
+                } else {
+                    BLOCK_SIZE
+                };
+                let block = blocks.get(bi)?;
+                decode_block_point(block, j, block_size, *base, *level, *have_exceptions)
+            }
+        }
+    }
+
+    /// Materializes the whole vector.
+    ///
+    /// # Errors
+    /// Returns `InvalidData` on malformed block payloads.
+    pub fn decode(&self) -> io::Result<Vec<Point>> {
+        (0..self.len()).map(|i| self.get(i)).collect()
+    }
+}
+
+/// Decodes the `j`-th point of one `CELL_IDS` block. Mirrors the inner loop of
+/// `decode_cell_ids_raw` (kept in sync — both are pinned by the same tests).
+fn decode_block_point(
+    block: &[u8],
+    j: usize,
+    block_size: usize,
+    base: u64,
+    level: i32,
+    have_exceptions: bool,
+) -> io::Result<Point> {
+    let bad = |msg: &str| io::Error::new(io::ErrorKind::InvalidData, msg.to_string());
+    if block.is_empty() {
+        return Err(bad("empty block"));
+    }
+    let header = block[0];
+    let overlap_nibbles = ((header >> 3) & 1) as usize;
+    let offset_bytes = ((header & 7) as usize) + overlap_nibbles;
+    let delta_nibbles = ((header >> 4) + 1) as usize;
+
+    let mut ptr = 1usize;
+    let offset = if offset_bytes > 0 {
+        let offset_shift = (delta_nibbles - overlap_nibbles) * 4;
+        if offset_shift >= 64 {
+            return Err(bad("offset shift too large"));
+        }
+        if ptr + offset_bytes > block.len() {
+            return Err(bad("offset out of bounds"));
+        }
+        let raw = encoded_uint_vector::get_uint_with_length(
+            &block[ptr..ptr + offset_bytes],
+            offset_bytes,
+        );
+        ptr += offset_bytes;
+        raw << offset_shift
+    } else {
+        0u64
+    };
+
+    let delta_bytes = delta_nibbles.div_ceil(2);
+    let delta_nibble_offset = j * delta_nibbles;
+    let delta_ptr = ptr + delta_nibble_offset / 2;
+    if delta_ptr + delta_bytes > block.len() {
+        return Err(bad("delta out of bounds"));
+    }
+    let raw = encoded_uint_vector::get_uint_with_length(
+        &block[delta_ptr..delta_ptr + delta_bytes],
+        delta_bytes,
+    );
+    let mut delta = raw >> ((delta_nibble_offset & 1) * 4);
+    delta &= bit_mask(delta_nibbles * 4);
+
+    if have_exceptions && delta < BLOCK_SIZE as u64 {
+        let exceptions_start = ptr + (block_size * delta_nibbles).div_ceil(2);
+        let exc_offset = exceptions_start + (delta as usize) * 24;
+        if exc_offset + 24 > block.len() {
+            return Err(bad("exception out of bounds"));
+        }
+        return Ok(read_point_from_bytes(block, exc_offset));
+    }
+    if have_exceptions {
+        delta -= BLOCK_SIZE as u64;
+    }
+    // Wrapping on purpose: see decode_cell_ids_raw.
+    let value = base.wrapping_add(offset).wrapping_add(delta);
+    Ok(value_to_point(value, level))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn probe_points() -> Vec<Vec<Point>> {
+        use crate::s2::cell_id::CellId;
+        use crate::s2::testing;
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(99);
+        // Cell centers at a uniform level (pure CELL_IDS encoding).
+        let centers: Vec<Point> = (0..40)
+            .map(|_| {
+                testing::random_cell_id(&mut rng)
+                    .parent_at_level(12u8)
+                    .to_point()
+            })
+            .collect();
+        // Mixed: cell centers plus arbitrary points (forces exceptions).
+        let mut mixed = centers.clone();
+        for _ in 0..7 {
+            mixed.push(testing::random_point(&mut rng));
+        }
+        // Arbitrary points only.
+        let random: Vec<Point> = (0..20).map(|_| testing::random_point(&mut rng)).collect();
+        let single = vec![CellId::from_face(3).to_point()];
+        vec![vec![], single, centers, mixed, random]
+    }
+
+    #[test]
+    fn test_lazy_view_matches_eager_both_formats() {
+        for points in probe_points() {
+            for hint in [CodingHint::Fast, CodingHint::Compact] {
+                let mut buf = Vec::new();
+                encode_s2point_vector(&points, hint, &mut buf).unwrap();
+                let eager = decode_s2point_vector(&mut io::Cursor::new(&buf)).unwrap();
+                assert_eq!(eager.len(), points.len());
+
+                buf.extend_from_slice(b"##");
+                let (view, rest) = EncodedS2PointVector::init(&buf).unwrap();
+                assert_eq!(rest, b"##", "hint {hint:?}");
+                assert_eq!(view.len(), points.len(), "hint {hint:?}");
+                assert_eq!(view.decode().unwrap(), eager, "hint {hint:?}");
+                for (i, p) in eager.iter().enumerate() {
+                    assert_eq!(view.get(i).unwrap(), *p, "hint {hint:?} get({i})");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_lazy_view_truncation_never_panics() {
+        for points in probe_points() {
+            for hint in [CodingHint::Fast, CodingHint::Compact] {
+                let mut buf = Vec::new();
+                encode_s2point_vector(&points, hint, &mut buf).unwrap();
+                for cut in 0..buf.len() {
+                    if let Ok((view, _)) = EncodedS2PointVector::init(&buf[..cut]) {
+                        // Structure parsed; per-point access may error but
+                        // must not panic.
+                        for i in 0..view.len() {
+                            drop(view.get(i));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     use crate::s2::CellId;
 
     fn roundtrip(points: &[Point], hint: CodingHint, expected_bytes: Option<usize>) -> usize {

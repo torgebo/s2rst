@@ -28,12 +28,12 @@ pub struct PyEdgeTessellator(Tess);
 impl PyEdgeTessellator {
     #[new]
     fn new(projection: &Bound<'_, PyAny>, tolerance: &PyAngle) -> PyResult<Self> {
-        if let Ok(p) = projection.downcast::<PyPlateCarreeProjection>() {
+        if let Ok(p) = projection.cast::<PyPlateCarreeProjection>() {
             Ok(Self(Tess::PlateCarree(EdgeTessellator::new(
                 p.borrow().0,
                 tolerance.0,
             ))))
-        } else if let Ok(p) = projection.downcast::<PyMercatorProjection>() {
+        } else if let Ok(p) = projection.cast::<PyMercatorProjection>() {
             Ok(Self(Tess::Mercator(EdgeTessellator::new(
                 p.borrow().0,
                 tolerance.0,

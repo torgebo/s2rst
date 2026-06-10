@@ -91,13 +91,13 @@ impl PyEdgeQueryResult {
 macro_rules! dispatch_target {
     ($module:ident, $obj:expr, $build:expr) => {{
         let obj: &Bound<'_, PyAny> = $obj;
-        if let Ok(p) = obj.downcast::<PyS2Point>() {
+        if let Ok(p) = obj.cast::<PyS2Point>() {
             Ok($build(&$module::PointTarget::new(p.borrow().0)))
         } else if let Ok((a, b)) = obj.extract::<(PyS2Point, PyS2Point)>() {
             Ok($build(&$module::EdgeTarget::new(a.0, b.0)))
-        } else if let Ok(c) = obj.downcast::<PyCell>() {
+        } else if let Ok(c) = obj.cast::<PyCell>() {
             Ok($build(&$module::CellTarget::new(c.borrow().0)))
-        } else if let Ok(ix) = obj.downcast::<PyShapeIndex>() {
+        } else if let Ok(ix) = obj.cast::<PyShapeIndex>() {
             let ix_ref = ix.borrow();
             Ok($build(&$module::ShapeIndexTarget::new(&ix_ref.0)))
         } else {
