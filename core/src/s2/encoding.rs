@@ -200,11 +200,20 @@ impl S2Decode for Cap {
         let y = read_f64(r)?;
         let z = read_f64(r)?;
         let radius = read_f64(r)?;
-        let center = Point(crate::r3::Vector { x, y, z });
-        Ok(Cap::from_center_chord_angle(
-            center,
+        let cap = Cap::from_center_chord_angle(
+            Point(crate::r3::Vector { x, y, z }),
             ChordAngle::from_length2(radius),
-        ))
+        );
+        // The center xyz and radius are raw `f64` from untrusted bytes; a
+        // non-unit (or NaN) center or an out-of-range radius length² violates
+        // the `Cap` invariants and would produce garbage (or trip a
+        // debug_assert) in later ops such as containment/covering. Reject here,
+        // matching `CellId`/`Rect` decode. Empty (radius < 0) and full
+        // (length² == 4) caps keep their unit center and stay valid.
+        if !cap.is_valid() {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid cap"));
+        }
+        Ok(cap)
     }
 }
 

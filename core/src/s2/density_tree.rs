@@ -29,7 +29,7 @@
     clippy::cast_possible_wrap,
     reason = "u64/u32 -> i64/i32 for tree weight arithmetic — bounded by tree structure"
 )]
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::ControlFlow;
 
@@ -141,7 +141,7 @@ impl DensityCell {
                             format!("Failed to decode child offset at {pos}"),
                         )
                     })?;
-                    cum += v as i64;
+                    cum = add_i64(cum, v as i64)?;
                     offset = next;
                 }
             }
@@ -149,7 +149,14 @@ impl DensityCell {
         let header_end = offset;
         for o in &mut offsets {
             if *o >= 0 {
-                *o += header_end as i64;
+                let abs = add_i64(*o, header_end as i64)?;
+                if abs as usize >= data.len() {
+                    return Err(S2Error::new(
+                        S2ErrorCode::InvalidArgument,
+                        format!("child offset out of range at cell {pos}"),
+                    ));
+                }
+                *o = abs;
             }
         }
         Ok(Self { weight, offsets })
@@ -163,6 +170,13 @@ impl DensityCell {
 pub struct DecodedPath<'a> {
     tree: &'a S2DensityTree,
     stack: Vec<DensityCell>,
+    /// Byte offset each `stack[level]` was decoded from, or `-1` when that level
+    /// is empty. Mirrors `stack` and lets `load_cell` reject an offset that
+    /// already appears higher on the current root-to-cell path — the same
+    /// aliased/cyclic-encoding guard `visit_recursive` applies (see Finding C in
+    /// `fuzz_decode_density_tree.md`). A valid tree encodes each cell once at a
+    /// unique offset, so a repeat on a single descending path is always corrupt.
+    offsets: Vec<i64>,
     last: CellId,
 }
 
@@ -174,6 +188,7 @@ impl<'a> DecodedPath<'a> {
             stack: (0..=MAX_CELL_LEVEL)
                 .map(|_| DensityCell::default())
                 .collect(),
+            offsets: (0..=MAX_CELL_LEVEL).map(|_| -1i64).collect(),
             last: CellId::sentinel(),
         }
     }
@@ -202,12 +217,17 @@ impl<'a> DecodedPath<'a> {
         let offset = self.tree.decoded_faces[face as usize];
         if offset < 0 {
             self.stack[0].clear();
+            self.offsets[0] = -1;
         } else {
             match DensityCell::decode(&self.tree.encoded, offset as usize) {
-                Ok(c) => self.stack[0] = c,
+                Ok(c) => {
+                    self.stack[0] = c;
+                    self.offsets[0] = offset;
+                }
                 Err(e) => {
                     *error = e;
                     self.stack[0].clear();
+                    self.offsets[0] = -1;
                 }
             }
         }
@@ -228,17 +248,35 @@ impl<'a> DecodedPath<'a> {
             if offset < 0 {
                 if self.stack[level - 1].has_children() {
                     self.stack[level].clear();
+                    self.offsets[level] = -1;
                     result_level = level;
                 } else {
                     result_level = level - 1;
                 }
                 break;
             }
+            // Reject an offset already seen higher on this path: a valid tree
+            // references each cell once, so a repeat means an aliased/cyclic
+            // encoding. Treated as a decode error (same as `visit_recursive`).
+            if self.offsets[..level].contains(&offset) {
+                *error = S2Error::new(
+                    S2ErrorCode::InvalidArgument,
+                    "S2DensityTree cell offset visited twice (aliased/cyclic encoding)",
+                );
+                self.stack[level].clear();
+                self.offsets[level] = -1;
+                self.last = cell_id.parent_at_level(level as u8 - 1);
+                return &self.stack[level];
+            }
             match DensityCell::decode(&self.tree.encoded, offset as usize) {
-                Ok(c) => self.stack[level] = c,
+                Ok(c) => {
+                    self.stack[level] = c;
+                    self.offsets[level] = offset;
+                }
                 Err(e) => {
                     *error = e;
                     self.stack[level].clear();
+                    self.offsets[level] = -1;
                     self.last = cell_id.parent_at_level(level as u8 - 1);
                     return &self.stack[level];
                 }
@@ -834,12 +872,19 @@ impl S2DensityTree {
         error: &mut S2Error,
     ) -> bool {
         *error = S2Error::ok();
+        let mut visited = HashSet::new();
         for face in 0..NUM_FACES {
             let off = self.decoded_faces[face];
             if off < 0 {
                 continue;
             }
-            if !self.visit_recursive(&mut visitor, CellId::from_face(face as u8), off, error) {
+            if !self.visit_recursive(
+                &mut visitor,
+                CellId::from_face(face as u8),
+                off,
+                &mut visited,
+                error,
+            ) {
                 return false;
             }
         }
@@ -851,8 +896,20 @@ impl S2DensityTree {
         visitor: &mut F,
         cell_id: CellId,
         pos: i64,
+        visited: &mut HashSet<usize>,
         error: &mut S2Error,
     ) -> bool {
+        // A valid density tree is a TREE: each cell is encoded once and
+        // referenced once. Reaching a byte offset twice means the input is
+        // corrupt or crafted to force 2^level re-decodes; reject it. Bounds
+        // total traversal work and the decoded map to O(encoded.len()).
+        if !visited.insert(pos as usize) {
+            *error = S2Error::new(
+                S2ErrorCode::InvalidArgument,
+                "S2DensityTree cell offset visited twice (aliased/cyclic encoding)",
+            );
+            return false;
+        }
         let cell = match DensityCell::decode(&self.encoded, pos as usize) {
             Ok(c) => c,
             Err(e) => {
@@ -868,7 +925,7 @@ impl S2DensityTree {
                     let children = cell_id.children();
                     for (i, &child) in children.iter().enumerate() {
                         let off = cell.child_offset(i);
-                        if off >= 0 && !self.visit_recursive(visitor, child, off, error) {
+                        if off >= 0 && !self.visit_recursive(visitor, child, off, visited, error) {
                             return false;
                         }
                     }
@@ -1278,6 +1335,19 @@ fn decode_varint_at(data: &[u8], mut pos: usize) -> Option<(u64, usize)> {
     }
 }
 
+/// Adds two `i64` offsets from untrusted decoded tree data, returning `Err` on
+/// overflow instead of panicking (mirrors `add_i32` in `point_compression.rs`).
+/// Offsets and their deltas come straight off the wire, so all arithmetic on
+/// them must be overflow-safe.
+fn add_i64(a: i64, b: i64) -> Result<i64, S2Error> {
+    a.checked_add(b).ok_or_else(|| {
+        S2Error::new(
+            S2ErrorCode::InvalidArgument,
+            "integer overflow in S2DensityTree decode",
+        )
+    })
+}
+
 fn decode_header(data: &[u8], error: &mut S2Error) -> [i64; NUM_FACES] {
     let mut faces = [-1i64; NUM_FACES];
     if data.len() < VERSION.len() {
@@ -1314,13 +1384,34 @@ fn decode_header(data: &[u8], error: &mut S2Error) -> [i64; NUM_FACES] {
                     *error = S2Error::new(S2ErrorCode::Internal, "Failed to decode face length");
                     return faces;
                 };
-                cum += v as i64;
+                let Some(next_cum) = cum.checked_add(v as i64) else {
+                    *error = S2Error::new(
+                        S2ErrorCode::InvalidArgument,
+                        "integer overflow in S2DensityTree face length",
+                    );
+                    return faces;
+                };
+                cum = next_cum;
                 pos = next_pos;
             }
         }
     }
     for &(face, off) in &coded[..coded_len] {
-        faces[face] = pos as i64 + off;
+        let Some(abs) = (pos as i64).checked_add(off) else {
+            *error = S2Error::new(
+                S2ErrorCode::InvalidArgument,
+                "integer overflow in S2DensityTree face offset",
+            );
+            return faces;
+        };
+        if abs < 0 || abs as usize >= data.len() {
+            *error = S2Error::new(
+                S2ErrorCode::InvalidArgument,
+                "S2DensityTree face offset out of range",
+            );
+            return faces;
+        }
+        faces[face] = abs;
     }
     faces
 }
