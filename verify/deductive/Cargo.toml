@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
+#
+# The deductive track of spec 003 (specs/003-formal-verify-decoders/, research R11, R12):
+# restated copies of the library's variable-length codecs, proved with Verus for every
+# length, and the tests that link them to the library (tested agreement, drift guard).
+# Verus verifies the crate with its own pinned compiler (`run-verus.sh`); `cargo test` builds
+# the same source with the stable toolchain, where `verus!` erases the ghost code.
+#
+# Standalone and unpublished, like `fuzz/` and `verify/`: no published crate depends on it,
+# so the Verus crates never reach the library's dependency set (spec FR-012).
+[package]
+name = "s2rst-deductive"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[dependencies]
+# Pinned to the crates.io versions that match Verus 0.2026.09.20.aef82ed (research R0, R11).
+vstd = "=0.0.0-2026-09-20-0158"
+verus_builtin = "=0.0.0-2026-09-16-0054"
+verus_builtin_macros = "=0.0.0-2026-09-20-0158"
+
+[dev-dependencies]
+s2rst = { path = "../../core" }
+quickcheck = "1.0.3"
+syn = { version = "2", features = ["full", "visit", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+# `verus!` expands to code gated on Verus's own cfgs, and `verify/` builds this crate under
+# Kani for the bounded agreement harnesses.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(verus_keep_ghost)', 'cfg(verus_keep_ghost_body)', 'cfg(verus_verify_core)', 'cfg(kani)'] }
+
+# Keep this crate out of the parent workspace.
+[workspace]

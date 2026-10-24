@@ -1,0 +1,18 @@
+Mutant: M-058
+Targets: P-ENC-09, P-ENC-10
+Expect-Fail: enc::p_enc_09__b2, enc::p_enc_10__b2
+Defect: from_debug_string() no longer checks the '/' after the face digit, so "0x" parses as face 0
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..bfc32a9 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -929,7 +929,7 @@ impl CellId {
+         }
+         let bytes = s.as_bytes();
+         let face = bytes[0].wrapping_sub(b'0');
+-        if face > 5 || bytes[1] != b'/' {
++        if face > 5 {
+             return None;
+         }
+         let mut id = CellId::from_face(face);

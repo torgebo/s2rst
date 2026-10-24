@@ -1,0 +1,19 @@
+Mutant: M-106
+Targets: P-UNORM-01
+Expect-Fail: cu_norm::p_unorm_01__n2
+Tier: slow
+Defect: normalize() no longer discards earlier cells that the new cell contains
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..32b10e3 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -179,7 +179,7 @@ impl CellUnion {
+             // Discard any previous cells that are contained by this cell.
+             while let Some(&last) = output.last() {
+                 if ci.contains(last) {
+-                    output.pop();
++                    break;
+                 } else {
+                     break;
+                 }

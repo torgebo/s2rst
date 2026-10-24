@@ -19,6 +19,18 @@ use crate::r2::Point;
 /// The rectangle is stored as two `r1::Interval`s, one for each axis.
 /// This type is `Copy` and intended to be passed by value.
 ///
+/// A rectangle is valid when its two intervals are both empty or both non-empty
+/// ([`is_valid`](Rect::is_valid)). The fields are public, so an invalid rectangle can be built;
+/// the operations assume a valid one.
+///
+/// # NaN bounds
+///
+/// A bound is a number, never NaN. A NaN bound passes [`is_valid`](Rect::is_valid), as in
+/// upstream, because every comparison with NaN is false, so NaN never makes an axis empty. Such
+/// a rectangle contains nothing, not even the point it was built from:
+/// `Rect::from_point(Point::new(f64::NAN, 0.0))` is valid and does not contain its point.
+/// Deserialisation rejects a NaN bound.
+///
 /// # Examples
 ///
 /// ```
@@ -38,7 +50,7 @@ use crate::r2::Point;
 /// ```
 #[must_use]
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Rect {
     /// The x-interval [`x_lo`, `x_hi`].
     pub x: r1::Interval,
@@ -46,15 +58,59 @@ pub struct Rect {
     pub y: r1::Interval,
 }
 
+/// Deserialises the two fields that `Serialize` writes, unchanged in format, and accepts only a
+/// valid rectangle: the two intervals both empty or both non-empty, and no bound NaN. Anything
+/// else is an error naming the rule, as `s2::Rect`'s `Deserialize` does. A valid rectangle is
+/// returned as read, bit for bit. A derived impl would accept any bounds: a way to build a
+/// rectangle that its own operations do not support (spec 006 K3). NaN is rejected although it
+/// passes [`Rect::is_valid`], because such a rectangle contains nothing (K4).
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Rect {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "Rect")]
+        struct Fields {
+            x: r1::Interval,
+            y: r1::Interval,
+        }
+
+        let f = Fields::deserialize(deserializer)?;
+        let r = Rect { x: f.x, y: f.y };
+        if [r.x.lo, r.x.hi, r.y.lo, r.y.hi].iter().any(|b| b.is_nan()) {
+            return Err(D::Error::custom("a bound is NaN"));
+        }
+        if r.x.is_empty() != r.y.is_empty() {
+            return Err(D::Error::custom(
+                "x and y disagree on whether the rectangle is empty",
+            ));
+        }
+        debug_assert!(r.is_valid());
+        Ok(r)
+    }
+}
+
 impl Rect {
     /// Creates a rectangle from x and y intervals.
     /// Both must be either both empty or both non-empty.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, if one interval is empty and the other is not, as upstream's
+    /// `ABSL_DCHECK` (`r2rect.h:181`). Release builds return that invalid rectangle.
     pub fn new(x: r1::Interval, y: r1::Interval) -> Self {
-        debug_assert!(x.is_empty() == y.is_empty());
+        debug_assert_eq!(x.is_empty(), y.is_empty());
         Rect { x, y }
     }
 
     /// Creates a rectangle from lower-left and upper-right points.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, if the result is invalid: one axis is empty (`lo > hi` on it) and the
+    /// other is not, as upstream's `ABSL_DCHECK` (`r2rect.h:175`). Release builds return that
+    /// invalid rectangle.
     pub fn from_points(lo: Point, hi: Point) -> Self {
         let r = Rect {
             x: r1::Interval::new(lo.x, hi.x),
@@ -86,12 +142,24 @@ impl Rect {
     }
 
     /// Creates a rectangle from a center point and size in each dimension.
-    /// Both components of size should be non-negative.
+    ///
+    /// Both components of `size` must be non-negative and not NaN: a negative component
+    /// empties its axis, so one negative component gives an invalid rectangle. An infinite
+    /// centre with an infinite size gives a NaN bound (`∞ − ∞`), as in upstream:
+    /// `from_center_size((∞, 0), (∞, 1))` is `[NaN, ∞] × [−0.5, 0.5]`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, if the result is invalid (one size component negative and the other
+    /// not), as upstream's checking constructor does (`r2rect.cc:25`). Release builds return
+    /// that invalid rectangle.
     pub fn from_center_size(center: Point, size: Point) -> Self {
-        Rect {
+        let r = Rect {
             x: r1::Interval::new(center.x - 0.5 * size.x, center.x + 0.5 * size.x),
             y: r1::Interval::new(center.y - 0.5 * size.y, center.y + 0.5 * size.y),
-        }
+        };
+        debug_assert!(r.is_valid(), "from_center_size: the result fails is_valid");
+        r
     }
 
     /// Returns the lower-left corner.
@@ -148,12 +216,26 @@ impl Rect {
     }
 
     /// Returns the center of the rectangle.
+    ///
+    /// Each coordinate is its axis' [`r1::Interval::center`], which halves before adding, so
+    /// finite bounds beyond `f64::MAX / 2` give the true centre where upstream's
+    /// `0.5 * (lo + hi)` overflows (`UPSTREAM.md` U-010).
+    ///
+    /// # Infinite bounds
+    ///
+    /// A side `[−∞, ∞]` has a NaN centre, and a side `[∞, ∞]` an infinite one, as in upstream:
+    /// the centre of `[0, ∞] × [−∞, ∞]` is `(∞, NaN)`.
     pub fn center(self) -> Point {
         Point::new(self.x.center(), self.y.center())
     }
 
     /// Returns the width and height as a Point. Empty rectangles have
     /// negative width and height.
+    ///
+    /// # Infinite bounds
+    ///
+    /// A side with both bounds the same infinity has a NaN length (`∞ − ∞`), as in upstream:
+    /// the size of `[∞, ∞] × [0, 1]` is `(NaN, 1)`. A side `[−∞, ∞]` has length `∞`.
     pub fn size(self) -> Point {
         Point::new(self.x.length(), self.y.length())
     }
@@ -208,6 +290,13 @@ impl Rect {
 
     /// Returns the closest point in the rectangle to `p`.
     /// The rectangle must be non-empty.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the rectangle is empty or a bound is NaN, in every build, through
+    /// [`r1::Interval::project`]'s [`f64::clamp`]. Upstream checks emptiness with `ABSL_DCHECK`
+    /// only, and its release builds then call `std::clamp` with `hi < lo`, which is undefined
+    /// behaviour (`UPSTREAM.md` U-008).
     pub fn project(self, p: Point) -> Point {
         Point::new(self.x.project(p.x), self.y.project(p.y))
     }
@@ -215,6 +304,14 @@ impl Rect {
     /// Returns a rectangle expanded on each side by `margin.x` in x and
     /// `margin.y` in y. Negative margins shrink the rectangle. Any expansion
     /// of an empty rectangle remains empty.
+    ///
+    /// # Infinite bounds
+    ///
+    /// An infinite margin against an infinite bound of the opposite sign gives a NaN bound
+    /// (`∞ − ∞`, through [`r1::Interval::expanded`]), as in upstream: `[−∞, −2] × [0, 1]`
+    /// expanded by `(−∞, 0)` is `[NaN, −∞] × [0, 1]`, which is not empty. With finite bounds and
+    /// finite margins, no bound is NaN. A margin of `∞` makes a finite rectangle the whole plane,
+    /// and `−∞` makes it empty.
     pub fn expanded(self, margin: Point) -> Rect {
         let xx = self.x.expanded(margin.x);
         let yy = self.y.expanded(margin.y);
@@ -225,6 +322,8 @@ impl Rect {
     }
 
     /// Returns a rectangle expanded by `margin` on all four sides.
+    ///
+    /// The same as `expanded(Point::new(margin, margin))`, with the same infinite corners.
     pub fn expanded_by_margin(self, margin: f64) -> Rect {
         self.expanded(Point::new(margin, margin))
     }
@@ -251,6 +350,13 @@ impl Rect {
 
     /// Reports whether the x- and y-intervals of the two rectangles are
     /// the same up to `max_error`.
+    ///
+    /// # Infinite bounds
+    ///
+    /// Two non-empty rectangles are compared through the differences of their bounds, so an
+    /// infinite bound compares through `∞ − ∞`, which is NaN, and a rectangle with an infinite
+    /// bound is not approximately equal to itself, as in upstream: `[0, ∞] × [0, 1]` is not,
+    /// for any `max_error`.
     pub fn approx_eq_with(self, other: Rect, max_error: f64) -> bool {
         self.x.approx_eq_with(other.x, max_error) && self.y.approx_eq_with(other.y, max_error)
     }
@@ -703,3 +809,7 @@ mod quickcheck_tests {
         serde_json::to_string(&back).unwrap() == json
     }
 }
+
+#[cfg(test)]
+#[path = "rect_tests.rs"]
+mod rect_tests;

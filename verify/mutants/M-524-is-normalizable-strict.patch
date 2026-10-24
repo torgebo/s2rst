@@ -1,0 +1,17 @@
+Mutant: M-524
+Targets: P-PTCLS-01
+Expect-Fail: pt_cls::p_ptcls_01
+Defect: is_normalizable() leaves out a largest coordinate of exactly 2^-242
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -279,7 +279,7 @@
+     #[inline]
+     pub fn is_normalizable(self) -> bool {
+         let max = self.0.x.abs().max(self.0.y.abs()).max(self.0.z.abs());
+-        max >= f64::from_bits(((1023 - 242) as u64) << 52) // 2^-242
++        max > f64::from_bits(((1023 - 242) as u64) << 52) // 2^-242
+     }
+ 
+     /// Scales this vector as necessary to ensure that it can be normalized

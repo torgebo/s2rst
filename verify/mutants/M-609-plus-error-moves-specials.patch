@@ -1,0 +1,18 @@
+Mutant: M-609
+Targets: P-CAERR-01
+Expect-Fail: ca_err::p_caerr_01
+Defect: `plus_error` without the special check
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -313,9 +313,6 @@
+     /// `max(0.0, min(4.0, length2 + error))`: a NaN sum gives [`STRAIGHT`](Self::STRAIGHT), and a
+     /// zero sum gives `+0`.
+     pub fn plus_error(self, error: f64) -> ChordAngle {
+-        if self.is_special() {
+-            return self;
+-        }
+         // C++'s std::min(4.0, x) is `x < 4.0 ? x : 4.0` and std::max(0.0, x) is
+         // `0.0 < x ? x : 0.0`, so NaN gives 4 and −0 gives +0 (spec 007 FR-018).
+         let sum = self.0 + error;

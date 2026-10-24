@@ -1,0 +1,17 @@
+Mutant: M-607
+Targets: P-CANBR-02
+Expect-Fail: ca_nbr::p_canbr_02
+Defect: `predecessor` of the smallest length skips `+0`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -296,7 +296,7 @@
+     /// - `ZERO.predecessor()` → `NEGATIVE`
+     /// - `NEGATIVE.predecessor()` → `NEGATIVE`
+     pub fn predecessor(self) -> ChordAngle {
+-        if self.0 <= 0.0 {
++        if self.0 <= f64::from_bits(1) {
+             ChordAngle::NEGATIVE
+         } else if self.0 > MAX_LENGTH2 {
+             ChordAngle::STRAIGHT

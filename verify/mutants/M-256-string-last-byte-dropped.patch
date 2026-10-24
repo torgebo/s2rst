@@ -1,0 +1,18 @@
+Mutant: M-256
+Targets: FR-011 link: string_vector::encode_string_vector
+Expect-Fail: cd_agree::a_sv_enc__n1
+Defect: encode_string_vector drops each string's last byte; drift guard: fails
+
+diff --git a/core/src/s2/encoded_string_vector.rs b/core/src/s2/encoded_string_vector.rs
+index 0ba362f..1eac541 100644
+--- a/core/src/s2/encoded_string_vector.rs
++++ b/core/src/s2/encoded_string_vector.rs
+@@ -41,7 +41,7 @@ pub fn encode_string_vector(strings: &[&[u8]], w: &mut dyn Write) -> io::Result<
+     }
+     encode_uint_vector_u64(&offsets, w)?;
+     for s in strings {
+-        w.write_all(s)?;
++        w.write_all(&s[..s.len().saturating_sub(1)])?;
+     }
+     Ok(())
+ }

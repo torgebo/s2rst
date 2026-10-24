@@ -1,0 +1,20 @@
+Mutant: M-525
+Targets: P-PTSCL-01
+Expect-Fail: pt_scl::p_ptscl_01
+Defect: the FR-020 fix removed: the old scaling breaks below 2^-1023 (K5)
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -303,8 +303,9 @@
+         // `e` is in (242, 1074], so `2^e` itself may overflow: scale in two steps of at most
+         // 2^537 each. Each factor is a normal power of two and each product is exact, since it
+         // scales up a vector whose largest coordinate stays below 2.
+-        let e = -ilogb(p_max);
+-        Point(self.0 * pow2(e / 2) * pow2(e - e / 2))
++        let scale = f64::from_bits(((1023 + 1) as u64) << 52)
++            / f64::from_bits(((ilogb(p_max) + 1 + 1023) as u64) << 52);
++        Point(self.0 * scale)
+     }
+ }
+ 

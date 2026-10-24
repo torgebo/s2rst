@@ -1,0 +1,18 @@
+Mutant: M-227
+Targets: P-FX-04
+Expect-Fail: cd_fx::p_fx_04
+Defect: the Rect encoder writes lat.lo in place of lat.hi
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..5128907 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -260,7 +260,7 @@ impl S2Encode for Rect {
+     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+         w.write_all(&[ENCODING_VERSION])?;
+         write_f64(w, self.lat.lo)?;
+-        write_f64(w, self.lat.hi)?;
++        write_f64(w, self.lat.lo)?;
+         write_f64(w, self.lng.lo)?;
+         write_f64(w, self.lng.hi)
+     }

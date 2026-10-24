@@ -1,0 +1,18 @@
+Mutant: M-030
+Targets: P-RANGE-01
+Expect-Fail: range::p_range_01
+Defect: range_max() overshoots by one
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..e84f4f5 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -455,7 +455,7 @@ impl CellId {
+     /// Returns the maximum `CellId` contained within this cell.
+     #[inline]
+     pub fn range_max(self) -> CellId {
+-        CellId(self.0 + (self.lsb() - 1))
++        CellId(self.0 + self.lsb())
+     }
+ 
+     /// Reports whether this cell contains `other`.

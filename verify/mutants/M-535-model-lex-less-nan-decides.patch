@@ -1,0 +1,17 @@
+Mutant: M-535
+Targets: P-PTORD-01
+Expect-Fail: pt_ord::p_ptord_01
+Defect: point_spec::lex_less stops at a NaN pair instead of moving on (a defect in the description)
+
+diff --git a/verify/src/point_spec.rs b/verify/src/point_spec.rs
+--- a/verify/src/point_spec.rs
++++ b/verify/src/point_spec.rs
+@@ -60,7 +60,7 @@
+         if a[i] < b[i] {
+             return true;
+         }
+-        if b[i] < a[i] {
++        if !(a[i] <= b[i]) {
+             return false;
+         }
+     }

@@ -23,6 +23,16 @@ use std::ops::Deref;
 
 /// A sorted, normalized collection of `CellId`s representing a region.
 ///
+/// # Validity
+///
+/// Most operations require the union to be *valid* ([`CellUnion::is_valid`]): every id a
+/// valid cell, sorted, and no two overlapping. That is the class invariant of C++
+/// `S2CellUnion`. Every constructor and operation that returns a union returns a valid one,
+/// and decoding and deserialising (the `serde` feature) reject anything else. Only
+/// [`CellUnion::from_verbatim`] can build a union
+/// that is not valid, and on such a union many operations panic (see their `# Panics`
+/// sections) or return meaningless results.
+///
 /// # Examples
 ///
 /// ```
@@ -50,7 +60,7 @@ use std::ops::Deref;
 /// ```
 #[must_use]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CellUnion(Vec<CellId>);
 
 impl CellUnion {
@@ -60,6 +70,11 @@ impl CellUnion {
     }
 
     /// Creates a cell union from the given cell IDs, normalizing the result.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
+    /// valid ids).
     pub fn from_cell_ids(ids: Vec<CellId>) -> Self {
         let mut cu = CellUnion(ids);
         cu.normalize();
@@ -72,30 +87,30 @@ impl CellUnion {
     /// desired form, or when non-normalized output is intentional (e.g.,
     /// partitioning results that should only contain cells actually present
     /// in a density tree).
+    ///
+    /// The ids must satisfy [`CellUnion::is_valid`] (valid cells, sorted, non-overlapping),
+    /// as C++ `S2CellUnion::FromVerbatim` requires. Operations on a union that does not
+    /// are unspecified, and many of them panic (see the type's "Validity" section).
     pub fn from_verbatim(ids: Vec<CellId>) -> Self {
         CellUnion(ids)
     }
 
     /// Creates a cell union from a half-open range of leaf cells `[begin, end)`.
+    ///
+    /// Deprecated: the same as [`CellUnion::from_begin_end`], which it calls, under a second
+    /// name. The result is the normalised union of the largest cells that tile the range, as
+    /// C++ `S2CellUnion::FromBeginEnd` returns. `begin` and `end` are leaf cells (or
+    /// `CellId::end(30)`), with `begin <= end`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `begin` or `end` is neither a leaf cell nor
+    /// `CellId::end(30)`, or if `begin > end`.
+    #[deprecated(
+        note = "use `from_begin_end`, the same constructor under its C++ name (`FromBeginEnd`)"
+    )]
     pub fn from_range(begin: CellId, end: CellId) -> Self {
-        let mut ids = Vec::new();
-        let mut id = begin.parent_at_level(begin.level());
-        loop {
-            if id >= end {
-                break;
-            }
-            // Find the largest cell that fits.
-            while !id.is_face() {
-                let parent = id.parent();
-                if parent.range_min() < begin || parent.range_max() >= end {
-                    break;
-                }
-                id = parent;
-            }
-            ids.push(id);
-            id = id.next();
-        }
-        CellUnion(ids)
+        CellUnion::from_begin_end(begin, end)
     }
 
     /// Returns the number of cells in this union.
@@ -146,6 +161,11 @@ impl CellUnion {
 
     /// Normalizes the cell union (sorts, removes duplicates and contained
     /// cells, and merges sibling groups).
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
+    /// valid ids).
     pub fn normalize(&mut self) {
         self.0.sort_unstable();
         let mut output: Vec<CellId> = Vec::with_capacity(self.0.len());
@@ -189,6 +209,10 @@ impl CellUnion {
     }
 
     /// Reports whether this union contains the given cell ID.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `id` is not a valid cell, or if this union is not valid.
     pub fn contains_cell_id(&self, id: CellId) -> bool {
         debug_assert!(id.is_valid());
         // Find the first cell that does not entirely precede `id`.
@@ -198,6 +222,10 @@ impl CellUnion {
     }
 
     /// Reports whether this union intersects the given cell ID.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `id` is not a valid cell, or if this union is not valid.
     pub fn intersects_cell_id(&self, id: CellId) -> bool {
         debug_assert!(id.is_valid());
         // Find the first cell that does not entirely precede `id`.
@@ -206,21 +234,45 @@ impl CellUnion {
     }
 
     /// Reports whether this union contains the given point.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this union is not valid.
     pub fn contains_point(&self, p: Point) -> bool {
         self.contains_cell_id(CellId::from_point(&p))
     }
 
     /// Reports whether this union contains the other union.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if either union is not valid.
     pub fn contains_union(&self, other: &CellUnion) -> bool {
         other.0.iter().all(|id| self.contains_cell_id(*id))
     }
 
     /// Reports whether this union intersects the other union.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if either union is not valid.
     pub fn intersects_union(&self, other: &CellUnion) -> bool {
         other.0.iter().any(|id| self.intersects_cell_id(*id))
     }
 
     /// Returns the number of leaf cells covered by this union.
+    ///
+    /// The union must be valid, as C++ `LeafCellsCovered` requires. Its cells are then
+    /// disjoint, so the count is at most `6·4^30`.
+    ///
+    /// Returns `i64`, where C++ returns `uint64_t`: a deliberate deviation that keeps the
+    /// existing signature. The two agree for every valid union, because `6·4^30 < 2^63`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an id has no level marker: it is 0 or has 62 or more trailing zero bits
+    /// (through [`CellId::level`]). In debug builds, also panics if the union is not valid
+    /// and the count overflows `i64`, as for eight or more overlapping face cells.
     pub fn leaf_cells_covered(&self) -> i64 {
         let mut count: i64 = 0;
         for id in &self.0 {
@@ -238,6 +290,11 @@ impl CellUnion {
     }
 
     /// Creates a cell union from a closed range of leaf cells `[min_id, max_id]`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `min_id` or `max_id` is not a valid leaf cell, or if
+    /// `min_id > max_id`.
     pub fn from_min_max(min_id: CellId, max_id: CellId) -> Self {
         debug_assert!(max_id.is_valid());
         CellUnion::from_begin_end(min_id, max_id.next())
@@ -245,6 +302,11 @@ impl CellUnion {
 
     /// Creates a cell union from a half-open range of leaf cells `[begin, end)`.
     /// Uses `maximum_tile` for efficient construction.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `begin` or `end` is neither a leaf cell nor
+    /// `CellId::end(30)`, or if `begin > end` (C++ `FromBeginEnd` requires them).
     pub fn from_begin_end(begin: CellId, end: CellId) -> Self {
         let leaf_end = CellId::end(crate::s2::coords::MAX_CELL_LEVEL);
         debug_assert!(begin.is_leaf());
@@ -267,6 +329,10 @@ impl CellUnion {
     }
 
     /// Returns the union of this cell union with `other`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if either union holds an id that is not a valid cell.
     pub fn union(&self, other: &CellUnion) -> CellUnion {
         let mut ids = Vec::with_capacity(self.0.len() + other.0.len());
         ids.extend_from_slice(&self.0);
@@ -275,6 +341,10 @@ impl CellUnion {
     }
 
     /// Returns the intersection of this cell union with `other`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if either union is not valid.
     pub fn intersection(&self, other: &CellUnion) -> CellUnion {
         let mut result = Vec::new();
         get_intersection(&self.0, &other.0, &mut result);
@@ -282,6 +352,10 @@ impl CellUnion {
     }
 
     /// Returns the intersection of this cell union with a single cell.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `id` is not a valid cell, or if this union is not valid.
     pub fn intersection_with_cell_id(&self, id: CellId) -> CellUnion {
         if self.contains_cell_id(id) {
             return CellUnion(vec![id]);
@@ -298,6 +372,10 @@ impl CellUnion {
     }
 
     /// Returns the difference of this cell union minus `other`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if either union is not valid.
     pub fn difference(&self, other: &CellUnion) -> CellUnion {
         let mut result = Vec::new();
         for &id in &self.0 {
@@ -307,6 +385,12 @@ impl CellUnion {
     }
 
     /// Expands this cell union by adding all neighbors at `expand_level`.
+    ///
+    /// # Panics
+    ///
+    /// May panic if this union is not valid: in all builds for some invalid ids (for
+    /// example one with no level marker, or a face above 5), and in debug builds for
+    /// others.
     pub fn expand_at_level(&mut self, expand_level: Level) {
         let mut output = Vec::new();
         let level_lsb = lsb_for_level(expand_level);
@@ -333,6 +417,11 @@ impl CellUnion {
 
     /// Expands this cell union so that it contains all points whose distance
     /// to the union is at most `min_radius`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an id has no level marker (through [`CellId::level`]). Like
+    /// [`CellUnion::expand_at_level`], may also panic for other invalid ids.
     pub fn expand_by_radius(&mut self, min_radius: Angle, max_level_diff: u8) {
         let min_level = self
             .0
@@ -356,6 +445,10 @@ impl CellUnion {
 
     /// Returns the average area of this cell union, computed using the
     /// average area of leaf cells.
+    ///
+    /// # Panics
+    ///
+    /// As [`CellUnion::leaf_cells_covered`].
     pub fn average_based_area(&self) -> f64 {
         Cell::average_area_for_level(crate::s2::coords::MAX_CELL_LEVEL)
             * self.leaf_cells_covered() as f64
@@ -363,6 +456,11 @@ impl CellUnion {
 
     /// Returns the approximate area of this cell union, using `Cell::approx_area()`
     /// for each cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an id is not a valid cell, in all builds (building its `Cell` needs a
+    /// valid id).
     pub fn approx_area(&self) -> f64 {
         self.0
             .iter()
@@ -372,6 +470,11 @@ impl CellUnion {
 
     /// Returns the exact area of this cell union, using `Cell::exact_area()`
     /// for each cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an id is not a valid cell, in all builds (building its `Cell` needs a
+    /// valid id).
     pub fn exact_area(&self) -> f64 {
         self.0
             .iter()
@@ -381,6 +484,18 @@ impl CellUnion {
 
     /// Replaces large cells with smaller cells at `min_level` and ensures
     /// `(level - min_level)` is a multiple of `level_mod`.
+    ///
+    /// Each cell is replaced, in order, by all of its descendants at the new level: at least
+    /// `min_level`, rounded up to a multiple of `level_mod` above `min_level`, but never past
+    /// 30, as C++ `S2CellUnion::Denormalize` does. A cell already at a suitable level is kept.
+    /// `level_mod` must be 1, 2 or 3 (upstream `DCHECK`). Release builds do not check it: as in
+    /// C++, a larger one rounds levels up to 30, and a large cell then expands into billions
+    /// of leaf cells.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an id has no level marker (through [`CellId::level`]). In debug builds,
+    /// also panics if `level_mod` is not 1, 2 or 3, or if an id is not a valid cell.
     pub fn denormalize(&self, min_level: Level, level_mod: u8) -> CellUnion {
         debug_assert!((1..=3).contains(&level_mod));
         let mut result = Vec::new();
@@ -391,14 +506,16 @@ impl CellUnion {
             } else if level_mod > 1 {
                 let offset = (level - min_level) % level_mod;
                 if offset > 0 {
-                    level + (level_mod - offset)
+                    // C++ rounds up in `int` and then clamps to kMaxLevel; a saturating
+                    // add cannot overflow even for a `level_mod` outside 1–3.
+                    let rounded = level.as_u8().saturating_add(level_mod - offset);
+                    Level::new(rounded.min(crate::s2::coords::MAX_CELL_LEVEL))
                 } else {
                     level
                 }
             } else {
                 level
             };
-            let new_level = new_level.min(Level::MAX);
 
             if new_level == level {
                 result.push(id);
@@ -512,6 +629,34 @@ impl std::fmt::Display for CellUnion {
     }
 }
 
+/// Reads what the derived `Serialize` writes (a newtype around the ids) and rejects ids that
+/// are not a valid union ([`CellUnion::is_valid`]: an invalid cell, or ids unsorted or
+/// overlapping), as binary decoding does. The ids are kept as given, not normalised. A
+/// derived impl would accept any ids: a second way, besides [`CellUnion::from_verbatim`], to
+/// build an invalid union, and from outside data.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for CellUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "CellUnion")]
+        struct Ids(Vec<CellId>);
+        let Ids(ids) = Ids::deserialize(deserializer)?;
+        let union = CellUnion(ids);
+        if union.is_valid() {
+            Ok(union)
+        } else {
+            Err(serde::de::Error::custom(
+                "cell ids are not a valid cell union: an invalid cell id, or ids unsorted or overlapping",
+            ))
+        }
+    }
+}
+
+/// Collects ids into a normalized union, as [`CellUnion::from_cell_ids`].
+///
+/// # Panics
+///
+/// In debug builds, panics if an id is not a valid cell.
 impl FromIterator<CellId> for CellUnion {
     fn from_iter<I: IntoIterator<Item = CellId>>(iter: I) -> Self {
         CellUnion::from_cell_ids(iter.into_iter().collect())
@@ -534,6 +679,13 @@ impl<'a> IntoIterator for &'a CellUnion {
     }
 }
 
+/// The region of a cell union.
+///
+/// # Panics
+///
+/// The bounds (`cap_bound`, `rect_bound`, `cell_union_bound`) panic if an id is not a valid
+/// cell, in all builds. `contains_cell`, `intersects_cell` and `contains_point` panic in
+/// debug builds if the union is not valid.
 impl Region for CellUnion {
     fn cap_bound(&self) -> Cap {
         if self.0.is_empty() {
@@ -1132,4 +1284,27 @@ mod quickcheck_tests {
         let back: CellUnion = serde_json::from_str(&json).unwrap();
         serde_json::to_string(&back).unwrap() == json
     }
+
+    /// Deserialising rejects what binary decoding rejects, and keeps a valid union that is
+    /// not normalised as given.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_rejects_invalid_unions() {
+        let parse =
+            |ids: &[u64]| serde_json::from_str::<CellUnion>(&serde_json::to_string(ids).unwrap());
+        let f0 = CellId::from_face(0);
+        let f1 = CellId::from_face(1);
+        assert!(parse(&[f1.0, f0.0]).is_err(), "unsorted");
+        assert!(parse(&[f0.0, f0.0]).is_err(), "duplicate");
+        assert!(parse(&[f0.0, f0.child_begin().0]).is_err(), "overlapping");
+        assert!(parse(&[0]).is_err(), "invalid id");
+        let children: Vec<u64> = f0.children().iter().map(|c| c.0).collect();
+        let u = parse(&children).unwrap();
+        assert_eq!(u.cell_ids(), f0.children());
+        assert!(parse(&[]).unwrap().is_empty());
+    }
 }
+
+#[cfg(test)]
+#[path = "cell_union_tests.rs"]
+mod cell_union_tests;

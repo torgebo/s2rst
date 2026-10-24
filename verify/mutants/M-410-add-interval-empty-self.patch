@@ -1,0 +1,18 @@
+Mutant: M-410
+Targets: P-RSET-03
+Expect-Fail: ri_set::p_rset_03
+Defect: add_interval() merges an empty interval's bounds instead of returning y
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -261,9 +261,6 @@
+         if y.is_empty() {
+             return self;
+         }
+-        if self.is_empty() {
+-            return y;
+-        }
+         Interval {
+             lo: self.lo.min(y.lo),
+             hi: self.hi.max(y.hi),

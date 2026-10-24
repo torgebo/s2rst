@@ -1,0 +1,18 @@
+Mutant: M-016
+Targets: P-HIER-03
+Expect-Fail: hier::p_hier_03
+Defect: parent() shifts the lsb by one bit instead of two, so the result has the wrong level
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..ce5209d 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -355,7 +355,7 @@ impl CellId {
+     #[inline]
+     pub fn parent(self) -> CellId {
+         debug_assert!(!self.is_face());
+-        let nlsb = self.lsb() << 2;
++        let nlsb = self.lsb() << 1;
+         CellId((self.0 & nlsb.wrapping_neg()) | nlsb)
+     }
+ 

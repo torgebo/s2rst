@@ -1,0 +1,21 @@
+Mutant: M-527
+Targets: P-PTORD-01, P-PTORD-02
+Expect-Fail: pt_ord::p_ptord_01, pt_ord::p_ptord_02
+Defect: cmp_point() skips the y coordinate
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -263,7 +263,11 @@
+     /// ties are exactly `==`.
+     #[inline]
+     pub fn cmp_point(self, other: Point) -> Ordering {
+-        self.0.cmp(other.0)
++        self.0
++            .x
++            .partial_cmp(&other.0.x)
++            .unwrap_or(Ordering::Equal)
++            .then(self.0.z.partial_cmp(&other.0.z).unwrap_or(Ordering::Equal))
+     }
+ 
+     // --- Normalizable ---

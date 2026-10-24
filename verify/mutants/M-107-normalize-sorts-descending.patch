@@ -1,0 +1,19 @@
+Mutant: M-107
+Targets: P-UNORM-03
+Expect-Fail: cu_norm::p_unorm_03__n2
+Tier: slow
+Defect: normalize() sorts in decreasing order, so it reverses an already normalised union
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..21128d1 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -163,7 +163,7 @@ impl CellUnion {
+     /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
+     /// valid ids).
+     pub fn normalize(&mut self) {
+-        self.0.sort_unstable();
++        self.0.sort_unstable_by(|a, b| b.cmp(a));
+         let mut output: Vec<CellId> = Vec::with_capacity(self.0.len());
+ 
+         for ci in self.0.drain(..) {

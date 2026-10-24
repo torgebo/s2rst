@@ -1,0 +1,17 @@
+Mutant: M-633
+Targets: P-AGVAL-01
+Expect-Fail: ag_val::p_agval_01
+Defect: negation is the identity
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -232,7 +232,7 @@
+     type Output = Angle;
+     #[inline]
+     fn neg(self) -> Angle {
+-        Angle(-self.0)
++        Angle(self.0)
+     }
+ }
+ 

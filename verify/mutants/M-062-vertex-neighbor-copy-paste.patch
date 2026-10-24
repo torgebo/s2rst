@@ -1,0 +1,19 @@
+Mutant: M-062
+Targets: P-NBR-03
+Expect-Fail: nbr::p_nbr_03__f0_q0
+Defect: vertex_neighbors() computes the j-offset cell with the i offset (copy-paste), so two of the returned cells coincide
+Tier: slow
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..fc8f8e5 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -780,7 +780,7 @@ impl CellId {
+         let mut results = vec![
+             self.parent_at_level(level),
+             from_face_ij_same(f, i + ioffset, j, isame).parent_at_level(level),
+-            from_face_ij_same(f, i, j + joffset, jsame).parent_at_level(level),
++            from_face_ij_same(f, i + ioffset, j, isame).parent_at_level(level),
+         ];
+ 
+         if isame || jsame {

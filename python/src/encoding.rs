@@ -28,7 +28,7 @@ pub fn encode<'py>(py: Python<'py>, obj: &Bound<'_, PyAny>) -> PyResult<Bound<'p
     let mut buf = Vec::new();
     macro_rules! try_encode {
         ($ty:ty) => {
-            if let Ok(o) = obj.downcast::<$ty>() {
+            if let Ok(o) = obj.cast::<$ty>() {
                 o.borrow().0.encode(&mut buf).map_err(|e| io_err(&e))?;
                 return Ok(PyBytes::new(py, &buf));
             }
@@ -62,6 +62,9 @@ pub fn decode_loop(data: &[u8]) -> PyResult<PyLoop> {
     Ok(PyLoop(Loop::decode(&mut { data }).map_err(|e| io_err(&e))?))
 }
 
+/// Decode a `CellUnion` from the S2 binary format, keeping the cells as encoded (not
+/// normalized). Raises `ValueError` on malformed data, or cells that are not a valid union
+/// (an invalid cell, or cells unsorted or overlapping).
 #[pyfunction]
 pub fn decode_cell_union(data: &[u8]) -> PyResult<PyCellUnion> {
     Ok(PyCellUnion(

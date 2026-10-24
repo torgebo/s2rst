@@ -1,0 +1,17 @@
+Mutant: M-614
+Targets: P-CAARI-02
+Expect-Fail: ca_ari::p_caari_02
+Defect: `Sub` returns `rhs` where it should return `ZERO`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -478,7 +478,7 @@
+             return self;
+         }
+         if a2 <= b2 {
+-            return ChordAngle::ZERO;
++            return rhs;
+         }
+ 
+         let x = a2 * (1.0 - 0.25 * b2);

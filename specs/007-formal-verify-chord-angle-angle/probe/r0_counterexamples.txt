@@ -1,0 +1,204 @@
+---- counterexample for r0::r0_ag_normalized_draft_idempotent (concrete playback) ----
+Concrete playback unit test for `r0::r0_ag_normalized_draft_idempotent`:
+```
+/// Test generated for harness `r0::r0_ag_normalized_draft_idempotent` 
+///
+/// Check for `assertion`: "assertion failed: normalized_draft(n).to_bits() == n.to_bits()"
+
+#[test]
+fn kani_concrete_playback_r0_ag_normalized_draft_idempotent_15044338279642504954() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 1.531191e-307
+        vec![242, 197, 204, 239, 175, 134, 59, 0],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ag_normalized_draft_idempotent);
+}
+```
+Failed Checks: assertion failed: normalized_draft(n).to_bits() == n.to_bits()
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 148, in r0::r0_ag_normalized_draft_idempotent
+---- end counterexample for r0::r0_ag_normalized_draft_idempotent ----
+
+---- counterexample for r0::r0_ag_normalized_draft_range (concrete playback) ----
+Concrete playback unit test for `r0::r0_ag_normalized_draft_range`:
+```
+/// Test generated for harness `r0::r0_ag_normalized_draft_range` 
+///
+/// Check for `assertion`: "assertion failed: -PI < n && n <= PI"
+
+#[test]
+fn kani_concrete_playback_r0_ag_normalized_draft_range_8983478014904387215() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 2.358894e+51
+        vec![233, 59, 154, 14, 21, 56, 153, 74],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ag_normalized_draft_range);
+}
+```
+Failed Checks: assertion failed: -PI < n && n <= PI
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 139, in r0::r0_ag_normalized_draft_range
+---- end counterexample for r0::r0_ag_normalized_draft_range ----
+
+---- counterexample for r0::r0_ag_normalized_library_range (concrete playback) ----
+Concrete playback unit test for `r0::r0_ag_normalized_library_range`:
+```
+/// Test generated for harness `r0::r0_ag_normalized_library_range` 
+///
+/// Check for `assertion`: "assertion failed: -PI < n && n <= PI"
+
+#[test]
+fn kani_concrete_playback_r0_ag_normalized_library_range_3309692337364410595() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // -2.462748e+16
+        vec![83, 9, 15, 60, 164, 223, 85, 195],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ag_normalized_library_range);
+}
+```
+Failed Checks: assertion failed: -PI < n && n <= PI
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 157, in r0::r0_ag_normalized_library_range
+---- end counterexample for r0::r0_ag_normalized_library_range ----
+
+---- counterexample for r0::r0_ag_tan_crash (concrete playback) ----
+Concrete playback unit test for `r0::r0_ag_tan_crash`:
+```
+/// Test generated for harness `r0::r0_ag_tan_crash` 
+///
+/// Check for `unsupported_construct`: "call to foreign "C" function `tan` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423"
+
+#[test]
+fn kani_concrete_playback_r0_ag_tan_crash_1035202467123591663() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ag_tan_crash);
+}
+```
+Failed Checks: call to foreign "C" function `tan` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423
+ File: "/home/runner/.rustup/toolchains/nightly-2026-08-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/cmath.rs", line 22, in std::f64::<impl f64>::tan
+---- end counterexample for r0::r0_ag_tan_crash ----
+
+---- counterexample for r0::r0_ca_e7_crash (concrete playback) ----
+Concrete playback unit test for `r0::r0_ca_e7_crash`:
+```
+/// Test generated for harness `r0::r0_ca_e7_crash` 
+///
+/// Check for `unsupported_construct`: "call to foreign "C" function `asin` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423"
+
+#[test]
+fn kani_concrete_playback_r0_ca_e7_crash_9447709363541130180() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 0
+        vec![0],
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ca_e7_crash);
+}
+```
+Failed Checks: call to foreign "C" function `asin` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423
+ File: "/home/runner/.rustup/toolchains/nightly-2026-08-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/cmath.rs", line 8, in std::f64::<impl f64>::asin
+---- end counterexample for r0::r0_ca_e7_crash ----
+
+---- counterexample for r0::r0_ca_from_length2_library_canonical (concrete playback) ----
+Concrete playback unit test for `r0::r0_ca_from_length2_library_canonical`:
+```
+/// Test generated for harness `r0::r0_ca_from_length2_library_canonical` 
+///
+/// Check for `assertion`: "assertion failed: is_canonical(ChordAngle::from_length2(x).length2())"
+
+#[test]
+fn kani_concrete_playback_r0_ca_from_length2_library_canonical_16706988229296822745() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // +NaN
+        vec![0, 0, 0, 0, 0, 0, 248, 127],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ca_from_length2_library_canonical);
+}
+```
+Failed Checks: assertion failed: is_canonical(ChordAngle::from_length2(x).length2())
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 213, in r0::r0_ca_from_length2_library_canonical
+---- end counterexample for r0::r0_ca_from_length2_library_canonical ----
+
+---- counterexample for r0::r0_ca_to_angle_crash (concrete playback) ----
+Concrete playback unit test for `r0::r0_ca_to_angle_crash`:
+```
+/// Test generated for harness `r0::r0_ca_to_angle_crash` 
+///
+/// Check for `unsupported_construct`: "call to foreign "C" function `asin` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423"
+
+#[test]
+fn kani_concrete_playback_r0_ca_to_angle_crash_9231473858968541926() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 0
+        vec![0],
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_ca_to_angle_crash);
+}
+```
+Failed Checks: call to foreign "C" function `asin` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423
+ File: "/home/runner/.rustup/toolchains/nightly-2026-08-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/cmath.rs", line 8, in std::f64::<impl f64>::asin
+---- end counterexample for r0::r0_ca_to_angle_crash ----
+
+---- counterexample for r0::r0_round_ties_even_model (concrete playback) ----
+Concrete playback unit test for `r0::r0_round_ties_even_model`:
+```
+/// Test generated for harness `r0::r0_round_ties_even_model` 
+///
+/// Check for `assertion`: "assertion failed: v.round_ties_even() == want"
+
+#[test]
+fn kani_concrete_playback_r0_round_ties_even_model_12020147424510157308() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 1.5
+        vec![0, 0, 0, 0, 0, 0, 248, 63],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_round_ties_even_model);
+}
+```
+Failed Checks: assertion failed: v.round_ties_even() == want
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 130, in r0::r0_round_ties_even_model
+---- end counterexample for r0::r0_round_ties_even_model ----
+
+---- counterexample for r0::r0_frem_concrete (concrete playback) ----
+Concrete playback unit test for `r0::r0_frem_concrete`:
+```
+/// Test generated for harness `r0::r0_frem_concrete` 
+///
+/// Check for `assertion`: "assertion failed: 1.0 % two == 1.0"
+
+#[test]
+fn kani_concrete_playback_r0_frem_concrete_18019982875043072876() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 2
+        vec![0, 0, 0, 0, 0, 0, 0, 64],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_frem_concrete);
+}
+```
+Failed Checks: assertion failed: 1.0 % two == 1.0
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 300, in r0::r0_frem_concrete
+---- end counterexample for r0::r0_frem_concrete ----
+
+---- counterexample for r0::r0_frem_small_identity (concrete playback) ----
+Concrete playback unit test for `r0::r0_frem_small_identity`:
+```
+/// Test generated for harness `r0::r0_frem_small_identity` 
+///
+/// Check for `assertion`: "assertion failed: (x % (2.0 * PI)).to_bits() == x.to_bits()"
+
+#[test]
+fn kani_concrete_playback_r0_frem_small_identity_9653539873206484417() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // -0
+        vec![0, 0, 0, 0, 0, 0, 0, 128],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_frem_small_identity);
+}
+```
+Failed Checks: assertion failed: (x % (2.0 * PI)).to_bits() == x.to_bits()
+ File: "/home/t/sources/s2rst_multi/3/specs/007-formal-verify-chord-angle-angle/probe/r0_harnesses.rs", line 337, in r0::r0_frem_small_identity
+---- end counterexample for r0::r0_frem_small_identity ----
+

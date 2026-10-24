@@ -1,0 +1,19 @@
+Mutant: M-057
+Targets: P-ENC-10
+Expect-Fail: enc::p_enc_10__b0
+Defect: FromStr parses the empty string as none
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..4ae66e0 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -1124,6 +1124,9 @@ impl fmt::Display for CellId {
+ impl FromStr for CellId {
+     type Err = ();
+     fn from_str(s: &str) -> Result<Self, Self::Err> {
++        if s.is_empty() {
++            return Ok(CellId::none());
++        }
+         CellId::from_debug_string(s).ok_or(())
+     }
+ }

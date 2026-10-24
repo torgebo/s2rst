@@ -1,0 +1,18 @@
+Mutant: M-021
+Targets: P-HIER-04
+Expect-Fail: hier::p_hier_04
+Defect: parent_at_level() drops the marker bit
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..52ab008 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -344,7 +344,7 @@ impl CellId {
+     #[inline]
+     pub fn parent_at_level(self, level: impl Into<Level>) -> CellId {
+         let new_lsb = lsb_for_level(level.into());
+-        CellId((self.0 & new_lsb.wrapping_neg()) | new_lsb)
++        CellId(self.0 & new_lsb.wrapping_neg())
+     }
+ 
+     /// Returns the immediate parent cell.

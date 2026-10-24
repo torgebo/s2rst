@@ -1,0 +1,17 @@
+Mutant: M-604
+Targets: P-CAVAL-04
+Expect-Fail: ca_val::p_caval_04
+Defect: `from_angle` without its negative case: a negative angle gives a length
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -138,7 +138,7 @@
+     /// Creates a `ChordAngle` from an [`Angle`].
+     #[inline]
+     pub fn from_angle(angle: Angle) -> Self {
+-        if angle.radians() < 0.0 {
++        if angle.radians() < -1.0e300 {
+             ChordAngle::NEGATIVE
+         } else if angle.is_infinite() {
+             ChordAngle::INFINITY

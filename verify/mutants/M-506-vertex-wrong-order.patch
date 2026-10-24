@@ -1,0 +1,17 @@
+Mutant: M-506
+Targets: P-QVAL-04
+Expect-Fail: ur_val::p_qval_04
+Defect: vertex() visits the corners out of upstream's order
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -192,7 +192,7 @@
+         // Twiddle bits to return points in CCW order (lower left, lower right,
+         // upper right, upper left).
+         let k = k.rem_euclid(4) as usize;
+-        let j = ((k >> 1) & 1) != 0;
++        let j = (k & 1) != 0;
+         let i = (usize::from(j) ^ (k & 1)) != 0;
+         self.vertex_ij(Endpoint::from(i), Endpoint::from(j))
+     }

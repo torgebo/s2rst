@@ -261,7 +261,7 @@ impl R2EdgeClipper {
 /// Interpolates from whichever of `a`/`b` is closer to `x` for better
 /// numerical accuracy.
 fn interpolate_double(x: f64, a: f64, b: f64, a1: f64, b1: f64) -> f64 {
-    debug_assert!(a != b);
+    debug_assert_ne!(a, b);
     if (a - x).abs() <= (b - x).abs() {
         a1 + (b1 - a1) * ((x - a) / (b - a))
     } else {

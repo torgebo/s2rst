@@ -112,6 +112,13 @@ class TestChordAngle:
         assert ca.length2 == pytest.approx(2.0)
         assert ca.degrees == pytest.approx(90.0)
 
+    def test_from_length2_canonical(self):
+        # Spec 007 FR-017/FR-018: every negative length is NEGATIVE; NaN and +inf are STRAIGHT.
+        for x in (-5.0, -0.001, float("-inf")):
+            assert s2rst.ChordAngle.from_length2(x).length2 == -1.0
+        for x in (float("nan"), float("inf"), 5.0):
+            assert s2rst.ChordAngle.from_length2(x).length2 == 4.0
+
     def test_from_angle(self):
         a = s2rst.Angle.from_degrees(90.0)
         ca = s2rst.ChordAngle.from_angle(a)

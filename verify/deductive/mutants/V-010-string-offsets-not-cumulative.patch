@@ -1,0 +1,17 @@
+Mutant: V-010
+Theorem: encode_string_vector's ensures, lemma_svec_round_trip
+Defect: the string encoder writes each length instead of the running end offset
+
+diff --git a/verify/deductive/src/string_vector.rs b/verify/deductive/src/string_vector.rs
+index fa7cd87..f7be8de 100644
+--- a/verify/deductive/src/string_vector.rs
++++ b/verify/deductive/src/string_vector.rs
+@@ -231,7 +231,7 @@ pub fn encode_string_vector(strings: &[Vec<u8>], w: &mut Vec<u8>) -> (width: usi
+             assert(vs.take((i + 1) as int).last() == strings[i as int]@);
+             lemma_total_prefix(vs, (i + 1) as int);
+         }
+-        offset = offset + strings[i].len() as u64;
++        offset = strings[i].len() as u64;
+         offsets.push(offset);
+         i += 1;
+     }

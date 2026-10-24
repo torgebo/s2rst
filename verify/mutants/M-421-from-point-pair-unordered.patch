@@ -1,0 +1,17 @@
+Mutant: M-421
+Targets: P-RIV-01
+Expect-Fail: ri_val::p_riv_01
+Defect: from_point_pair() keeps the points in the wrong order
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -129,7 +129,7 @@
+ 
+     /// Returns the minimal interval containing the two given points.
+     pub fn from_point_pair(p1: f64, p2: f64) -> Self {
+-        if p1 <= p2 {
++        if p1 >= p2 {
+             Interval { lo: p1, hi: p2 }
+         } else {
+             Interval { lo: p2, hi: p1 }

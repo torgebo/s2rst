@@ -1,0 +1,19 @@
+Mutant: M-140
+Targets: P-UDEN-01, P-UDEN-02
+Expect-Fail: cu_den::p_uden_01__n1_ids, cu_den::p_uden_02__n1
+Tier: slow
+Defect: denormalize() rounds the level up one step too far, off the level_mod grid
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..e9330f6 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -502,7 +502,7 @@ impl CellUnion {
+                 if offset > 0 {
+                     // C++ rounds up in `int` and then clamps to kMaxLevel; a saturating
+                     // add cannot overflow even for a `level_mod` outside 1–3.
+-                    let rounded = level.as_u8().saturating_add(level_mod - offset);
++                    let rounded = level.as_u8().saturating_add(level_mod - offset + 1);
+                     Level::new(rounded.min(crate::s2::coords::MAX_CELL_LEVEL))
+                 } else {
+                     level

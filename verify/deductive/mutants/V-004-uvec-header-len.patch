@@ -1,0 +1,17 @@
+Mutant: V-004
+Theorem: lemma_uvec_full_round_trip, encode_uint_vector_u64's ensures
+Defect: the u64 encoder writes the width as len instead of len - 1
+
+diff --git a/verify/deductive/src/uint_vector.rs b/verify/deductive/src/uint_vector.rs
+index 57dc4fa..95824bb 100644
+--- a/verify/deductive/src/uint_vector.rs
++++ b/verify/deductive/src/uint_vector.rs
+@@ -254,7 +254,7 @@ pub fn encode_uint_vector_u64(v: &[u64], w: &mut Vec<u8>) -> (len: usize)
+                 requires (x | o) == o, 1 <= l <= 8, l >= 8 || (o >> (8 * l)) == 0;
+         }
+     }
+-    let size_len: u64 = ((v.len() as u64) * 8) | ((len as u64) - 1);
++    let size_len: u64 = ((v.len() as u64) * 8) | (len as u64);
+     write_uvarint(w, size_len);
+     let ghost wh = w@;
+     let mut i: usize = 0;

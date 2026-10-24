@@ -1,0 +1,18 @@
+Mutant: M-201
+Targets: P-UV-05, P-UV-01
+Expect-Fail: cd_uv::p_uv_05_u64__n1, cd_uv::p_uv_01_enc__n1
+Defect: byte_length_u64 rounds the bit width up to multiples of 7 bits, so some widths are one byte too wide
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..d808cb5 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -187,7 +187,7 @@ fn byte_length_u64(v: u64) -> usize {
+     if v == 0 {
+         1
+     } else {
+-        (64 - v.leading_zeros() as usize).div_ceil(8)
++        (64 - v.leading_zeros() as usize).div_ceil(7)
+     }
+ }
+ 

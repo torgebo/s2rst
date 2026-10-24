@@ -1,0 +1,17 @@
+Mutant: M-508
+Targets: P-QMEM-01
+Expect-Fail: ur_mem::p_qmem_01
+Defect: contains_point() checks x only
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -242,7 +242,7 @@
+ 
+     /// Reports whether the rectangle contains the point `p`.
+     pub fn contains_point(self, p: Point) -> bool {
+-        self.x.contains(p.x) && self.y.contains(p.y)
++        self.x.contains(p.x)
+     }
+ 
+     /// Reports whether the interior of the rectangle contains the point `p`.

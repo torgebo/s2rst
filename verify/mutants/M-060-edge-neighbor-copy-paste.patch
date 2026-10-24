@@ -1,0 +1,19 @@
+Mutant: M-060
+Targets: P-NBR-01
+Expect-Fail: nbr::p_nbr_01__f0_p02
+Defect: edge_neighbors() computes the third (j + size) neighbour with the first neighbour's offset and test (copy-paste), so two neighbours coincide
+Tier: slow
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..702df25 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -748,7 +748,7 @@ impl CellId {
+         [
+             from_face_ij_same(f, i, j - size, j - size >= 0).parent_at_level(level),
+             from_face_ij_same(f, i + size, j, i + size < MAX_SIZE).parent_at_level(level),
+-            from_face_ij_same(f, i, j + size, j + size < MAX_SIZE).parent_at_level(level),
++            from_face_ij_same(f, i, j - size, j - size >= 0).parent_at_level(level),
+             from_face_ij_same(f, i - size, j, i - size >= 0).parent_at_level(level),
+         ]
+     }

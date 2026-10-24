@@ -1,0 +1,18 @@
+Mutant: M-211
+Targets: P-FX-06
+Expect-Fail: cd_fx::p_fx_06__b8
+Defect: the CellId decoder skips its validity check and accepts invalid ids (FR-022)
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..8ff30cc 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -171,7 +171,7 @@ impl S2Decode for CellId {
+         // level mask) panics in `to_face_ij_orientation`, and breaks the validity
+         // invariant of a decoded `CellUnion`. Both callers (CellUnion and Cell decode)
+         // require valid ids.
+-        if !id.is_valid() {
++        if false && !id.is_valid() {
+             return Err(io::Error::new(
+                 io::ErrorKind::InvalidData,
+                 "invalid cell id",

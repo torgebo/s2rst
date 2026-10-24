@@ -1,0 +1,17 @@
+Mutant: V-003
+Theorem: lemma_le_round_trip, encode_uint_with_length's ensures
+Defect: encode_uint_with_length takes each byte one bit too high
+
+diff --git a/verify/deductive/src/fixed_width.rs b/verify/deductive/src/fixed_width.rs
+index a41a993..c84cf7f 100644
+--- a/verify/deductive/src/fixed_width.rs
++++ b/verify/deductive/src/fixed_width.rs
+@@ -94,7 +94,7 @@ pub fn encode_uint_with_length(w: &mut Vec<u8>, value: u64, len: usize)
+         invariant j <= len <= 8, w@ =~= w0 + le(value, j as int),
+         decreases len - j,
+     {
+-        let b: u8 = ((value >> ((8 * j) as u64)) & 0xff) as u8;
++        let b: u8 = ((value >> ((8 * j + 1) as u64)) & 0xff) as u8;
+         w.push(b);
+         assert(w@ =~= w0 + le(value, (j + 1) as int));
+         j += 1;

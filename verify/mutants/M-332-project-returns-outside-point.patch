@@ -1,0 +1,17 @@
+Mutant: M-332
+Targets: P-ISET-06
+Expect-Fail: iv_set::p_iset_06
+Defect: project() returns the point itself when the high bound is nearer
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -371,7 +371,7 @@
+         }
+         let dlo = positive_distance(p, self.lo);
+         let dhi = positive_distance(self.hi, p);
+-        if dlo < dhi { self.lo } else { self.hi }
++        if dlo < dhi { self.lo } else { p }
+     }
+ 
+     /// Returns an interval expanded on each side by `margin`.

@@ -1,0 +1,17 @@
+Mutant: M-631
+Targets: P-AGVAL-01
+Expect-Fail: ag_val::p_agval_01
+Defect: `from_radians` negates
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -74,7 +74,7 @@
+     /// Creates an angle from a value in radians (exact).
+     #[inline]
+     pub const fn from_radians(radians: f64) -> Self {
+-        Angle(radians)
++        Angle(-radians)
+     }
+ 
+     /// Creates an angle from a value in degrees.

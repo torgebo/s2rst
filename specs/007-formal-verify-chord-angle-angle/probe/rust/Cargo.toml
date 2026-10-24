@@ -1,0 +1,10 @@
+[package]
+name = "probe007"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+s2rst = { path = "../../../../core" }

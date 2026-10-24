@@ -34,7 +34,7 @@ use crate::s2::Point;
 use crate::s2::coords::{self, Face, MAX_CELL_LEVEL};
 use crate::s2::encoded_string_vector::{self, StringVectorBuilder};
 use crate::s2::encoded_uint_vector;
-use crate::s2::encoding::write_uvarint;
+use crate::s2::encoding::{read_uvarint, write_uvarint};
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -132,7 +132,18 @@ pub fn encode_s2point_vector(
 ///
 /// # Errors
 ///
-/// Returns an error if the data is malformed or the read fails.
+/// - [`io::ErrorKind::UnexpectedEof`]: the input ends early.
+/// - [`io::ErrorKind::InvalidData`]:
+///   - a format tag (the low 3 bits of the first byte) other than 0 (uncompressed) or 1
+///     (cell ids);
+///   - in the uncompressed format, a header varint whose tenth byte is above 1, or more
+///     than 50,000,000 points. That limit is a deliberate deviation; upstream has none;
+///   - in the cell-id format, a level above 30, an error of its block string vector
+///     ([`decode_string_vector`](super::encoded_string_vector::decode_string_vector)), an
+///     empty block, or an offset, delta or exception that runs past its block.
+///
+/// The points are not validated, as upstream: an uncompressed point may have any
+/// coordinates, NaN and non-unit lengths included.
 pub fn decode_s2point_vector(r: &mut dyn Read) -> io::Result<Vec<Point>> {
     // Peek at the first byte to determine the format.
     let mut first_byte = [0u8; 1];
@@ -151,36 +162,45 @@ pub fn decode_s2point_vector(r: &mut dyn Read) -> io::Result<Vec<Point>> {
             r.read_exact(&mut second_byte)?;
             decode_cell_ids_raw(first_byte[0], second_byte[0], r)
         }
-        _ => Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("unknown S2PointVector format {format}"),
-        )),
+        _ => Err(PointVectorDecodeError::UnknownFormat(format).into()),
     }
 }
 
-/// Reconstructs a varint given its first byte has already been read.
+/// Why decoding a point vector failed, for the messages built from decoded values.
+///
+/// The message is formatted only when the error is displayed, never while decoding, with the
+/// same text as before. Formatting it from decoded values put `core::fmt` into every decoding
+/// proof (spec 003, research R0 and R6).
+#[derive(Debug)]
+enum PointVectorDecodeError {
+    /// The format tag in the low 3 bits of the first byte is neither 0 nor 1.
+    UnknownFormat(u8),
+    /// The compact format's cell level is above the maximum.
+    InvalidLevel(i32),
+}
+
+impl std::fmt::Display for PointVectorDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnknownFormat(format) => write!(f, "unknown S2PointVector format {format}"),
+            Self::InvalidLevel(level) => write!(f, "invalid level {level}"),
+        }
+    }
+}
+
+impl std::error::Error for PointVectorDecodeError {}
+
+impl From<PointVectorDecodeError> for io::Error {
+    fn from(e: PointVectorDecodeError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, e)
+    }
+}
+
+/// Reads a varint whose first byte has already been read: [`read_uvarint`] over that byte
+/// followed by the rest of `r`. One varint reader, the one the Verus proof and the drift guard
+/// cover (`verify/deductive/mirrors.toml`), instead of a second copy of its rules.
 fn reconstruct_uvarint(first: u8, r: &mut dyn Read) -> io::Result<u64> {
-    let mut result = u64::from(first & 0x7F);
-    if first < 0x80 {
-        return Ok(result);
-    }
-    let mut shift = 7u32;
-    loop {
-        let mut buf = [0u8; 1];
-        r.read_exact(&mut buf)?;
-        let b = buf[0];
-        result |= u64::from(b & 0x7F) << shift;
-        if b < 0x80 {
-            return Ok(result);
-        }
-        shift += 7;
-        if shift >= 64 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "varint overflow",
-            ));
-        }
-    }
+    read_uvarint(&mut [first].as_slice().chain(r))
 }
 
 // ─── UNCOMPRESSED format ────────────────────────────────────────────────
@@ -208,7 +228,11 @@ fn decode_uncompressed(size_format: u64, r: &mut dyn Read) -> io::Result<Vec<Poi
             "too many points",
         ));
     }
-    let mut points = Vec::with_capacity(count);
+    // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
+    // declaring a huge count must not reserve memory for it). Not even a capped reservation:
+    // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
+    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    let mut points = Vec::new();
     for _ in 0..count {
         let mut buf = [0u8; 24];
         r.read_exact(&mut buf)?;
@@ -358,10 +382,7 @@ fn decode_cell_ids_raw(byte0: u8, byte1: u8, r: &mut dyn Read) -> io::Result<Vec
     let base_bytes = (byte1 & 7) as usize;
     let level = i32::from(byte1 >> 3);
     if level > i32::from(MAX_CELL_LEVEL) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("invalid level {level}"),
-        ));
+        return Err(PointVectorDecodeError::InvalidLevel(level).into());
     }
 
     // Decode base.
@@ -374,9 +395,11 @@ fn decode_cell_ids_raw(byte0: u8, byte1: u8, r: &mut dyn Read) -> io::Result<Vec
     if num_blocks == 0 {
         return Ok(Vec::new());
     }
-    let total_points = BLOCK_SIZE * (num_blocks - 1) + last_block_count;
-
-    let mut points = Vec::with_capacity(total_points);
+    // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
+    // declaring a huge count must not reserve memory for it). Not even a capped reservation:
+    // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
+    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    let mut points = Vec::new();
 
     for (bi, block) in block_data.iter().enumerate() {
         if block.is_empty() {
@@ -1041,3 +1064,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "encoded_s2point_vector_tests.rs"]
+mod encoded_s2point_vector_tests;

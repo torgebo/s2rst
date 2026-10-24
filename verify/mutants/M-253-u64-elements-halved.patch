@@ -1,0 +1,18 @@
+Mutant: M-253
+Targets: FR-011 link: uint_vector::decode_uint_vector_u64
+Expect-Fail: cd_agree::a_uv64_dec__b2
+Defect: decode_uint_vector_u64 halves every element; drift guard: fails
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..a150dd9 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -166,7 +166,7 @@ pub fn decode_uint_vector_u64(r: &mut dyn Read) -> io::Result<Vec<u64>> {
+     // declaring a huge count must not reserve memory for it).
+     let mut result = Vec::new();
+     for _ in 0..count {
+-        result.push(decode_uint_with_length(r, len)?);
++        result.push(decode_uint_with_length(r, len)? >> 1);
+     }
+     Ok(result)
+ }

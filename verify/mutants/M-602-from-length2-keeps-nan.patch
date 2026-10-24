@@ -1,0 +1,17 @@
+Mutant: M-602
+Targets: P-CAVAL-03, P-CAVAL-02
+Expect-Fail: ca_val::p_caval_03 ca_val::p_caval_02__ctor
+Defect: `from_length2` keeps NaN (FR-018 undone)
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -128,7 +128,7 @@
+     pub fn from_length2(length2: f64) -> Self {
+         if length2 < 0.0 {
+             ChordAngle::NEGATIVE
+-        } else if length2 <= MAX_LENGTH2 {
++        } else if !(length2 > MAX_LENGTH2) {
+             ChordAngle(length2)
+         } else {
+             ChordAngle::STRAIGHT

@@ -1,0 +1,17 @@
+Mutant: M-305
+Targets: P-CCNT-01
+Expect-Fail: cl_cnt::p_ccnt_01
+Defect: intersects_cell() misses the case where the other cell contains this one
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -397,7 +397,7 @@
+     /// Reports whether this cell intersects the other cell.
+     #[inline]
+     pub fn intersects_cell(self, other: Cell) -> bool {
+-        self.id.intersects(other.id)
++        self.id.contains(other.id)
+     }
+ 
+     // --- Bounding ---

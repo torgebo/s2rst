@@ -1,0 +1,18 @@
+Mutant: M-637
+Targets: P-AGCNV-01
+Expect-Fail: 
+Test: verify --release --test angle_enumeration -- --ignored p_agcnv_01_unsigned
+Defect: `from_unsigned_e7` goes through `from_e6`
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -112,7 +112,7 @@
+     /// negative angle (its bits read as an `i32`), as upstream's `static_cast<int32_t>`.
+     #[inline]
+     pub fn from_unsigned_e7(e7: u32) -> Self {
+-        Self::from_e7(e7 as i32)
++        Self::from_e6(e7 as i32)
+     }
+ 
+     // --- Accessors ---

@@ -1,0 +1,17 @@
+Mutant: M-606
+Targets: P-CANBR-01, P-CAVAL-02
+Expect-Fail: ca_nbr::p_canbr_01 ca_val::p_caval_02__nbr
+Defect: `successor` of `STRAIGHT` steps one ulp past 4 instead of to `INFINITY`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -280,7 +280,7 @@
+     /// - `STRAIGHT.successor()` → `INFINITY`
+     /// - `INFINITY.successor()` → `INFINITY`
+     pub fn successor(self) -> ChordAngle {
+-        if self.0 >= MAX_LENGTH2 {
++        if self.0 > MAX_LENGTH2 {
+             ChordAngle::INFINITY
+         } else if self.0 < 0.0 {
+             ChordAngle::ZERO

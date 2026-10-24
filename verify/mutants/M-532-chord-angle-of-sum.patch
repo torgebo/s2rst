@@ -1,0 +1,17 @@
+Mutant: M-532
+Targets: P-PTDST-01
+Expect-Fail: pt_dst::p_ptdst_01__self
+Defect: chord_angle() measures the sum instead of the difference
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -171,7 +171,7 @@
+     /// upstream's `std::min(4.0, …)`.
+     #[inline]
+     pub fn chord_angle(self, other: Point) -> ChordAngle {
+-        ChordAngle::from_length2((self.0 - other.0).norm2().min(4.0))
++        ChordAngle::from_length2((self.0 + other.0).norm2().min(4.0))
+     }
+ 
+     /// Returns a stable angle between this point and `other`, using

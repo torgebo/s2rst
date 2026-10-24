@@ -1,0 +1,17 @@
+Mutant: M-435
+Targets: P-LEQ-01
+Expect-Fail: rl_eq::p_leq_01
+Defect: equality compares the latitudes only
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -137,7 +137,7 @@
+ 
+ impl PartialEq for Rect {
+     fn eq(&self, other: &Self) -> bool {
+-        self.lat == other.lat && self.lng == other.lng
++        self.lat == other.lat
+     }
+ }
+ 

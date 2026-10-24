@@ -1,0 +1,19 @@
+Mutant: M-104
+Targets: P-UINV-02
+Expect-Fail: cu_inv::p_uinv_02__n4
+Tier: slow
+Defect: is_normalized() skips the sibling check at index 0
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..b6c0480 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -145,7 +145,7 @@ impl CellUnion {
+         if !self.is_valid() {
+             return false;
+         }
+-        for i in 0..self.0.len() {
++        for i in 1..self.0.len() {
+             if i + 3 < self.0.len()
+                 && are_siblings(self.0[i], self.0[i + 1], self.0[i + 2], self.0[i + 3])
+             {

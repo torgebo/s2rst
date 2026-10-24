@@ -1477,6 +1477,28 @@ fn prop_point_distance_triangle_inequality(
     d_ac <= d_ab + d_bc + 1e-14
 }
 
+/// Distance and the stable angle are symmetric, bit for bit, in the default build, whose
+/// products are unfused (spec 006 P-PTDST-02, K9). Kani cannot prove it: both reach `atan2`, a
+/// tool limit (spec 006 research R0).
+#[cfg(not(target_feature = "fma"))]
+#[quickcheck]
+fn prop_point_distance_symmetric_bits(
+    x0: f64,
+    y0: f64,
+    z0: f64,
+    x1: f64,
+    y1: f64,
+    z1: f64,
+) -> bool {
+    match (make_point(x0, y0, z0), make_point(x1, y1, z1)) {
+        (Some(p), Some(q)) => {
+            p.distance(q).radians().to_bits() == q.distance(p).radians().to_bits()
+                && p.stable_angle(q).radians().to_bits() == q.stable_angle(p).radians().to_bits()
+        }
+        _ => true,
+    }
+}
+
 // ════════════════════════════════════════════════════════════════════
 // 15. CELLID PARENT/CHILD CONSISTENCY
 // ════════════════════════════════════════════════════════════════════
@@ -1616,7 +1638,7 @@ fn prop_cell_union_contains_cell_centers(face: i32, level: i32) -> bool {
     cu.contains_point(id.to_point())
 }
 
-/// `CellUnion` `from_range` covers the range endpoints.
+/// `CellUnion` `from_begin_end` covers the range endpoints.
 #[quickcheck]
 fn prop_cell_union_from_range_covers_endpoints(face: i32, level: i32) -> bool {
     use s2rst::s2::CellUnion;
@@ -1625,7 +1647,7 @@ fn prop_cell_union_from_range_covers_endpoints(face: i32, level: i32) -> bool {
     let id = CellId::from_face(f).child_begin_at_level(l);
     let begin = id.range_min();
     let end = id.range_max().next();
-    let cu = CellUnion::from_range(begin, end);
+    let cu = CellUnion::from_begin_end(begin, end);
     cu.is_valid() && cu.contains_cell_id(id)
 }
 
@@ -8339,4 +8361,294 @@ fn prop_reclipped_dimension_matches(dim: u8) -> bool {
     let mut shape = ReclippedShape::new();
     shape.init(&mut clipper, 0, dim, false, std::iter::empty(), false);
     shape.dimension() == Some(dim)
+}
+
+// ────────────────────────────────────────────────────────────────────
+// CellUnion beyond the formal proofs (spec 002, research R17)
+// ────────────────────────────────────────────────────────────────────
+
+/// Properties of `CellUnion` for the sizes and operations the Kani proofs of
+/// `specs/002-formal-verify-cell-union` cannot reach: unions of up to 20 cells (sibling
+/// merges and their cascades), `difference`, the range constructors, and multi-cell
+/// `denormalize`. Each is stated against a sampled version of the covered-set meaning: leaves
+/// at the edges of every input and output cell, and random leaves near the union.
+mod cell_union_beyond_the_proofs {
+    use super::*;
+    use s2rst::s2::CellUnion;
+    use s2rst::s2::encoding::{S2Decode, S2Encode};
+
+    /// SplitMix64, so that one quickcheck `u64` seeds a whole union.
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
+            let mut z = self.0;
+            z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+            z ^ (z >> 31)
+        }
+
+        fn below(&mut self, n: u64) -> u64 {
+            self.next() % n
+        }
+
+        /// A random cell at a level in `min_level..=max_level`.
+        fn cell(&mut self, min_level: u8, max_level: u8) -> CellId {
+            let level = min_level + self.below(u64::from(max_level - min_level) + 1) as u8;
+            let mut c = CellId::from_face(self.below(6) as u8);
+            for _ in 0..level {
+                c = c.children()[self.below(4) as usize];
+            }
+            c
+        }
+
+        /// A random descendant of `anchor`, at most four levels below it.
+        fn descendant(&mut self, anchor: CellId) -> CellId {
+            let mut c = anchor;
+            for _ in 0..self.below(5) {
+                if c.is_leaf() {
+                    break;
+                }
+                c = c.children()[self.below(4) as usize];
+            }
+            c
+        }
+
+        /// A random leaf inside `cell`.
+        fn leaf_in(&mut self, cell: CellId) -> CellId {
+            let leaves = 1u64 << (2 * (30 - cell.level().as_u32()));
+            cell.range_min().advance(self.below(leaves) as i64)
+        }
+
+        /// Up to `max_cells` valid cells among `anchor`'s descendants, unsorted, with
+        /// duplicates and nesting. With `siblings`, often a complete group of four children,
+        /// sometimes a cascade (three children plus the four children of the fourth).
+        fn cells_around(
+            &mut self,
+            anchor: CellId,
+            max_cells: usize,
+            siblings: bool,
+        ) -> Vec<CellId> {
+            let n = self.below(max_cells as u64 + 1);
+            let mut ids: Vec<CellId> = (0..n).map(|_| self.descendant(anchor)).collect();
+            if siblings && self.below(2) == 0 {
+                let p = self.descendant(anchor);
+                if !p.is_leaf() {
+                    let kids = p.children();
+                    if self.below(2) == 0 && !kids[3].is_leaf() {
+                        ids.extend_from_slice(&kids[..3]);
+                        ids.extend(kids[3].children());
+                    } else {
+                        ids.extend(kids);
+                    }
+                }
+            }
+            ids
+        }
+    }
+
+    /// Whether some cell of `ids` contains `leaf` (a linear scan, independent of the
+    /// implementation's binary searches).
+    fn covered(ids: &[CellId], leaf: CellId) -> bool {
+        ids.iter()
+            .any(|c| c.range_min() <= leaf && leaf <= c.range_max())
+    }
+
+    /// Leaves at the edges of every cell in `sets`, the leaves just outside them, and 16
+    /// random leaves inside `anchor`.
+    fn samples(r: &mut Rng, anchor: CellId, sets: &[&[CellId]]) -> Vec<CellId> {
+        let mut out = Vec::new();
+        for set in sets {
+            for c in *set {
+                let (lo, hi) = (c.range_min(), c.range_max());
+                out.extend([lo, hi]);
+                if lo > CellId::begin(30u8) {
+                    out.push(lo.prev());
+                }
+                if hi.next().is_valid() {
+                    out.push(hi.next());
+                }
+            }
+        }
+        out.extend((0..16).map(|_| r.leaf_in(anchor)));
+        out
+    }
+
+    fn leaves(c: CellId) -> u64 {
+        1u64 << (2 * (30 - c.level().as_u32()))
+    }
+
+    /// `normalize` (through `from_cell_ids`) returns a normalised union with the same covered
+    /// leaves, and normalising it again changes nothing, for unions of up to 20 cells with
+    /// complete sibling groups and cascades.
+    #[quickcheck]
+    fn prop_cell_union_normalize_preserves_coverage(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let anchor = r.cell(0, 20);
+        let input = r.cells_around(anchor, 20, true);
+        let u = CellUnion::from_cell_ids(input.clone());
+        let again = CellUnion::from_cell_ids(u.cell_ids().to_vec());
+        u.is_normalized()
+            && again == u
+            && samples(&mut r, anchor, &[&input, u.cell_ids()])
+                .into_iter()
+                .all(|x| covered(&input, x) == covered(u.cell_ids(), x))
+    }
+
+    /// `union`, `intersection` and `difference` cover the set union, intersection and
+    /// difference; `union` is normalised, and the other two are normalised because their
+    /// inputs are (C++ `Union`, `Intersection`, `Difference`).
+    #[quickcheck]
+    fn prop_cell_union_set_ops_match_covered_sets(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let anchor = r.cell(0, 20);
+        let other = if r.below(2) == 0 {
+            anchor
+        } else {
+            r.cell(0, 20)
+        };
+        let a = CellUnion::from_cell_ids(r.cells_around(anchor, 20, true));
+        let b = CellUnion::from_cell_ids(r.cells_around(other, 20, true));
+        let (union, inter, diff) = (a.union(&b), a.intersection(&b), a.difference(&b));
+        let all: [&[CellId]; 5] = [&a, &b, &union, &inter, &diff];
+        union.is_normalized()
+            && inter.is_normalized()
+            && diff.is_normalized()
+            && samples(&mut r, anchor, &all).into_iter().all(|x| {
+                let (in_a, in_b) = (covered(&a, x), covered(&b, x));
+                covered(&union, x) == (in_a || in_b)
+                    && covered(&inter, x) == (in_a && in_b)
+                    && covered(&diff, x) == (in_a && !in_b)
+            })
+    }
+
+    /// The cell and union queries agree with linear scans over the members, and
+    /// `intersection_with_cell_id` covers exactly the union's leaves inside the cell, on
+    /// normalised unions of up to 20 cells.
+    #[quickcheck]
+    fn prop_cell_union_queries_match_covered_sets(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let anchor = r.cell(0, 20);
+        let u = CellUnion::from_cell_ids(r.cells_around(anchor, 20, true));
+        let b = CellUnion::from_cell_ids(r.cells_around(anchor, 6, false));
+        let c = if r.below(3) == 0 {
+            anchor.parent_at_level(anchor.level().as_u8() / 2)
+        } else {
+            r.descendant(anchor)
+        };
+        let contains = u.cell_ids().iter().any(|m| m.contains(c));
+        let intersects = u.cell_ids().iter().any(|m| m.intersects(c));
+        let piece = u.intersection_with_cell_id(c);
+        u.contains_cell_id(c) == contains
+            && u.intersects_cell_id(c) == intersects
+            && u.contains_union(&b) == b.cell_ids().iter().all(|&x| u.contains_cell_id(x))
+            && u.intersects_union(&b) == b.cell_ids().iter().any(|&x| u.intersects_cell_id(x))
+            && piece.is_normalized()
+            && samples(&mut r, c, &[&u, &piece, &[c]])
+                .into_iter()
+                .all(|x| covered(&piece, x) == (covered(&u, x) && c.contains(x)))
+    }
+
+    /// `from_begin_end(b, e)` covers exactly the leaves `[b, e)` and is normalised;
+    /// `from_min_max(b, e.prev())` and the deprecated `from_range(b, e)` give the same union.
+    #[expect(deprecated, reason = "checks the deprecated alias until it is removed")]
+    #[quickcheck]
+    fn prop_cell_union_ranges_cover_exactly(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let anchor = r.cell(0, 20);
+        let (mut b, mut e) = (r.leaf_in(anchor), r.leaf_in(anchor));
+        if e < b {
+            std::mem::swap(&mut b, &mut e);
+        }
+        if r.below(4) == 0 {
+            e = anchor.range_max().next(); // may be the next face, or End(30)
+        }
+        let u = CellUnion::from_begin_end(b, e);
+        let in_range = |x: CellId| b <= x && x < e;
+        let count: u64 = u.cell_ids().iter().map(|&c| leaves(c)).sum();
+        u.is_normalized()
+            && count == (e.id() - b.id()) / 2
+            && (b == e || CellUnion::from_min_max(b, e.prev()) == u)
+            && CellUnion::from_range(b, e) == u
+            && samples(&mut r, anchor, &[&u, &[b]])
+                .into_iter()
+                .chain([b, e])
+                .filter(|x| x.is_valid())
+                .all(|x| covered(&u, x) == in_range(x))
+    }
+
+    /// `denormalize` covers the same leaves, and every member is at a level `≥ min_level`
+    /// with `(level − min_level) % level_mod == 0`, unless its level is 30 (C++
+    /// `Denormalize`, including the FR-015 clamp). Cells stay within two levels below
+    /// `min_level`, so outputs stay small.
+    #[quickcheck]
+    fn prop_cell_union_denormalize_preserves_coverage(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let min_level = r.below(31) as u8;
+        let level_mod = 1 + r.below(3) as u8;
+        let anchor = r.cell(min_level.saturating_sub(2), 30);
+        let u = CellUnion::from_cell_ids(r.cells_around(anchor, 8, true));
+        let d = u.denormalize(Level::new(min_level), level_mod);
+        let total = |v: &[CellId]| v.iter().map(|&c| leaves(c)).sum::<u64>();
+        d.is_valid()
+            && total(&d) == total(&u)
+            && d.cell_ids().iter().all(|c| {
+                let l = c.level().as_u8();
+                l >= min_level && (l == 30 || (l - min_level).is_multiple_of(level_mod))
+            })
+            && samples(&mut r, anchor, &[&u, &d])
+                .into_iter()
+                .all(|x| covered(&u, x) == covered(&d, x))
+    }
+
+    fn encoded(ids: &[CellId]) -> Vec<u8> {
+        let mut out = Vec::new();
+        CellUnion::from_verbatim(ids.to_vec())
+            .encode(&mut out)
+            .unwrap();
+        out
+    }
+
+    /// A valid union that is not normalised (a normalised one with one cell split into its
+    /// children) decodes to exactly its ids (FR-017).
+    #[quickcheck]
+    fn prop_cell_union_decode_roundtrips_verbatim(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let anchor = r.cell(0, 20);
+        let u = CellUnion::from_cell_ids(r.cells_around(anchor, 20, true));
+        let mut ids = Vec::new();
+        let mut split = false;
+        for &c in u.cell_ids() {
+            if !split && !c.is_leaf() {
+                ids.extend(c.children());
+                split = true;
+            } else {
+                ids.push(c);
+            }
+        }
+        let decoded = CellUnion::decode(&mut &encoded(&ids)[..]);
+        decoded.is_ok_and(|d| d.cell_ids() == &ids[..])
+    }
+
+    /// Swapping two members of a valid union of two or more cells, or repeating one, makes
+    /// the decoder reject it (FR-017).
+    #[quickcheck]
+    fn prop_cell_union_decode_rejects_invalid_order(seed: u64) -> bool {
+        let mut r = Rng(seed);
+        let anchor = r.cell(0, 20);
+        let u = CellUnion::from_cell_ids(r.cells_around(anchor, 20, true));
+        let n = u.num_cells();
+        if n < 2 {
+            return true;
+        }
+        let i = r.below(n as u64 - 1) as usize;
+        let j = i + 1 + r.below((n - i - 1) as u64) as usize;
+        let mut swapped = u.cell_ids().to_vec();
+        swapped.swap(i, j);
+        let mut repeated = u.cell_ids().to_vec();
+        repeated.insert(i, repeated[i]);
+        CellUnion::decode(&mut &encoded(&swapped)[..]).is_err()
+            && CellUnion::decode(&mut &encoded(&repeated)[..]).is_err()
+    }
 }

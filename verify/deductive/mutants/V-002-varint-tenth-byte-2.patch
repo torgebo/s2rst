@@ -1,0 +1,17 @@
+Mutant: V-002
+Theorem: read_uvarint's ensures (the spec decoder, D-003)
+Defect: read_uvarint accepts a tenth byte of 2
+
+diff --git a/verify/deductive/src/varint.rs b/verify/deductive/src/varint.rs
+index 9cf855b..5440c9b 100644
+--- a/verify/deductive/src/varint.rs
++++ b/verify/deductive/src/varint.rs
+@@ -111,7 +111,7 @@ pub fn read_uvarint(buf: &[u8], pos: usize) -> (r: Option<(u64, usize)>)
+             return None;
+         }
+         let b = buf[i];
+-        if shift == 63 && b > 1 {
++        if shift == 63 && b > 2 {
+             return None;
+         }
+         let part: u64 = ((b & 0x7f) as u64) << shift;

@@ -575,7 +575,7 @@ impl RobustCellClipper {
         let k = boundary as usize;
         let (va, vb) = self.boundaries[k];
         let dir = predicates::robust_sign(va, vb, v0);
-        debug_assert!(dir != predicates::Direction::Indeterminate);
+        debug_assert_ne!(dir, predicates::Direction::Indeterminate);
         if dir == predicates::Direction::CounterClockwise {
             CrossingType::Outgoing
         } else {

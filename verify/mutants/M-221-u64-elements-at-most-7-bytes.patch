@@ -1,0 +1,18 @@
+Mutant: M-221
+Targets: P-UV-06, P-UV-01
+Expect-Fail: cd_uv::p_uv_05_u64__n1, cd_uv::p_uv_01_enc__n1
+Defect: encode_uint_vector_u64 writes 8-byte elements with 7 bytes, under a header that declares 8
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..88af3c9 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -104,7 +104,7 @@ pub fn encode_uint_vector_u64(v: &[u64], w: &mut dyn Write) -> io::Result<()> {
+     let size_len = (v.len() as u64 * 8) | (len as u64 - 1);
+     write_uvarint(w, size_len)?;
+     for &x in v {
+-        encode_uint_with_length(w, x, len)?;
++        encode_uint_with_length(w, x, len.min(7))?;
+     }
+     Ok(())
+ }

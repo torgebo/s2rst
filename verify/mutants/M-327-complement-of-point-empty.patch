@@ -1,0 +1,17 @@
+Mutant: M-327
+Targets: P-ISET-01
+Expect-Fail: iv_set::p_iset_01
+Defect: the complement of a single point is empty
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -192,7 +192,7 @@
+     /// any interior values. The complement of a singleton interval is full.
+     pub fn complement(self) -> Interval {
+         if self.lo == self.hi {
+-            return Interval::full(); // Singleton.
++            return Interval::empty(); // Singleton.
+         }
+         Interval::new_checked(self.hi, self.lo) // Handles empty and full.
+     }

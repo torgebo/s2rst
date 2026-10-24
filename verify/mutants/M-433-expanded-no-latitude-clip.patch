@@ -1,0 +1,17 @@
+Mutant: M-433
+Targets: P-LVAL-02
+Expect-Fail: rl_val::p_lval_02__expanded
+Defect: expanded() does not clip the latitudes to [-π/2, π/2]
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -495,7 +495,7 @@
+         }
+ 
+         Rect {
+-            lat: lat.intersection(VALID_LAT_RANGE),
++            lat,
+             lng,
+         }
+     }

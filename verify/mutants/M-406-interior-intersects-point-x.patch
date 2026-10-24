@@ -1,0 +1,17 @@
+Mutant: M-406
+Targets: P-RREL-02
+Expect-Fail: ri_rel::p_rrel_02
+Defect: interior_intersects() forgets that a single point has an empty interior
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -212,7 +212,7 @@
+     /// Reports whether the interior of this interval intersects any point
+     /// of the given interval (including its boundary).
+     pub fn interior_intersects(self, y: Interval) -> bool {
+-        y.lo < self.hi && self.lo < y.hi && self.lo < self.hi && y.lo <= y.hi
++        y.lo < self.hi && self.lo < y.hi && y.lo <= y.hi
+     }
+ 
+     /// Returns the Hausdorff distance to the given interval `y`.

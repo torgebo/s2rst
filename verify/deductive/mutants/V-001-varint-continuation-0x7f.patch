@@ -1,0 +1,17 @@
+Mutant: V-001
+Theorem: lemma_round_trip, write_uvarint's ensures
+Defect: write_uvarint continues at 0x7f instead of 0x80
+
+diff --git a/verify/deductive/src/varint.rs b/verify/deductive/src/varint.rs
+index 9cf855b..bcc54b7 100644
+--- a/verify/deductive/src/varint.rs
++++ b/verify/deductive/src/varint.rs
+@@ -36,7 +36,7 @@ pub fn write_uvarint(w: &mut Vec<u8>, x0: u64)
+ {
+     let ghost w0 = w@;
+     let mut x = x0;
+-    while x >= 0x80
++    while x >= 0x7f
+         invariant w@ + varint(x) == w0 + varint(x0),
+         decreases x,
+     {

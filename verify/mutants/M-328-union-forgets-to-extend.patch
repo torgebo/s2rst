@@ -1,0 +1,17 @@
+Mutant: M-328
+Targets: P-ISET-02
+Expect-Fail: iv_set::p_iset_02
+Defect: union() does not extend over y's high end
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -429,7 +429,7 @@
+                 }
+                 return Interval::full();
+             }
+-            return Interval::new_checked(self.lo, y.hi);
++            return Interval::new_checked(self.lo, self.hi);
+         }
+         if self.fast_contains(y.hi) {
+             return Interval::new_checked(y.lo, self.hi);

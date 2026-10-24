@@ -32,7 +32,7 @@ fn with_region<R>(
 ) -> PyResult<R> {
     macro_rules! try_region {
         ($ty:ty) => {
-            if let Ok(r) = region.downcast::<$ty>() {
+            if let Ok(r) = region.cast::<$ty>() {
                 let r = r.borrow();
                 return Ok(f(&r.0));
             }

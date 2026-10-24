@@ -1,0 +1,17 @@
+Mutant: M-517
+Targets: P-QMEA-01
+Expect-Fail: ur_mea::p_qmea_01__size
+Defect: size() negates the width
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -237,7 +237,7 @@
+     /// A side with both bounds the same infinity has a NaN length (`∞ − ∞`), as in upstream:
+     /// the size of `[∞, ∞] × [0, 1]` is `(NaN, 1)`. A side `[−∞, ∞]` has length `∞`.
+     pub fn size(self) -> Point {
+-        Point::new(self.x.length(), self.y.length())
++        Point::new(-self.x.length(), self.y.length())
+     }
+ 
+     /// Reports whether the rectangle contains the point `p`.

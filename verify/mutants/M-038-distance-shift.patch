@@ -1,0 +1,18 @@
+Mutant: M-038
+Targets: P-TRAV-06
+Expect-Fail: trav::p_trav_06
+Defect: distance_from_begin() shifts one bit too far
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..50ac7b2 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -573,7 +573,7 @@ impl CellId {
+     /// Returns the number of steps from `Begin()` at this level to this cell.
+     #[inline]
+     pub fn distance_from_begin(self) -> i64 {
+-        (self.0 >> (2 * (u32::from(MAX_CELL_LEVEL) - self.level().as_u32()) + 1)) as i64
++        (self.0 >> (2 * (u32::from(MAX_CELL_LEVEL) - self.level().as_u32()) + 2)) as i64
+     }
+ 
+     // =======================================================================

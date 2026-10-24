@@ -1,0 +1,1 @@
+core/src/s2/encoding.rs:112:13: replace >= with < in write_uvarint

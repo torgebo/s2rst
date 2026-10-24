@@ -1,0 +1,17 @@
+Mutant: M-526
+Targets: P-PTSCL-02
+Expect-Fail: pt_scl::p_ptscl_02
+Defect: the scaling's first factor takes the whole exponent and overflows beyond 2^1023
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -304,7 +304,7 @@
+         // 2^537 each. Each factor is a normal power of two and each product is exact, since it
+         // scales up a vector whose largest coordinate stays below 2.
+         let e = -ilogb(p_max);
+-        Point(self.0 * pow2(e / 2) * pow2(e - e / 2))
++        Point(self.0 * pow2(e - 1) * pow2(1))
+     }
+ }
+ 

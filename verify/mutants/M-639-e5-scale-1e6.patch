@@ -1,0 +1,18 @@
+Mutant: M-639
+Targets: P-AGEF-01
+Expect-Fail: ag_eform::p_agef_01__e5
+Tier: slow
+Defect: `e5` with 1e6
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -143,7 +143,7 @@
+     ///   −2147483648 for all of these in release builds (U-014).
+     #[inline]
+     pub fn e5(self) -> i32 {
+-        (self.degrees() * 1e5).round_ties_even() as i32
++        (self.degrees() * 1e6).round_ties_even() as i32
+     }
+ 
+     /// Returns the angle in E6 representation: degrees × 10⁶, rounded to the nearest integer,

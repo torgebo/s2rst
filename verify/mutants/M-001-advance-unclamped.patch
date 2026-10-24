@@ -1,0 +1,19 @@
+Mutant: M-001
+Targets: C-advance, P-TRAV-04
+Expect-Fail: crash::c_advance, trav::p_trav_04
+Defect: advance() no longer clamps positive steps (steps.min(max_steps) removed), so self.0 + (steps << shift) can overflow
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 02fd8d3..94cc651 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -468,8 +468,7 @@ impl CellId {
+             let steps = steps.max(min_steps);
+             CellId(self.0.wrapping_add((steps as u64) << step_shift))
+         } else {
+-            let max_steps = ((WRAP_OFFSET + self.lsb() - self.0) >> step_shift) as i64;
+-            let steps = steps.min(max_steps);
++            let _max_steps = ((WRAP_OFFSET + self.lsb() - self.0) >> step_shift) as i64;
+             CellId(self.0 + ((steps as u64) << step_shift))
+         }
+     }

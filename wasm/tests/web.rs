@@ -796,6 +796,36 @@ fn test_cell_union_from_tokens() {
 }
 
 #[wasm_bindgen_test]
+fn test_cell_union_from_range_covers_exactly_the_range() {
+    // D-002: five leaves are a level-29 cell plus one leaf (C++ FromBeginEnd).
+    let begin = CellId::from_face(1).child_begin_at_level(30);
+    let end = begin.advance(5);
+    assert_eq!(CellUnion::from_range(&begin, &end).unwrap().num_cells(), 2);
+}
+
+#[wasm_bindgen_test]
+fn test_cell_union_range_constructors_reject_bad_arguments() {
+    // C++ FromBeginEnd requires leaf cells with begin <= end (DCHECKs only). In a release
+    // build, CellId(0) as begin looped forever; the bindings throw instead.
+    let leaf = |face: u8, k: i64| CellId::from_face(face).child_begin_at_level(30).advance(k);
+    let zero = CellId::none();
+    let face4 = CellId::from_face(4);
+    assert!(CellUnion::from_range(&zero, &leaf(0, 3)).is_err());
+    assert!(CellUnion::from_range(&leaf(1, 0), &face4).is_err());
+    assert!(CellUnion::from_range(&leaf(3, 0), &leaf(1, 0)).is_err());
+    assert!(CellUnion::from_begin_end(&zero, &leaf(0, 3)).is_err());
+    assert!(CellUnion::from_min_max(&leaf(3, 0), &leaf(1, 0)).is_err());
+    let leaf_end = CellId::from_face(5).range_max().next();
+    assert!(CellUnion::from_min_max(&leaf(5, 0), &leaf_end).is_err());
+    assert_eq!(
+        CellUnion::from_range(&leaf(5, 0), &leaf_end)
+            .unwrap()
+            .num_cells(),
+        1
+    );
+}
+
+#[wasm_bindgen_test]
 fn test_cell_union_whole_sphere() {
     let ws = CellUnion::whole_sphere();
     assert!(!ws.is_empty());
@@ -2462,12 +2492,12 @@ fn test_cap_interior_and_add() {
 #[wasm_bindgen_test]
 fn test_cell_union_range_constructors() {
     let f = CellId::from_face(0);
-    let u = CellUnion::from_range(&f.range_min(), &f.range_max());
+    let u = CellUnion::from_range(&f.range_min(), &f.range_max()).unwrap();
     assert!(u.is_valid());
     assert!(u.num_cells() >= 1);
-    let u2 = CellUnion::from_min_max(&f.range_min(), &f.range_max());
+    let u2 = CellUnion::from_min_max(&f.range_min(), &f.range_max()).unwrap();
     assert!(u2.is_valid());
-    let u3 = CellUnion::from_begin_end(&f.range_min(), &f.range_max());
+    let u3 = CellUnion::from_begin_end(&f.range_min(), &f.range_max()).unwrap();
     assert!(u3.is_valid());
 }
 
@@ -2490,6 +2520,16 @@ fn test_snap_function_and_simplified() {
         .simplified(&SnapFunction::identity(&Angle::from_degrees(0.5)))
         .area();
     let _ = poly.simplified(&SnapFunction::int_lat_lng(6)).area();
+}
+
+#[wasm_bindgen_test]
+fn test_cell_union_decode_rejects_unsorted() {
+    // FR-017 (spec 002): ids that are not a valid union (face 1, then face 0) are rejected.
+    let mut bytes = vec![1u8];
+    bytes.extend_from_slice(&2u64.to_le_bytes());
+    bytes.extend_from_slice(&0x3000_0000_0000_0000u64.to_le_bytes());
+    bytes.extend_from_slice(&0x1000_0000_0000_0000u64.to_le_bytes());
+    assert!(CellUnion::decode(&bytes).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -2899,7 +2939,7 @@ fn test_edge_tessellator() {
     let a = parse_point("60:0").unwrap();
     let b = parse_point("60:90").unwrap();
     let proj = t.tessellate_projected(&a, &b);
-    assert!(proj.len() >= 2 && proj.len() % 2 == 0);
+    assert!(proj.len() >= 2 && proj.len().is_multiple_of(2));
 
     // project / unproject round-trip.
     let xy = t.project(&parse_point("10:20").unwrap());

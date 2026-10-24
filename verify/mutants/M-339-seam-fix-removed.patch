@@ -1,0 +1,22 @@
+Mutant: M-339
+Targets: P-IMEA-01, P-IMEA-02
+Expect-Fail: iv_mea::p_imea_01,iv_mea::p_imea_02
+Defect: FR-020's fix is taken out: the corner's length is −1 again
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -177,12 +177,8 @@
+         let length = length + 2.0 * PI;
+         if length > 0.0 {
+             length
+-        } else if self.is_empty() {
++        } else {
+             -1.0
+-        } else {
+-            // The one-ulp interval across the seam: `hi − lo` rounded to −2π. This form
+-            // loses no bit (spec 004 FR-020).
+-            (self.hi + PI) - (self.lo - PI)
+         }
+     }
+ 

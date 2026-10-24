@@ -1,0 +1,18 @@
+Mutant: M-217
+Targets: P-FW-01
+Expect-Fail: cd_fw::p_fw_01
+Defect: encode_uint_with_length writes the high bytes, big-endian
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..6727f01 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -34,7 +34,7 @@ use crate::s2::encoding::{read_uvarint, write_uvarint};
+ /// Panics if `length > 8`. Upstream states the same precondition as a debug-only check
+ /// (`ABSL_DCHECK`, `encoded_uint_vector.h:145`).
+ pub fn encode_uint_with_length(w: &mut dyn Write, value: u64, length: usize) -> io::Result<()> {
+-    let bytes = value.to_le_bytes();
++    let bytes = value.to_be_bytes();
+     w.write_all(&bytes[..length])
+ }
+ 

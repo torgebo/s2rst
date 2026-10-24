@@ -372,7 +372,7 @@ impl S2BooleanOperation {
 
     /// Creates an operation that sends output to three layers (one per dimension).
     pub fn multi(op_type: OpType, layers: Vec<Box<dyn Layer>>, options: Options) -> Self {
-        debug_assert!(layers.len() == 3);
+        debug_assert_eq!(layers.len(), 3);
         S2BooleanOperation {
             op_type,
             options,
@@ -2932,9 +2932,9 @@ mod tests {
             a,
             b,
             &format!(
-                "{}{}",
+                "{} # {}",
                 diff_result.replace(" #", ""),
-                &format!(" # {}", vertex_test_polygon_str())
+                vertex_test_polygon_str()
             ),
         );
         expect_result(
@@ -2957,9 +2957,9 @@ mod tests {
             a,
             b,
             &format!(
-                "{}{}",
+                "{} # {}",
                 diff_result.replace(" #", ""),
-                &format!(" # {}", vertex_test_polygon_str())
+                vertex_test_polygon_str()
             ),
         );
     }
@@ -2978,9 +2978,9 @@ mod tests {
             a,
             b,
             &format!(
-                "{}{}",
+                "{} # {}",
                 diff_result.replace(" #", ""),
-                &format!(" # {}", vertex_test_polygon_str())
+                vertex_test_polygon_str()
             ),
         );
         expect_result(
@@ -3004,9 +3004,9 @@ mod tests {
             a,
             b,
             &format!(
-                "{}{}",
+                "{} # {}",
                 diff_result.replace(" #", ""),
-                &format!(" # {}", vertex_test_polygon_str())
+                vertex_test_polygon_str()
             ),
         );
     }
@@ -3025,9 +3025,9 @@ mod tests {
             a,
             b,
             &format!(
-                "{}{}",
+                "{} # {}",
                 diff_result.replace(" #", ""),
-                &format!(" # {}", vertex_test_polygon_str())
+                vertex_test_polygon_str()
             ),
         );
         expect_result(
@@ -3051,9 +3051,9 @@ mod tests {
             a,
             b,
             &format!(
-                "{}{}",
+                "{} # {}",
                 diff_result.replace(" #", ""),
-                &format!(" # {}", vertex_test_polygon_str())
+                vertex_test_polygon_str()
             ),
         );
     }

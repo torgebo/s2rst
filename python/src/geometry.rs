@@ -19,7 +19,7 @@ use crate::s2point::{PyLatLng, PyS2Point, PyS2PointIter};
 // ---------------------------------------------------------------------------
 
 /// An open polyline on the unit sphere, defined by a sequence of vertices.
-#[pyclass(name = "Polyline", module = "s2rst")]
+#[pyclass(from_py_object, name = "Polyline", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyPolyline(pub(crate) Polyline);
 
@@ -212,7 +212,7 @@ impl PyPolyline {
 ///
 /// Vertices are in counter-clockwise order (the interior is on the left).
 /// A loop with clockwise vertices represents a hole (complement region).
-#[pyclass(name = "Loop", module = "s2rst")]
+#[pyclass(from_py_object, name = "Loop", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyLoop(pub(crate) s2::Loop);
 
@@ -524,7 +524,7 @@ impl PyLoopIter {
 ///
 /// The first loop is the outer shell; subsequent loops are holes.
 /// Loops may be nested to arbitrary depth.
-#[pyclass(name = "Polygon", module = "s2rst")]
+#[pyclass(from_py_object, name = "Polygon", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyPolygon(pub(crate) s2::Polygon);
 

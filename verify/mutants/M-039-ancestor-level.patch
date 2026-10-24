@@ -1,0 +1,18 @@
+Mutant: M-039
+Targets: P-ANC-01
+Expect-Fail: anc::p_anc_01
+Defect: common_ancestor_level() rounds the level for odd difference bits the wrong way
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..4809f9c 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -872,7 +872,7 @@ impl CellId {
+         if msb_pos > 60 {
+             return None;
+         }
+-        Some(Level::new(((60 - msb_pos) >> 1) as u8))
++        Some(Level::new(((61 - msb_pos) >> 1).min(30) as u8))
+     }
+ 
+     /// Returns the largest cell with the same `range_min()` such that

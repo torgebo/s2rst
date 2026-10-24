@@ -1,0 +1,18 @@
+Mutant: M-031
+Targets: P-RANGE-02, P-RANGE-04
+Expect-Fail: range::p_range_02, range::p_range_04
+Defect: contains() excludes the last leaf
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..6fb245b 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -461,7 +461,7 @@ impl CellId {
+     /// Reports whether this cell contains `other`.
+     #[inline]
+     pub fn contains(self, other: CellId) -> bool {
+-        self.range_min().0 <= other.0 && other.0 <= self.range_max().0
++        self.range_min().0 <= other.0 && other.0 < self.range_max().0
+     }
+ 
+     /// Reports whether this cell intersects `other`.

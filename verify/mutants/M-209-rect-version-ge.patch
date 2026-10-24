@@ -1,0 +1,18 @@
+Mutant: M-209
+Targets: P-FX-09, P-FX-04
+Expect-Fail: cd_fx::p_fx_09__b33, cd_fx::p_fx_04
+Defect: the Rect decoder rejects version 1, its own encoder's version
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..7c14bcd 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -304,7 +304,7 @@ impl From<RectDecodeError> for io::Error {
+ impl S2Decode for Rect {
+     fn decode(r: &mut dyn Read) -> io::Result<Self> {
+         let version = read_u8(r)?;
+-        if version > ENCODING_VERSION {
++        if version >= ENCODING_VERSION {
+             return Err(RectDecodeError::Version(version).into());
+         }
+         let lat_lo = read_f64(r)?;

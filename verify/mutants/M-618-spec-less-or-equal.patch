@@ -1,0 +1,17 @@
+Mutant: M-618
+Targets: P-CAORD-01
+Expect-Fail: ca_ord::p_caord_01
+Defect: description: `chord_spec::less` is `<=`
+
+diff --git a/verify/src/chord_spec.rs b/verify/src/chord_spec.rs
+--- a/verify/src/chord_spec.rs
++++ b/verify/src/chord_spec.rs
+@@ -50,7 +50,7 @@
+ /// every length, the two zeros equal).
+ #[must_use]
+ pub fn less(a: f64, b: f64) -> bool {
+-    a < b
++    a <= b
+ }
+ 
+ /// The least canonical value above `l` (`l` itself at the top): −1 → +0; ±0 → the smallest

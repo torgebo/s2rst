@@ -1,0 +1,17 @@
+Mutant: M-307
+Targets: P-CCNT-02, P-CCNT-03
+Expect-Fail: cl_cnt::p_ccnt_03,cl_cnt::p_ccnt_02
+Defect: Region::intersects_cell for Cell misses the case where this cell contains the other
+
+diff --git a/core/src/s2/region.rs b/core/src/s2/region.rs
+--- a/core/src/s2/region.rs
++++ b/core/src/s2/region.rs
+@@ -140,7 +140,7 @@
+     }
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {
+-        Cell::intersects_cell(*self, *cell)
++        cell.id().contains(self.id())
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {

@@ -1,0 +1,18 @@
+Mutant: M-054
+Targets: P-ENC-02, P-ENC-03
+Expect-Fail: enc::p_enc_02, enc::p_enc_03
+Defect: from_face_ij() corrupts one path bit of its result
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..bb230b5 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -988,7 +988,7 @@ pub fn from_face_ij(f: Face, i: i32, j: i32) -> CellId {
+         n |= (bits as u64 >> 2) << (k as u32 * 2 * LOOKUP_BITS);
+         bits &= i32::from(SWAP_MASK | INVERT_MASK);
+     }
+-    CellId(n * 2 + 1)
++    CellId((n * 2 + 1) ^ 4)
+ }
+ 
+ /// Wraps (i, j) coordinates onto the appropriate adjacent face.

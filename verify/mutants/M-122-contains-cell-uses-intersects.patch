@@ -1,0 +1,18 @@
+Mutant: M-122
+Targets: P-UMEM-01, P-UMEM-03
+Expect-Fail: cu_mem::p_umem_01__n1, cu_mem::p_umem_03__n1
+Defect: contains_cell_id() tests intersection, so it claims a parent of a member is contained
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..a280c39 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -214,7 +214,7 @@ impl CellUnion {
+         // Find the first cell that does not entirely precede `id`.
+         // "Entirely precedes" means `c.range_max() < id.range_min()`.
+         let pos = self.0.partition_point(|c| c.range_max() < id.range_min());
+-        pos < self.0.len() && self.0[pos].contains(id)
++        pos < self.0.len() && self.0[pos].intersects(id)
+     }
+ 
+     /// Reports whether this union intersects the given cell ID.

@@ -828,6 +828,21 @@ fn no_decoder_panics_on_any_input() {
         )),
         enc(&CellId::from_point(&rand_point(&mut r))),
         enc(&CellUnion::from_cell_ids(cells.clone())),
+        // A valid union that is not normalised (four siblings), which decodes verbatim, and
+        // an unsorted encoding, which is rejected (spec 002, FR-017).
+        enc(&CellUnion::from_verbatim(
+            CellId::from_face(2u8)
+                .child_begin_at_level(9)
+                .children()
+                .to_vec(),
+        )),
+        [
+            &[1u8][..],
+            &2u64.to_le_bytes(),
+            &CellId::from_face(1u8).id().to_le_bytes(),
+            &CellId::from_face(0u8).id().to_le_bytes(),
+        ]
+        .concat(),
         enc(&Cell::from(CellId::from_point(&rand_point(&mut r)))),
         enc(&Polyline::new(pts.clone())),
         enc(&Loop::new(square.clone())),
@@ -1027,4 +1042,224 @@ fn no_decoder_panics_on_any_input() {
             .collect::<Vec<_>>()
             .join("\n")
     );
+}
+
+// ── text parsers (spec 001, FR-017) ────────────────────────────────────────
+//
+// `CellId::from_token`, `CellId::from_debug_string` and `str::parse::<CellId>` take
+// untrusted text (Constitution II). Their return types follow upstream (an id, an
+// `Option`, a `Result`), so the contract is: never panic; a rejected token is `none`;
+// a decoded token re-encodes and decodes back to the same id; an accepted debug string
+// is the canonical spelling of its cell; and `FromStr` agrees with `from_debug_string`.
+
+fn check_text_contract(s: &str) {
+    let t = CellId::from_token(s);
+    assert_eq!(
+        CellId::from_token(&t.to_token()),
+        t,
+        "token round trip for {s:?}"
+    );
+    let d = CellId::from_debug_string(s);
+    if let Some(c) = d {
+        assert_eq!(
+            c.to_debug_string(),
+            s,
+            "debug string of {s:?} is not canonical"
+        );
+    }
+    assert_eq!(
+        s.parse::<CellId>(),
+        d.ok_or(()),
+        "FromStr disagrees for {s:?}"
+    );
+}
+
+#[test]
+fn text_parsers_deterministic_cases() {
+    let digits31 = format!("0/{}", "0".repeat(31));
+    let cases = [
+        "",
+        "X",
+        "ffffffffffffffff",
+        "fffffffffffffffff",
+        "+1",
+        "-1",
+        " 1",
+        "g",
+        "0x1",
+        "é",
+        "€1",
+        "0/",
+        "6/0",
+        "0/4",
+        digits31.as_str(),
+        "0|0",
+        "0/\0",
+        "\0",
+    ];
+    for s in cases {
+        check_text_contract(s);
+    }
+    for s in [
+        "",
+        "X",
+        "fffffffffffffffff",
+        "+1",
+        "-1",
+        " 1",
+        "g",
+        "0x1",
+        "é",
+        "€1",
+        "\0",
+    ] {
+        assert_eq!(CellId::from_token(s), CellId::none(), "token {s:?}");
+    }
+    for s in ["", "0", "6/0", "0/4", digits31.as_str(), "0|0", "é", "0/\0"] {
+        assert_eq!(CellId::from_debug_string(s), None, "debug string {s:?}");
+        assert_eq!(s.parse::<CellId>(), Err(()), "FromStr {s:?}");
+    }
+    assert_eq!(
+        CellId::from_debug_string("0/"),
+        Some(CellId::from_face(0u8))
+    );
+    assert!(CellId::from_token("89c25").is_valid());
+}
+
+#[test]
+fn text_parsers_random_strings() {
+    const PIECES: &[&str] = &[
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "f", "A", "F", "/", "+", "-", " ",
+        "x", "X", "\0", "é", "€",
+    ];
+    let mut r = rng(0x7e47_7e47);
+    for _ in 0..5000 {
+        let n = r.gen_range(0..=34);
+        let mut s = String::new();
+        for _ in 0..n {
+            if r.gen_bool(0.1) {
+                s.push(r.gen_range('\0'..=char::MAX));
+            } else {
+                s.push_str(PIECES[r.gen_range(0..PIECES.len())]);
+            }
+        }
+        check_text_contract(&s);
+    }
+}
+
+// ── bounded reservation (spec 003 FR-019, SC-008) ─────────────────────────
+
+/// The shortest unsigned LEB128 encoding of `x`, written independently of the library.
+#[cfg(target_os = "linux")]
+fn leb128(mut x: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    while x >= 0x80 {
+        out.push((x & 0x7f) as u8 | 0x80);
+        x >>= 7;
+    }
+    out.push(x as u8);
+    out
+}
+
+/// The K2 inputs (spec 003 Context): each at most 16 bytes, each declaring the largest count
+/// its decoder accepts, with none of the data. Before FR-019 each of them made its decoder
+/// reserve 200 MB to 1.2 GB up front.
+#[cfg(target_os = "linux")]
+fn k2_inputs() -> Vec<(&'static str, Vec<u8>)> {
+    let u64_header = leb128(50_000_000 * 8);
+    let mut cell_ids = vec![0x00]; // shift code 0, base length 0
+    cell_ids.extend_from_slice(&u64_header);
+    let mut strings = Vec::new();
+    encode_uint_vector_u64(&[499_999_999], &mut strings).unwrap();
+    vec![
+        ("uint_vector_u64", u64_header),
+        ("uint_vector_u32", leb128(50_000_000 * 4)),
+        ("s2cell_id_vector", cell_ids),
+        ("string_vector", strings),
+        ("s2point_vector", leb128(50_000_000 << 3)),
+    ]
+}
+
+/// The child half of [`reservation_under_address_space_limit`]: run on its own it simply
+/// checks that every K2 input is rejected; under the parent's address-space limit it also
+/// shows that no decoder reserves memory in proportion to the declared count.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "run by reservation_under_address_space_limit in a child process"]
+fn reservation_child() {
+    for (name, input) in k2_inputs() {
+        assert!(input.len() <= 16, "{name}: input too long");
+        let rejected = match name {
+            "uint_vector_u64" => decode_uint_vector_u64(&mut input.as_slice()).is_err(),
+            "uint_vector_u32" => decode_uint_vector_u32(&mut input.as_slice()).is_err(),
+            "s2cell_id_vector" => decode_s2cell_id_vector(&mut input.as_slice()).is_err(),
+            "string_vector" => decode_string_vector(&mut input.as_slice()).is_err(),
+            "s2point_vector" => decode_s2point_vector(&mut input.as_slice()).is_err(),
+            _ => unreachable!(),
+        };
+        assert!(rejected, "{name}: a truncated input was accepted");
+    }
+}
+
+/// FR-019 regression test (spec 003 K2): decoding a short input that declares a huge count
+/// must not reserve memory in proportion to the count. The K2 inputs run in a child process
+/// under a 256 MiB address-space limit; before the fix the child died with SIGABRT
+/// ("memory allocation of 400000000 bytes failed").
+#[cfg(target_os = "linux")]
+#[test]
+fn reservation_under_address_space_limit() {
+    let exe = std::env::current_exe().expect("the test binary's path");
+    let out = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("ulimit -v 262144 && exec \"$0\" --exact reservation_child --ignored --test-threads=1")
+        .arg(&exe)
+        .output()
+        .expect("spawning the child test");
+    assert!(
+        out.status.success(),
+        "the K2 inputs did not decode under a 256 MiB address-space limit: {:?}\n{}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+// ── the C++ reference inputs (spec 003 FR-023, FR-024) ─────────────────────
+
+/// Every decode input of `data/cpp_coding_vectors.csv` (valid encodings, all their prefixes
+/// and the survey's malformed inputs), and three byte mutations at each of its first 16
+/// bytes, through every in-scope decoder: none may panic. The differential test
+/// (`cpp_coding_diff.rs`) checks the answers; this test checks crash-freedom on inputs meant
+/// for a *different* decoder too.
+#[test]
+fn cpp_coding_inputs_never_panic() {
+    const CSV: &str = include_str!("data/cpp_coding_vectors.csv");
+    fn all_decoders(b: &[u8]) {
+        for_each_decoder(|_, decode| decode(b));
+        no_panic("CellId", |r| CellId::decode(r), b);
+        no_panic("Point", |r| Point::decode(r), b);
+        no_panic("Cap", |r| Cap::decode(r), b);
+        no_panic("Rect", |r| Rect::decode(r), b);
+        no_panic("Cell", |r| Cell::decode(r), b);
+    }
+    let mut inputs = 0;
+    for line in CSV.lines().skip(1) {
+        let f: Vec<&str> = line.split(',').collect();
+        if !f[0].ends_with("_DECODE") {
+            continue;
+        }
+        let b: Vec<u8> = (0..f[1].len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&f[1][i..i + 2], 16).unwrap())
+            .collect();
+        all_decoders(&b);
+        inputs += 1;
+        for i in 0..b.len().min(16) {
+            for m in [0x00, 0xff, b[i] ^ 0x80] {
+                let mut c = b.clone();
+                c[i] = m;
+                all_decoders(&c);
+            }
+        }
+    }
+    assert!(inputs > 4000, "only {inputs} inputs");
 }

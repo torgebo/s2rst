@@ -1,0 +1,17 @@
+Mutant: M-420
+Targets: P-RIV-01
+Expect-Fail: ri_val::p_riv_01
+Defect: the default interval is [0, 0], not empty
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -372,7 +372,7 @@
+ impl Default for Interval {
+     /// The default interval is empty.
+     fn default() -> Self {
+-        Interval::empty()
++        Interval::from_point(0.0)
+     }
+ }
+ 

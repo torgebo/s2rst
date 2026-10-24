@@ -44,6 +44,10 @@ out of the main `cargo build` / CI matrix; it is built and run only on demand.
 | `decode_cell_union`       | `<CellUnion as encoding::S2Decode>::decode` (+ round-trip) |
 | `decode_cell`             | `<Cell as encoding::S2Decode>::decode` (+ round-trip) |
 | `decode_cap`              | `<Cap as encoding::S2Decode>::decode` (+ round-trip) |
+| `decode_cell_id`          | `<CellId as encoding::S2Decode>::decode` (+ round-trip) |
+| `decode_point`            | `<Point as encoding::S2Decode>::decode` (+ round-trip) |
+| `decode_rect`             | `<Rect as encoding::S2Decode>::decode` (+ round-trip) |
+| `parse_cell_id_text`      | `CellId::{from_token, from_debug_string}` and `FromStr` (+ round-trip) |
 
 `decode_uint_vector_u32` and `decode_uint_vector_u64` also assert round-trip
 idempotence on the decoded values.

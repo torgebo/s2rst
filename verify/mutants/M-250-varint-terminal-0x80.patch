@@ -1,0 +1,17 @@
+Mutant: M-250
+Targets: FR-011 link: uint_vector::decode_uint_vector_u64 (its header varint)
+Expect-Fail: cd_agree::a_uv64_dec__b1
+Defect: read_uvarint ends a varint at the byte 0x80, a continuation byte; drift guard: fails (write_uvarint/read_uvarint are mirrored)
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -133,7 +133,7 @@
+             ));
+         }
+         result |= u64::from(b & 0x7F) << shift;
+-        if b < 0x80 {
++        if b <= 0x80 {
+             return Ok(result);
+         }
+         // At most 56 here, so the next shift is at most 63: at 63 the byte above was either

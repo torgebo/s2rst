@@ -1,0 +1,23 @@
+core/src/s2/encoded_s2cell_id_vector.rs:108:47: replace | with ^ in encode_base_shift
+core/src/s2/encoded_s2cell_id_vector.rs:72:88: replace + with * in encode_s2cell_id_vector
+core/src/s2/encoded_s2point_vector.rs:220:14: replace < with <= in reconstruct_uvarint
+core/src/s2/encoded_s2point_vector.rs:237:57: replace | with ^ in encode_fast
+core/src/s2/encoded_s2point_vector.rs:252:14: replace > with == in decode_uncompressed
+core/src/s2/encoded_s2point_vector.rs:252:14: replace > with >= in decode_uncompressed
+core/src/s2/encoded_s2point_vector.rs:445:38: replace > with >= in decode_cell_ids_raw
+core/src/s2/encoded_s2point_vector.rs:453:20: replace + with * in decode_cell_ids_raw
+core/src/s2/encoded_s2point_vector.rs:453:35: replace > with == in decode_cell_ids_raw
+core/src/s2/encoded_s2point_vector.rs:453:35: replace > with >= in decode_cell_ids_raw
+core/src/s2/encoded_s2point_vector.rs:580:26: replace | with ^ in value_to_point
+core/src/s2/encoded_s2point_vector.rs:581:26: replace | with ^ in value_to_point
+core/src/s2/encoded_s2point_vector.rs:582:43: replace | with ^ in value_to_point
+core/src/s2/encoded_string_vector.rs:70:18: replace > with == in decode_string_vector
+core/src/s2/encoded_string_vector.rs:70:18: replace > with >= in decode_string_vector
+core/src/s2/encoded_uint_vector.rs:104:41: replace | with ^ in encode_uint_vector_u64
+core/src/s2/encoded_uint_vector.rs:131:14: replace > with == in decode_uint_vector_u32
+core/src/s2/encoded_uint_vector.rs:131:14: replace > with >= in decode_uint_vector_u32
+core/src/s2/encoded_uint_vector.rs:158:14: replace > with == in decode_uint_vector_u64
+core/src/s2/encoded_uint_vector.rs:158:14: replace > with >= in decode_uint_vector_u64
+core/src/s2/encoded_uint_vector.rs:86:59: replace | with ^ in encode_uint_vector_u32
+core/src/s2/encoded_uint_vector.rs:88:41: replace | with ^ in encode_uint_vector_u32
+core/src/s2/encoding.rs:49:31: replace << with >>

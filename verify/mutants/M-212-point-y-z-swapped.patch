@@ -1,0 +1,18 @@
+Mutant: M-212
+Targets: P-FX-07, P-FX-02
+Expect-Fail: cd_fx::p_fx_07__b24, cd_fx::p_fx_02
+Defect: the Point decoder swaps the y and z coordinates
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..deb89e6 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -203,7 +203,7 @@ impl S2Decode for Point {
+         let x = read_f64(r)?;
+         let y = read_f64(r)?;
+         let z = read_f64(r)?;
+-        Ok(Point(crate::r3::Vector { x, y, z }))
++        Ok(Point(crate::r3::Vector { x, y: z, z: y }))
+     }
+ }
+ 

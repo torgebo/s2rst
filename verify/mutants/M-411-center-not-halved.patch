@@ -1,0 +1,17 @@
+Mutant: M-411
+Targets: P-RMEA-01
+Expect-Fail: ri_mea::p_rmea_01
+Defect: center() returns the sum of the bounds
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -157,7 +157,7 @@
+     /// `[f64::MAX, f64::MAX]` is ∞ in upstream and `f64::MAX` here (`UPSTREAM.md` U-010).
+     /// Every other center is upstream's, bit for bit.
+     pub fn center(self) -> f64 {
+-        f64::midpoint(self.lo, self.hi)
++        self.lo + self.hi
+     }
+ 
+     /// Returns the length of the interval. The length of an empty interval

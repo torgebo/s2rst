@@ -16,3 +16,5 @@ See CONTRIBUTING.md for build/test instructions and conventions.
 - [ ] Updated the docs and the Python stub (`_core.pyi`) if the public API
       changed.
 - [ ] No new clippy warnings (`make clippy` is clean — warnings are errors).
+- [ ] If `verify/` changed: updated its inventory, property catalogue,
+      `PROPERTIES_BY_KIND.md` (and the `.html` copies) and `VERIFIED_TYPES.md`.

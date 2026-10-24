@@ -1,0 +1,17 @@
+Mutant: M-512
+Targets: P-QREL-02
+Expect-Fail: ur_rel::p_qrel_02
+Defect: intersects() checks y only
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -263,7 +263,7 @@
+ 
+     /// Reports whether the two rectangles have any points in common.
+     pub fn intersects(self, other: Rect) -> bool {
+-        self.x.intersects(other.x) && self.y.intersects(other.y)
++        self.y.intersects(other.y)
+     }
+ 
+     /// Reports whether the interior of this rectangle intersects any point

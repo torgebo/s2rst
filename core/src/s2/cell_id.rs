@@ -229,6 +229,12 @@ impl CellId {
     /// Returns a cell given its face (0–5), the 61-bit Hilbert curve position
     /// within that face, and the level (0–30). The position is truncated to
     /// correspond to the Hilbert curve position at the center of the returned cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
+    /// In debug builds, also panics on overflow if `pos` is far outside the 61-bit range
+    /// (`face << 61` plus `pos` overflows).
     #[inline]
     pub fn from_face_pos_level(face: impl Into<u8>, pos: u64, level: impl Into<Level>) -> Self {
         let f: u8 = face.into();
@@ -280,6 +286,12 @@ impl CellId {
     }
 
     /// Returns the subdivision level (0–30).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the id has no level marker: it is 0 (`CellId::none()`) or has 62 or more
+    /// trailing zero bits. C++ `S2CellId::level()` assumes a non-zero id, and returns −1
+    /// for the others.
     #[inline]
     pub fn level(self) -> Level {
         Level::new(MAX_CELL_LEVEL - (self.0.trailing_zeros() >> 1) as u8)
@@ -305,6 +317,12 @@ impl CellId {
 
     /// Returns the child position (0–3) of this cell's ancestor at the given
     /// level, relative to its parent. The level should be in `1..=MAX_LEVEL`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
+    /// In debug builds, also panics if this cell is not valid or `level` is not in
+    /// `1..=self.level()`.
     #[inline]
     pub fn child_position(self, level: impl Into<Level>) -> u8 {
         let level = level.into();
@@ -319,13 +337,21 @@ impl CellId {
     // =======================================================================
 
     /// Returns the cell at the given level (which must be <= this cell's level).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
     pub fn parent_at_level(self, level: impl Into<Level>) -> CellId {
         let new_lsb = lsb_for_level(level.into());
         CellId((self.0 & new_lsb.wrapping_neg()) | new_lsb)
     }
 
-    /// Returns the immediate parent cell. Panics if `self.is_face()`.
+    /// Returns the immediate parent cell.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this is a face cell (`self.is_face()`).
     #[inline]
     pub fn parent(self) -> CellId {
         debug_assert!(!self.is_face());
@@ -334,6 +360,10 @@ impl CellId {
     }
 
     /// Returns the four immediate children of this cell.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this cell is not valid or is a leaf cell.
     #[inline]
     pub fn children(self) -> [CellId; 4] {
         debug_assert!(self.is_valid());
@@ -351,6 +381,10 @@ impl CellId {
     }
 
     /// Returns the first child in a traversal of children in Hilbert curve order.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this cell is not valid or is a leaf cell.
     #[inline]
     pub fn child_begin(self) -> CellId {
         debug_assert!(self.is_valid());
@@ -360,6 +394,10 @@ impl CellId {
     }
 
     /// Returns the first cell after a traversal of children in Hilbert curve order.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this cell is not valid or is a leaf cell.
     #[inline]
     pub fn child_end(self) -> CellId {
         debug_assert!(self.is_valid());
@@ -369,24 +407,40 @@ impl CellId {
     }
 
     /// Returns the first child at the given level (must be >= this cell's level).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
     pub fn child_begin_at_level(self, level: impl Into<Level>) -> CellId {
         CellId(self.0 - self.lsb() + lsb_for_level(level.into()))
     }
 
     /// Returns the first cell after the last child at the given level.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
     pub fn child_end_at_level(self, level: impl Into<Level>) -> CellId {
         CellId(self.0 + self.lsb() + lsb_for_level(level.into()))
     }
 
     /// Returns the first cell at the given level (the smallest cell ID).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
     pub fn begin(level: impl Into<Level>) -> CellId {
         CellId::from_face(0).child_begin_at_level(level)
     }
 
     /// Returns the past-the-end cell at the given level.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
     pub fn end(level: impl Into<Level>) -> CellId {
         CellId::from_face(5).child_end_at_level(level)
@@ -433,6 +487,10 @@ impl CellId {
     }
 
     /// Returns the next cell along the Hilbert curve, wrapping from last to first.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this cell is not valid.
     #[inline]
     pub fn next_wrap(self) -> CellId {
         debug_assert!(self.is_valid());
@@ -445,6 +503,10 @@ impl CellId {
     }
 
     /// Returns the previous cell, wrapping from first to last.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if this cell is not valid.
     #[inline]
     pub fn prev_wrap(self) -> CellId {
         debug_assert!(self.is_valid());
@@ -522,14 +584,13 @@ impl CellId {
     #[inline]
     pub fn get_center_si_ti(self) -> (Face, u32, u32) {
         let (face, i, j, _) = self.to_face_ij_orientation();
-        let delta: i32;
-        if self.is_leaf() {
-            delta = 1;
+        let delta: i32 = if self.is_leaf() {
+            1
         } else if (i64::from(i) ^ (self.0 as i64 >> 2)) & 1 != 0 {
-            delta = 2;
+            2
         } else {
-            delta = 0;
-        }
+            0
+        };
         (face, (2 * i + delta) as u32, (2 * j + delta) as u32)
     }
 
@@ -579,6 +640,10 @@ impl CellId {
     }
 
     /// Returns the edge length at the given level in (s,t)-space.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
     pub fn size_st(level: impl Into<Level>) -> f64 {
         ij_to_st_min(size_ij(level))
@@ -644,22 +709,24 @@ impl CellId {
         s.trim_end_matches('0').to_string()
     }
 
-    /// Parses a hex-encoded token string. Returns `CellId::none()` on error.
+    /// Parses a hex-encoded token string.
+    ///
+    /// Returns `CellId::none()` if the token is empty, longer than 16 characters, or contains
+    /// anything other than hex digits (as C++ `S2CellId::FromToken`).
     pub fn from_token(token: &str) -> Self {
         if token.len() > 16 || token.is_empty() {
             return CellId::none();
         }
-        if token == "X" {
-            return CellId::none();
+        // Every byte must be a hex digit, which rejects `X` (the token of `none`) and a leading
+        // `+` (which `u64::from_str_radix` would accept). At most 16 digits fit in a `u64`.
+        let mut n: u64 = 0;
+        for b in token.bytes() {
+            let Some(d) = char::from(b).to_digit(16) else {
+                return CellId::none();
+            };
+            n = (n << 4) | u64::from(d);
         }
-        let Ok(n) = u64::from_str_radix(token, 16) else {
-            return CellId::none();
-        };
-        if token.len() < 16 {
-            CellId(n << (4 * (16 - token.len()) as u32))
-        } else {
-            CellId(n)
-        }
+        CellId(n << (4 * (16 - token.len())))
     }
 
     // =======================================================================
@@ -682,6 +749,11 @@ impl CellId {
 
     /// Returns the neighbors of the closest vertex at the given level.
     /// Normally 4 cells, but only 3 at a cube vertex.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is 30, or an integer greater than 30. `level` must be less than
+    /// `self.level()`, as upstream `AppendVertexNeighbors` requires.
     pub fn vertex_neighbors(self, level: impl Into<Level>) -> Vec<CellId> {
         let level = level.into();
         let half_size = size_ij(Level::new(level.as_u8() + 1));
@@ -717,6 +789,10 @@ impl CellId {
 
     /// Returns all neighbors of this cell at the given level. Two cells are
     /// neighbors if their boundaries intersect but their interiors do not.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     pub fn all_neighbors(self, level: impl Into<Level>) -> Option<Vec<CellId>> {
         let level = level.into();
         if level < self.level() || level > Level::MAX {
@@ -778,6 +854,11 @@ impl CellId {
 
     /// Returns the level of the lowest common ancestor of the two cell IDs,
     /// or `None` if they are on different faces.
+    ///
+    /// # Panics
+    ///
+    /// Panics if both ids are `CellId::none()`. For that pair C++ `GetCommonAncestorLevel`
+    /// is undefined behaviour, and Go returns level 30.
     #[inline]
     pub fn common_ancestor_level(self, other: CellId) -> Option<Level> {
         let diff_bits = (self.0 ^ other.0).max(self.lsb()).max(other.lsb());
@@ -818,9 +899,12 @@ impl CellId {
     }
 
     /// Returns the string representation in the form "face/childpath" (e.g. "3/102").
+    ///
+    /// An invalid id prints as `Invalid: ` followed by the id as 16 zero-padded lowercase hex
+    /// digits (e.g. "Invalid: 0000000000000002"), as C++ `S2CellId::ToString` does.
     pub fn to_debug_string(self) -> String {
         if !self.is_valid() {
-            return format!("Invalid: {:x}", self.0);
+            return format!("Invalid: {:016x}", self.0);
         }
         let mut s = String::new();
         s.push((b'0' + self.face().as_u8()) as char);
@@ -859,6 +943,10 @@ impl CellId {
 // ---------------------------------------------------------------------------
 
 /// Returns the lowest-numbered bit that is on for cells at the given level.
+///
+/// # Panics
+///
+/// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
 #[inline]
 pub fn lsb_for_level(level: impl Into<Level>) -> u64 {
     let level = level.into();
@@ -866,12 +954,21 @@ pub fn lsb_for_level(level: impl Into<Level>) -> u64 {
 }
 
 /// Returns the edge length of cells at the given level in (i,j)-space.
+///
+/// # Panics
+///
+/// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
 #[inline]
 pub fn size_ij(level: impl Into<Level>) -> i32 {
     1 << (MAX_CELL_LEVEL - level.into().as_u8())
 }
 
 /// Returns a leaf cell given its cube face and (i, j) coordinates.
+///
+/// # Panics
+///
+/// In debug builds, panics on arithmetic overflow if `i` or `j` is outside `[0, 2^30)`, the
+/// range upstream documents for leaf coordinates. Release builds return an unspecified id.
 #[inline]
 pub fn from_face_ij(f: Face, i: i32, j: i32) -> CellId {
     let fb = f.as_u8();
@@ -900,7 +997,11 @@ fn from_face_ij_wrap(f: Face, i: i32, j: i32) -> CellId {
     let v = (SCALE * (i64::from(j) * 2 + 1 - i64::from(MAX_SIZE)) as f64).clamp(-limit, limit);
 
     let (nf, nu, nv) = xyz_to_face_uv(&face_uv_to_xyz(f, u, v));
-    from_face_ij(nf, st_to_ij(0.5 * (nu + 1.0)), st_to_ij(0.5 * (nv + 1.0)))
+    from_face_ij(
+        nf,
+        st_to_ij(f64::midpoint(nu, 1.0)),
+        st_to_ij(f64::midpoint(nv, 1.0)),
+    )
 }
 
 /// If `same_face` is true, uses `from_face_ij`, otherwise `from_face_ij_wrap`.
@@ -915,6 +1016,10 @@ fn from_face_ij_same(f: Face, i: i32, j: i32, same_face: bool) -> CellId {
 
 /// Returns the bounds in (u,v)-space for the cell at the given level
 /// containing the leaf cell with the given (i,j)-coordinates.
+///
+/// # Panics
+///
+/// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
 #[inline]
 pub fn ij_level_to_bound_uv(i: i32, j: i32, level: impl Into<Level>) -> r2::Rect {
     let cell_size = size_ij(level);
@@ -2536,3 +2641,7 @@ mod quickcheck_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cell_id_tests.rs"]
+mod cell_id_tests;

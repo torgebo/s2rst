@@ -1,0 +1,18 @@
+Mutant: M-056
+Targets: P-ENC-09
+Expect-Fail: enc::p_enc_09__b3
+Defect: from_debug_string() accepts the digit 4
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..7a01da9 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -935,7 +935,7 @@ impl CellId {
+         let mut id = CellId::from_face(face);
+         for &b in &bytes[2..] {
+             let child_pos = b.wrapping_sub(b'0');
+-            if child_pos > 3 {
++            if child_pos > 4 {
+                 return None;
+             }
+             id = id.children()[child_pos as usize];

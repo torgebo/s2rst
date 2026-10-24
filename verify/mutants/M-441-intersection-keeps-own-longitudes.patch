@@ -1,0 +1,17 @@
+Mutant: M-441
+Targets: P-LSET-02
+Expect-Fail: rl_set::p_lset_02
+Defect: intersection() keeps this rectangle's longitudes
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -568,7 +568,7 @@
+     /// this rectangle and the other rectangle.
+     pub fn intersection(self, other: Rect) -> Rect {
+         let lat = self.lat.intersection(other.lat);
+-        let lng = self.lng.intersection(other.lng);
++        let lng = self.lng;
+ 
+         if lat.is_empty() || lng.is_empty() {
+             return Self::empty();

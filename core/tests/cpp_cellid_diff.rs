@@ -139,3 +139,55 @@ fn face_ij_match_cpp() {
         assert_eq!(i64::from(orientation), want(4), "orientation on: {line}");
     }
 }
+
+/// Decodes the hex-encoded bytes of a text input (empty field → empty text).
+fn text_field(hex: &str) -> String {
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+        .collect();
+    String::from_utf8(bytes).expect("generator emits valid UTF-8")
+}
+
+/// `CellId::from_token` must match C++ `S2CellId::FromToken`, including rejecting any
+/// byte that is not a hex digit, such as a leading `+` (FR-015).
+#[test]
+fn from_token_matches_cpp() {
+    let rows = section_lines("CELLID_FROM_TOKEN");
+    assert!(!rows.is_empty(), "CELLID_FROM_TOKEN section missing");
+    for line in rows {
+        let (hex, id) = line.split_once(',').unwrap();
+        let token = text_field(hex.trim());
+        assert_eq!(CellId::from_token(&token).id(), u64f(id), "token {token:?}");
+    }
+}
+
+/// `CellId::from_debug_string` must match C++ `S2CellId::FromDebugString` (`None` is 0).
+#[test]
+fn from_debug_string_matches_cpp() {
+    let rows = section_lines("CELLID_FROM_DEBUG_STRING");
+    assert!(!rows.is_empty(), "CELLID_FROM_DEBUG_STRING section missing");
+    for line in rows {
+        let (hex, id) = line.split_once(',').unwrap();
+        let s = text_field(hex.trim());
+        assert_eq!(
+            CellId::from_debug_string(&s).map_or(0, CellId::id),
+            u64f(id),
+            "string {s:?}"
+        );
+    }
+}
+
+/// `CellId::to_debug_string` and `Display` must match C++ `S2CellId::ToString`, including
+/// the zero-padded `Invalid: ` form for invalid ids (FR-016).
+#[test]
+fn to_debug_string_matches_cpp() {
+    let rows = section_lines("CELLID_TO_STRING");
+    assert!(!rows.is_empty(), "CELLID_TO_STRING section missing");
+    for line in rows {
+        let (id, want) = line.split_once(',').unwrap();
+        let c = CellId(u64f(id));
+        assert_eq!(c.to_debug_string(), want, "id {id}");
+        assert_eq!(c.to_string(), want, "Display of id {id}");
+    }
+}

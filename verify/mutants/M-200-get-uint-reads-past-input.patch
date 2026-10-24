@@ -1,0 +1,18 @@
+Mutant: M-200
+Targets: C-encoded_uint_vector::get_uint_with_length, P-FW-02
+Expect-Fail: cd_fw::p_fw_02__d8
+Defect: get_uint_with_length copies data[..length + 1], one byte past the input when the data is exactly length bytes long (US1 scenario 4)
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..72f013d 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -47,7 +47,7 @@ pub fn encode_uint_with_length(w: &mut dyn Write, value: u64, length: usize) ->
+ /// the input's size, since it takes a pointer.
+ pub fn get_uint_with_length(data: &[u8], length: usize) -> u64 {
+     let mut buf = [0u8; 8];
+-    buf[..length].copy_from_slice(&data[..length]);
++    buf[..length + 1].copy_from_slice(&data[..length + 1]);
+     u64::from_le_bytes(buf)
+ }
+ 

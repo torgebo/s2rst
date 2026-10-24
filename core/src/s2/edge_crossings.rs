@@ -10,10 +10,6 @@
 //!
 //! Corresponds to Go `s2/edge_crossings.go`, C++ `s2edge_crossings.cc`.
 
-#![expect(
-    clippy::cast_possible_truncation,
-    reason = "axis index used as array subscript"
-)]
 use crate::r3::PreciseVector;
 use crate::s1::Angle;
 use crate::s2::Point;
@@ -200,10 +196,29 @@ pub const EXACT_CROSS_PROD_ERROR: Angle = Angle::from_radians(predicates::DBL_ER
 ///   are linearly dependent.
 /// - `robust_cross_prod(a, b) != (0,0,0)` for all inputs.
 ///
-/// Uses a 4-level fallback: double-precision stable → exact arithmetic
-/// (via [`PreciseVector`]) → symbolic perturbation.
+/// Uses a 3-level fallback: double-precision stable → exact arithmetic
+/// (via [`PreciseVector`]) → symbolic perturbation, whose result is scaled by
+/// [`Point::ensure_normalizable`].
 ///
 /// Corresponds to C++ `S2::RobustCrossProd(a, b)`.
+///
+/// # Deviation from upstream
+///
+/// - **The scaling (`UPSTREAM.md` U-012).** Upstream scales the symbolic perturbation's result
+///   with `EnsureNormalizable`, whose factor `ldexp(2, −1 − ilogb(p_max))` overflows for a
+///   largest component below `2⁻¹⁰²³`: for the unit point `b = (2⁻¹⁰⁷⁴, 0, 1)`,
+///   `S2::RobustCrossProd(−b, b)` is `(NaN, ∞, NaN)`. This uses
+///   [`Point::ensure_normalizable`], which scales exactly, and returns `(−0, 1, 0)`: finite,
+///   non-zero and normalizable. Wherever upstream's scaling is finite the two agree, bit for
+///   bit.
+/// - **The length past the double-precision step.** Between the double-precision and the exact
+///   steps, C++ tries the stable product in `long double`, which answers for points closer than
+///   about 9ε and returns `(a − b) × (a + b)`, twice the cross product, rounded in 80 bits; its
+///   exact step returns the cross product unnormalised. This has no `long double` step, and
+///   its exact step returns the cross product normalised ([`PreciseVector::to_vector`]
+///   normalises, as Go's `PreciseVector.Vector` does). The direction is the same within the
+///   error bound (within `2e-16` radians on the C++ vectors' 48 rows that reach the
+///   `long double` step); the length differs.
 pub fn robust_cross_prod(a: Point, b: Point) -> Point {
     // Level 1: double-precision stable cross product via (a-b)×(a+b).
     if let Some(result) = get_stable_cross_prod(a.0, b.0) {
@@ -246,41 +261,12 @@ fn get_stable_cross_prod(a: crate::r3::Vector, b: crate::r3::Vector) -> Option<c
     }
 }
 
-/// Returns true if the vector's magnitude is large enough that `angle()`
-/// and `normalize()` can be called without precision loss from underflow.
-#[inline]
-fn is_normalizable(p: crate::r3::Vector) -> bool {
-    // The largest component must be at least 2^(-242).
-    let max_comp = p.x.abs().max(p.y.abs()).max(p.z.abs());
-    max_comp >= f64::from_bits(0x30D0_0000_0000_0000) // 2^(-242)
-}
-
-/// Scales a vector to ensure it can be normalized without underflow.
-///
-/// REQUIRES: p != (0, 0, 0)
-fn ensure_normalizable(p: crate::r3::Vector) -> crate::r3::Vector {
-    if is_normalizable(p) {
-        return p;
-    }
-    // Scale by a power of two so the largest component is in [1, 2).
-    let p_max = p.x.abs().max(p.y.abs()).max(p.z.abs());
-    debug_assert!(p_max > 0.0, "EnsureNormalizable: zero vector");
-    // ilogb(p_max) gives floor(log2(p_max)). ldexp(2, -1 - ilogb) scales to [1,2).
-    let ilog = if p_max == 0.0 {
-        0
-    } else {
-        (p_max.log2().floor()) as i32
-    };
-    let scale = (2.0f64).powi(-1 - ilog);
-    p * scale
-}
-
 /// Converts a `PreciseVector` (exact arithmetic) to a normalizable `Vector`.
 fn normalizable_from_exact(pv: &PreciseVector) -> crate::r3::Vector {
     use crate::r3::Vector;
 
     let x = pv.to_vector();
-    if is_normalizable(x) {
+    if Point(x).is_normalizable() {
         return x;
     }
     // Find the maximum exponent across all components.
@@ -342,9 +328,13 @@ fn symbolic_cross_prod_sorted(a: Point, b: Point) -> crate::r3::Vector {
 fn symbolic_cross_prod(a: Point, b: Point) -> crate::r3::Vector {
     debug_assert!(a != b, "SymbolicCrossProd: a == b");
     if a < b {
-        ensure_normalizable(symbolic_cross_prod_sorted(a, b))
+        Point(symbolic_cross_prod_sorted(a, b))
+            .ensure_normalizable()
+            .0
     } else {
-        -ensure_normalizable(symbolic_cross_prod_sorted(b, a))
+        -Point(symbolic_cross_prod_sorted(b, a))
+            .ensure_normalizable()
+            .0
     }
 }
 
@@ -852,7 +842,7 @@ mod tests {
         let dbl_err = predicates::DBL_ERROR;
         let a = Point(Vector::new(5e-324, 1.0, 0.0));
         let b = Point(Vector::new(5e-324, 1.0 - dbl_err, 0.0));
-        assert!(a != b);
+        assert_ne!(a, b);
         let result = robust_cross_prod(a, b);
         assert!(result.0.norm2() > 0.0);
         // Should point roughly in -z direction.
@@ -884,7 +874,7 @@ mod tests {
         use crate::r3::Vector;
         let a = Point(Vector::new(0.0, 1.0 + f64::EPSILON, 0.0));
         let b = Point(Vector::new(0.0, 1.0, 0.0));
-        assert!(a != b);
+        assert_ne!(a, b);
         let result = robust_cross_prod(a, b);
         assert!(result.0.norm2() > 0.0);
         let sign = predicates::robust_sign(a, b, result.normalize());
@@ -1056,7 +1046,10 @@ mod tests {
         // Test that normalizable_from_exact scales up tiny vectors.
         let tiny = PreciseVector::new(5e-324, 0.0, 0.0);
         let result = normalizable_from_exact(&tiny);
-        assert!(is_normalizable(result), "result should be normalizable");
+        assert!(
+            Point(result).is_normalizable(),
+            "result should be normalizable"
+        );
         // Direction should be preserved.
         assert!(result.x > 0.0);
         assert_eq!(result.y, 0.0);
@@ -1070,22 +1063,6 @@ mod tests {
         assert_eq!(result.x, 0.0);
         assert_eq!(result.y, 0.0);
         assert_eq!(result.z, 0.0);
-    }
-
-    #[test]
-    fn test_ensure_normalizable_normal() {
-        use crate::r3::Vector;
-        let v = Vector::new(1.0, 0.0, 0.0);
-        assert_eq!(ensure_normalizable(v), v);
-    }
-
-    #[test]
-    fn test_ensure_normalizable_tiny() {
-        use crate::r3::Vector;
-        let v = Vector::new(1e-300, 0.0, 0.0);
-        let result = ensure_normalizable(v);
-        assert!(is_normalizable(result));
-        assert!(result.x > 0.0);
     }
 
     #[test]
@@ -1136,3 +1113,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "edge_crossings_tests.rs"]
+mod edge_crossings_tests;

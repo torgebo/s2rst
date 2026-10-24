@@ -1,0 +1,17 @@
+Mutant: M-316
+Targets: P-IVAL-01
+Expect-Fail: iv_val::p_ival_01
+Defect: is_valid() accepts −π as a low bound outside the full interval
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -548,7 +548,7 @@
+ // --- Helper functions ---
+ 
+ fn is_valid_pair(lo: f64, hi: f64) -> bool {
+-    lo.abs() <= PI && hi.abs() <= PI && !(lo == -PI && hi != PI) && !(hi == -PI && lo != PI)
++    lo.abs() <= PI && hi.abs() <= PI && !(hi == -PI && lo != PI)
+ }
+ 
+ /// Compute the distance from `a` to `b` in \[0, 2π).

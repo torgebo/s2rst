@@ -1,0 +1,17 @@
+Mutant: M-635
+Targets: P-AGCNV-01, P-AGCNV-02
+Expect-Fail: ag_cnv::p_agcnv_02__degrees
+Defect: `degrees` with π/180
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -126,7 +126,7 @@
+     /// Returns the angle in degrees.
+     #[inline]
+     pub fn degrees(self) -> f64 {
+-        self.0 * (180.0 / PI)
++        self.0 * (PI / 180.0)
+     }
+ 
+     /// Returns the angle in E5 representation: degrees × 10⁵, rounded to the nearest integer.

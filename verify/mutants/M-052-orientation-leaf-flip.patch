@@ -1,0 +1,18 @@
+Mutant: M-052
+Targets: P-ENC-01
+Expect-Fail: enc::p_enc_01
+Defect: to_face_ij_orientation() also flips the swap bit for leaf cells
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..e5df8af 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -690,7 +690,7 @@ impl CellId {
+             nbits = LOOKUP_BITS as i32;
+         }
+ 
+-        if self.lsb() & 0x1111111111111110 != 0 {
++        if self.lsb() & 0x1111111111111111 != 0 {
+             orientation ^= i32::from(SWAP_MASK);
+         }
+ 

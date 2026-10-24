@@ -1,0 +1,17 @@
+Mutant: M-412
+Targets: P-RMEA-01
+Expect-Fail: ri_mea::p_rmea_01
+Defect: length() subtracts the wrong way round
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -169,7 +169,7 @@
+     /// single-point intervals have no defined length. Every other interval without a NaN bound
+     /// has a length that is not NaN.
+     pub fn length(self) -> f64 {
+-        self.hi - self.lo
++        self.lo - self.hi
+     }
+ 
+     /// Reports whether the interval contains the point `p`.

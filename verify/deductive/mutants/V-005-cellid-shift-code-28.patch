@@ -1,0 +1,17 @@
+Mutant: V-005
+Theorem: decode_base_shift's ensures, lemma_idvec_round_trip
+Defect: the extended shift code adds 28 instead of 29
+
+diff --git a/verify/deductive/src/cellid_vector.rs b/verify/deductive/src/cellid_vector.rs
+index a9bc90f..81ee09f 100644
+--- a/verify/deductive/src/cellid_vector.rs
++++ b/verify/deductive/src/cellid_vector.rs
+@@ -110,7 +110,7 @@ pub fn decode_base_shift(buf: &[u8], pos: usize) -> (r: Option<(u64, u64, usize)
+         if p >= buf.len() {
+             return None;
+         }
+-        shift_code = 29 + buf[p] as u64;
++        shift_code = 28 + buf[p] as u64;
+         p = p + 1;
+         if shift_code > 56 {
+             return None;

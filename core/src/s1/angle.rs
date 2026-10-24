@@ -25,11 +25,11 @@
 
 #![expect(
     clippy::cast_possible_truncation,
-    reason = "E5/E6/E7 angle encoding (f64->i32) — values clamped to valid range"
+    reason = "E5/E6/E7 encoding (f64 -> i32): a saturating `as` cast; the out-of-range results are documented on `e5`"
 )]
 #![expect(
     clippy::cast_possible_wrap,
-    reason = "E5/E6/E7 angle encoding — f64->i32 range checked by domain"
+    reason = "the unsigned E6/E7 constructors read a u32's bits as an i32, as upstream's static_cast; documented on them"
 )]
 use std::f64::consts::PI;
 use std::fmt;
@@ -101,13 +101,15 @@ impl Angle {
         Self::from_degrees(f64::from(e7) * 1e-7)
     }
 
-    /// Creates an angle from unsigned E6 representation.
+    /// Creates an angle from unsigned E6 representation. A value above `i32::MAX` wraps to a
+    /// negative angle (its bits read as an `i32`), as upstream's `static_cast<int32_t>`.
     #[inline]
     pub fn from_unsigned_e6(e6: u32) -> Self {
         Self::from_e6(e6 as i32)
     }
 
-    /// Creates an angle from unsigned E7 representation.
+    /// Creates an angle from unsigned E7 representation. A value above `i32::MAX` wraps to a
+    /// negative angle (its bits read as an `i32`), as upstream's `static_cast<int32_t>`.
     #[inline]
     pub fn from_unsigned_e7(e7: u32) -> Self {
         Self::from_e7(e7 as i32)
@@ -127,22 +129,35 @@ impl Angle {
         self.0 * (180.0 / PI)
     }
 
-    /// Returns the angle in E5 representation (degrees × 10⁵, rounded).
+    /// Returns the angle in E5 representation: degrees × 10⁵, rounded to the nearest integer.
+    ///
+    /// Upstream requires the angle to lie in (−180°, 180°] (`s1angle.h:127`; its debug builds
+    /// check that the value fits an `int32`). The library computes every angle:
+    ///
+    /// - **Ties** (degrees × 10⁵ exactly a half integer) round to even, as C++ on x86-64, the
+    ///   reference build (its `MathUtil::Round<int32_t>` is the `cvtsd2si` instruction). C++'s
+    ///   generic code on other processors rounds ties away from zero, so upstream itself
+    ///   depends on the platform there (`UPSTREAM.md` U-014).
+    /// - **Outside the `i32` range** the result saturates: `i32::MAX` above it and for +∞,
+    ///   `i32::MIN` below it and for −∞, and 0 for NaN. This deviates from C++, which returns
+    ///   −2147483648 for all of these in release builds (U-014).
     #[inline]
     pub fn e5(self) -> i32 {
-        (self.degrees() * 1e5).round() as i32
+        (self.degrees() * 1e5).round_ties_even() as i32
     }
 
-    /// Returns the angle in E6 representation (degrees × 10⁶, rounded).
+    /// Returns the angle in E6 representation: degrees × 10⁶, rounded to the nearest integer,
+    /// ties to even, saturating outside the `i32` range (see [`e5`](Self::e5)).
     #[inline]
     pub fn e6(self) -> i32 {
-        (self.degrees() * 1e6).round() as i32
+        (self.degrees() * 1e6).round_ties_even() as i32
     }
 
-    /// Returns the angle in E7 representation (degrees × 10⁷, rounded).
+    /// Returns the angle in E7 representation: degrees × 10⁷, rounded to the nearest integer,
+    /// ties to even, saturating outside the `i32` range (see [`e5`](Self::e5)).
     #[inline]
     pub fn e7(self) -> i32 {
-        (self.degrees() * 1e7).round() as i32
+        (self.degrees() * 1e7).round_ties_even() as i32
     }
 
     // --- Operations ---
@@ -154,9 +169,24 @@ impl Angle {
     }
 
     /// Returns an equivalent angle in (-π, π].
+    ///
+    /// The result is upstream's `S1Angle::Normalize`: the IEEE-754 remainder of the angle by
+    /// the `f64` nearest 2π (`remainder(radians, 2 * M_PI)`), exact for every finite angle,
+    /// with −π mapped to π. It lies in (−π, π] for every finite angle; ±∞ and NaN give NaN.
     pub fn normalized(self) -> Angle {
-        let rem = self.0 - (self.0 / (2.0 * PI)).round() * (2.0 * PI);
-        if rem <= -PI { Angle(PI) } else { Angle(rem) }
+        // `%` is IEEE fmod, which is exact: `r` has the sign of the angle and |r| < 2π. The
+        // remainder differs from it by 0 or ±2π. Where |r| > π the correction is exact
+        // (Sterbenz: π ≤ |r| ≤ 2·2π), and at |r| = π either choice ends at π, as upstream maps
+        // −π to π (spec 007 FR-021, research R6).
+        let y = 2.0 * PI;
+        let r = self.0 % y;
+        if r > PI {
+            Angle(r - y)
+        } else if r <= -PI {
+            Angle(r + y)
+        } else {
+            Angle(r)
+        }
     }
 
     /// Returns the sine of this angle.
@@ -669,3 +699,7 @@ mod quickcheck_tests {
         back == a
     }
 }
+
+#[cfg(test)]
+#[path = "angle_tests.rs"]
+mod angle_tests;

@@ -1,0 +1,18 @@
+Mutant: M-505
+Targets: P-QVAL-03
+Expect-Fail: ur_val::p_qval_03__center_size
+Defect: from_center_size() goes the whole size, not half, each way along x
+Tier: slow
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -155,7 +155,7 @@
+     /// that invalid rectangle.
+     pub fn from_center_size(center: Point, size: Point) -> Self {
+         let r = Rect {
+-            x: r1::Interval::new(center.x - 0.5 * size.x, center.x + 0.5 * size.x),
++            x: r1::Interval::new(center.x - size.x, center.x + size.x),
+             y: r1::Interval::new(center.y - 0.5 * size.y, center.y + 0.5 * size.y),
+         };
+         debug_assert!(r.is_valid(), "from_center_size: the result fails is_valid");

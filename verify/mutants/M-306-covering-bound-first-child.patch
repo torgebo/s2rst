@@ -1,0 +1,17 @@
+Mutant: M-306
+Targets: P-CCNT-02, P-CCNT-03
+Expect-Fail: cl_cnt::p_ccnt_02,cl_cnt::p_ccnt_03
+Defect: cell_union_bound() covers only the first child
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -478,7 +478,7 @@
+ 
+     /// Returns the `CellId` of this cell as a singleton covering.
+     pub fn cell_union_bound(self) -> Vec<CellId> {
+-        vec![self.id]
++        vec![if self.is_leaf() { self.id } else { self.id.child_begin() }]
+     }
+ 
+     /// Returns the minimum distance from the cell to the given point.

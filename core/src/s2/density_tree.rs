@@ -1324,6 +1324,12 @@ fn decode_varint_at(data: &[u8], mut pos: usize) -> Option<(u64, usize)> {
         }
         let b = data[pos];
         pos += 1;
+        // The tenth byte carries bit 63 only: upstream rejects anything above 1 as "too long
+        // to be a varint64" (`util/coding/varint.cc`, `Parse64WithLimit`), and so does this
+        // decoder, instead of dropping the extra bits (spec 003 D-003).
+        if shift == 63 && b > 1 {
+            return None;
+        }
         result |= u64::from(b & 0x7F) << shift;
         if b < 0x80 {
             return Some((result, pos));

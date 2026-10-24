@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
+#
+# The drift guard (spec 003 FR-011; data-model §6; contracts/deductive-conventions.md).
+# One [[mirror]] per library function that a restated copy in src/ mirrors:
+#
+#   restated    = "module::fn" in src/
+#   library     = "core/src/s2/<file>.rs::<fn>" or "<file>.rs::<impl header>::<fn>"
+#   fingerprint = "fnv1a64:<16 hex digits>" of the library function's tokens, doc attributes removed,
+#                 followed by those of the module constants it names (top-level `const` items of
+#                 the same file, such as MAX_DECODE_COUNT)
+#   differences = the permitted differences the restatement uses (deductive-conventions rule 2)
+#
+# `tests/drift.rs` recomputes every fingerprint. After reviewing a restated copy against a
+# changed library function, run `make verify-deductive-bless`.
+
+[[mirror]]
+restated = "varint::write_uvarint"
+library = "core/src/s2/encoding.rs::write_uvarint"
+fingerprint = "fnv1a64:9872a549f2be626f"
+differences = ["Vec<u8> for the writer", "None for io::Error"]
+
+[[mirror]]
+restated = "varint::read_uvarint"
+library = "core/src/s2/encoding.rs::read_uvarint"
+fingerprint = "fnv1a64:c8cbf459a8d7729a"
+differences = ["slice and cursor reader", "None for io::Error"]
+
+[[mirror]]
+restated = "fixed_width::encode_uint_with_length"
+library = "core/src/s2/encoded_uint_vector.rs::encode_uint_with_length"
+fingerprint = "fnv1a64:9ed10251baa82817"
+differences = ["Vec<u8> for the writer", "a byte loop for to_le_bytes"]
+
+[[mirror]]
+restated = "fixed_width::get_uint_with_length"
+library = "core/src/s2/encoded_uint_vector.rs::get_uint_with_length"
+fingerprint = "fnv1a64:4cf60d2f59905954"
+differences = ["a byte loop for from_le_bytes"]
+
+[[mirror]]
+restated = "fixed_width::decode_uint_with_length"
+library = "core/src/s2/encoded_uint_vector.rs::decode_uint_with_length"
+fingerprint = "fnv1a64:f8c78ba0ae210867"
+differences = ["slice and cursor reader", "None for io::Error", "a byte loop for from_le_bytes"]
+
+[[mirror]]
+restated = "fixed_width::byte_length_u64"
+library = "core/src/s2/encoded_uint_vector.rs::byte_length_u64"
+fingerprint = "fnv1a64:58aca1021b6ad959"
+differences = ["comparisons for leading_zeros and div_ceil"]
+
+[[mirror]]
+restated = "fixed_width::byte_length_u32"
+library = "core/src/s2/encoded_uint_vector.rs::byte_length_u32"
+fingerprint = "fnv1a64:69bedf711c2365a8"
+differences = ["comparisons for leading_zeros and div_ceil"]
+
+[[mirror]]
+restated = "uint_vector::encode_uint_vector_u64"
+library = "core/src/s2/encoded_uint_vector.rs::encode_uint_vector_u64"
+fingerprint = "fnv1a64:01edda4445d3e23b"
+differences = ["Vec<u8> for the writer", "an indexed loop for iter().fold"]
+
+[[mirror]]
+restated = "uint_vector::decode_uint_vector_u64"
+library = "core/src/s2/encoded_uint_vector.rs::decode_uint_vector_u64"
+fingerprint = "fnv1a64:d06c4c56b418e48c"
+differences = ["slice and cursor reader", "None for io::Error"]
+
+[[mirror]]
+restated = "uint_vector::encode_uint_vector_u32"
+library = "core/src/s2/encoded_uint_vector.rs::encode_uint_vector_u32"
+fingerprint = "fnv1a64:641dfb01d2a280d6"
+differences = ["Vec<u8> for the writer", "an indexed loop for iter().fold"]
+
+[[mirror]]
+restated = "uint_vector::decode_uint_vector_u32"
+library = "core/src/s2/encoded_uint_vector.rs::decode_uint_vector_u32"
+fingerprint = "fnv1a64:dabb4b87f249878e"
+differences = ["slice and cursor reader", "None for io::Error"]
+
+[[mirror]]
+restated = "cellid_vector::encode_s2cell_id_vector"
+library = "core/src/s2/encoded_s2cell_id_vector.rs::encode_s2cell_id_vector"
+fingerprint = "fnv1a64:946e60b16abc8728"
+differences = ["raw u64 for CellId", "Vec<u8> for the writer", "u64 for the i32 shift and msb", "if expressions for min and max", "an indexed loop for map().collect()"]
+
+[[mirror]]
+restated = "cellid_vector::encode_base_shift"
+library = "core/src/s2/encoded_s2cell_id_vector.rs::encode_base_shift"
+fingerprint = "fnv1a64:63492222296f9fec"
+differences = ["Vec<u8> for the writer", "u64 for the i32 shift", "an if expression for min"]
+
+[[mirror]]
+restated = "cellid_vector::decode_s2cell_id_vector"
+library = "core/src/s2/encoded_s2cell_id_vector.rs::decode_s2cell_id_vector"
+fingerprint = "fnv1a64:6e6783542966d483"
+differences = ["raw u64 for CellId", "slice and cursor reader", "None for io::Error", "<< for wrapping_shl (shift <= 56)"]
+
+[[mirror]]
+restated = "cellid_vector::decode_base_shift"
+library = "core/src/s2/encoded_s2cell_id_vector.rs::decode_base_shift"
+fingerprint = "fnv1a64:191224c6206c79da"
+differences = ["slice and cursor reader", "None for io::Error", "u64 for the i32 shift code"]
+
+[[mirror]]
+restated = "string_vector::encode_string_vector"
+library = "core/src/s2/encoded_string_vector.rs::encode_string_vector"
+fingerprint = "fnv1a64:fbf69816bd033904"
+differences = ["Vec<u8> strings for &[u8]", "Vec<u8> for the writer"]
+
+[[mirror]]
+restated = "string_vector::decode_string_vector"
+library = "core/src/s2/encoded_string_vector.rs::decode_string_vector"
+fingerprint = "fnv1a64:478ec6ec2dce7782"
+differences = ["slice and cursor reader: a subslice for Read::take + read_to_end", "None for io::Error", "u64 offsets for the usize casts"]

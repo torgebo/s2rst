@@ -1,0 +1,17 @@
+Mutant: M-610
+Targets: P-CAERR-01, P-CAVAL-02
+Expect-Fail: ca_err::p_caerr_01 ca_val::p_caval_02__err
+Defect: `plus_error` clamps below at −0.5, not 0
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -320,7 +320,7 @@
+         // `0.0 < x ? x : 0.0`, so NaN gives 4 and −0 gives +0 (spec 007 FR-018).
+         let sum = self.0 + error;
+         let at_most_4 = if sum < MAX_LENGTH2 { sum } else { MAX_LENGTH2 };
+-        ChordAngle(if 0.0 < at_most_4 { at_most_4 } else { 0.0 })
++        ChordAngle(if 0.0 < at_most_4 { at_most_4 } else { -0.5 })
+     }
+ 
+     /// Returns the maximum error in `length2()` for a `ChordAngle` constructed

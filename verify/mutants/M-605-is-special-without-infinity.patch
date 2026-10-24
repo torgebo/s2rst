@@ -1,0 +1,17 @@
+Mutant: M-605
+Targets: P-CACLS-01
+Expect-Fail: ca_cls::p_cacls_01
+Defect: `is_special` misses `INFINITY`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -262,7 +262,7 @@
+     /// Reports whether this is a special value (negative or infinity).
+     #[inline]
+     pub fn is_special(self) -> bool {
+-        self.is_negative() || self.is_infinity()
++        self.is_negative()
+     }
+ 
+     /// Reports whether the internal representation is valid.

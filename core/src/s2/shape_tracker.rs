@@ -232,8 +232,8 @@ impl ShapeTracker {
     ///
     /// REQUIRES: `ij0 != ij1`, dimension == 2.
     pub fn add_interval(&mut self, face: i32, axis: i32, ijcoord: i64, ij0: i64, ij1: i64) {
-        debug_assert!(ij0 != ij1);
-        debug_assert!(self.dimension == Dimension::Polygon);
+        debug_assert_ne!(ij0, ij1);
+        debug_assert_eq!(self.dimension, Dimension::Polygon);
 
         let mut face = face;
         let mut axis = axis;

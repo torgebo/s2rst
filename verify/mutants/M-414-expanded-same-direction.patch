@@ -1,0 +1,18 @@
+Mutant: M-414
+Targets: P-REXP-01
+Expect-Fail: ri_exp::p_rexp_01
+Defect: expanded() moves both bounds the same way
+Tier: slow
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -301,7 +301,7 @@
+             return self;
+         }
+         Interval {
+-            lo: self.lo - margin,
++            lo: self.lo + margin,
+             hi: self.hi + margin,
+         }
+     }

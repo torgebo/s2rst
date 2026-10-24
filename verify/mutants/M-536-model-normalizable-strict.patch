@@ -1,0 +1,17 @@
+Mutant: M-536
+Targets: P-PTCLS-01
+Expect-Fail: pt_cls::p_ptcls_01
+Defect: point_spec::normalizable leaves out 2^-242 itself (a defect in the description)
+
+diff --git a/verify/src/point_spec.rs b/verify/src/point_spec.rs
+--- a/verify/src/point_spec.rs
++++ b/verify/src/point_spec.rs
+@@ -101,7 +101,7 @@
+ /// `s2edge_crossings.cc:276–288`). For a triple without NaN.
+ #[must_use]
+ pub fn normalizable(p: Point) -> bool {
+-    max_abs(p) >= TWO_M242
++    max_abs(p) > TWO_M242
+ }
+ 
+ /// Whether every coordinate is finite and the squared length `x·x + y·y + z·z`, summed in

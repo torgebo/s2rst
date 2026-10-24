@@ -1,0 +1,17 @@
+Mutant: M-617
+Targets: P-CAVAL-01
+Expect-Fail: ca_val::p_caval_01
+Defect: `RIGHT` as 1
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -100,7 +100,7 @@
+     pub const ZERO: ChordAngle = ChordAngle(0.0);
+ 
+     /// A right angle (90 degrees). Squared chord length = 2.
+-    pub const RIGHT: ChordAngle = ChordAngle(2.0);
++    pub const RIGHT: ChordAngle = ChordAngle(1.0);
+ 
+     /// A straight angle (180 degrees). The maximum finite chord angle.
+     /// Squared chord length = 4.

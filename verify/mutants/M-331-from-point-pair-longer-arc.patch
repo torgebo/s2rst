@@ -1,0 +1,17 @@
+Mutant: M-331
+Targets: P-ISET-05
+Expect-Fail: iv_set::p_iset_05
+Defect: from_point_pair() returns the longer arc
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -114,7 +114,7 @@
+         debug_assert!(p2.abs() <= PI);
+         let p1 = if p1 == -PI { PI } else { p1 };
+         let p2 = if p2 == -PI { PI } else { p2 };
+-        if positive_distance(p1, p2) <= PI {
++        if positive_distance(p1, p2) > PI {
+             Interval::new_checked(p1, p2)
+         } else {
+             Interval::new_checked(p2, p1)

@@ -1,0 +1,19 @@
+Mutant: M-518
+Targets: P-QEXP-01, P-QVAL-02
+Expect-Fail: ur_exp::p_qexp_01__result, ur_val::p_qval_02__expanded
+Defect: expanded() keeps a non-empty axis beside an emptied one
+Tier: slow
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -315,9 +315,6 @@
+     pub fn expanded(self, margin: Point) -> Rect {
+         let xx = self.x.expanded(margin.x);
+         let yy = self.y.expanded(margin.y);
+-        if xx.is_empty() || yy.is_empty() {
+-            return Rect::empty();
+-        }
+         Rect { x: xx, y: yy }
+     }
+ 

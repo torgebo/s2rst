@@ -1,0 +1,18 @@
+Mutant: M-646
+Targets: P-AGNRM-01
+Expect-Fail: 
+Test: core --lib s1::angle::angle_tests
+Defect: `normalized` subtracts 2π at π, giving −π
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -180,7 +180,7 @@
+         // −π to π (spec 007 FR-021, research R6).
+         let y = 2.0 * PI;
+         let r = self.0 % y;
+-        if r > PI {
++        if r >= PI {
+             Angle(r - y)
+         } else if r <= -PI {
+             Angle(r + y)

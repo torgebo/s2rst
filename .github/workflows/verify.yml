@@ -1,0 +1,373 @@
+# Formal verification of `s2rst::s2::CellId` (specs/001-formal-verify-base-type),
+# `s2rst::s2::CellUnion` (specs/002-formal-verify-cell-union), the decoding layer
+# (specs/003-formal-verify-decoders) and the value types `Cell` and `s1::Interval`
+# (specs/004-formal-verify-cell-interval), `r1::Interval` and `s2::Rect`
+# (specs/005-formal-verify-r1-interval-rect), `r2::Rect` and `s2::Point`
+# (specs/006-formal-verify-r2-rect-point), `s1::ChordAngle` and `s1::Angle`
+# (specs/007-formal-verify-chord-angle-angle) with Kani, and of the decoding layer's restated
+# codecs with Verus.
+#
+# Four jobs, each one Makefile target, so CI runs exactly what a developer runs locally:
+#
+# - `verify` (per change): parallel legs, `make verify-cellid`, `make verify-union`, the
+#   three parts of `make verify-decoding` (P=vectors, links, codecs) and the eight parts of
+#   `make verify-values` (P=cell, interval, real, rect, uvrect, point, chord, angle), each the
+#   models' sanity tests (for P=angle also the E-form enumeration, spec 007 R12) and
+#   that suite's proof harnesses
+#   except the weekly slow tier. They run on pull requests and pushes to master that touch the
+#   verified code, its dependencies or the verification layer, and weekly: CellUnion is built
+#   on CellId, so a CellId change re-checks both.
+# - `deductive` (per change and weekly): `make verify-deductive`, Verus on the restated codecs
+#   of spec 003 and the tests that link them to the library; weekly also the V-NNN mutants.
+# - `slow` (weekly): `make verify-slow`, the proofs that exceed the per-change budget (30
+#   minutes per harness; spec FR-012 and SC-005). Several CPU-hours in all, so it runs as a
+#   matrix: one leg per cube face (F=0…5), one for the vertex crash proof, one for the
+#   CellUnion suite with its slow-tier members (F=union, 8 GB per harness, one at a time),
+#   three for the decoding suite with its slow-tier members (F=decoding with P=vectors,
+#   links, codecs; 8 GB per harness, one at a time), and eight for the value-type suite's
+#   weekly members (F=values, specs 004–006; 8 GB and 60 minutes per harness, one at a time).
+# - `mutants` (weekly): `make verify-mutants`, the non-vacuity campaign, one leg per spec.
+#   Every mutant in verify/mutants/ must make its target harnesses fail, except those whose
+#   target times out unmutated too (no verdict, verify/known-timeouts.txt).
+#
+# `run-verify.sh` sizes its parallelism from the runner's cores and available memory and
+# caps every CBMC process (research R15), so VERIFY_JOBS is left unset except in the slow
+# job. A failing
+# harness is named in the log, followed by a concrete-playback test with its inputs.
+name: verify
+
+on:
+  # The same path list twice: CellId, CellUnion and the decoding layer, what they are built
+  # from (`cell.rs` builds the Cell that the CellUnion Region proofs take; `cap.rs`, `rect.rs`,
+  # `point.rs` and the intervals give the decoded types their validity), the value types and
+  # what their proofs execute (`edge_crossings.rs` shares `Point`'s scaling, `angle.rs` runs
+  # `rotate`'s trigonometry), the C++ vectors, and the verification layer (`verify/**` includes
+  # the deductive crate).
+  pull_request:
+    paths:
+      - 'core/src/s2/cell_id.rs'
+      - 'core/src/s2/coords.rs'
+      - 'core/src/s2/cell_union.rs'
+      - 'core/src/s2/encoding.rs'
+      - 'core/src/s2/cell.rs'
+      - 'core/src/r3/**'
+      - 'core/src/s2/mod.rs'
+      - 'core/Cargo.toml'
+      - 'core/tests/data/cpp_cellid_vectors.csv'
+      - 'core/tests/data/cpp_cellunion_vectors.csv'
+      - 'core/src/s2/encoded_uint_vector.rs'
+      - 'core/src/s2/encoded_s2cell_id_vector.rs'
+      - 'core/src/s2/encoded_string_vector.rs'
+      - 'core/src/s2/encoded_s2point_vector.rs'
+      - 'core/src/s2/cap.rs'
+      - 'core/src/s2/rect.rs'
+      - 'core/src/s2/point.rs'
+      - 'core/src/s2/edge_crossings.rs'
+      - 'core/src/s1/angle.rs'
+      - 'core/src/s1/chord_angle.rs'
+      - 'core/src/s1/interval.rs'
+      - 'core/src/r1/interval.rs'
+      - 'core/src/s2/latlng.rs'
+      - 'core/tests/data/cpp_coding_vectors.csv'
+      - 'core/src/s2/region.rs'
+      - 'core/src/r2/**'
+      - 'core/tests/data/cpp_values_vectors.csv'
+      - 'core/tests/trait_property_tests.rs'
+      - 'verify/**'
+      - 'Makefile'
+      - '.github/workflows/verify.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'core/src/s2/cell_id.rs'
+      - 'core/src/s2/coords.rs'
+      - 'core/src/s2/cell_union.rs'
+      - 'core/src/s2/encoding.rs'
+      - 'core/src/s2/cell.rs'
+      - 'core/src/r3/**'
+      - 'core/src/s2/mod.rs'
+      - 'core/Cargo.toml'
+      - 'core/tests/data/cpp_cellid_vectors.csv'
+      - 'core/tests/data/cpp_cellunion_vectors.csv'
+      - 'core/src/s2/encoded_uint_vector.rs'
+      - 'core/src/s2/encoded_s2cell_id_vector.rs'
+      - 'core/src/s2/encoded_string_vector.rs'
+      - 'core/src/s2/encoded_s2point_vector.rs'
+      - 'core/src/s2/cap.rs'
+      - 'core/src/s2/rect.rs'
+      - 'core/src/s2/point.rs'
+      - 'core/src/s2/edge_crossings.rs'
+      - 'core/src/s1/angle.rs'
+      - 'core/src/s1/chord_angle.rs'
+      - 'core/src/s1/interval.rs'
+      - 'core/src/r1/interval.rs'
+      - 'core/src/s2/latlng.rs'
+      - 'core/tests/data/cpp_coding_vectors.csv'
+      - 'core/src/s2/region.rs'
+      - 'core/src/r2/**'
+      - 'core/tests/data/cpp_values_vectors.csv'
+      - 'core/tests/trait_property_tests.rs'
+      - 'verify/**'
+      - 'Makefile'
+      - '.github/workflows/verify.yml'
+  schedule:
+    # 05:23 UTC on Mondays (off the hour to avoid the cron rush).
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  KANI_VERSION: 0.68.0
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The decoding suite runs as three parts, so each leg stays under SC-006's 10 minutes,
+        # and the value types as four (spec 004 research R12, spec 005 research R8).
+        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      # `cargo kani setup` installs a pinned nightly toolchain and the Kani bundle;
+      # ~/.kani/kani-<version>/toolchain is a symlink into ~/.rustup/toolchains/nightly-*.
+      - name: Restore Kani
+        id: kani-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-kani
+            ~/.cargo/bin/kani
+            ~/.kani
+            ~/.rustup/toolchains/nightly-*
+          key: kani-${{ env.KANI_VERSION }}-${{ runner.os }}
+      - name: Install Kani
+        if: steps.kani-cache.outputs.cache-hit != 'true'
+        run: cargo install --locked kani-verifier --version "$KANI_VERSION" && cargo kani setup
+      - name: Check Kani
+        run: |
+          if [ ! -x ~/.kani/kani-$KANI_VERSION/toolchain/bin/rustc ]; then
+            echo "Kani toolchain missing from the cache; running setup again"
+            cargo kani setup
+          fi
+          cargo kani --version
+      - name: Runner size
+        run: |
+          echo "nproc: $(nproc)"
+          grep -E '^(MemTotal|MemAvailable):' /proc/meminfo
+      - name: make verify-${{ matrix.suite }}
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          case "$SUITE" in
+            decoding-*) make verify-decoding P="${SUITE#decoding-}" ;;
+            values-*) make verify-values P="${SUITE#values-}" ;;
+            *) make "verify-$SUITE" ;;
+          esac
+      - name: Upload verification logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs-${{ matrix.suite }}
+          path: verify/target/run-verify/
+          if-no-files-found: ignore
+
+  deductive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERUS_VERSION: 0.2026.09.20.aef82ed
+      VERUS_TOOLCHAIN: 1.98.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Verus's Rust toolchain
+        run: rustup toolchain install "$VERUS_TOOLCHAIN" --profile minimal
+      # The release archive unpacks to verus-x86-linux/, with its own Z3.
+      - name: Restore Verus
+        id: verus-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.verus
+          key: verus-${{ env.VERUS_VERSION }}-${{ runner.os }}
+      - name: Install Verus
+        if: steps.verus-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.verus
+          curl -fsSL -o /tmp/verus.zip \
+            "https://github.com/verus-lang/verus/releases/download/release/$VERUS_VERSION/verus-$VERUS_VERSION-x86-linux.zip"
+          unzip -q /tmp/verus.zip -d ~/.verus
+      - name: make verify-deductive
+        run: make verify-deductive VERUS=$HOME/.verus/verus-x86-linux/verus
+      - name: make verify-deductive MUTANTS=1
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: make verify-deductive VERUS=$HOME/.verus/verus-x86-linux/verus MUTANTS=1
+      - name: Upload Verus logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verus-logs
+          path: verify/deductive/target/run-verus/
+          if-no-files-found: ignore
+
+  slow:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ['0', '1', '2', '3', '4', '5', vertex, union, decoding-vectors, decoding-links, decoding-codecs,
+               values-cell-a, values-cell-b, values-interval-rect, values-uvrect-point, values-chord-angle,
+               values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e]
+        # The value-type suite's 75 weekly members take about 29 hours one at a time on the
+        # workstation (2026-10-14, 2026-10-18), so they run as ten legs of
+        # `make verify-slow F=values`, each a list of harness filters. The first five hold the members that prove; their
+        # longest, `iv_mea::p_imea_06_range__ynoninv_xnoninv`, took 44 minutes there. The
+        # `limits` legs hold the 20 members that time out at 60 minutes (tool limits, listed in
+        # verify/known-timeouts.txt), at most four to a leg, so each leg stays inside the job's 6
+        # hours: the runner reports them as KNOWN-TIMEOUT and fails the leg only if one fails,
+        # runs out of memory or starts to prove (then record it and remove its line). A new
+        # weekly member must join one of these lists.
+        include:
+          - part: values-cell-a
+            filters: 'cl_bnd::p_cbnd_'
+          - part: values-cell-b
+            filters: 'cl_bnd::p_cchd_ cl_bnd::p_ceq_'
+          - part: values-interval-rect
+            filters: 'iv_exp::p_iexp_01_ iv_mea::p_imea_06_range ri_exp::p_rexp_03_symmetric rl_exp::p_lexp_01 rl_bnd::'
+          - part: values-uvrect-point
+            filters: 'ur_exp:: ur_mea::p_qmea_01 ur_val::p_qval_03 pt_cls::p_ptcls_02 pt_crash::c_ortho pt_crash::c_rotate pt_ort::p_ptort_02 pt_val::p_ptval_02'
+          - part: values-chord-angle
+            filters: 'ag_cnv::p_agcnv_01 ag_eform::p_agef_01 ag_ari::p_agari_01__mul'
+          - part: values-limits-a
+            filters: 'iv_exp::p_iexp_02_symmetric'
+          - part: values-limits-b
+            filters: 'iv_exp::p_iexp_02_default iv_exp::p_iexp_03_ rl_exp::p_lexp_02_symmetric'
+          - part: values-limits-c
+            filters: 'pt_cls::p_ptcls_03 pt_dst::p_ptdst_01__symmetric'
+          - part: values-limits-d
+            filters: 'pt_crash::c_from_coords_normalize__band pt_ort::p_ptort_03'
+          - part: values-limits-e
+            filters: 'ca_ari::p_caari_03__sin ag_ari::p_agari_01__div ag_ari::p_agari_01__ratio'
+    env:
+      # One CBMC per physical core: these harnesses run close to their 30-minute limit,
+      # and hyperthread contention slows them (EVALUATION.md, "Measurements"). The union and
+      # decoding legs run one harness at a time: they run at an 8 GB ceiling, their largest
+      # members come close to it, and two of them would fill the 16 GB runner. Only
+      # `ulimit -v` guards them there, as hosted runners have no `systemd-run --user` for the
+      # cgroup backstop. The decoding suite runs as its three parts so that each leg stays
+      # well inside the job's 6 hours: one at a time on the workstation (2026-10-09), its
+      # harnesses took 3.6 hours in all, and the largest part, codecs, 1.9. The values legs
+      # run one at a time for the same reason (8 GB each).
+      VERIFY_JOBS: ${{ (matrix.part == 'union' || startsWith(matrix.part, 'decoding') || startsWith(matrix.part, 'values')) && '1' || '2' }}
+      # The tier's budget (spec FR-012). The Makefile's default is 60 minutes, for a
+      # workstation running one harness at a time; the value types' weekly tier was measured
+      # against it (specs 004–006), so their legs keep it.
+      VERIFY_HARNESS_TIMEOUT: ${{ startsWith(matrix.part, 'values') && '60m' || '30m' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Restore Kani
+        id: kani-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-kani
+            ~/.cargo/bin/kani
+            ~/.kani
+            ~/.rustup/toolchains/nightly-*
+          key: kani-${{ env.KANI_VERSION }}-${{ runner.os }}
+      - name: Install Kani
+        if: steps.kani-cache.outputs.cache-hit != 'true'
+        run: cargo install --locked kani-verifier --version "$KANI_VERSION" && cargo kani setup
+      - name: Check Kani
+        run: |
+          if [ ! -x ~/.kani/kani-$KANI_VERSION/toolchain/bin/rustc ]; then
+            echo "Kani toolchain missing from the cache; running setup again"
+            cargo kani setup
+          fi
+          cargo kani --version
+      - name: Runner size
+        run: |
+          echo "nproc: $(nproc)"
+          grep -E '^(MemTotal|MemAvailable):' /proc/meminfo
+      - name: make verify-slow (${{ matrix.part }})
+        env:
+          PART: ${{ matrix.part }}
+          FILTERS: ${{ matrix.filters }}
+        run: |
+          case "$PART" in
+            decoding-*) make verify-slow F=decoding P="${PART#decoding-}" ;;
+            values-*) make verify-slow F=values P="$FILTERS" ;;
+            *) make verify-slow F="$PART" ;;
+          esac
+      - name: Upload verification logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-slow-logs-${{ matrix.part }}
+          path: verify/target/run-verify/
+          if-no-files-found: ignore
+
+  mutants:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # The most a hosted job may run. The 226 mutants take about 9 hours on the workstation
+    # (2026-10-14), more than one job's 6, so each spec's mutants are a leg: series N holds
+    # spec 00(N+1)'s (M-0NN spec 001, … M-5NN spec 006, M-6NN spec 007). Without the counterexample re-runs,
+    # which run-mutants.sh now skips, the workstation took 33, 50 and 54 minutes for specs
+    # 001–003, and about 3.8, 1.2 and 1.9 hours for specs 004–006, whose weekly-tier mutants
+    # have 60 minutes. Spec 004's leg is the longest: M-344 and M-345 give no verdict only when
+    # their 60 minutes are up, and M-343's kill took 46 minutes. The xlarge-tier mutant (M-222) is
+    # skipped here.
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        series: ['0', '1', '2', '3', '4', '5', '6']
+    env:
+      # The weekly tier's limit, as the slow job's values legs have it: run-mutants.sh's
+      # default of 30 minutes is too short for the weekly-tier mutants of specs 004–006.
+      VERIFY_SLOW_HARNESS_TIMEOUT: 60m
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Restore Kani
+        id: kani-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-kani
+            ~/.cargo/bin/kani
+            ~/.kani
+            ~/.rustup/toolchains/nightly-*
+          key: kani-${{ env.KANI_VERSION }}-${{ runner.os }}
+      - name: Install Kani
+        if: steps.kani-cache.outputs.cache-hit != 'true'
+        run: cargo install --locked kani-verifier --version "$KANI_VERSION" && cargo kani setup
+      - name: Check Kani
+        run: |
+          if [ ! -x ~/.kani/kani-$KANI_VERSION/toolchain/bin/rustc ]; then
+            echo "Kani toolchain missing from the cache; running setup again"
+            cargo kani setup
+          fi
+          cargo kani --version
+      - name: make verify-mutants (M-${{ matrix.series }}NN)
+        run: make verify-mutants M='M-${{ matrix.series }}*'
+      - name: Upload mutant logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-mutant-logs-${{ matrix.series }}
+          path: verify/target/mutant-worktrees/*.log
+          if-no-files-found: ignore

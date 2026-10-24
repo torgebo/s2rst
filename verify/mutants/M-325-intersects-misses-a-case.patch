@@ -1,0 +1,17 @@
+Mutant: M-325
+Targets: P-IREL-04
+Expect-Fail: iv_rel::p_irel_04
+Defect: intersects() misses an inverted interval that meets at the low end
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -280,7 +280,7 @@
+             return y.is_inverted() || y.lo <= self.hi || y.hi >= self.lo;
+         }
+         if y.is_inverted() {
+-            return y.lo <= self.hi || y.hi >= self.lo;
++            return y.lo <= self.hi;
+         }
+         y.lo <= self.hi && y.hi >= self.lo
+     }

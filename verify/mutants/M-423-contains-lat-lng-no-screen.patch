@@ -1,0 +1,18 @@
+Mutant: M-423
+Targets: P-LMEM-01
+Expect-Fail: rl_mem::p_lmem_01
+Defect: contains_lat_lng() tests an invalid point (C++'s behaviour, K2)
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -341,9 +341,6 @@
+     /// then tests it anyway, so it may report an out-of-range point as contained.
+     #[inline]
+     pub fn contains_lat_lng(self, ll: LatLng) -> bool {
+-        if !ll.is_valid() {
+-            return false;
+-        }
+         self.lat.contains(ll.lat.radians()) && self.lng.contains(ll.lng.radians())
+     }
+ 

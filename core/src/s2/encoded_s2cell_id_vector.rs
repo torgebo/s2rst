@@ -123,12 +123,24 @@ fn encode_base_shift(w: &mut dyn Write, shift: i32, base: u64, base_len: usize) 
 ///
 /// # Errors
 ///
-/// Returns an error if the data is malformed or the read fails.
+/// - [`io::ErrorKind::UnexpectedEof`]: the input ends inside the header, the base or the
+///   deltas.
+/// - [`io::ErrorKind::InvalidData`]: an extended shift code above 56, or an error of the
+///   delta vector ([`decode_uint_vector_u64`](encoded_uint_vector::decode_uint_vector_u64)):
+///   a header varint whose tenth byte is above 1, or more than 50,000,000 ids. That limit is
+///   a deliberate deviation; upstream has none.
+///
+/// The identifiers are not validated, as upstream: a decoded id may be invalid (0, for
+/// example), and each is rebuilt as `base + (delta << shift)` modulo 2^64, as upstream's
+/// unsigned arithmetic does.
 pub fn decode_s2cell_id_vector(r: &mut dyn Read) -> io::Result<Vec<CellId>> {
     let (base, shift) = decode_base_shift(r)?;
     let deltas = encoded_uint_vector::decode_uint_vector_u64(r)?;
 
-    let mut result = Vec::with_capacity(deltas.len());
+    // Grow on demand, as the delta vector does (spec 003 FR-019). `deltas.len()` is known
+    // here, but a reservation sized from decoded data keeps the decoder out of the Kani proofs'
+    // reach all the same (research R7).
+    let mut result = Vec::new();
     for d in deltas {
         result.push(CellId(base.wrapping_add(d.wrapping_shl(shift))));
     }
@@ -540,3 +552,7 @@ mod tests {
         drop(result);
     }
 }
+
+#[cfg(test)]
+#[path = "encoded_s2cell_id_vector_tests.rs"]
+mod encoded_s2cell_id_vector_tests;

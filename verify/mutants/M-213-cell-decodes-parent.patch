@@ -1,0 +1,18 @@
+Mutant: M-213
+Targets: P-FX-10, P-FX-05
+Expect-Fail: cd_fx::p_fx_10__b8, cd_fx::p_fx_05
+Defect: the Cell decoder returns the parent of the decoded cell
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..b3efcd6 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -1026,7 +1026,7 @@ impl S2Encode for Cell {
+ impl S2Decode for Cell {
+     fn decode(r: &mut dyn Read) -> io::Result<Self> {
+         let id = CellId::decode(r)?;
+-        Ok(Cell::from(id))
++        Ok(Cell::from(id.parent()))
+     }
+ }
+ 

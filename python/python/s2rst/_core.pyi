@@ -51,15 +51,15 @@ class Angle:
         ...
 
     def e5(self) -> int:
-        """The angle in E5 representation."""
+        """The angle in E5 representation (degrees * 1e5, ties to even, saturating)."""
         ...
 
     def e6(self) -> int:
-        """The angle in E6 representation."""
+        """The angle in E6 representation (degrees * 1e6, ties to even, saturating)."""
         ...
 
     def e7(self) -> int:
-        """The angle in E7 representation."""
+        """The angle in E7 representation (degrees * 1e7, ties to even, saturating)."""
         ...
 
     def abs(self) -> "Angle":
@@ -110,7 +110,7 @@ class ChordAngle:
 
     @classmethod
     def from_length2(cls, length2: float) -> "ChordAngle":
-        """Create from squared chord length."""
+        """Create from squared chord length; negatives give NEGATIVE, above 4 or NaN give STRAIGHT."""
         ...
 
     @classmethod
@@ -1264,7 +1264,11 @@ class Cell:
     def __deepcopy__(self, memo: dict) -> Cell: ...
 
 class CellUnion:
-    """A set of S2 cells, automatically normalized (sorted, deduplicated, merged)."""
+    """A set of S2 cells.
+
+    Built from cell ids, it is normalized (sorted, deduplicated, merged);
+    ``decode_cell_union`` keeps the cells as encoded.
+    """
 
     def __init__(self) -> None:
         """Create an empty cell union."""
@@ -1277,7 +1281,11 @@ class CellUnion:
 
     @classmethod
     def from_range(cls, begin: CellId, end: CellId) -> "CellUnion":
-        """Create from a half-open range [begin, end) of leaf cells."""
+        """Create from a half-open range [begin, end) of leaf cells.
+
+        Raises ``ValueError`` unless ``begin`` and ``end`` are leaf cells (either may also be
+        the end of the leaves, the cell after the last leaf of face 5) and ``begin <= end``.
+        """
         ...
 
     @classmethod
@@ -1287,7 +1295,11 @@ class CellUnion:
 
     @classmethod
     def from_min_max(cls, min_id: CellId, max_id: CellId) -> "CellUnion":
-        """Create from an inclusive range [min_id, max_id] of leaf cells."""
+        """Create from an inclusive range [min_id, max_id] of leaf cells.
+
+        Raises ``ValueError`` unless ``min_id`` and ``max_id`` are leaf cells and
+        ``min_id <= max_id``.
+        """
         ...
 
     def num_cells(self) -> int:
@@ -1335,7 +1347,10 @@ class CellUnion:
         ...
 
     def denormalize(self, min_level: int, level_mod: int) -> "CellUnion":
-        """Replace large cells with smaller cells respecting min_level and level_mod."""
+        """Replace large cells with smaller cells respecting min_level and level_mod.
+
+        Raises ``ValueError`` unless ``min_level`` is in 0..=30 and ``level_mod`` is 1, 2 or 3.
+        """
         ...
 
     def is_empty(self) -> bool:
@@ -2966,7 +2981,13 @@ def encode(obj: Polygon | Polyline | Loop | CellUnion) -> bytes: ...
 def decode_polygon(data: bytes) -> Polygon: ...
 def decode_polyline(data: bytes) -> Polyline: ...
 def decode_loop(data: bytes) -> Loop: ...
-def decode_cell_union(data: bytes) -> CellUnion: ...
+def decode_cell_union(data: bytes) -> CellUnion:
+    """Decode a CellUnion from the S2 binary format, keeping the cells as encoded.
+
+    Raises ``ValueError`` on malformed data, or cells that are not a valid union
+    (an invalid cell, or cells unsorted or overlapping).
+    """
+    ...
 
 # ---------------------------------------------------------------------------
 # Geometry builder

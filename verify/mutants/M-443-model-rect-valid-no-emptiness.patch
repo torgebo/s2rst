@@ -1,0 +1,16 @@
+Mutant: M-443
+Targets: P-LVAL-01
+Expect-Fail: rl_val::p_lval_01
+Defect: rect_spec::valid forgets the emptiness rule (a defect in the description)
+
+diff --git a/verify/src/rect_spec.rs b/verify/src/rect_spec.rs
+--- a/verify/src/rect_spec.rs
++++ b/verify/src/rect_spec.rs
+@@ -29,7 +29,6 @@
+     r.lat.lo.abs() <= FRAC_PI_2
+         && r.lat.hi.abs() <= FRAC_PI_2
+         && arc_spec::valid(r.lng.lo, r.lng.hi)
+-        && real_spec::empty(r.lat) == arc_spec::empty(r.lng)
+ }
+ 
+ /// Whether a latitude–longitude is valid: `|lat| ≤ π/2` and `|lng| ≤ π`, false for NaN

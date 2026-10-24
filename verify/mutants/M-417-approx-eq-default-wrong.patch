@@ -1,0 +1,17 @@
+Mutant: M-417
+Targets: P-REXP-03
+Expect-Fail: ri_exp::p_rexp_03_default
+Defect: approx_eq() uses 1e-14 instead of upstream's 1e-15
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -357,7 +357,7 @@
+     /// `max_error` of 1e-15, so also false for an interval with an infinite bound (see
+     /// there).
+     pub fn approx_eq(self, y: Interval) -> bool {
+-        self.approx_eq_with(y, 1e-15)
++        self.approx_eq_with(y, 1e-14)
+     }
+ 
+     /// Returns the lower or upper endpoint of the interval.

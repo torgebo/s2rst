@@ -44,6 +44,10 @@ jobs:
           - decode_cell_union
           - decode_cell
           - decode_cap
+          - decode_cell_id
+          - decode_point
+          - decode_rect
+          - parse_cell_id_text
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust nightly

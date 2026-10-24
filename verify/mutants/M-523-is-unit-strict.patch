@@ -1,0 +1,18 @@
+Mutant: M-523
+Targets: P-PTCLS-02
+Expect-Fail: pt_cls::p_ptcls_02
+Defect: is_unit() leaves out a squared length exactly 5ε from 1
+Tier: slow
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -130,7 +130,7 @@
+     /// Uses a tolerance of `5 * f64::EPSILON`.
+     #[inline]
+     pub fn is_unit(self) -> bool {
+-        (self.0.norm2() - 1.0).abs() <= 5.0 * f64::EPSILON
++        (self.0.norm2() - 1.0).abs() < 5.0 * f64::EPSILON
+     }
+ 
+     /// Returns a normalized copy of this point.

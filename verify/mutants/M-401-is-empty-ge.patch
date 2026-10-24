@@ -1,0 +1,17 @@
+Mutant: M-401
+Targets: P-RIV-01
+Expect-Fail: ri_val::p_riv_01
+Defect: is_empty() calls a single point empty
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -138,7 +138,7 @@
+ 
+     /// Reports whether the interval is empty (contains no points).
+     pub fn is_empty(self) -> bool {
+-        self.lo > self.hi
++        self.lo >= self.hi
+     }
+ 
+     /// Returns the center of the interval. Undefined for empty intervals.

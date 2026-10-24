@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
+#
+# Formal-verification layer for `s2rst::s2::CellId` (spec 001), `s2rst::s2::CellUnion`
+# (spec 002), the decoding layer (spec 003) and the value types `s2rst::s2::Cell` and
+# `s2rst::s1::Interval` (spec 004), `s2rst::r1::Interval` and `s2rst::s2::Rect` (spec 005),
+# `s2rst::r2::Rect` and `s2rst::s2::Point` (spec 006):
+# Kani proof harnesses, the independent reference models they are checked against, and the
+# models' sanity tests against the committed C++ oracle vectors. Run with `make verify` from
+# the repository root (see verify/README.md and specs/001-formal-verify-base-type/ …
+# specs/006-formal-verify-r2-rect-point/).
+#
+# Standalone workspace (`[workspace]` below), like `fuzz/`, so the Kani toolchain
+# and the harnesses stay out of the main `cargo build`/`make test` and CI matrix.
+[package]
+name = "s2rst-verify"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[dependencies]
+s2rst = { path = "../core" }
+# The Verus-restated codecs of spec 003, for the bounded agreement harnesses (`cd_agree`,
+# research R12). Its ghost code is erased outside Verus.
+s2rst-deductive = { path = "deductive" }
+
+[dev-dependencies]
+# The SC-008 reservation measurement (tests/reservation.rs; spec 003 research R7). MIT; it
+# needs no `unsafe` in this crate.
+stats_alloc = "0.1.10"
+
+[features]
+default = ["cellunion", "decoding", "values"]
+# The CellUnion proofs (spec 002). `make verify-cellid` builds without them through
+# `--no-default-features`, which selects the CellId suite alone (research R1).
+cellunion = []
+# The decoding-layer proofs (spec 003): the integer coding primitives, the integer, cell-id,
+# string and point vectors, and the fixed-size binary codecs. `--harness cd_` selects them
+# (`make verify-decoding`).
+decoding = []
+# The value-type proofs, in the modules `cl_*` (`Cell`) and `iv_*` (the circular interval
+# `s1::Interval`) from spec 004, `ri_*` (the real interval `r1::Interval`) and `rl_*` (the
+# rectangle `s2::Rect`) from spec 005, `ur_*` (the u-v rectangle `r2::Rect`) and `pt_*` (the
+# point `s2::Point`) from spec 006, `ca_*` (the chord angle `s1::ChordAngle`) and `ag_*` (the
+# angle `s1::Angle`) from spec 007. `make verify-values` runs all eight; `P=<part>` one, selected
+# by module name (`--harness ri_exp::`), since a bare prefix matches inside other names.
+values = []
+# The weekly slow tier: harnesses over the per-change budget (research R12, R15), run by
+# `make verify-slow` with a 30-minute limit per harness. `make verify` leaves it off.
+slow = []
+# The xlarge tier (spec 003): harnesses over the weekly budget, which need a machine with
+# 32 GB of memory. `make verify-xlarge` runs them one at a time at a 26G ceiling; no CI job
+# does. `make verify` leaves it off.
+xlarge = ["decoding"]
+
+[lints.rust]
+# `deny`, not `forbid`: `domain::with_text` carries the single, audited
+# `#[allow(unsafe_code)]` (research R6). `core/` itself stays `forbid`.
+unsafe_code = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+# Keep the verification crate out of the parent workspace.
+[workspace]
+# The deductive crate is its own workspace (Verus builds it as well as cargo); `cd_agree`
+# uses it as a path dependency.
+exclude = ["deductive"]

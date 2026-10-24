@@ -1,0 +1,17 @@
+Mutant: M-303
+Targets: P-CID-02
+Expect-Fail: cl_id::p_cid_02
+Defect: size_ij() is one level too small
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -207,7 +207,7 @@
+     /// Returns the edge length of this cell in (i,j)-space.
+     #[inline]
+     pub fn size_ij(self) -> i32 {
+-        size_ij(self.level)
++        size_ij(self.level) / 2
+     }
+ 
+     /// Returns the edge length of this cell in (s,t)-space.

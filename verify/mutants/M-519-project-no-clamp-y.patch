@@ -1,0 +1,17 @@
+Mutant: M-519
+Targets: P-QEXP-02
+Expect-Fail: ur_exp::p_qexp_02
+Defect: project() returns the point's y even outside the rectangle
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -298,7 +298,7 @@
+     /// only, and its release builds then call `std::clamp` with `hi < lo`, which is undefined
+     /// behaviour (`UPSTREAM.md` U-008).
+     pub fn project(self, p: Point) -> Point {
+-        Point::new(self.x.project(p.x), self.y.project(p.y))
++        Point::new(self.x.project(p.x), p.y)
+     }
+ 
+     /// Returns a rectangle expanded on each side by `margin.x` in x and

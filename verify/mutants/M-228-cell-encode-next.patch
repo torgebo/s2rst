@@ -1,0 +1,18 @@
+Mutant: M-228
+Targets: P-FX-05
+Expect-Fail: cd_fx::p_fx_05
+Defect: the Cell encoder writes the next cell's identifier
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..32af7c6 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -1012,7 +1012,7 @@ impl S2Decode for PointVector {
+ 
+ impl S2Encode for Cell {
+     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+-        self.id().encode(w)
++        self.id().next().encode(w)
+     }
+ }
+ 

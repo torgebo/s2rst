@@ -1,0 +1,17 @@
+Mutant: M-404
+Targets: P-RREL-01
+Expect-Fail: ri_rel::p_rrel_01
+Defect: contains_interval() tests the reverse containment
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -187,7 +187,7 @@
+         if y.is_empty() {
+             return true;
+         }
+-        y.lo >= self.lo && y.hi <= self.hi
++        self.lo >= y.lo && self.hi <= y.hi
+     }
+ 
+     /// Reports whether the interior of this interval contains the entire

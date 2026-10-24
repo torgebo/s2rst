@@ -1,0 +1,18 @@
+Mutant: M-255
+Targets: FR-011 link: cellid_vector::encode_base_shift
+Expect-Fail: cd_agree::a_cv_enc__n0
+Defect: encode_base_shift declares one base byte more than it writes; drift guard: fails
+
+diff --git a/core/src/s2/encoded_s2cell_id_vector.rs b/core/src/s2/encoded_s2cell_id_vector.rs
+index d6de035..1444110 100644
+--- a/core/src/s2/encoded_s2cell_id_vector.rs
++++ b/core/src/s2/encoded_s2cell_id_vector.rs
+@@ -105,7 +105,7 @@ fn encode_base_shift(w: &mut dyn Write, shift: i32, base: u64, base_len: usize)
+     };
+     let shift_code = shift_code.min(31);
+ 
+-    let byte0: u8 = ((shift_code as u8) << 3) | (base_len as u8);
++    let byte0: u8 = ((shift_code as u8) << 3) | (base_len as u8 + 1);
+     w.write_all(&[byte0])?;
+     if shift_code == 31 {
+         w.write_all(&[(shift >> 1) as u8])?;

@@ -1,0 +1,17 @@
+Mutant: M-323
+Targets: P-IREL-02, P-IREL-01
+Expect-Fail: iv_rel::p_irel_02,iv_rel::p_irel_01
+Defect: contains_interval() lets the empty interval contain a single point at π
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -248,7 +248,7 @@
+             if y.is_inverted() {
+                 return y.lo >= self.lo && y.hi <= self.hi;
+             }
+-            return (y.lo >= self.lo || y.hi <= self.hi) && !self.is_empty();
++            return y.lo >= self.lo || y.hi <= self.hi;
+         }
+         if y.is_inverted() {
+             return self.is_full() || y.is_empty();

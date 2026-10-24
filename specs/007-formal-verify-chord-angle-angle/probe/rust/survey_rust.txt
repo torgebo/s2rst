@@ -1,0 +1,39 @@
+e6_tie radians=3e42bd8646c1beed deg*1e6=0.5 e6=1
+e6_tie radians=3e5c1c496a229e64 deg*1e6=1.5 e6=2
+e6_tie radians=3e676ce7d8722ea9 deg*1e6=2.5 e6=3
+e6_tie radians=3e7515370f99f6cb deg*1e6=4.5 e6=5
+e6_tie radians=3e79c498a14a6686 deg*1e6=5.5 e6=6
+e6_tie radians=3e7e73fa32fad641 deg*1e6=6.5 e6=7
+e7_tie radians=be0dfc0a0acf97e2 deg*1e7=-0.5 e7=-1
+e7_tie radians=be267d07881bb1e9 deg*1e7=-1.5 e7=-2
+e7_tie radians=be32bd8646c1beed deg*1e7=-2.5 e7=-3
+e7_1e10rad 2147483647
+e7_neg1e10rad -2147483648
+e5_inf 2147483647
+e5_nan 0
+e6_400deg 400000000
+normalized x=9.42477796076938e0 -> 3.141592653589793e0 (400921fb54442d18) in(-pi,pi]=true
+normalized x=-9.42477796076938e0 -> 3.141592653589793e0 (400921fb54442d18) in(-pi,pi]=true
+normalized x=3.141592653589793e0 -> 3.141592653589793e0 (400921fb54442d18) in(-pi,pi]=true
+normalized x=-3.141592653589793e0 -> 3.141592653589793e0 (400921fb54442d18) in(-pi,pi]=true
+normalized x=1.5707963267948966e1 -> 3.141592653589793e0 (400921fb54442d18) in(-pi,pi]=true
+normalized x=7e0 -> 7.168146928204138e-1 (3fe6f0255dde9740) in(-pi,pi]=true
+normalized x=1e6 -> -3.575641670031473e-1 (bfd6e254d0e00000) in(-pi,pi]=true
+normalized x=1e16 -> 3.141592653589793e0 (400921fb54442d18) in(-pi,pi]=true
+normalized x=1e20 -> 0e0 (0000000000000000) in(-pi,pi]=true
+normalized x=1e300 -> 0e0 (0000000000000000) in(-pi,pi]=true
+normalized x=-1e20 -> 0e0 (0000000000000000) in(-pi,pi]=true
+normalized x=inf -> NaN (fff8000000000000) in(-pi,pi]=false
+normalized x=NaN -> NaN (7ff8000000000000) in(-pi,pi]=false
+chord_from_length2_nan NaN
+chord_from_length2_m5 -5
+chord_from_angle_m1rad -1
+chord_from_angle_nan 4
+chord_m5_is_valid 1
+chord_m5_predecessor -1
+chord_m5_to_angle -1
+chord_inf_e5 2147483647
+chord_inf_e7 2147483647
+chord_neg_e7 -572957795
+chord_plus_error_nan NaN
+chord_neg_inf is_negative=true is_infinity=true

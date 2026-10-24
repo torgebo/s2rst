@@ -48,9 +48,18 @@ pub fn encode_string_vector(strings: &[&[u8]], w: &mut dyn Write) -> io::Result<
 
 /// Decodes a vector of byte vectors from the `EncodedStringVector` format.
 ///
+/// The end offsets are not checked against each other. An entry whose range is out of order
+/// (it ends before the previous entry) or reaches past the data decodes as an empty string,
+/// and the next entry starts at its end offset. That is upstream's rule since commit
+/// `95b1e15`, which the pinned upstream includes (spec 003 FR-020). Every entry is decoded at
+/// once, where upstream decodes each one when it is accessed.
+///
 /// # Errors
 ///
-/// Returns an error if the data is malformed or the read fails.
+/// - An error of the offset vector ([`decode_uint_vector_u64`]).
+/// - [`io::ErrorKind::InvalidData`]: the last offset, the data length, is above 500,000,000
+///   bytes. A deliberate deviation: upstream has no limit.
+/// - [`io::ErrorKind::UnexpectedEof`]: the input ends before the data does.
 pub fn decode_string_vector(r: &mut dyn Read) -> io::Result<Vec<Vec<u8>>> {
     let offsets = decode_uint_vector_u64(r)?;
     if offsets.is_empty() {
@@ -64,10 +73,21 @@ pub fn decode_string_vector(r: &mut dyn Read) -> io::Result<Vec<Vec<u8>>> {
             "string vector data too large",
         ));
     }
-    let mut data = vec![0u8; total_len as usize];
-    r.read_exact(&mut data)?;
+    // Read the data as it arrives instead of reserving `total_len` bytes first: a short input
+    // declaring a huge length must not reserve memory for it (spec 003 FR-019). No capped
+    // reservation either: any reservation sized from decoded data keeps the decoder out of the
+    // Kani proofs' reach (research R7).
+    let mut data = Vec::new();
+    let n = r.take(total_len).read_to_end(&mut data)?;
+    if n as u64 != total_len {
+        return Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "string vector data truncated",
+        ));
+    }
 
-    let mut result = Vec::with_capacity(offsets.len());
+    // Grow on demand, as above (research R7), although `offsets.len()` is known here.
+    let mut result = Vec::new();
     let mut start = 0usize;
     for &end in &offsets {
         let end = end as usize;
@@ -257,3 +277,7 @@ mod tests {
         assert_eq!(b"tu", d3[0].as_slice());
     }
 }
+
+#[cfg(test)]
+#[path = "encoded_string_vector_tests.rs"]
+mod encoded_string_vector_tests;

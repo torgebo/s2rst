@@ -1,0 +1,17 @@
+Mutant: M-311
+Targets: P-CEQ-01
+Expect-Fail: cl_eq::p_ceq_01
+Defect: Cell equality compares levels only
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -101,7 +101,7 @@
+ 
+ impl PartialEq for Cell {
+     fn eq(&self, other: &Self) -> bool {
+-        self.id == other.id
++        self.level == other.level
+     }
+ }
+ 

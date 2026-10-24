@@ -1,0 +1,17 @@
+Mutant: M-504
+Targets: P-QVAL-03
+Expect-Fail: ur_val::p_qval_03__points
+Defect: from_point_pair() keeps the x coordinates in the given order
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -136,7 +136,7 @@
+     /// Creates the minimal bounding rectangle containing two points.
+     pub fn from_point_pair(p1: Point, p2: Point) -> Self {
+         Rect {
+-            x: r1::Interval::from_point_pair(p1.x, p2.x),
++            x: r1::Interval::new(p1.x, p2.x),
+             y: r1::Interval::from_point_pair(p1.y, p2.y),
+         }
+     }

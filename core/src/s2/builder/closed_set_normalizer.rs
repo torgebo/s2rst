@@ -56,10 +56,10 @@ const SENTINEL: Edge = (VertexId::MAX, VertexId::MAX);
 impl ClosedSetNormalizer {
     fn new(options: Options, graph_options_out: Vec<GraphOptions>) -> Self {
         assert_eq!(graph_options_out.len(), 3);
-        debug_assert!(graph_options_out[0].edge_type == EdgeType::Directed);
-        debug_assert!(graph_options_out[2].edge_type == EdgeType::Directed);
-        debug_assert!(graph_options_out[1].sibling_pairs != SiblingPairs::Create);
-        debug_assert!(graph_options_out[1].sibling_pairs != SiblingPairs::Require);
+        debug_assert_eq!(graph_options_out[0].edge_type, EdgeType::Directed);
+        debug_assert_eq!(graph_options_out[2].edge_type, EdgeType::Directed);
+        debug_assert_ne!(graph_options_out[1].sibling_pairs, SiblingPairs::Create);
+        debug_assert_ne!(graph_options_out[1].sibling_pairs, SiblingPairs::Require);
         let mut graph_options_in = graph_options_out.clone();
         for opt in &mut graph_options_in {
             opt.allow_vertex_filtering = false;

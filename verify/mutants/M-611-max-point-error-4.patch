@@ -1,0 +1,17 @@
+Mutant: M-611
+Targets: P-CAERR-02
+Expect-Fail: ca_err::p_caerr_02__point
+Defect: `max_point_error` with 4·ε for 4.5·ε
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -327,7 +327,7 @@
+     /// from two unit-length points (assuming they are normalized to within the
+     /// bounds guaranteed by `normalize()`).
+     pub fn max_point_error(self) -> f64 {
+-        4.5 * f64::EPSILON * self.0 + 16.0 * f64::EPSILON * f64::EPSILON
++        4.0 * f64::EPSILON * self.0 + 16.0 * f64::EPSILON * f64::EPSILON
+     }
+ 
+     /// Returns the maximum error in `length2()` for a `ChordAngle` constructed

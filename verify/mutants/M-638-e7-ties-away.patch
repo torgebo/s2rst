@@ -1,0 +1,18 @@
+Mutant: M-638
+Targets: P-AGEF-01
+Expect-Fail: ag_eform::p_agef_01__e7
+Tier: slow
+Defect: `e7` rounds ties away from zero (FR-022 undone)
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -157,7 +157,7 @@
+     /// ties to even, saturating outside the `i32` range (see [`e5`](Self::e5)).
+     #[inline]
+     pub fn e7(self) -> i32 {
+-        (self.degrees() * 1e7).round_ties_even() as i32
++        (self.degrees() * 1e7).round() as i32
+     }
+ 
+     // --- Operations ---

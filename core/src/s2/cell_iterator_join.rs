@@ -140,7 +140,8 @@ impl<'a> S2CellIteratorJoin<'a> {
         }
         let max = iter.range_max();
 
-        let cu = CellUnion::from_range(min, max.next());
+        // C++ S2CellIteratorJoin: S2CellUnion::FromMinMax(min, max).
+        let cu = CellUnion::from_min_max(min, max);
         cu.cell_ids().iter().map(|&id| Cell::from(id)).collect()
     }
 

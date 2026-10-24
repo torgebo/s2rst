@@ -1,0 +1,17 @@
+Mutant: M-319
+Targets: P-IVAL-04
+Expect-Fail: iv_val::p_ival_04
+Defect: bound(i) returns the other bound
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -512,7 +512,7 @@
+     /// # Panics
+     /// Panics if `i` is not 0 or 1.
+     pub fn bound(self, i: usize) -> f64 {
+-        [self.lo, self.hi][i]
++        [self.hi, self.lo][i]
+     }
+ 
+     /// Reports whether the interval contains `p`. Assumes `p` is already

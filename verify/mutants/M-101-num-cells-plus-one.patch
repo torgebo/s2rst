@@ -1,0 +1,18 @@
+Mutant: M-101
+Targets: P-UACC-01
+Expect-Fail: cu_acc::p_uacc_01__n1
+Defect: num_cells() returns one more than the number of cells
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..407d1b3 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -112,7 +112,7 @@ impl CellUnion {
+     /// Returns the number of cells in this union.
+     #[inline]
+     pub fn num_cells(&self) -> usize {
+-        self.0.len()
++        self.0.len() + 1
+     }
+ 
+     /// Returns the inner slice of cell IDs.

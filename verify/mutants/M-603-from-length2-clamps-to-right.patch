@@ -1,0 +1,17 @@
+Mutant: M-603
+Targets: P-CAVAL-03
+Expect-Fail: ca_val::p_caval_03
+Defect: `from_length2` clamps above 4 to `RIGHT`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -131,7 +131,7 @@
+         } else if length2 <= MAX_LENGTH2 {
+             ChordAngle(length2)
+         } else {
+-            ChordAngle::STRAIGHT
++            ChordAngle::RIGHT
+         }
+     }
+ 

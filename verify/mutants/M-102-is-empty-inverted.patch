@@ -1,0 +1,18 @@
+Mutant: M-102
+Targets: P-UACC-01
+Expect-Fail: cu_acc::p_uacc_01__n0
+Defect: is_empty() is inverted
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..f1f97ec 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -321,7 +321,7 @@ impl CellUnion {
+ 
+     /// Returns true if this cell union is empty.
+     pub fn is_empty(&self) -> bool {
+-        self.0.is_empty()
++        !self.0.is_empty()
+     }
+ 
+     /// Returns the union of this cell union with `other`.

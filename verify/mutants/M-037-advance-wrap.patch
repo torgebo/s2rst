@@ -1,0 +1,18 @@
+Mutant: M-037
+Targets: P-TRAV-05
+Expect-Fail: trav::p_trav_05__l0
+Defect: advance_wrap() wraps backwards one cell short
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..912a3c8 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -548,7 +548,7 @@ impl CellId {
+                 let wrap = (WRAP_OFFSET >> shift) as i64;
+                 let mut s = steps % wrap;
+                 if s < min {
+-                    s += wrap;
++                    s += wrap - 1;
+                 }
+                 s
+             } else {

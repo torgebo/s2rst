@@ -1,0 +1,18 @@
+Mutant: M-034
+Targets: P-TRAV-01, P-TRAV-07
+Expect-Fail: trav::p_trav_01, trav::p_trav_07
+Defect: next() steps two cells
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..bfa4071 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -477,7 +477,7 @@ impl CellId {
+     /// Returns the next cell along the Hilbert curve.
+     #[inline]
+     pub fn next(self) -> CellId {
+-        CellId(self.0.wrapping_add(self.lsb() << 1))
++        CellId(self.0.wrapping_add(self.lsb() << 2))
+     }
+ 
+     /// Returns the previous cell along the Hilbert curve.

@@ -1,0 +1,17 @@
+Mutant: V-009
+Theorem: encode_s2cell_id_vector's ensures (the round trip)
+Defect: the cell-id encoder shifts each delta one bit too far
+
+diff --git a/verify/deductive/src/cellid_vector.rs b/verify/deductive/src/cellid_vector.rs
+index a9bc90f..f1fa3c8 100644
+--- a/verify/deductive/src/cellid_vector.rs
++++ b/verify/deductive/src/cellid_vector.rs
+@@ -573,7 +573,7 @@ pub fn encode_s2cell_id_vector(v: &[u64], w: &mut Vec<u8>)
+             forall|k: int| 0 <= k < i ==> deltas[k] == ((v[k] - base) as u64) >> shift,
+         decreases v.len() - i,
+     {
+-        deltas.push((v[i] - e_base) >> e_shift);
++        deltas.push((v[i] - e_base) >> (e_shift + 1));
+         i += 1;
+     }
+     let width = encode_uint_vector_u64(&deltas, w);

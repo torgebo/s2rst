@@ -1,0 +1,18 @@
+Mutant: M-025
+Targets: P-HIER-08
+Expect-Fail: hier::p_hier_08
+Defect: end() is computed from face 4 instead of face 5
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..94e66e6 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -443,7 +443,7 @@ impl CellId {
+     /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
+     #[inline]
+     pub fn end(level: impl Into<Level>) -> CellId {
+-        CellId::from_face(5).child_end_at_level(level)
++        CellId::from_face(4).child_end_at_level(level)
+     }
+ 
+     /// Returns the minimum `CellId` contained within this cell.

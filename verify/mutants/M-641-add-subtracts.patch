@@ -1,0 +1,17 @@
+Mutant: M-641
+Targets: P-AGARI-01
+Expect-Fail: ag_ari::p_agari_01__add
+Defect: `Add` subtracts
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -240,7 +240,7 @@
+     type Output = Angle;
+     #[inline]
+     fn add(self, rhs: Angle) -> Angle {
+-        Angle(self.0 + rhs.0)
++        Angle(self.0 - rhs.0)
+     }
+ }
+ 

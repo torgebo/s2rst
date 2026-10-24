@@ -1,0 +1,17 @@
+Mutant: M-334
+Targets: P-IMEA-05
+Expect-Fail: iv_mea::p_imea_05
+Defect: complement_center() returns the interval's own centre
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -203,7 +203,7 @@
+     /// interval, the result is its antipodal point on S1.
+     pub fn complement_center(self) -> f64 {
+         if self.lo != self.hi {
+-            return self.complement().center();
++            return self.center();
+         }
+         // Singleton.
+         if self.hi <= 0.0 {

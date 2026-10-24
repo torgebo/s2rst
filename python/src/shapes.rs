@@ -31,7 +31,7 @@ fn lock_evs(m: &Mutex<EdgeVectorShape>) -> MutexGuard<'_, EdgeVectorShape> {
 // ---------------------------------------------------------------------------
 
 /// An edge of a Shape: a pair of S2Points (v0, v1).
-#[pyclass(name = "Edge", module = "s2rst")]
+#[pyclass(from_py_object, name = "Edge", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyEdge(pub(crate) Edge);
 
@@ -106,7 +106,7 @@ impl PyEdge {
 // ---------------------------------------------------------------------------
 
 /// A reference point with a containment flag, used for dimension-2 shapes.
-#[pyclass(name = "ReferencePoint", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "ReferencePoint", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyReferencePoint(pub(crate) ReferencePoint);
 
@@ -156,7 +156,7 @@ impl PyReferencePoint {
 // ---------------------------------------------------------------------------
 
 /// A polymorphic Shape object wrapping any concrete shape type.
-#[pyclass(name = "Shape", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "Shape", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyShape {
     inner: ShapeKind,
@@ -341,7 +341,7 @@ impl PyShape {
 // ---------------------------------------------------------------------------
 
 /// A lightweight closed loop (dimension 2).
-#[pyclass(name = "LaxLoop", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "LaxLoop", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyLaxLoop(pub(crate) LaxLoop);
 
@@ -417,7 +417,7 @@ impl PyLaxLoop {
 // ---------------------------------------------------------------------------
 
 /// A lightweight open polyline (dimension 1).
-#[pyclass(name = "LaxPolyline", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "LaxPolyline", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyLaxPolyline(pub(crate) LaxPolyline);
 
@@ -495,7 +495,7 @@ impl PyLaxPolyline {
 // ---------------------------------------------------------------------------
 
 /// A lightweight polygon with multiple loops (dimension 2).
-#[pyclass(name = "LaxPolygon", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "LaxPolygon", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyLaxPolygon(pub(crate) LaxPolygon);
 
@@ -591,7 +591,7 @@ impl PyLaxPolygon {
 // ---------------------------------------------------------------------------
 
 /// A set of points as a shape (dimension 0).
-#[pyclass(name = "PointVector", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "PointVector", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyPointVector(pub(crate) PointVector);
 

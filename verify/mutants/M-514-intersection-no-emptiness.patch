@@ -1,0 +1,18 @@
+Mutant: M-514
+Targets: P-QSET-02
+Expect-Fail: ur_set::p_qset_02
+Defect: intersection() keeps a non-empty axis beside an empty one
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -342,9 +342,6 @@
+     pub fn intersection(self, other: Rect) -> Rect {
+         let xx = self.x.intersection(other.x);
+         let yy = self.y.intersection(other.y);
+-        if xx.is_empty() || yy.is_empty() {
+-            return Rect::empty();
+-        }
+         Rect { x: xx, y: yy }
+     }
+ 

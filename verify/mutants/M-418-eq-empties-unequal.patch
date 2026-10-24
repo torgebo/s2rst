@@ -1,0 +1,17 @@
+Mutant: M-418
+Targets: P-RIV-02
+Expect-Fail: ri_val::p_riv_02
+Defect: equality tells empty intervals apart by their bounds
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -378,7 +378,7 @@
+ 
+ impl PartialEq for Interval {
+     fn eq(&self, other: &Self) -> bool {
+-        (self.lo == other.lo && self.hi == other.hi) || (self.is_empty() && other.is_empty())
++        self.lo == other.lo && self.hi == other.hi
+     }
+ }
+ 

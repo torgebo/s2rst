@@ -1,0 +1,18 @@
+Mutant: M-216
+Targets: P-VAR-01, P-UV-03
+Expect-Fail: cd_uv::p_uv_03__h2_b18
+Tier: slow
+Defect: read_uvarint shifts each varint byte by 8 bits instead of 7
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -138,7 +138,7 @@
+         }
+         // At most 56 here, so the next shift is at most 63: at 63 the byte above was either
+         // rejected or below 0x80.
+-        shift += 7;
++        shift += 8;
+     }
+ }
+ 

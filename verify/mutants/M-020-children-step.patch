@@ -1,0 +1,18 @@
+Mutant: M-020
+Targets: P-HIER-01, P-HIER-02
+Expect-Fail: hier::p_hier_01, hier::p_hier_02
+Defect: children() steps by one child lsb instead of two
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..524e511 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -371,7 +371,7 @@ impl CellId {
+         let old_lsb = self.lsb();
+         let new_lsb = old_lsb >> 2;
+         let child0 = self.0 - old_lsb + new_lsb;
+-        let step = new_lsb << 1;
++        let step = new_lsb;
+         [
+             CellId(child0),
+             CellId(child0 + step),

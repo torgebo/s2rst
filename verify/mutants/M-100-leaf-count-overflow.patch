@@ -1,0 +1,18 @@
+Mutant: M-100
+Targets: C-CellUnion::leaf_cells_covered, P-UMEAS-01
+Expect-Fail: cu_crash::c_leaf_cells_covered__n2, cu_meas::p_umeas_01__n1
+Defect: leaf_cells_covered shifts by 2·(31 − level) instead of 2·(30 − level), so two face cells sum to 2^63 and overflow
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..f919d3d 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -274,7 +274,7 @@ impl CellUnion {
+         for id in &self.0 {
+             let level = id.level();
+             let leaves =
+-                1i64 << (2 * (u32::from(crate::s2::coords::MAX_CELL_LEVEL) - level.as_u32()));
++                1i64 << (2 * (u32::from(crate::s2::coords::MAX_CELL_LEVEL) + 1 - level.as_u32()));
+             count += leaves;
+         }
+         count

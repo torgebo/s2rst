@@ -140,7 +140,7 @@ impl PolylineSimplifier {
         self.window = self.window.intersection(target);
 
         // Process any pending avoid ranges.
-        let ranges: Vec<RangeToAvoid> = self.ranges_to_avoid.drain(..).collect();
+        let ranges: Vec<RangeToAvoid> = std::mem::take(&mut self.ranges_to_avoid);
         for range in &ranges {
             self.avoid_range(range.interval, range.on_left);
         }

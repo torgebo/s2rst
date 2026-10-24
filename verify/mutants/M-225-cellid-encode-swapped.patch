@@ -1,0 +1,18 @@
+Mutant: M-225
+Targets: P-FX-01
+Expect-Fail: cd_fx::p_fx_01
+Defect: the CellId encoder writes the identifier byte-swapped
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..59ba23b 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -150,7 +150,7 @@ pub(crate) fn read_uvarint(r: &mut dyn Read) -> io::Result<u64> {
+ 
+ impl S2Encode for CellId {
+     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+-        write_u64(w, self.0)
++        write_u64(w, self.0.swap_bytes())
+     }
+ }
+ 

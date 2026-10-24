@@ -1,0 +1,18 @@
+Mutant: M-416
+Targets: P-REXP-03
+Expect-Fail: ri_exp::p_rexp_03_symmetric
+Defect: approx_eq_with() compares the low bounds without the absolute value, so it is not symmetric
+Tier: slow
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -350,7 +350,7 @@
+         if y.is_empty() {
+             return self.length() <= 2.0 * max_error;
+         }
+-        (y.lo - self.lo).abs() <= max_error && (y.hi - self.hi).abs() <= max_error
++        (y.lo - self.lo) <= max_error && (y.hi - self.hi).abs() <= max_error
+     }
+ 
+     /// Like [`approx_eq_with`](Interval::approx_eq_with) with a default

@@ -47,10 +47,53 @@ const MAX_LENGTH2: f64 = 4.0;
 /// // Comparisons are efficient (no trig needed)
 /// assert!(ChordAngle::RIGHT < ChordAngle::STRAIGHT);
 /// ```
+///
+/// # Values
+///
+/// A `ChordAngle` holds one of these, and nothing else (the *canonical* values):
+///
+/// - a squared chord length in `[0, 4]` (either zero), the distance between two points;
+/// - [`NEGATIVE`](Self::NEGATIVE) (−1), smaller than any distance, the radius of an empty
+///   [`Cap`](crate::s2::Cap);
+/// - [`INFINITY`](Self::INFINITY) (+∞), larger than any distance.
+///
+/// Every constructor, the arithmetic and deserialisation return one of these, so the order and
+/// [`successor`](Self::successor)/[`predecessor`](Self::predecessor) behave the same for every
+/// value.
+///
+/// # Deviation from upstream
+///
+/// Upstream's `S1ChordAngle` treats every negative value as valid (its `is_negative` carries a
+/// "TODO: Consider stricter check here -- only allow `Negative()`"), so −1, −5 and −0.001 all
+/// mean "below every distance" but compare and step differently: upstream's
+/// `FromLength2(-5).Predecessor()` is −1, which is larger. Here [`from_length2`](Self::from_length2)
+/// maps every negative value, −∞ included, to `NEGATIVE` (spec 007 FR-017). One consequence: a
+/// [`Cap`](crate::s2::Cap) that C++ encoded with a negative radius other than −1 decodes as an
+/// empty cap of radius `NEGATIVE`, so its bytes do not round-trip, where C++ keeps them.
 #[must_use]
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ChordAngle(f64);
+
+/// Deserialises the squared length, a bare number as the derived `Serialize` writes it, and
+/// rejects it unless it is canonical (−1, a length in `[0, 4]`, or +∞), with an error naming
+/// the rule (spec 007 FR-020). A canonical value is returned as read, bit for bit. A derived
+/// impl would accept any number, a way to build a value no constructor returns (spec 007 K6).
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for ChordAngle {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        let l = f64::deserialize(deserializer)?;
+        if l == -1.0 || (0.0..=MAX_LENGTH2).contains(&l) || l == f64::INFINITY {
+            Ok(ChordAngle(l))
+        } else {
+            Err(D::Error::custom(format_args!(
+                "{l} is not a canonical chord angle length (-1, [0, 4] or +inf)"
+            )))
+        }
+    }
+}
 
 impl ChordAngle {
     /// The zero angle.
@@ -73,14 +116,22 @@ impl ChordAngle {
 
     // --- Constructors ---
 
-    /// Creates a `ChordAngle` from a squared chord length.
-    /// The value is clamped to at most `MAX_LENGTH2` (4.0).
+    /// Creates a `ChordAngle` from a squared chord length:
+    ///
+    /// - a negative value, −∞ included, gives [`NEGATIVE`](Self::NEGATIVE) (a documented
+    ///   deviation: upstream keeps it, see the type's documentation);
+    /// - a value in `[0, 4]` is kept as it is, bit for bit (`−0` stays a zero);
+    /// - a value above 4, +∞ included, gives [`STRAIGHT`](Self::STRAIGHT), as upstream's
+    ///   `std::min(4.0, length2)`;
+    /// - NaN gives `STRAIGHT`, as upstream (`std::min(4.0, NaN)` is 4.0).
     #[inline]
     pub fn from_length2(length2: f64) -> Self {
-        if length2 > MAX_LENGTH2 {
-            ChordAngle::STRAIGHT
-        } else {
+        if length2 < 0.0 {
+            ChordAngle::NEGATIVE
+        } else if length2 <= MAX_LENGTH2 {
             ChordAngle(length2)
+        } else {
+            ChordAngle::STRAIGHT
         }
     }
 
@@ -161,18 +212,27 @@ impl ChordAngle {
     }
 
     /// Returns this angle in E5 representation (via conversion to `Angle`).
+    ///
+    /// Through [`to_angle`](Self::to_angle) and [`Angle::e5`], so ties round to even and the
+    /// result saturates outside the `i32` range: [`INFINITY`](Self::INFINITY)'s is `i32::MAX`,
+    /// where C++ returns −2147483648 (its `Infinity().ToAngle()` breaks `S1Angle::e5`'s range,
+    /// `UPSTREAM.md` U-014), and [`NEGATIVE`](Self::NEGATIVE)'s is that of −1 radian.
     #[inline]
     pub fn e5(self) -> i32 {
         self.to_angle().e5()
     }
 
     /// Returns this angle in E6 representation (via conversion to `Angle`).
+    ///
+    /// As [`e5`](Self::e5): ties to even, saturating outside the `i32` range.
     #[inline]
     pub fn e6(self) -> i32 {
         self.to_angle().e6()
     }
 
     /// Returns this angle in E7 representation (via conversion to `Angle`).
+    ///
+    /// As [`e5`](Self::e5): ties to even, saturating outside the `i32` range.
     #[inline]
     pub fn e7(self) -> i32 {
         self.to_angle().e7()
@@ -192,10 +252,11 @@ impl ChordAngle {
         self.0 < 0.0
     }
 
-    /// Reports whether this is the special infinity value.
+    /// Reports whether this is the special infinity value (+∞; upstream's test, which no
+    /// longer meets −∞, since the constructors map it to `NEGATIVE`).
     #[inline]
     pub fn is_infinity(self) -> bool {
-        self.0.is_infinite()
+        self.0 == f64::INFINITY
     }
 
     /// Reports whether this is a special value (negative or infinity).
@@ -248,12 +309,18 @@ impl ChordAngle {
 
     /// Returns this chord angle adjusted by the given error bound (which
     /// can be positive or negative). Special values are not modified.
-    /// The result is clamped to the valid range \[0, 4\].
+    /// The result is clamped to the valid range \[0, 4\] as upstream's
+    /// `max(0.0, min(4.0, length2 + error))`: a NaN sum gives [`STRAIGHT`](Self::STRAIGHT), and a
+    /// zero sum gives `+0`.
     pub fn plus_error(self, error: f64) -> ChordAngle {
         if self.is_special() {
             return self;
         }
-        ChordAngle((self.0 + error).clamp(0.0, MAX_LENGTH2))
+        // C++'s std::min(4.0, x) is `x < 4.0 ? x : 4.0` and std::max(0.0, x) is
+        // `0.0 < x ? x : 0.0`, so NaN gives 4 and −0 gives +0 (spec 007 FR-018).
+        let sum = self.0 + error;
+        let at_most_4 = if sum < MAX_LENGTH2 { sum } else { MAX_LENGTH2 };
+        ChordAngle(if 0.0 < at_most_4 { at_most_4 } else { 0.0 })
     }
 
     /// Returns the maximum error in `length2()` for a `ChordAngle` constructed
@@ -264,15 +331,23 @@ impl ChordAngle {
     }
 
     /// Returns the maximum error in `length2()` for a `ChordAngle` constructed
-    /// from an `Angle`.
+    /// from an `Angle`: `1.5 * ε * length2`, upstream's `GetS1AngleConstructorMaxError`
+    /// (the `sin` call and the multiply each have a relative error of `ε / 2`, and the `sin`
+    /// error is squared). It was `ε * length2`, older upstream's bound (spec 007 D-008).
     pub fn max_angle_error(self) -> f64 {
-        f64::EPSILON * self.0
+        1.5 * f64::EPSILON * self.0
     }
 
     // --- Trigonometry ---
 
     /// Returns the sine of this chord angle. More efficient than converting
     /// to `Angle` and computing the sine.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when `self` is special ([`NEGATIVE`](Self::NEGATIVE) or
+    /// [`INFINITY`](Self::INFINITY)), as upstream's `ABSL_DCHECK`. Release builds evaluate the
+    /// formula on the sentinel's length, without meaning: both sentinels give NaN.
     #[inline]
     pub fn sin(self) -> f64 {
         self.sin2().sqrt()
@@ -280,21 +355,41 @@ impl ChordAngle {
 
     /// Returns the square of the sine of this chord angle. More efficient
     /// than `sin()` since it avoids a square root.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when `self` is special ([`NEGATIVE`](Self::NEGATIVE) or
+    /// [`INFINITY`](Self::INFINITY)), as upstream's `ABSL_DCHECK`. Release builds evaluate the
+    /// formula on the sentinel's length, without meaning: `NEGATIVE` gives −1.25 and `INFINITY` −∞.
     #[inline]
     pub fn sin2(self) -> f64 {
+        debug_assert!(!self.is_special(), "sin2 of a special chord angle");
         // sin(2A) = 2 sin(A) cos(A), and length2 = 4 sin²(A), so:
         // sin²(2A) = 4 sin²(A) (1 - sin²(A)) = length2 * (1 - length2/4)
         self.0 * (1.0 - 0.25 * self.0)
     }
 
     /// Returns the cosine of this chord angle.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when `self` is special ([`NEGATIVE`](Self::NEGATIVE) or
+    /// [`INFINITY`](Self::INFINITY)), as upstream's `ABSL_DCHECK`. Release builds evaluate the
+    /// formula on the sentinel's length, without meaning: `NEGATIVE` gives 1.5 and `INFINITY` −∞.
     #[inline]
     pub fn cos(self) -> f64 {
+        debug_assert!(!self.is_special(), "cos of a special chord angle");
         // cos(2A) = 1 - 2 sin²(A) = 1 - length2/2
         1.0 - 0.5 * self.0
     }
 
     /// Returns the tangent of this chord angle.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when `self` is special ([`NEGATIVE`](Self::NEGATIVE) or
+    /// [`INFINITY`](Self::INFINITY)), as upstream's `ABSL_DCHECK`. Release builds evaluate the
+    /// formula on the sentinel's length, without meaning: both sentinels give NaN.
     #[inline]
     pub fn tan(self) -> f64 {
         self.sin() / self.cos()
@@ -330,6 +425,12 @@ impl Add for ChordAngle {
 
     /// Adds two chord angles. Both must be non-special.
     /// The result is clamped to at most `STRAIGHT` (180°).
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when either operand is special (`NEGATIVE` or `INFINITY`), as
+    /// upstream's `ABSL_DCHECK`. Release builds evaluate the formula on the sentinels'
+    /// lengths, without meaning (`NEGATIVE + RIGHT` gives `STRAIGHT`).
     fn add(self, rhs: ChordAngle) -> ChordAngle {
         debug_assert!(!self.is_special());
         debug_assert!(!rhs.is_special());
@@ -360,6 +461,12 @@ impl Sub for ChordAngle {
 
     /// Subtracts a chord angle from this one. Both must be non-special.
     /// The result is clamped to at least `ZERO`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when either operand is special (`NEGATIVE` or `INFINITY`), as
+    /// upstream's `ABSL_DCHECK`. Release builds evaluate the formula on the sentinels'
+    /// lengths, without meaning (`INFINITY - RIGHT` gives `ZERO`).
     fn sub(self, rhs: ChordAngle) -> ChordAngle {
         debug_assert!(!self.is_special());
         debug_assert!(!rhs.is_special());
@@ -1088,3 +1195,7 @@ mod quickcheck_tests {
         back == ca
     }
 }
+
+#[cfg(test)]
+#[path = "chord_angle_tests.rs"]
+mod chord_angle_tests;

@@ -1,0 +1,18 @@
+Mutant: M-539
+Targets: P-PTCLS-03
+Expect-Fail: pt_cls::p_ptcls_03__normalize
+Defect: normalize() divides by the squared length instead of the length
+Tier: slow
+
+diff --git a/core/src/r3/vector.rs b/core/src/r3/vector.rs
+--- a/core/src/r3/vector.rs
++++ b/core/src/r3/vector.rs
+@@ -148,7 +148,7 @@
+         if n2 == 0.0 {
+             return Vector::default();
+         }
+-        self * (1.0 / n2.sqrt())
++        self * (1.0 / n2)
+     }
+ 
+     /// Reports whether this vector is approximately unit length.

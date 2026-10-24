@@ -1,0 +1,18 @@
+Mutant: M-121
+Targets: P-UMEM-02
+Expect-Fail: cu_mem::p_umem_02__n1
+Defect: intersects_cell_id() tests containment instead of intersection
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..1ac7944 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -226,7 +226,7 @@ impl CellUnion {
+         debug_assert!(id.is_valid());
+         // Find the first cell that does not entirely precede `id`.
+         let pos = self.0.partition_point(|c| c.range_max() < id.range_min());
+-        pos < self.0.len() && self.0[pos].intersects(id)
++        pos < self.0.len() && self.0[pos].contains(id)
+     }
+ 
+     /// Reports whether this union contains the given point.

@@ -1,0 +1,17 @@
+Mutant: M-501
+Targets: P-QVAL-01
+Expect-Fail: ur_val::p_qval_01
+Defect: is_valid() accepts every rectangle, one empty axis included
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -177,7 +177,7 @@
+     /// Reports whether the rectangle is valid (both intervals are either
+     /// both empty or both non-empty).
+     pub fn is_valid(self) -> bool {
+-        self.x.is_empty() == self.y.is_empty()
++        true
+     }
+ 
+     /// Reports whether the rectangle is empty.

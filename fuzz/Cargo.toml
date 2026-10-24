@@ -143,5 +143,33 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "parse_cell_id_text"
+path = "fuzz_targets/parse_cell_id_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_cell_id"
+path = "fuzz_targets/decode_cell_id.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_point"
+path = "fuzz_targets/decode_point.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_rect"
+path = "fuzz_targets/decode_rect.rs"
+test = false
+doc = false
+bench = false
+
 # Keep the fuzz crate out of the parent workspace.
 [workspace]

@@ -1,0 +1,20 @@
+Mutant: M-252
+Targets: FR-011 link: uint_vector::encode_uint_vector_u32
+Expect-Fail: cd_agree::a_uv32_enc__n1
+Tier: slow
+Memory: 8G
+Defect: encode_uint_vector_u32 never uses one-byte elements; drift guard: fails
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..6270f13 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -84,7 +84,7 @@ pub fn decode_uint_with_length(r: &mut dyn Read, length: usize) -> io::Result<u6
+ /// Returns an I/O error if the write fails.
+ pub fn encode_uint_vector_u32(v: &[u32], w: &mut dyn Write) -> io::Result<()> {
+     let one_bits: u32 = v.iter().fold(1u32, |acc, &x| acc | x);
+-    let len = byte_length_u32(one_bits);
++    let len = byte_length_u32(one_bits).max(2);
+     let size_len = (v.len() as u64 * 4) | (len as u64 - 1);
+     write_uvarint(w, size_len)?;
+     for &x in v {

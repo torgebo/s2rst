@@ -1,0 +1,17 @@
+Mutant: M-317
+Targets: P-IVAL-02
+Expect-Fail: iv_val::p_ival_02
+Defect: new() does not turn a low bound of −π into π
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -70,7 +70,7 @@
+     pub fn new(lo: f64, hi: f64) -> Self {
+         // Note: both checks use the *original* lo/hi values (matching C++
+         // where the parameter names shadow nothing).
+-        let new_lo = if lo == -PI && hi != PI { PI } else { lo };
++        let new_lo = lo;
+         let new_hi = if hi == -PI && lo != PI { PI } else { hi };
+         debug_assert!(is_valid_pair(new_lo, new_hi));
+         Interval {

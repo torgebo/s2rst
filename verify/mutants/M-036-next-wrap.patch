@@ -1,0 +1,18 @@
+Mutant: M-036
+Targets: P-TRAV-03
+Expect-Fail: trav::p_trav_03
+Defect: next_wrap() wraps to the second cell instead of the first
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..9e2251a 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -498,7 +498,7 @@ impl CellId {
+         if n.0 < WRAP_OFFSET {
+             n
+         } else {
+-            CellId(n.0 - WRAP_OFFSET)
++            CellId(n.0 - WRAP_OFFSET + (self.lsb() << 1))
+         }
+     }
+ 

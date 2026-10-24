@@ -1,0 +1,18 @@
+Mutant: M-103
+Targets: P-UINV-01
+Expect-Fail: cu_inv::p_uinv_01__n2
+Defect: is_valid() accepts a cell whose last leaf is the next cell's first leaf (> instead of >= on the overlap check)
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..74fae65 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -132,7 +132,7 @@ impl CellUnion {
+                 if self.0[i - 1] >= self.0[i] {
+                     return false;
+                 }
+-                if self.0[i - 1].range_max() >= self.0[i].range_min() {
++                if self.0[i - 1].range_max() > self.0[i].range_min() {
+                     return false;
+                 }
+             }

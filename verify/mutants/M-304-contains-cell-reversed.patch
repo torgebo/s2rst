@@ -1,0 +1,17 @@
+Mutant: M-304
+Targets: P-CCNT-01
+Expect-Fail: cl_cnt::p_ccnt_01
+Defect: contains_cell() tests the reverse containment
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -391,7 +391,7 @@
+     /// Reports whether this cell contains the other cell.
+     #[inline]
+     pub fn contains_cell(self, other: Cell) -> bool {
+-        self.id.contains(other.id)
++        other.id.contains(self.id)
+     }
+ 
+     /// Reports whether this cell intersects the other cell.

@@ -71,7 +71,7 @@ fn shape_id_arithmetic_and_comparison() {
     id += 4;
     assert_eq!(id.as_i32(), 7);
     // PartialEq<i32> / PartialOrd<i32> / Display
-    assert!(id == 7);
+    assert_eq!(id, 7);
     assert!(id > 5);
     assert!(id < 10);
     assert_eq!(format!("{id}"), "7");

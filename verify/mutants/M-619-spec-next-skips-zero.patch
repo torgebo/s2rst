@@ -1,0 +1,17 @@
+Mutant: M-619
+Targets: P-CANBR-01
+Expect-Fail: ca_nbr::p_canbr_01
+Defect: description: `chord_spec::next` of −1 skips +0
+
+diff --git a/verify/src/chord_spec.rs b/verify/src/chord_spec.rs
+--- a/verify/src/chord_spec.rs
++++ b/verify/src/chord_spec.rs
+@@ -58,7 +58,7 @@
+ #[must_use]
+ pub fn next(l: f64) -> f64 {
+     if l == NEGATIVE {
+-        ZERO
++        TINY
+     } else if l == ZERO {
+         TINY
+     } else if l == STRAIGHT || l == INFINITY {

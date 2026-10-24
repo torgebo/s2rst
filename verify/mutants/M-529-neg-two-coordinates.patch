@@ -1,0 +1,21 @@
+Mutant: M-529
+Targets: P-PTARI-01
+Expect-Fail: pt_ari::p_ptari_01__neg
+Defect: negation leaves z alone
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -365,7 +365,11 @@
+     type Output = Point;
+     #[inline]
+     fn neg(self) -> Point {
+-        Point(-self.0)
++        Point(Vector {
++            x: -self.0.x,
++            y: -self.0.y,
++            z: self.0.z,
++        })
+     }
+ }
+ 

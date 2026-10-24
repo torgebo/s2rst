@@ -1,0 +1,17 @@
+Mutant: M-507
+Targets: P-QVAL-04
+Expect-Fail: ur_val::p_qval_04
+Defect: vertex_ij() swaps the axes' endpoints
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -200,7 +200,7 @@
+     /// Returns the vertex in direction `i` along x (Lo=left, Hi=right) and
+     /// direction `j` along y (Lo=down, Hi=up).
+     pub fn vertex_ij(self, i: r1::Endpoint, j: r1::Endpoint) -> Point {
+-        Point::new(self.x.bound(i), self.y.bound(j))
++        Point::new(self.x.bound(j), self.y.bound(i))
+     }
+ 
+     /// Returns all four vertices in CCW order: lower-left, lower-right,

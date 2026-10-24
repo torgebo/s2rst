@@ -1,0 +1,18 @@
+Mutant: M-206
+Targets: P-CV-02
+Expect-Fail: cd_cv::p_cv_02__b4
+Defect: decode_base_shift places the base bytes one byte too low
+
+diff --git a/core/src/s2/encoded_s2cell_id_vector.rs b/core/src/s2/encoded_s2cell_id_vector.rs
+index d6de035..7481f98 100644
+--- a/core/src/s2/encoded_s2cell_id_vector.rs
++++ b/core/src/s2/encoded_s2cell_id_vector.rs
+@@ -164,7 +164,7 @@ fn decode_base_shift(r: &mut dyn Read) -> io::Result<(u64, u32)> {
+     }
+ 
+     let raw_base = encoded_uint_vector::decode_uint_with_length(r, base_len)?;
+-    let mut base = raw_base << (64 - 8 * base_len.max(1));
++    let mut base = raw_base << (56 - 8 * base_len.max(1));
+ 
+     let shift = if shift_code >= 29 {
+         let s = 2 * (shift_code - 29) + 1;

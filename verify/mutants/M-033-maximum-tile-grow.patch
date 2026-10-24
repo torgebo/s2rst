@@ -1,0 +1,18 @@
+Mutant: M-033
+Targets: P-RANGE-06
+Expect-Fail: range::p_range_06
+Defect: maximum_tile() grows without checking that the parent starts at the same leaf
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..b735742 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -896,7 +896,7 @@ impl CellId {
+ 
+         while !ci.is_face() {
+             let p = ci.parent();
+-            if p.range_min() != start || p.range_max() >= limit {
++            if p.range_max() >= limit {
+                 break;
+             }
+             ci = p;

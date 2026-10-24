@@ -1,0 +1,17 @@
+Mutant: M-503
+Targets: P-QVAL-03
+Expect-Fail: ur_val::p_qval_03__points
+Defect: from_points() swaps the y bounds
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -114,7 +114,7 @@
+     pub fn from_points(lo: Point, hi: Point) -> Self {
+         let r = Rect {
+             x: r1::Interval::new(lo.x, hi.x),
+-            y: r1::Interval::new(lo.y, hi.y),
++            y: r1::Interval::new(hi.y, lo.y),
+         };
+         debug_assert!(r.is_valid());
+         r

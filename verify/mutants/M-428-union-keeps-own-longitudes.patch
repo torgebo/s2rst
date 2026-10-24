@@ -1,0 +1,17 @@
+Mutant: M-428
+Targets: P-LSET-01
+Expect-Fail: rl_set::p_lset_01
+Defect: union() keeps this rectangle's longitudes
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -560,7 +560,7 @@
+     pub fn union(self, other: Rect) -> Rect {
+         Rect {
+             lat: self.lat.union(other.lat),
+-            lng: self.lng.union(other.lng),
++            lng: self.lng,
+         }
+     }
+ 

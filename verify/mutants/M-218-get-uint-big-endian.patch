@@ -1,0 +1,18 @@
+Mutant: M-218
+Targets: P-FW-02
+Expect-Fail: cd_fw::p_fw_02__d8
+Defect: get_uint_with_length reads its bytes big-endian
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..32448ef 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -48,7 +48,7 @@ pub fn encode_uint_with_length(w: &mut dyn Write, value: u64, length: usize) ->
+ pub fn get_uint_with_length(data: &[u8], length: usize) -> u64 {
+     let mut buf = [0u8; 8];
+     buf[..length].copy_from_slice(&data[..length]);
+-    u64::from_le_bytes(buf)
++    u64::from_be_bytes(buf)
+ }
+ 
+ /// Reads and consumes a little-endian unsigned integer of `length` bytes. A `length` of 0

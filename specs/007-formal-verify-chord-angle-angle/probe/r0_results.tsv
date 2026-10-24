@@ -1,0 +1,32 @@
+# R0 run, 2026-10-16 (run-verify: 4 GiB, 12 minutes per harness). Kani 0.68.0, CBMC 6.11.0.
+# Second run (r0_frem_*, r0_round_ties_even_concrete, _model_nofrem) the same day; r0_frem_which run alone with cargo kani (covers).
+# harness	result	seconds
+r0::r0_ag_e6_e7_identity	TIMEOUT	-
+r0::r0_ag_e7_round_trip_draft_small	TIMEOUT	-
+r0::r0_ag_e7_round_trip_draft	TIMEOUT	-
+r0::r0_ag_e7_round_trip_library	TIMEOUT	-
+r0::r0_ag_eforms_crash	SUCCESSFUL	0.0
+r0::r0_ag_normalized_draft_idempotent	FAILED	7.1
+r0::r0_ag_normalized_draft_range	FAILED	2.1
+r0::r0_ag_normalized_library_range	FAILED	0.3
+r0::r0_ag_sin_cos_crash	SUCCESSFUL	0.0
+r0::r0_ag_tan_crash	FAILED	0.0
+r0::r0_ca_add_range	SUCCESSFUL	4.5
+r0::r0_ca_e7_crash	FAILED	0.9
+r0::r0_ca_from_angle_range	SUCCESSFUL	0.2
+r0::r0_ca_from_length2_draft_canonical	SUCCESSFUL	0.0
+r0::r0_ca_from_length2_library_canonical	FAILED	0.1
+r0::r0_ca_neighbours_inverse	SUCCESSFUL	0.3
+r0::r0_ca_order_laws	SUCCESSFUL	1.0
+r0::r0_ca_plus_error_canonical	SUCCESSFUL	0.7
+r0::r0_ca_predecessor_previous	SUCCESSFUL	0.5
+r0::r0_ca_sub_range	SUCCESSFUL	15.4
+r0::r0_ca_successor_next	SUCCESSFUL	1.0
+r0::r0_ca_tan_crash	SUCCESSFUL	1.6
+r0::r0_ca_to_angle_crash	FAILED	0.8
+r0::r0_frem_concrete	FAILED	0.5
+r0::r0_frem_small_identity	FAILED	0.1
+r0::r0_round_ties_even_concrete	SUCCESSFUL	0.2
+r0::r0_round_ties_even_model	FAILED	0.2
+r0::r0_round_ties_even_model_nofrem	SUCCESSFUL	6.5
+r0::r0_frem_which	SUCCESSFUL (covers: 1 % 2 is 0; -0 % 2pi is +0)	-

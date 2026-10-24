@@ -15,7 +15,7 @@ use crate::points::PyVector;
 // ---------------------------------------------------------------------------
 
 /// A point on the unit sphere, represented as a normalized 3D vector.
-#[pyclass(name = "S2Point", module = "s2rst")]
+#[pyclass(from_py_object, name = "S2Point", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyS2Point(pub(crate) s2::Point);
 
@@ -245,7 +245,7 @@ pub fn s2_rotate(p: &PyS2Point, axis: &PyS2Point, angle: &PyAngle) -> PyS2Point 
 // ---------------------------------------------------------------------------
 
 /// A point on the unit sphere as a (latitude, longitude) pair.
-#[pyclass(name = "LatLng", module = "s2rst")]
+#[pyclass(from_py_object, name = "LatLng", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyLatLng(pub(crate) s2::LatLng);
 

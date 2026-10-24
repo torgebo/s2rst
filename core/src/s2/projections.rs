@@ -219,8 +219,8 @@ mod tests {
         let proj = PlateCarreeProjection::new(180.0);
         let ll = LatLng::from_degrees(45.0, 90.0);
         let pt = proj.from_lat_lng(ll);
-        assert!(float64_near(pt.x, 90.0, 1e-10), "x = {}, want 90", pt.x,);
-        assert!(float64_near(pt.y, 45.0, 1e-10), "y = {}, want 45", pt.y,);
+        assert!(float64_near(pt.x, 90.0, 1e-10), "x = {}, want 90", pt.x);
+        assert!(float64_near(pt.y, 45.0, 1e-10), "y = {}, want 45", pt.y);
     }
 
     #[test]

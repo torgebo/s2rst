@@ -1,0 +1,18 @@
+Mutant: M-314
+Targets: P-CBND-02, P-CBND-01
+Expect-Fail: cl_bnd::p_cbnd_02__l01
+Defect: ij_level_to_bound_uv() returns the u bounds high first
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -1027,8 +1027,8 @@
+     let y_lo = j & (-cell_size);
+     r2::Rect {
+         x: r1::Interval::new(
++            st_to_uv(ij_to_st_min(x_lo + cell_size)),
+             st_to_uv(ij_to_st_min(x_lo)),
+-            st_to_uv(ij_to_st_min(x_lo + cell_size)),
+         ),
+         y: r1::Interval::new(
+             st_to_uv(ij_to_st_min(y_lo)),

@@ -1,0 +1,17 @@
+Mutant: M-318
+Targets: P-IVAL-03
+Expect-Fail: iv_val::p_ival_03
+Defect: is_inverted() is true for a single point
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -139,7 +139,7 @@
+     /// Reports whether the interval is inverted (lo > hi).
+     /// This is true for empty intervals.
+     pub fn is_inverted(self) -> bool {
+-        self.lo > self.hi
++        self.lo >= self.hi
+     }
+ 
+     /// Returns the midpoint of the interval. Undefined for full and empty

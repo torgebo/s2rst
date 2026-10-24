@@ -1,0 +1,17 @@
+Mutant: M-329
+Targets: P-ISET-03
+Expect-Fail: iv_set::p_iset_03
+Defect: intersection() keeps only y's low bound of an overlap
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -464,7 +464,7 @@
+                 }
+                 return self;
+             }
+-            return Interval::new_checked(y.lo, self.hi);
++            return Interval::new_checked(y.lo, y.lo);
+         }
+         if self.fast_contains(y.hi) {
+             return Interval::new_checked(self.lo, y.hi);

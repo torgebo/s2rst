@@ -1,0 +1,18 @@
+Mutant: M-120
+Targets: P-UMEM-01
+Expect-Fail: cu_mem::p_umem_01__n1
+Defect: contains_cell_id() searches by range_min instead of range_max, so it misses a cell that starts before the query
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..8502e8f 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -213,7 +213,7 @@ impl CellUnion {
+         debug_assert!(id.is_valid());
+         // Find the first cell that does not entirely precede `id`.
+         // "Entirely precedes" means `c.range_max() < id.range_min()`.
+-        let pos = self.0.partition_point(|c| c.range_max() < id.range_min());
++        let pos = self.0.partition_point(|c| c.range_min() < id.range_min());
+         pos < self.0.len() && self.0[pos].contains(id)
+     }
+ 

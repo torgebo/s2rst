@@ -1,0 +1,18 @@
+Mutant: M-254
+Targets: FR-011 link: cellid_vector::decode_s2cell_id_vector
+Expect-Fail: cd_agree::a_cv_dec__b3
+Defect: decode_s2cell_id_vector subtracts each delta from the base; drift guard: fails
+
+diff --git a/core/src/s2/encoded_s2cell_id_vector.rs b/core/src/s2/encoded_s2cell_id_vector.rs
+index d6de035..3462853 100644
+--- a/core/src/s2/encoded_s2cell_id_vector.rs
++++ b/core/src/s2/encoded_s2cell_id_vector.rs
+@@ -140,7 +140,7 @@ pub fn decode_s2cell_id_vector(r: &mut dyn Read) -> io::Result<Vec<CellId>> {
+     // Grow on demand, as the delta vector does (spec 003 FR-019).
+     let mut result = Vec::new();
+     for d in deltas {
+-        result.push(CellId(base.wrapping_add(d.wrapping_shl(shift))));
++        result.push(CellId(base.wrapping_sub(d.wrapping_shl(shift))));
+     }
+     Ok(result)
+ }

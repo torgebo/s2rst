@@ -1,0 +1,18 @@
+Mutant: M-220
+Targets: P-UV-02
+Expect-Fail: cd_uv::p_uv_02_enc__n1
+Defect: encode_uint_vector_u32 writes the count times 8, as for u64
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..ae4e428 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -85,7 +85,7 @@ pub fn decode_uint_with_length(r: &mut dyn Read, length: usize) -> io::Result<u6
+ pub fn encode_uint_vector_u32(v: &[u32], w: &mut dyn Write) -> io::Result<()> {
+     let one_bits: u32 = v.iter().fold(1u32, |acc, &x| acc | x);
+     let len = byte_length_u32(one_bits);
+-    let size_len = (v.len() as u64 * 4) | (len as u64 - 1);
++    let size_len = (v.len() as u64 * 8) | (len as u64 - 1);
+     write_uvarint(w, size_len)?;
+     for &x in v {
+         encode_uint_with_length(w, u64::from(x), len)?;

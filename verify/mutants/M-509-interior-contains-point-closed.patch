@@ -1,0 +1,17 @@
+Mutant: M-509
+Targets: P-QMEM-02
+Expect-Fail: ur_mem::p_qmem_02
+Defect: interior_contains_point() uses closed membership along x
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -247,7 +247,7 @@
+ 
+     /// Reports whether the interior of the rectangle contains the point `p`.
+     pub fn interior_contains_point(self, p: Point) -> bool {
+-        self.x.interior_contains(p.x) && self.y.interior_contains(p.y)
++        self.x.contains(p.x) && self.y.interior_contains(p.y)
+     }
+ 
+     /// Reports whether the rectangle contains the given other rectangle.

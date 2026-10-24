@@ -1,0 +1,20 @@
+Mutant: M-210
+Targets: P-FX-08
+Expect-Fail: cd_fx::p_fx_08__b32
+Tier: slow
+Memory: 8G
+Defect: the Cap decoder skips its validity check and accepts invalid caps (FR-022)
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..4c4ef3b 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -247,7 +247,7 @@ impl S2Decode for Cap {
+         // debug_assert) in later ops such as containment/covering. Reject here,
+         // matching `CellId`/`Rect` decode. Empty (radius < 0) and full
+         // (length² == 4) caps keep their unit center and stay valid.
+-        if !cap.is_valid() {
++        if false && !cap.is_valid() {
+             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid cap"));
+         }
+         Ok(cap)

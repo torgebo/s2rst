@@ -1,0 +1,21 @@
+Mutant: M-531
+Targets: P-PTORT-02
+Expect-Fail: pt_ort::p_ptort_02__point_cross
+Defect: point_cross() returns the zero vector for parallel points
+Tier: slow
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -229,11 +229,6 @@
+     pub fn point_cross(self, other: Point) -> Point {
+         // (p + q) × (q - p) = 2(p × q), but more numerically stable.
+         let x = (self.0 + other.0).cross(other.0 - self.0);
+-        if x == Vector::default() {
+-            // p and other are parallel or anti-parallel; return an arbitrary
+-            // orthogonal vector.
+-            return Point(ortho_impl(self.0));
+-        }
+         Point(x)
+     }
+ 

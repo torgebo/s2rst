@@ -1,0 +1,17 @@
+Mutant: M-620
+Targets: P-CAVAL-02, P-CAVAL-04
+Expect-Fail: ca_val::p_caval_02__angle ca_val::p_caval_04
+Defect: `from_angle`'s length plus one, past 4
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -144,7 +144,7 @@
+             ChordAngle::INFINITY
+         } else {
+             let l = 2.0 * (0.5 * angle.radians().min(std::f64::consts::PI)).sin();
+-            ChordAngle(l * l)
++            ChordAngle(l * l + 1.0)
+         }
+     }
+ 

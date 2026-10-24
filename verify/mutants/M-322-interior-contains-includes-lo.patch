@@ -1,0 +1,17 @@
+Mutant: M-322
+Targets: P-IMEM-02
+Expect-Fail: iv_mem::p_imem_02
+Defect: interior_contains(p) includes the low bound
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -238,7 +238,7 @@
+         if self.is_inverted() {
+             p > self.lo || p < self.hi
+         } else {
+-            (p > self.lo && p < self.hi) || self.is_full()
++            (p >= self.lo && p < self.hi) || self.is_full()
+         }
+     }
+ 

@@ -1,0 +1,18 @@
+Mutant: M-516
+Targets: P-QMEA-01
+Expect-Fail: ur_mea::p_qmea_01__center
+Defect: center() swaps the axes
+Tier: slow
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -226,7 +226,7 @@
+     /// A side `[−∞, ∞]` has a NaN centre, and a side `[∞, ∞]` an infinite one, as in upstream:
+     /// the centre of `[0, ∞] × [−∞, ∞]` is `(∞, NaN)`.
+     pub fn center(self) -> Point {
+-        Point::new(self.x.center(), self.y.center())
++        Point::new(self.y.center(), self.x.center())
+     }
+ 
+     /// Returns the width and height as a Point. Empty rectangles have

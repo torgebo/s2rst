@@ -2,6 +2,9 @@
 # SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 """Tests for richer S2 encoding: vector codecs and lexicons."""
 
+import subprocess
+import sys
+
 import pytest
 
 from hypothesis import given
@@ -198,3 +201,44 @@ def test_value_lexicon_dedup_property(faces):
 def test_encoded_shape_index_rejects_garbage():
     with pytest.raises(ValueError):
         s2rst.EncodedS2ShapeIndex.from_bytes(b"\x00\x01\x02garbage")
+
+
+# ---------------------------------------------------------------------------
+# Bounded reservation (spec 003 FR-019, K2)
+# ---------------------------------------------------------------------------
+
+_K2_CHILD = """
+import resource
+import s2rst
+
+def leb128(x):
+    out = bytearray()
+    while x >= 0x80:
+        out.append((x & 0x7F) | 0x80)
+        x >>= 7
+    out.append(x)
+    return bytes(out)
+
+limit = 512 << 20
+resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+inputs = [
+    (s2rst.decode_s2cell_id_vector, b"\\x00" + leb128(50_000_000 * 8)),
+    (s2rst.decode_s2point_vector, leb128(50_000_000 << 3)),
+]
+for decode, data in inputs:
+    try:
+        decode(data)
+    except ValueError:
+        continue
+    raise SystemExit("a truncated input was accepted")
+"""
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="needs RLIMIT_AS")
+def test_k2_inputs_raise_under_address_space_limit():
+    # A few bytes that declare a huge count must raise, not abort the interpreter by
+    # reserving memory for the count (before FR-019: 400 MB and 1.2 GB).
+    proc = subprocess.run(
+        [sys.executable, "-c", _K2_CHILD], capture_output=True, text=True, check=False
+    )
+    assert proc.returncode == 0, (proc.returncode, proc.stderr)

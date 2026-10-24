@@ -1,0 +1,18 @@
+Mutant: M-141
+Targets: P-UMEAS-01
+Expect-Fail: cu_meas::p_umeas_01__n1
+Defect: leaf_cells_covered() counts 4^level instead of 4^(30 − level) leaves per cell
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..c94907b 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -274,7 +274,7 @@ impl CellUnion {
+         for id in &self.0 {
+             let level = id.level();
+             let leaves =
+-                1i64 << (2 * (u32::from(crate::s2::coords::MAX_CELL_LEVEL) - level.as_u32()));
++                1i64 << (2 * level.as_u32());
+             count += leaves;
+         }
+         count

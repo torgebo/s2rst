@@ -1,0 +1,18 @@
+Mutant: M-223
+Targets: P-SV-03
+Expect-Fail: cd_sv::p_sv_03__n2
+Defect: encode_string_vector writes each string's length instead of the running end offset
+
+diff --git a/core/src/s2/encoded_string_vector.rs b/core/src/s2/encoded_string_vector.rs
+index 0ba362f..fd8e24e 100644
+--- a/core/src/s2/encoded_string_vector.rs
++++ b/core/src/s2/encoded_string_vector.rs
+@@ -36,7 +36,7 @@ pub fn encode_string_vector(strings: &[&[u8]], w: &mut dyn Write) -> io::Result<
+     let mut offset = 0u64;
+     let mut offsets = Vec::with_capacity(strings.len());
+     for s in strings {
+-        offset += s.len() as u64;
++        offset = s.len() as u64;
+         offsets.push(offset);
+     }
+     encode_uint_vector_u64(&offsets, w)?;

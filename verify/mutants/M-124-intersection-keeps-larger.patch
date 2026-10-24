@@ -1,0 +1,19 @@
+Mutant: M-124
+Targets: P-USET-02
+Expect-Fail: cu_set::p_uset_02__n1_n1
+Tier: slow
+Defect: get_intersection() keeps the larger of two cells with the same range_min
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..20e8093 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -555,7 +555,7 @@ fn get_intersection(x: &[CellId], y: &[CellId], out: &mut Vec<CellId>) {
+             }
+             std::cmp::Ordering::Equal => {
+                 // Same range_min, so one contains the other.
+-                if x[i] < y[j] {
++                if x[i] > y[j] {
+                     out.push(x[i]);
+                     i += 1;
+                 } else {

@@ -3,7 +3,8 @@
 
 //! Original regression tests for [`super::S2DensityTree`]: an out-of-range
 //! `max_level` is clamped to [`MAX_CELL_LEVEL`] instead of panicking in
-//! `Level::from`. Written for this crate, not ported from upstream S2.
+//! `Level::from`, and the header varint reader rejects a tenth byte above 1.
+//! Written for this crate, not ported from upstream S2.
 
 use super::*;
 use crate::s2::LatLng;
@@ -67,4 +68,22 @@ fn sum_density_clamps_max_level() {
 
     let mut sum = S2DensityTree::new();
     assert!(sum.init_to_sum_density(&[&t1], 255).is_ok());
+}
+
+/// D-003 regression test for the density tree's own varint reader: a tenth byte above 1 is
+/// rejected, as upstream does; 0 and 1 are accepted.
+#[test]
+fn decode_varint_at_rejects_a_tenth_byte_above_one() {
+    let varint = |last: u8| {
+        let mut b = vec![0xff; 9];
+        b.push(last);
+        b
+    };
+    assert_eq!(decode_varint_at(&varint(0x02), 0), None);
+    assert_eq!(decode_varint_at(&varint(0x7f), 0), None);
+    assert_eq!(decode_varint_at(&varint(0x01), 0), Some((u64::MAX, 10)));
+    assert_eq!(
+        decode_varint_at(&varint(0x00), 0),
+        Some((u64::MAX >> 1, 10))
+    );
 }

@@ -1,0 +1,17 @@
+Mutant: M-511
+Targets: P-QREL-01
+Expect-Fail: ur_rel::p_qrel_01
+Defect: interior_contains() uses closed containment along x
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -258,7 +258,7 @@
+     /// Reports whether the interior of this rectangle contains all points
+     /// of the given other rectangle (including its boundary).
+     pub fn interior_contains(self, other: Rect) -> bool {
+-        self.x.interior_contains_interval(other.x) && self.y.interior_contains_interval(other.y)
++        self.x.contains_interval(other.x) && self.y.interior_contains_interval(other.y)
+     }
+ 
+     /// Reports whether the two rectangles have any points in common.

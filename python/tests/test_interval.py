@@ -134,6 +134,13 @@ class TestS1Interval:
         i = s2rst.S1Interval(math.pi / 2, -math.pi / 2)
         assert i.is_inverted()
 
+    def test_seam_corner_length(self):
+        # The one-ulp interval across the seam reports its true length, one ulp of pi,
+        # where upstream reports -1, the empty interval's length (spec 004 FR-020).
+        i = s2rst.S1Interval.from_point_pair(math.pi, math.nextafter(-math.pi, 0.0))
+        assert not i.is_empty()
+        assert i.length() == 2.0**-51
+
     def test_complement(self):
         i = s2rst.S1Interval(0.0, math.pi)
         c = i.complement()

@@ -1,0 +1,17 @@
+Mutant: M-301
+Targets: P-CCHD-01
+Expect-Fail: cl_chd::p_cchd_01
+Defect: children() takes each child's orientation from the wrong entry of kPosToOrientation
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -305,7 +305,7 @@
+             children[pos] = Cell {
+                 face: self.face,
+                 level: self.level + 1,
+-                orientation: self.orientation ^ POS_TO_ORIENTATION[pos],
++                orientation: self.orientation ^ POS_TO_ORIENTATION[3 - pos],
+                 id: cid,
+                 uv: r2::Rect::default(),
+             };

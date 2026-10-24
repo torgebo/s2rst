@@ -1,0 +1,18 @@
+Mutant: M-226
+Targets: P-FX-03
+Expect-Fail: cd_fx::p_fx_03_enc
+Defect: the Cap encoder writes the centre's x in place of y
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..7c1d552 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -214,7 +214,7 @@ impl S2Encode for Cap {
+     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+         let center = self.center();
+         write_f64(w, center.0.x)?;
+-        write_f64(w, center.0.y)?;
++        write_f64(w, center.0.x)?;
+         write_f64(w, center.0.z)?;
+         write_f64(w, self.chord_radius().length2())
+     }

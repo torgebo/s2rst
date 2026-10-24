@@ -1,0 +1,19 @@
+Mutant: M-343
+Targets: P-IEXP-03
+Expect-Fail: iv_exp::p_iexp_03__mneg
+Defect: FR-023's shrink guard is taken out: crossed bounds give almost the full circle again (U-011)
+Tier: slow
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -433,9 +433,6 @@
+         if margin >= 0.0 && !result.contains_interval(self) {
+             return Interval::full();
+         }
+-        if margin < 0.0 && !self.contains_interval(result) {
+-            return Interval::empty();
+-        }
+         result
+     }
+ 

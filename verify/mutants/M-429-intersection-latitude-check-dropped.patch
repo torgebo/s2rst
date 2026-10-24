@@ -1,0 +1,17 @@
+Mutant: M-429
+Targets: P-LVAL-02
+Expect-Fail: rl_val::p_lval_02__intersection
+Defect: intersection() returns empty latitudes with non-empty longitudes
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -570,7 +570,7 @@
+         let lat = self.lat.intersection(other.lat);
+         let lng = self.lng.intersection(other.lng);
+ 
+-        if lat.is_empty() || lng.is_empty() {
++        if lng.is_empty() {
+             return Self::empty();
+         }
+         Rect { lat, lng }

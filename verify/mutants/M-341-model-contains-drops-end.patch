@@ -1,0 +1,17 @@
+Mutant: M-341
+Targets: P-IREL-05
+Expect-Fail: iv_rel::p_irel_05
+Defect: arc_spec::contains forgets that y must end before x does (a defect in the description)
+
+diff --git a/verify/src/arc_spec.rs b/verify/src/arc_spec.rs
+--- a/verify/src/arc_spec.rs
++++ b/verify/src/arc_spec.rs
+@@ -122,7 +122,7 @@
+     if empty(x) || full(y) {
+         return false;
+     }
+-    ccw_le(x.lo, y.lo, y.hi) && ccw_le(x.lo, y.hi, x.hi)
++    ccw_le(x.lo, y.lo, y.hi)
+ }
+ 
+ /// Whether `y` lies in the interior of `x`: the open real arc, or the whole circle for the full

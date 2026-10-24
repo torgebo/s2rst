@@ -119,14 +119,14 @@ fn leaf_cells_covered_1000() -> i64 {
 fn from_range_full_sphere() -> CellUnion {
     let begin = CellId::from_face(0).child_begin_at_level(30);
     let end = CellId::from_face(5).child_end_at_level(30);
-    black_box(CellUnion::from_range(begin, end))
+    black_box(CellUnion::from_begin_end(begin, end))
 }
 
 #[library_benchmark]
 fn from_range_single_face() -> CellUnion {
     let begin = CellId::from_face(2).child_begin_at_level(30);
     let end = CellId::from_face(2).child_end_at_level(30);
-    black_box(CellUnion::from_range(begin, end))
+    black_box(CellUnion::from_begin_end(begin, end))
 }
 
 library_benchmark_group!(

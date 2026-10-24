@@ -1,0 +1,18 @@
+Mutant: M-012
+Targets: P-VAL-04
+Expect-Fail: val::p_val_04
+Defect: From<CellId> for u64 sets the low bit
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..2c38b6d 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -1097,7 +1097,7 @@ impl From<u64> for CellId {
+ impl From<CellId> for u64 {
+     #[inline]
+     fn from(c: CellId) -> Self {
+-        c.0
++        c.0 | 1
+     }
+ }
+ 

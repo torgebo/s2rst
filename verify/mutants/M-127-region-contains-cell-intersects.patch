@@ -1,0 +1,18 @@
+Mutant: M-127
+Targets: P-UMEM-05
+Expect-Fail: cu_mem::p_umem_05__n1
+Defect: Region::contains_cell() answers intersects_cell_id
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..6ac294a 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -695,7 +695,7 @@ impl Region for CellUnion {
+     }
+ 
+     fn contains_cell(&self, cell: &Cell) -> bool {
+-        self.contains_cell_id(cell.id())
++        self.intersects_cell_id(cell.id())
+     }
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {

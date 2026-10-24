@@ -1,0 +1,17 @@
+Mutant: M-409
+Targets: P-RSET-03
+Expect-Fail: ri_set::p_rset_03
+Defect: add_point() does not extend the low bound
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -248,7 +248,7 @@
+         if self.is_empty() {
+             Interval::from_point(p)
+         } else if p < self.lo {
+-            Interval { lo: p, hi: self.hi }
++            Interval { lo: self.lo, hi: self.hi }
+         } else if p > self.hi {
+             Interval { lo: self.lo, hi: p }
+         } else {

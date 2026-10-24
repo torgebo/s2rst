@@ -130,7 +130,7 @@ pub fn project(x: Point, a: Point, b: Point) -> Point {
 /// If X is on the line segment AB, this is the fraction `t` such that
 /// `X == interpolate(t, a, b)`. Requires A and B to be distinct.
 pub fn distance_fraction(x: Point, a: Point, b: Point) -> f64 {
-    debug_assert!(a != b);
+    debug_assert_ne!(a, b);
     let d0 = x.0.angle(a.0);
     let d1 = x.0.angle(b.0);
     d0 / (d0 + d1)
@@ -717,7 +717,7 @@ mod tests {
         let b = Point::from_coords(0.0, 1.0, 0.0);
         // At distance 0 from A should give A.
         let p = point_on_line(a, b, Angle::ZERO);
-        assert!(p.approx_eq(a), "point_on_line(a, b, 0) = {p}, want ≈ {a}",);
+        assert!(p.approx_eq(a), "point_on_line(a, b, 0) = {p}, want ≈ {a}");
     }
 
     #[test]

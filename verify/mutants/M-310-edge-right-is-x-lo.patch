@@ -1,0 +1,17 @@
+Mutant: M-310
+Targets: P-CBND-03
+Expect-Fail: cl_bnd::p_cbnd_03
+Defect: uv_coord_of_edge(Right) returns the low u bound
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -273,7 +273,7 @@
+     pub fn uv_coord_of_edge(self, k: CellEdge) -> f64 {
+         match k {
+             CellEdge::Bottom => self.uv.y.lo,
+-            CellEdge::Right => self.uv.x.hi,
++            CellEdge::Right => self.uv.x.lo,
+             CellEdge::Top => self.uv.y.hi,
+             CellEdge::Left => self.uv.x.lo,
+         }

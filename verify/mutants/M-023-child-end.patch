@@ -1,0 +1,18 @@
+Mutant: M-023
+Targets: P-HIER-06
+Expect-Fail: hier::p_hier_06
+Defect: child_end() adds half the parent lsb instead of a quarter
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..132fc08 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -403,7 +403,7 @@ impl CellId {
+         debug_assert!(self.is_valid());
+         debug_assert!(!self.is_leaf());
+         let ol = self.lsb();
+-        CellId(self.0 + ol + (ol >> 2))
++        CellId(self.0 + ol + (ol >> 1))
+     }
+ 
+     /// Returns the first child at the given level (must be >= this cell's level).

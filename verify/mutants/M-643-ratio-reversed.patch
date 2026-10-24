@@ -1,0 +1,18 @@
+Mutant: M-643
+Targets: P-AGARI-01
+Expect-Fail: ag_ari::p_agari_01__ratio
+Tier: slow
+Defect: `Angle / Angle` reversed
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -280,7 +280,7 @@
+     type Output = f64;
+     #[inline]
+     fn div(self, rhs: Angle) -> f64 {
+-        self.0 / rhs.0
++        rhs.0 / self.0
+     }
+ }
+ 

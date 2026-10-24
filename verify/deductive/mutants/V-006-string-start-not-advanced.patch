@@ -1,0 +1,16 @@
+Mutant: V-006
+Theorem: decode_string_vector's ensures (FR-020)
+Defect: the string decoder does not advance start past an entry
+
+diff --git a/verify/deductive/src/string_vector.rs b/verify/deductive/src/string_vector.rs
+index fa7cd87..80f2873 100644
+--- a/verify/deductive/src/string_vector.rs
++++ b/verify/deductive/src/string_vector.rs
+@@ -318,7 +318,6 @@ pub fn decode_string_vector(buf: &[u8], pos: usize) -> (r: Option<(Vec<Vec<u8>>,
+             assert(entry(off, i as int, data@) == views(result@).last());
+             assert(views(result@) =~= r0.push(entry(off, i as int, data@)));
+         }
+-        start = end;
+         i += 1;
+     }
+     proof {

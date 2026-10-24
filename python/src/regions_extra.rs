@@ -54,7 +54,7 @@ fn region_from_pyany(obj: &Bound<'_, PyAny>) -> PyResult<Box<dyn Region>> {
 /// Mainly useful for completeness and uniform handling alongside the other
 /// region types: it implements the same `cap_bound`/`rect_bound`/
 /// `contains_point` surface.
-#[pyclass(name = "PointRegion", module = "s2rst")]
+#[pyclass(from_py_object, name = "PointRegion", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyPointRegion(pub(crate) PointRegion);
 

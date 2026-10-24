@@ -1,0 +1,17 @@
+Mutant: M-413
+Targets: P-RMEA-02
+Expect-Fail: ri_mea::p_rmea_02
+Defect: directed_hausdorff_distance() can return a negative distance
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -240,7 +240,7 @@
+         if y.is_empty() {
+             return f64::INFINITY;
+         }
+-        0.0_f64.max((self.hi - y.hi).max(y.lo - self.lo))
++        (self.hi - y.hi).max(y.lo - self.lo)
+     }
+ 
+     /// Returns the interval expanded to contain the given point `p`.

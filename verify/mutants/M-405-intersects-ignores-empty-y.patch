@@ -1,0 +1,17 @@
+Mutant: M-405
+Targets: P-RREL-02
+Expect-Fail: ri_rel::p_rrel_02
+Defect: intersects() forgets that an empty y intersects nothing
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -203,7 +203,7 @@
+     /// (i.e., they have any points in common).
+     pub fn intersects(self, y: Interval) -> bool {
+         if self.lo <= y.lo {
+-            y.lo <= self.hi && y.lo <= y.hi
++            y.lo <= self.hi
+         } else {
+             self.lo <= y.hi && self.lo <= self.hi
+         }

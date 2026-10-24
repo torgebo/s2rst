@@ -1,0 +1,17 @@
+Mutant: M-403
+Targets: P-RMEM-02
+Expect-Fail: ri_mem::p_rmem_02
+Defect: interior_contains() includes the low bound
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -179,7 +179,7 @@
+ 
+     /// Reports whether the interior of the interval contains the point `p`.
+     pub fn interior_contains(self, p: f64) -> bool {
+-        p > self.lo && p < self.hi
++        p >= self.lo && p < self.hi
+     }
+ 
+     /// Reports whether this interval contains the interval `y`.

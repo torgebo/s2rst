@@ -1,0 +1,17 @@
+Mutant: M-308
+Targets: P-CCHD-02
+Expect-Fail: cl_bnd::p_cchd_02__l01
+Defect: children() gives each child the other half of the parent's u range
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -314,7 +314,7 @@
+             let i = ij >> 1;
+             let j = ij & 1;
+ 
+-            children[pos].uv.x = if i == 1 {
++            children[pos].uv.x = if i == 0 {
+                 crate::r1::Interval::new(uv_mid.x, self.uv.x.hi)
+             } else {
+                 crate::r1::Interval::new(self.uv.x.lo, uv_mid.x)

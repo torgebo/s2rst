@@ -1,0 +1,17 @@
+Mutant: M-537
+Targets: P-PTVAL-01
+Expect-Fail: pt_val::p_ptval_01
+Defect: origin()'s z coordinate is rounded, not upstream's
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -96,7 +96,7 @@
+         Point(Vector {
+             x: -0.009_999_466_435_025_02,
+             y: 0.002_592_454_260_932_412,
+-            z: 0.999_946_643_502_502,
++            z: 0.999_946_643_502_5,
+         })
+     }
+ 

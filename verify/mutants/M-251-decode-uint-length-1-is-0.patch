@@ -1,0 +1,18 @@
+Mutant: M-251
+Targets: FR-011 link: fixed_width::decode_uint_with_length
+Expect-Fail: cd_agree::a_fw_dec__b1
+Defect: decode_uint_with_length returns 0 without reading for a length of 1; drift guard: fails
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..921baa2 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -63,7 +63,7 @@ pub fn get_uint_with_length(data: &[u8], length: usize) -> u64 {
+ ///
+ /// Panics if `length > 8`, the precondition of [`encode_uint_with_length`].
+ pub fn decode_uint_with_length(r: &mut dyn Read, length: usize) -> io::Result<u64> {
+-    if length == 0 {
++    if length <= 1 {
+         return Ok(0);
+     }
+     let mut buf = [0u8; 8];

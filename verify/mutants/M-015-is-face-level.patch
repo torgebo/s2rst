@@ -1,0 +1,18 @@
+Mutant: M-015
+Targets: P-VAL-07
+Expect-Fail: val::p_val_07
+Defect: is_face() tests the level-1 marker instead of the level-0 one
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..c1421b7 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -312,7 +312,7 @@ impl CellId {
+     /// Reports whether this is a top-level face cell (level 0).
+     #[inline]
+     pub fn is_face(self) -> bool {
+-        self.0 & (lsb_for_level(Level::MIN) - 1) == 0
++        self.0 & (lsb_for_level(Level::new(1)) - 1) == 0
+     }
+ 
+     /// Returns the child position (0–3) of this cell's ancestor at the given

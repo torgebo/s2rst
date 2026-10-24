@@ -13,7 +13,7 @@ use crate::hash_util::hash_f64s;
 // ---------------------------------------------------------------------------
 
 /// A one-dimensional angle, stored internally as radians.
-#[pyclass(name = "Angle", module = "s2rst")]
+#[pyclass(from_py_object, name = "Angle", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyAngle(pub(crate) s1::Angle);
 
@@ -140,8 +140,8 @@ impl PyAngle {
         PyAngle(scalar * self.0)
     }
 
-    fn __truediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    fn __truediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             // Check Angle first — Angle has __float__ so extract::<f64> would succeed
             if let Ok(angle) = other.extract::<PyRef<'_, PyAngle>>() {
                 Ok((self.0 / angle.0).into_pyobject(py)?.into_any().unbind())
@@ -204,7 +204,7 @@ impl PyAngle {
 // ---------------------------------------------------------------------------
 
 /// An angle represented as the squared chord length on the unit sphere.
-#[pyclass(name = "ChordAngle", module = "s2rst")]
+#[pyclass(from_py_object, name = "ChordAngle", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyChordAngle(pub(crate) s1::ChordAngle);
 

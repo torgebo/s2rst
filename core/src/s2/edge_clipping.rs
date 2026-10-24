@@ -322,14 +322,13 @@ fn clip_destination(
 
     let p = Vector::new(uv.x, uv.y, 1.0);
 
-    let score;
-    if (p - a).dot(a_tan) < 0.0 {
-        score = 2; // B' is on wrong side of A.
+    let score = if (p - a).dot(a_tan) < 0.0 {
+        2 // B' is on wrong side of A.
     } else if (p - b).dot(b_tan) < 0.0 {
-        score = 1; // B' is on wrong side of B.
+        1 // B' is on wrong side of B.
     } else {
-        score = 0;
-    }
+        0
+    };
 
     if score > 0 {
         if b.z <= 0.0 {

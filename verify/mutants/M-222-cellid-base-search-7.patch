@@ -1,0 +1,19 @@
+Mutant: M-222
+Targets: P-CV-03
+Expect-Fail: cd_xlarge::p_cv_03__n2
+Tier: xlarge
+Defect: encode_s2cell_id_vector never considers a 7-byte base
+
+diff --git a/core/src/s2/encoded_s2cell_id_vector.rs b/core/src/s2/encoded_s2cell_id_vector.rs
+index d6de035..2863125 100644
+--- a/core/src/s2/encoded_s2cell_id_vector.rs
++++ b/core/src/s2/encoded_s2cell_id_vector.rs
+@@ -62,7 +62,7 @@ pub fn encode_s2cell_id_vector(v: &[CellId], w: &mut dyn Write) -> io::Result<()
+         }
+ 
+         let mut e_bytes = u64::MAX;
+-        for len in 0..8usize {
++        for len in 0..7usize {
+             let t_base = v_min & !(u64::MAX >> (8 * len));
+             let t_max_delta_msb = if v.is_empty() {
+                 0

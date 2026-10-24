@@ -1,0 +1,18 @@
+Mutant: M-224
+Targets: P-PV-01
+Expect-Fail: cd_pv::p_pv_01_enc__n1
+Defect: the FAST point encoder writes y in place of z
+
+diff --git a/core/src/s2/encoded_s2point_vector.rs b/core/src/s2/encoded_s2point_vector.rs
+index b07c046..47ed3c7 100644
+--- a/core/src/s2/encoded_s2point_vector.rs
++++ b/core/src/s2/encoded_s2point_vector.rs
+@@ -239,7 +239,7 @@ fn encode_fast(points: &[Point], w: &mut dyn Write) -> io::Result<()> {
+     for p in points {
+         w.write_all(&p.0.x.to_le_bytes())?;
+         w.write_all(&p.0.y.to_le_bytes())?;
+-        w.write_all(&p.0.z.to_le_bytes())?;
++        w.write_all(&p.0.y.to_le_bytes())?;
+     }
+     Ok(())
+ }

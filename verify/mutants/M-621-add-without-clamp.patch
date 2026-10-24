@@ -1,0 +1,17 @@
+Mutant: M-621
+Targets: P-CAVAL-02, P-CAARI-01
+Expect-Fail: ca_val::p_caval_02__ari ca_ari::p_caari_01
+Defect: `Add` without its clamp at 4
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -452,7 +452,7 @@
+         //       cos(X)  = sqrt(1 - sin²(X))
+         let x = a2 * (1.0 - 0.25 * b2);
+         let y = b2 * (1.0 - 0.25 * a2);
+-        ChordAngle((x + y + 2.0 * (x * y).sqrt()).min(MAX_LENGTH2))
++        ChordAngle(x + y + 2.0 * (x * y).sqrt())
+     }
+ }
+ 

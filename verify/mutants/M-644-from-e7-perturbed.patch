@@ -1,0 +1,18 @@
+Mutant: M-644
+Targets: P-AGCNV-01
+Expect-Fail: 
+Test: verify --release --test angle_enumeration -- --ignored p_agcnv_01_e_forms
+Defect: `from_e7`'s scale two ulps off
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -98,7 +98,7 @@
+     /// Creates an angle from E7 representation (degrees × 10⁷).
+     #[inline]
+     pub fn from_e7(e7: i32) -> Self {
+-        Self::from_degrees(f64::from(e7) * 1e-7)
++        Self::from_degrees(f64::from(e7) * 1.0000000000000002e-7)
+     }
+ 
+     /// Creates an angle from unsigned E6 representation. A value above `i32::MAX` wraps to a

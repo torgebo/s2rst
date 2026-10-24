@@ -149,9 +149,11 @@ pub fn points_from_lat_lng_degrees(coords: &[f64]) -> Result<Vec<Point>, JsValue
         ));
     }
     Ok(coords
-        .chunks_exact(2)
-        .map(|c| {
-            let ll = s2rst::s2::LatLng::from_degrees(c[0], c[1]);
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&[lat, lng]| {
+            let ll = s2rst::s2::LatLng::from_degrees(lat, lng);
             Point(ll.to_point())
         })
         .collect())

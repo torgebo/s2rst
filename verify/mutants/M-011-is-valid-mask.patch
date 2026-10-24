@@ -1,0 +1,18 @@
+Mutant: M-011
+Targets: P-VAL-03
+Expect-Fail: val::p_val_03
+Defect: is_valid() accepts a lowest set bit at an odd position (mask 0x5555… instead of 0x1555…)
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..2b0a3b0 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -270,7 +270,7 @@ impl CellId {
+     #[inline]
+     pub fn is_valid(self) -> bool {
+         let face_bits = (self.0 >> POS_BITS) as u8;
+-        face_bits < 6 && (self.lsb() & 0x1555555555555555 != 0)
++        face_bits < 6 && (self.lsb() & 0x5555555555555555 != 0)
+     }
+ 
+     /// Returns the cube face (0–5).

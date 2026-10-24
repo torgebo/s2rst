@@ -1,0 +1,28 @@
+# Weekly harnesses that time out at the weekly limit (60 minutes, one at a time): tool limits,
+# recorded as not proven in the catalogues (`verify/values/PROPERTIES.md`, "Bound" column).
+# One line per harness: `<fully qualified harness> <entry>`, e.g. `iv_exp::p_iexp_03__mpos P-IEXP-03`.
+# run-verify.sh reports a listed harness that times out as `KNOWN-TIMEOUT`, which does not fail
+# the run, so the weekly CI legs can keep running them. A listed harness that succeeds is an
+# error ("stale known-timeout entry"): record the proof in the catalogue and remove the line.
+# A listed harness that fails, or runs out of memory, fails the run as any other.
+# run-mutants.sh gives a mutant whose expected harness ends in KNOWN-TIMEOUT no verdict.
+iv_exp::p_iexp_02_symmetric__xinv_yinv P-IEXP-02
+iv_exp::p_iexp_02_symmetric__xinv_ynoninv P-IEXP-02
+iv_exp::p_iexp_02_symmetric__xnoninv_yinv P-IEXP-02
+iv_exp::p_iexp_02_symmetric__xnoninv_ynoninv P-IEXP-02
+iv_exp::p_iexp_02_default P-IEXP-02
+iv_exp::p_iexp_03__mneg P-IEXP-03
+iv_exp::p_iexp_03__mpos P-IEXP-03
+rl_exp::p_lexp_02_symmetric P-LEXP-02
+pt_cls::p_ptcls_03__normalize P-PTCLS-03
+pt_cls::p_ptcls_03__normalize_band P-PTCLS-03
+pt_cls::p_ptcls_03__ortho P-PTCLS-03
+pt_crash::c_from_coords_normalize__band C-s2::Point::from_coords
+pt_dst::p_ptdst_01__symmetric P-PTDST-01
+pt_ort::p_ptort_03__swap P-PTORT-03
+pt_ort::p_ptort_03__neg_p P-PTORT-03
+pt_ort::p_ptort_03__neg_q P-PTORT-03
+ca_ari::p_caari_03__sin2 P-CAARI-03
+ca_ari::p_caari_03__sin P-CAARI-03
+ag_ari::p_agari_01__div P-AGARI-01
+ag_ari::p_agari_01__ratio P-AGARI-01

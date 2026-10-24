@@ -1,0 +1,18 @@
+Mutant: M-540
+Targets: P-PTORT-03
+Expect-Fail: pt_ort::p_ptort_03__swap
+Defect: point_cross() drops the sign of its x coordinate
+Tier: slow
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -234,7 +234,7 @@
+             // orthogonal vector.
+             return Point(ortho_impl(self.0));
+         }
+-        Point(x)
++        Point(Vector { x: x.x.abs(), ..x })
+     }
+ 
+     /// Returns a unit-length reference direction for this point, guaranteed

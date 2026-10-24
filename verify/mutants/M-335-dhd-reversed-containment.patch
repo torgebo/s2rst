@@ -1,0 +1,17 @@
+Mutant: M-335
+Targets: P-IMEA-06
+Expect-Fail: iv_mea::p_imea_06
+Defect: directed_hausdorff_distance() is 0 when x contains y instead of when y contains x
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -303,7 +303,7 @@
+     /// Returns the Hausdorff distance to the given interval `y`, measured
+     /// along S1.
+     pub fn directed_hausdorff_distance(self, y: Interval) -> f64 {
+-        if y.contains_interval(self) {
++        if self.contains_interval(y) {
+             return 0.0; // includes the case self is empty
+         }
+         if y.is_empty() {

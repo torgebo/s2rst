@@ -1,0 +1,17 @@
+Mutant: M-521
+Targets: P-QEQ-01
+Expect-Fail: ur_eq::p_qeq_01
+Defect: equality compares x only
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -377,7 +377,7 @@
+ 
+ impl PartialEq for Rect {
+     fn eq(&self, other: &Self) -> bool {
+-        self.x == other.x && self.y == other.y
++        self.x == other.x
+     }
+ }
+ 

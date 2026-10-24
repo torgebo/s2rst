@@ -1,0 +1,18 @@
+Mutant: M-013
+Targets: P-VAL-05
+Expect-Fail: val::p_val_05
+Defect: sentinel() loses its top bit
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..916b4e7 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -216,7 +216,7 @@ impl CellId {
+     /// Used primarily by `ShapeIndex`.
+     #[inline]
+     pub fn sentinel() -> Self {
+-        CellId(!0u64)
++        CellId(!0u64 >> 1)
+     }
+ 
+     /// Returns the cell corresponding to a given S2 cube face (0–5).

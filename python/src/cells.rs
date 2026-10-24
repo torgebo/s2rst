@@ -22,12 +22,45 @@ fn cell_edge_from_index(k: u8) -> PyResult<s2::CellEdge> {
     }
 }
 
+/// Checks a leaf-cell range against C++ `S2CellUnion::FromBeginEnd`'s `DCHECK`s: both ends
+/// are leaf cells (either may also be the end of the leaves, when `end_allowed`) and
+/// `lo <= hi`. The core checks them only in debug builds, as C++ does; in release builds an
+/// invalid id can make it loop forever, so a bad call raises `ValueError` here instead.
+fn check_leaf_range(
+    lo: s2::CellId,
+    hi: s2::CellId,
+    names: (&str, &str),
+    end_allowed: bool,
+) -> PyResult<()> {
+    let leaf_end = s2::CellId::end(s2::Level::MAX);
+    let is_leaf = |id: s2::CellId| id.is_valid() && id.is_leaf();
+    if !is_leaf(lo) && !(end_allowed && lo == leaf_end) {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "{} must be a leaf cell",
+            names.0
+        )));
+    }
+    if !is_leaf(hi) && !(end_allowed && hi == leaf_end) {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "{} must be a leaf cell",
+            names.1
+        )));
+    }
+    if lo > hi {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "{} must not be after {}",
+            names.0, names.1
+        )));
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // CellId
 // ---------------------------------------------------------------------------
 
 /// A 64-bit identifier for a cell in the S2 cell decomposition.
-#[pyclass(name = "CellId", module = "s2rst")]
+#[pyclass(from_py_object, name = "CellId", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyCellId(pub(crate) s2::CellId);
 
@@ -346,7 +379,7 @@ impl PyCellId {
 // ---------------------------------------------------------------------------
 
 /// A concrete S2 cell with precomputed geometric bounds.
-#[pyclass(name = "Cell", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "Cell", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyCell(pub(crate) s2::Cell);
 
@@ -509,8 +542,9 @@ impl PyCell {
 // CellUnion
 // ---------------------------------------------------------------------------
 
-/// A set of S2 cells, automatically normalized (sorted, deduplicated, merged).
-#[pyclass(name = "CellUnion", module = "s2rst")]
+/// A set of S2 cells. Built from cell ids, it is normalized (sorted, deduplicated, merged);
+/// `decode_cell_union` keeps the cells as encoded.
+#[pyclass(from_py_object, name = "CellUnion", module = "s2rst")]
 #[derive(Clone)]
 pub struct PyCellUnion(pub(crate) s2::CellUnion);
 
@@ -538,9 +572,13 @@ impl PyCellUnion {
     }
 
     /// Create from a half-open range [begin, end) of leaf cells.
+    ///
+    /// Raises `ValueError` unless `begin` and `end` are leaf cells (either may also be the
+    /// end of the leaves, the cell after the last leaf of face 5) and `begin <= end`.
     #[classmethod]
-    fn from_range(_cls: &Bound<'_, PyType>, begin: &PyCellId, end: &PyCellId) -> Self {
-        PyCellUnion(s2::CellUnion::from_range(begin.0, end.0))
+    fn from_range(_cls: &Bound<'_, PyType>, begin: &PyCellId, end: &PyCellId) -> PyResult<Self> {
+        check_leaf_range(begin.0, end.0, ("begin", "end"), true)?;
+        Ok(PyCellUnion(s2::CellUnion::from_begin_end(begin.0, end.0)))
     }
 
     /// A cell union covering the whole sphere (the six face cells).
@@ -550,9 +588,16 @@ impl PyCellUnion {
     }
 
     /// Create from an inclusive range [min_id, max_id] of leaf cells.
+    ///
+    /// Raises `ValueError` unless `min_id` and `max_id` are leaf cells and `min_id <= max_id`.
     #[classmethod]
-    fn from_min_max(_cls: &Bound<'_, PyType>, min_id: &PyCellId, max_id: &PyCellId) -> Self {
-        PyCellUnion(s2::CellUnion::from_min_max(min_id.0, max_id.0))
+    fn from_min_max(
+        _cls: &Bound<'_, PyType>,
+        min_id: &PyCellId,
+        max_id: &PyCellId,
+    ) -> PyResult<Self> {
+        check_leaf_range(min_id.0, max_id.0, ("min_id", "max_id"), false)?;
+        Ok(PyCellUnion(s2::CellUnion::from_min_max(min_id.0, max_id.0)))
     }
 
     /// Number of cells in this union.
@@ -611,8 +656,22 @@ impl PyCellUnion {
     }
 
     /// Replace large cells with smaller cells respecting min_level and level_mod.
-    fn denormalize(&self, min_level: u8, level_mod: u8) -> Self {
-        PyCellUnion(self.0.denormalize(min_level.into(), level_mod))
+    ///
+    /// Raises `ValueError` unless `min_level` is in 0..=30 and `level_mod` is 1, 2 or 3.
+    /// The core checks `level_mod` only in debug builds (upstream `DCHECK`); a larger one
+    /// would expand every cell to leaf level, which never finishes for a large cell.
+    fn denormalize(&self, min_level: u8, level_mod: u8) -> PyResult<Self> {
+        let min_level = s2::Level::try_new(min_level).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "min_level must be in 0..=30, got {min_level}"
+            ))
+        })?;
+        if !(1..=3).contains(&level_mod) {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "level_mod must be 1, 2 or 3, got {level_mod}"
+            )));
+        }
+        Ok(PyCellUnion(self.0.denormalize(min_level, level_mod)))
     }
 
     /// Whether this union contains no cells.

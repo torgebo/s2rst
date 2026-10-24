@@ -1,0 +1,17 @@
+Mutant: M-415
+Targets: P-REXP-02
+Expect-Fail: ri_exp::p_rexp_02
+Defect: project() returns the point even outside the interval
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -282,7 +282,7 @@
+     /// `std::clamp` with `hi < lo`, which is undefined behaviour (`UPSTREAM.md` U-008).
+     pub fn project(self, p: f64) -> f64 {
+         debug_assert!(!self.is_empty());
+-        p.clamp(self.lo, self.hi)
++        p
+     }
+ 
+     /// Returns an interval that has been expanded on each side by `margin`.

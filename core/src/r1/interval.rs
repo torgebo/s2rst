@@ -91,6 +91,16 @@ impl From<bool> for Endpoint {
 /// // Empty interval.
 /// assert!(Interval::empty().is_empty());
 /// ```
+///
+/// # Signed zeros
+///
+/// `0.0` and `-0.0` are the same number, so `[−0, 0]` and `[0, 0]` are the same interval. Where
+/// [`union`](Interval::union), [`intersection`](Interval::intersection),
+/// [`add_interval`](Interval::add_interval) and
+/// [`directed_hausdorff_distance`](Interval::directed_hausdorff_distance) choose between a `0`
+/// and a `-0`, the sign of the zero may differ from upstream's: [`f64::min`] and [`f64::max`] do
+/// not fix it, where C++'s `std::min` and `std::max` return their first argument. The values
+/// are equal.
 #[must_use]
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -132,12 +142,32 @@ impl Interval {
     }
 
     /// Returns the center of the interval. Undefined for empty intervals.
+    ///
+    /// # Infinite bounds
+    ///
+    /// The center of `[−∞, ∞]`, and of the empty interval `[∞, −∞]`, is NaN, as in upstream
+    /// (`∞/2 − ∞/2`). Every other interval without a NaN bound has a center that is not
+    /// NaN.
+    ///
+    /// # Deviation from upstream
+    ///
+    /// For finite bounds beyond `f64::MAX / 2` this returns the true center, through
+    /// [`f64::midpoint`], which halves before it adds. Upstream's `R1Interval::GetCenter`
+    /// computes `0.5 * (lo + hi)`, which overflows there: the center of
+    /// `[f64::MAX, f64::MAX]` is ∞ in upstream and `f64::MAX` here (`UPSTREAM.md` U-010).
+    /// Every other center is upstream's, bit for bit.
     pub fn center(self) -> f64 {
-        0.5 * (self.lo + self.hi)
+        f64::midpoint(self.lo, self.hi)
     }
 
     /// Returns the length of the interval. The length of an empty interval
     /// is negative.
+    ///
+    /// # Infinite bounds
+    ///
+    /// The length of `[∞, ∞]` and of `[−∞, −∞]` is NaN (`∞ − ∞`), as in upstream: these
+    /// single-point intervals have no defined length. Every other interval without a NaN bound
+    /// has a length that is not NaN.
     pub fn length(self) -> f64 {
         self.hi - self.lo
     }
@@ -189,6 +219,20 @@ impl Interval {
     ///
     /// For two intervals x and y, this distance is defined as:
     ///   h(x, y) = max_{p in x} min_{q in y} d(p, q)
+    ///
+    /// # Infinite bounds
+    ///
+    /// When both intervals have an infinite bound on the same side, `∞ − ∞` arises. This
+    /// returns the other side's distance, which is the true distance: `[0, ∞]` to `[5, ∞]`
+    /// is 5, and `[−∞, ∞]` to `[−1, ∞]` is ∞.
+    ///
+    /// # Deviation from upstream
+    ///
+    /// Upstream's `R1Interval::GetDirectedHausdorffDistance` computes
+    /// `std::max(0.0, std::max(hi − y.hi, y.lo − lo))`, where the NaN of `∞ − ∞` wins the
+    /// inner `std::max` and loses the outer one, so it returns 0 for both examples above
+    /// (`UPSTREAM.md` U-009). [`f64::max`] drops the NaN instead. For finite bounds the two
+    /// agree, bit for bit.
     pub fn directed_hausdorff_distance(self, y: Interval) -> f64 {
         if self.is_empty() {
             return 0.0;
@@ -228,7 +272,14 @@ impl Interval {
 
     /// Returns the closest point in the interval to the given point `p`.
     ///
-    /// The interval must be non-empty.
+    /// The interval must be non-empty. A NaN `p` gives NaN.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the interval is empty or a bound is NaN, in every build: a debug assertion
+    /// checks emptiness, and [`f64::clamp`] panics when its bounds are out of order or NaN.
+    /// Upstream checks emptiness with `ABSL_DCHECK` only, and its release builds then call
+    /// `std::clamp` with `hi < lo`, which is undefined behaviour (`UPSTREAM.md` U-008).
     pub fn project(self, p: f64) -> f64 {
         debug_assert!(!self.is_empty());
         p.clamp(self.lo, self.hi)
@@ -238,6 +289,13 @@ impl Interval {
     ///
     /// If `margin` is negative, the interval is shrunk instead. The resulting
     /// interval may be empty. Any expansion of an empty interval remains empty.
+    ///
+    /// # Infinite bounds
+    ///
+    /// An infinite margin against an infinite bound of the opposite sign gives a NaN bound
+    /// (`∞ − ∞`), as in upstream: `[−∞, −2]` expanded by `−∞` is `[NaN, −∞]`, and `[2, ∞]`
+    /// expanded by `−∞` is `[∞, NaN]`. With finite bounds, or a finite margin, no bound is
+    /// NaN.
     pub fn expanded(self, margin: f64) -> Interval {
         if self.is_empty() {
             return self;
@@ -278,6 +336,13 @@ impl Interval {
     /// The empty interval is considered to be positioned arbitrarily on the
     /// real line, thus any interval with length <= 2*`max_error` matches the
     /// empty interval.
+    ///
+    /// # Infinite bounds
+    ///
+    /// An interval with an infinite bound is not approximately equal to anything, itself
+    /// included: `|∞ − ∞|` is NaN, and NaN compares false. So `[−1, ∞]` is not approximately
+    /// equal to `[−1, ∞]`, and `[∞, ∞]` (whose length is NaN) does not match the empty
+    /// interval. Upstream computes the same.
     pub fn approx_eq_with(self, y: Interval, max_error: f64) -> bool {
         if self.is_empty() {
             return y.length() <= 2.0 * max_error;
@@ -289,7 +354,8 @@ impl Interval {
     }
 
     /// Like [`approx_eq_with`](Interval::approx_eq_with) with a default
-    /// `max_error` of 1e-15.
+    /// `max_error` of 1e-15, so also false for an interval with an infinite bound (see
+    /// there).
     pub fn approx_eq(self, y: Interval) -> bool {
         self.approx_eq_with(y, 1e-15)
     }

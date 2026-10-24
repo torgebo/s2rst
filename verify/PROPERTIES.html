@@ -1,0 +1,612 @@
+<h1 id="property-catalogue-s2rsts2cellid-fr-005">Property Catalogue:
+<code>s2rst::s2::CellId</code> (FR-005)</h1>
+<p>In plain language and grouped by kind of guarantee, with the other
+two catalogues: <a
+href="PROPERTIES_BY_KIND.md"><code>PROPERTIES_BY_KIND.md</code></a>.</p>
+<p>Functional properties, each stated against the reference model
+<code>verify/src/spec.rs</code> (FR-006) and traced to upstream S2.
+Crash-freedom proofs are not catalogue properties; they live in
+<code>INVENTORY.md</code> (spec Key Entities). Fields:
+<code>specs/001-formal-verify-base-type/data-model.md</code> §4. Status
+values: <code>proven</code> | <code>proven-within-bounds</code> |
+<code>not-proven (&lt;reason&gt;)</code>, the reason being
+<code>tool-limit: &lt;detail&gt;</code>,
+<code>excluded: &lt;operation&gt;</code> or
+<code>defect D-NNN</code>.</p>
+<p><strong>SC-003 counting</strong> (clarification 2026-10-01): only
+entries whose operations are all in scope count towards the 90 %. Rows
+marked <em>outside</em> exercise an excluded operation.</p>
+<table>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 10%" />
+<col style="width: 47%" />
+<col style="width: 7%" />
+<col style="width: 8%" />
+<col style="width: 7%" />
+<col style="width: 6%" />
+<col style="width: 8%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>Statement</th>
+<th>Upstream source (<code>s2cell_id.h</code>/<code>.cc</code> unless
+noted)</th>
+<th>Domain</th>
+<th>Harness</th>
+<th>Status</th>
+<th>Bound</th>
+<th>Mutants</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>P-VAL-01</td>
+<td><code>decompose(compose(d)) == Some(d)</code> for every well-formed
+<code>d</code></td>
+<td><code>s2cell_id.h</code> class comment: the bit layout (face,
+Hilbert position, trailing 1 bit)</td>
+<td>well-formed <code>Decomposed</code></td>
+<td><code>val::p_val_01</code></td>
+<td>proven</td>
+<td></td>
+<td>M-010</td>
+</tr>
+<tr class="even">
+<td>P-VAL-02</td>
+<td><code>compose(decompose(x)?) == x</code> whenever
+<code>decompose(x)</code> is some</td>
+<td><code>s2cell_id.h</code> class comment: the bit layout</td>
+<td>Any</td>
+<td><code>val::p_val_02</code></td>
+<td>proven</td>
+<td></td>
+<td>M-010</td>
+</tr>
+<tr class="odd">
+<td>P-VAL-03</td>
+<td><code>CellId(x).is_valid() == spec::valid(x)</code></td>
+<td><code>S2CellId::is_valid()</code></td>
+<td>Any</td>
+<td><code>val::p_val_03</code></td>
+<td>proven</td>
+<td></td>
+<td>M-011</td>
+</tr>
+<tr class="even">
+<td>P-VAL-04</td>
+<td><code>CellId::from(x).id() == x</code> and
+<code>u64::from(CellId(x)) == x</code></td>
+<td><code>S2CellId(uint64_t)</code>, <code>id()</code></td>
+<td>Any</td>
+<td><code>val::p_val_04</code></td>
+<td>proven</td>
+<td></td>
+<td>M-012</td>
+</tr>
+<tr class="odd">
+<td>P-VAL-05</td>
+<td><code>none().id() == 0</code>,
+<code>sentinel().id() == u64::MAX</code>,
+<code>CellId::default() == none()</code>, and neither is valid</td>
+<td><code>None()</code>, <code>Sentinel()</code>, default
+constructor</td>
+<td>—</td>
+<td><code>val::p_val_05</code></td>
+<td>proven</td>
+<td></td>
+<td>M-013</td>
+</tr>
+<tr class="even">
+<td>P-VAL-06</td>
+<td><code>face() == d.face</code>, <code>level() == d.level</code>,
+<code>pos() == id &amp; (2^61 − 1)</code></td>
+<td><code>face()</code>, <code>level()</code>, <code>pos()</code></td>
+<td>Valid</td>
+<td><code>val::p_val_06</code></td>
+<td>proven</td>
+<td></td>
+<td>M-014</td>
+</tr>
+<tr class="odd">
+<td>P-VAL-07</td>
+<td><code>lsb() == spec::lsb_for_level(d.level)</code>,
+<code>is_leaf() ⇔ d.level == 30</code>,
+<code>is_face() ⇔ d.level == 0</code></td>
+<td><code>lsb()</code>, <code>lsb_for_level()</code>,
+<code>is_leaf()</code>, <code>is_face()</code></td>
+<td>Valid</td>
+<td><code>val::p_val_07</code></td>
+<td>proven</td>
+<td></td>
+<td>M-015</td>
+</tr>
+<tr class="even">
+<td>P-VAL-08</td>
+<td><code>lsb_for_level(l) == 1 &lt;&lt; (60 − 2l)</code> and
+<code>size_ij(l) == 1 &lt;&lt; (30 − l)</code></td>
+<td><code>lsb_for_level(level)</code>,
+<code>GetSizeIJ(level)</code></td>
+<td>Level</td>
+<td><code>val::p_val_08</code></td>
+<td>proven</td>
+<td></td>
+<td>M-017</td>
+</tr>
+<tr class="odd">
+<td>P-VAL-09</td>
+<td><code>from_face(f) == compose({f, 0, 0})</code></td>
+<td><code>FromFace(face)</code></td>
+<td>Face</td>
+<td><code>val::p_val_09</code></td>
+<td>proven</td>
+<td></td>
+<td>M-018</td>
+</tr>
+<tr class="even">
+<td>P-VAL-10</td>
+<td><code>from_face_pos_level(f, pos, l) == compose(ancestor({f, 30, pos &gt;&gt; 1}, l))</code></td>
+<td><code>FromFacePosLevel(face, pos, level)</code></td>
+<td>Face × <code>pos &lt; 2^61</code> × Level</td>
+<td><code>val::p_val_10</code></td>
+<td>proven</td>
+<td></td>
+<td>M-019</td>
+</tr>
+<tr class="odd">
+<td>P-HIER-01</td>
+<td><code>children()[k] == compose(child(d, k))</code> for
+<code>k &lt; 4</code></td>
+<td><code>child(position)</code></td>
+<td>Valid, level &lt; 30</td>
+<td><code>hier::p_hier_01</code></td>
+<td>proven</td>
+<td></td>
+<td>M-020</td>
+</tr>
+<tr class="even">
+<td>P-HIER-02</td>
+<td>The four children partition the parent in curve order:
+<code>children()[0].range_min() == range_min()</code>,
+<code>children()[3].range_max() == range_max()</code>,
+<code>children()[k].range_max().id() + 2 == children()[k+1].range_min().id()</code></td>
+<td><code>child(position)</code>, <code>range_min()</code>,
+<code>range_max()</code>; class comment (children in Hilbert order)</td>
+<td>Valid, level &lt; 30</td>
+<td><code>hier::p_hier_02</code></td>
+<td>proven</td>
+<td></td>
+<td>M-020</td>
+</tr>
+<tr class="odd">
+<td>P-HIER-03</td>
+<td><code>parent() == compose(parent(d))</code></td>
+<td><code>parent()</code></td>
+<td>Valid, level ≥ 1</td>
+<td><code>hier::p_hier_03</code></td>
+<td>proven</td>
+<td></td>
+<td>M-016</td>
+</tr>
+<tr class="even">
+<td>P-HIER-04</td>
+<td><code>parent_at_level(l) == compose(ancestor(d, l))</code></td>
+<td><code>parent(level)</code></td>
+<td>Valid, <code>l ≤ level</code></td>
+<td><code>hier::p_hier_04</code></td>
+<td>proven</td>
+<td></td>
+<td>M-021</td>
+</tr>
+<tr class="odd">
+<td>P-HIER-05</td>
+<td><code>child_position(l) == spec::child_position(d, l)</code></td>
+<td><code>child_position(level)</code></td>
+<td>Valid, <code>1 ≤ l ≤ level</code></td>
+<td><code>hier::p_hier_05</code></td>
+<td>proven</td>
+<td></td>
+<td>M-022</td>
+</tr>
+<tr class="even">
+<td>P-HIER-06</td>
+<td><code>child_begin() == compose(child(d, 0))</code> and
+<code>child_end() == from_position(level+1, pos(child(d, 3)) + 1)</code></td>
+<td><code>child_begin()</code>, <code>child_end()</code></td>
+<td>Valid, level &lt; 30</td>
+<td><code>hier::p_hier_06</code></td>
+<td>proven</td>
+<td></td>
+<td>M-023</td>
+</tr>
+<tr class="odd">
+<td>P-HIER-07</td>
+<td><code>child_begin_at_level(l) == compose({face, l, path·4^(l−level)})</code>
+and
+<code>child_end_at_level(l) == from_position(l, pos(that) + 4^(l−level))</code></td>
+<td><code>child_begin(level)</code>, <code>child_end(level)</code></td>
+<td>Valid, <code>l ≥ level</code></td>
+<td><code>hier::p_hier_07</code></td>
+<td>proven</td>
+<td></td>
+<td>M-024</td>
+</tr>
+<tr class="even">
+<td>P-HIER-08</td>
+<td><code>begin(l) == compose({0, l, 0})</code> and
+<code>end(l) == spec::end(l)</code></td>
+<td><code>Begin(level)</code>, <code>End(level)</code></td>
+<td>Level</td>
+<td><code>hier::p_hier_08</code></td>
+<td>proven</td>
+<td></td>
+<td>M-025</td>
+</tr>
+<tr class="odd">
+<td>P-RANGE-01</td>
+<td><code>range_min() == leaf_id(range(d).0)</code> and
+<code>range_max() == leaf_id(range(d).1)</code></td>
+<td><code>range_min()</code>, <code>range_max()</code></td>
+<td>Valid</td>
+<td><code>range::p_range_01</code></td>
+<td>proven</td>
+<td></td>
+<td>M-030</td>
+</tr>
+<tr class="even">
+<td>P-RANGE-02</td>
+<td><code>a.contains(b) == spec::contains(da, db)</code></td>
+<td><code>contains(other)</code></td>
+<td>Valid × Valid</td>
+<td><code>range::p_range_02</code></td>
+<td>proven</td>
+<td></td>
+<td>M-031</td>
+</tr>
+<tr class="odd">
+<td>P-RANGE-03</td>
+<td><code>a.intersects(b) == (contains(da, db) ∨ contains(db, da))</code></td>
+<td><code>intersects(other)</code></td>
+<td>Valid × Valid</td>
+<td><code>range::p_range_03</code></td>
+<td>proven</td>
+<td></td>
+<td>M-032</td>
+</tr>
+<tr class="even">
+<td>P-RANGE-04</td>
+<td><code>a.contains(b) ⇔ a.range_min().id() ≤ b.id() ≤ a.range_max().id()</code></td>
+<td><code>contains(other)</code>;
+<code>range_min()</code>/<code>range_max()</code> comment</td>
+<td>Valid × ValidOrEnd</td>
+<td><code>range::p_range_04</code></td>
+<td>proven</td>
+<td></td>
+<td>M-031</td>
+</tr>
+<tr class="odd">
+<td>P-RANGE-05</td>
+<td>Nested or disjoint:
+<code>a.contains(b) ∨ b.contains(a) ∨ ¬a.intersects(b)</code></td>
+<td>class comment: the cell hierarchy (nested or disjoint)</td>
+<td>Valid × Valid</td>
+<td><code>range::p_range_05</code></td>
+<td>proven</td>
+<td></td>
+<td>M-032</td>
+</tr>
+<tr class="even">
+<td>P-RANGE-06</td>
+<td><code>maximum_tile(limit)</code> is <code>limit</code> if
+<code>range_min() ≥ limit.range_min()</code>. Otherwise it is the
+largest valid cell <code>r</code> with
+<code>r.range_min() == range_min()</code> and
+<code>r.range_max() &lt; limit.range_min()</code> (<code>r</code> is a
+face, or <code>r.parent()</code> breaks one of the two conditions)</td>
+<td><code>maximum_tile(limit)</code> doc comment</td>
+<td>Valid × ValidOrEnd</td>
+<td><code>range::p_range_06</code></td>
+<td>proven</td>
+<td></td>
+<td>M-033</td>
+</tr>
+<tr class="odd">
+<td>P-TRAV-01</td>
+<td><code>next() == from_position(level, pos(d) + 1)</code>. One past
+the last cell is <code>end(level)</code></td>
+<td><code>next()</code>, <code>End(level)</code></td>
+<td>Valid</td>
+<td><code>trav::p_trav_01</code></td>
+<td>proven</td>
+<td></td>
+<td>M-034</td>
+</tr>
+<tr class="even">
+<td>P-TRAV-02</td>
+<td><code>prev() == from_position(level, pos(d) − 1)</code> for
+<code>pos(d) ≥ 1</code>, <code>end(l).prev()</code> is the last cell at
+<code>l</code>, and <code>next().prev() == c</code></td>
+<td><code>prev()</code></td>
+<td>Valid ∪ {end(l)}</td>
+<td><code>trav::p_trav_02</code></td>
+<td>proven</td>
+<td></td>
+<td>M-035</td>
+</tr>
+<tr class="odd">
+<td>P-TRAV-03</td>
+<td><code>next_wrap()</code> equals <code>next()</code> except that the
+last cell at a level wraps to <code>begin(level)</code>.
+<code>prev_wrap()</code> equals <code>prev()</code> except that
+<code>begin(level)</code> wraps to the last cell</td>
+<td><code>next_wrap()</code>, <code>prev_wrap()</code></td>
+<td>Valid</td>
+<td><code>trav::p_trav_03</code></td>
+<td>proven</td>
+<td></td>
+<td>M-036</td>
+</tr>
+<tr class="even">
+<td>P-TRAV-04</td>
+<td><code>advance(n) == from_position(level, clamp(pos(d) + n, 0, 6·4^level))</code>
+(i128)</td>
+<td><code>advance(steps)</code> doc comment (never past
+<code>End()</code> or before <code>Begin()</code>)</td>
+<td>Valid × i64</td>
+<td><code>trav::p_trav_04</code></td>
+<td>proven</td>
+<td></td>
+<td>M-001</td>
+</tr>
+<tr class="odd">
+<td>P-TRAV-05</td>
+<td><code>advance_wrap(n) == from_position(level, (pos(d) + n).rem_euclid(6·4^level))</code>
+(i128)</td>
+<td><code>advance_wrap(steps)</code></td>
+<td>Valid × i64</td>
+<td><code>trav::p_trav_05__l{0..30}</code></td>
+<td>proven</td>
+<td></td>
+<td>M-037</td>
+</tr>
+<tr class="even">
+<td>P-TRAV-06</td>
+<td><code>distance_from_begin() == pos(d)</code></td>
+<td><code>distance_from_begin()</code></td>
+<td>Valid</td>
+<td><code>trav::p_trav_06</code></td>
+<td>proven</td>
+<td></td>
+<td>M-038</td>
+</tr>
+<tr class="odd">
+<td>P-TRAV-07</td>
+<td>Stepping by n agrees with n single steps. For every <code>n</code>
+with <code>0 ≤ pos(d) + n &lt; 6·4^level</code>:
+<code>advance(n).next() == advance(n + 1)</code>. When also
+<code>pos(d) + n ≥ 1</code>:
+<code>advance(n).prev() == advance(n − 1)</code>. With
+<code>advance(0) == c</code>, induction gives the FR-005 statement</td>
+<td><code>advance(steps)</code>, <code>next()</code>,
+<code>prev()</code></td>
+<td>Valid × i64</td>
+<td><code>trav::p_trav_07</code></td>
+<td>proven</td>
+<td></td>
+<td>M-034, M-035</td>
+</tr>
+<tr class="even">
+<td>P-ENC-01</td>
+<td><code>to_face_ij_orientation() == spec::face_ij_orientation(d)</code></td>
+<td><code>ToFaceIJOrientation()</code>; <code>s2coords_internal.h</code>
+tables</td>
+<td>Valid</td>
+<td><code>enc::p_enc_01</code></td>
+<td>proven</td>
+<td></td>
+<td>M-052, M-053</td>
+</tr>
+<tr class="odd">
+<td>P-ENC-02</td>
+<td><code>from_face_ij(f, i, j).id() == spec::leaf_from_face_ij(f, i, j)</code></td>
+<td><code>FromFaceIJ(face, i, j)</code>;
+<code>s2coords_internal.h</code> tables</td>
+<td>Face × <code>[0, 2^30)²</code></td>
+<td><code>enc::p_enc_02</code></td>
+<td>proven</td>
+<td></td>
+<td>M-053, M-054</td>
+</tr>
+<tr class="even">
+<td>P-ENC-03</td>
+<td>With <code>(f, i, j, _) = to_face_ij_orientation()</code>:
+<code>from_face_ij(f, i, j).parent_at_level(level()) == c</code></td>
+<td><code>FromFaceIJ()</code>, <code>ToFaceIJOrientation()</code></td>
+<td>Valid</td>
+<td><code>enc::p_enc_03</code></td>
+<td>proven</td>
+<td></td>
+<td>M-054</td>
+</tr>
+<tr class="odd">
+<td>P-ENC-04</td>
+<td><code>get_center_si_ti() == spec::center_si_ti(d)</code></td>
+<td><code>GetCenterSiTi()</code></td>
+<td>Valid</td>
+<td><code>enc::p_enc_04</code></td>
+<td>proven</td>
+<td></td>
+<td>M-055</td>
+</tr>
+<tr class="even">
+<td>P-ENC-05</td>
+<td><code>CellId::from_token(&amp;c.to_token()) == c</code></td>
+<td><code>ToToken()</code>, <code>FromToken()</code></td>
+<td>Any (R6)</td>
+<td>—</td>
+<td>not-proven (tool-limit: to_token: <code>format!</code> over 5 min) —
+<em>outside</em></td>
+<td></td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>P-ENC-06</td>
+<td><code>from_token(s).id() == spec::parse_token(s.as_bytes())</code>:
+none unless 1–16 hex digits (FR-015)</td>
+<td><code>FromToken()</code> (<code>s2cell_id.cc</code>)</td>
+<td>Text (R6)</td>
+<td><code>enc::p_enc_06__b{0..=17}</code></td>
+<td>proven-within-bounds</td>
+<td>input size: byte length ≤ 17; longer texts are rejected by the
+length check before any loop (FR-007)</td>
+<td>M-050</td>
+</tr>
+<tr class="even">
+<td>P-ENC-07</td>
+<td><code>c.to_token().as_bytes() == spec::token(x)</code></td>
+<td><code>ToToken()</code></td>
+<td>Any (R6)</td>
+<td>—</td>
+<td>not-proven (tool-limit: to_token: <code>format!</code> over 5 min) —
+<em>outside</em></td>
+<td></td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>P-ENC-08</td>
+<td><code>to_debug_string()</code> equals
+<code>spec::debug_string(d)</code>, and
+<code>from_debug_string(&amp;c.to_debug_string()) == Some(c)</code></td>
+<td><code>ToString()</code>, <code>FromDebugString()</code></td>
+<td>Valid (R6)</td>
+<td>—</td>
+<td>not-proven (tool-limit: to_debug_string: over 5 min (valid branch))
+— <em>outside</em></td>
+<td></td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>P-ENC-09</td>
+<td><code>from_debug_string(s).map(CellId::id) == spec::parse_debug_string(s.as_bytes())</code></td>
+<td><code>FromDebugString()</code></td>
+<td>Text (R6)</td>
+<td><code>enc::p_enc_09__b{0..=33}</code></td>
+<td>proven-within-bounds</td>
+<td>input size: byte length ≤ 33; longer texts are rejected by the
+length check before any loop (FR-007)</td>
+<td>M-056, M-058</td>
+</tr>
+<tr class="odd">
+<td>P-ENC-10</td>
+<td><code>s.parse::&lt;CellId&gt;().map(CellId::id) == spec::parse_debug_string(s.as_bytes()).ok_or(())</code></td>
+<td><code>FromDebugString()</code> (Rust <code>FromStr</code> delegates
+to it)</td>
+<td>Text (R6)</td>
+<td><code>enc::p_enc_10__b{0..=33}</code></td>
+<td>proven-within-bounds</td>
+<td>input size: byte length ≤ 33; longer texts are rejected by the
+length check before any loop (FR-007)</td>
+<td>M-057, M-058</td>
+</tr>
+<tr class="even">
+<td>P-ENC-11</td>
+<td>For every id that is not a valid cell,
+<code>to_debug_string()</code> is <code>Invalid:</code> plus 16
+zero-padded lowercase hex digits (FR-016)</td>
+<td><code>ToString()</code> (invalid branch,
+<code>absl::kZeroPad16</code>)</td>
+<td>Any, <code>¬valid(x)</code> (R6, R13)</td>
+<td>—</td>
+<td>not-proven (tool-limit: to_debug_string: <code>format!</code> OOM
+above 6 GB) — <em>outside</em></td>
+<td></td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>P-ENC-12</td>
+<td><code>c.to_string() == c.to_debug_string()</code></td>
+<td><code>operator&lt;&lt;</code> (writes <code>ToString()</code>)</td>
+<td>Any (R6)</td>
+<td>—</td>
+<td>not-proven (tool-limit: Display: <code>core::fmt</code> over 5 min)
+— <em>outside</em></td>
+<td></td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>P-ANC-01</td>
+<td><code>a.common_ancestor_level(b).map(u8::from) == spec::common_ancestor_level(da, db)</code></td>
+<td><code>GetCommonAncestorLevel(other)</code></td>
+<td>Valid × Valid</td>
+<td><code>anc::p_anc_01</code></td>
+<td>proven</td>
+<td></td>
+<td>M-039, M-040</td>
+</tr>
+<tr class="odd">
+<td>P-ANC-02</td>
+<td>Symmetric (<code>cal(a, b) == cal(b, a)</code>) and reflexive
+(<code>cal(a, a) == Some(a.level())</code>), and
+<code>a.parent_at_level(l) == b.parent_at_level(l)</code> for every
+<code>l ≤</code> the result</td>
+<td><code>GetCommonAncestorLevel(other)</code>,
+<code>parent(level)</code></td>
+<td>Valid × Valid</td>
+<td><code>anc::p_anc_02</code></td>
+<td>proven</td>
+<td></td>
+<td>M-040</td>
+</tr>
+<tr class="even">
+<td>P-NBR-01</td>
+<td><code>edge_neighbors()</code> gives four valid cells at
+<code>level()</code>, pairwise distinct, none equal to
+<code>c</code></td>
+<td><code>GetEdgeNeighbors()</code></td>
+<td>Valid (R12)</td>
+<td><code>nbr::p_nbr_01__f{0..5}_k{0..3}</code> and
+<code>nbr::p_nbr_01__f{0..5}_p{01,02,03,12,13,23}</code> (weekly slow
+tier)</td>
+<td>proven</td>
+<td></td>
+<td>M-060</td>
+</tr>
+<tr class="odd">
+<td>P-NBR-02</td>
+<td>Symmetry: <code>c</code> is in <code>n.edge_neighbors()</code> for
+every <code>n</code> in <code>c.edge_neighbors()</code></td>
+<td><code>GetEdgeNeighbors()</code></td>
+<td>Valid (R12)</td>
+<td>—</td>
+<td>not-proven (tool-limit: CBMC out of memory at the 4 GiB ceiling
+within 35 s, per face and per face × neighbour index)</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>P-NBR-03</td>
+<td><code>vertex_neighbors(l)</code> gives 3 or 4 valid, pairwise
+distinct cells at level <code>l</code>, one of them
+<code>parent_at_level(l)</code></td>
+<td><code>AppendVertexNeighbors(level)</code></td>
+<td>Valid, <code>l &lt; level</code> (R12)</td>
+<td><code>nbr::p_nbr_03__f{0..5}_q{0..3}</code> (weekly slow tier)</td>
+<td>proven</td>
+<td></td>
+<td>M-062</td>
+</tr>
+<tr class="odd">
+<td>P-NBR-04</td>
+<td><code>all_neighbors(l)</code> is <code>None</code> iff
+<code>l &lt; level()</code>. Otherwise every returned cell is valid at
+level <code>l</code> and does not intersect <code>c</code></td>
+<td><code>AppendAllNeighbors(level)</code></td>
+<td>Valid × Level (operation excluded, R12)</td>
+<td>—</td>
+<td>not-proven (excluded: all_neighbors) — <em>outside</em></td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>

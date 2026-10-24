@@ -122,9 +122,12 @@ const VALID_LAT_RANGE: r1::Interval = r1::Interval {
 /// assert!(merged.contains_lat_lng(nyc));
 /// assert!(merged.contains_lat_lng(london));
 /// ```
+///
+/// Deserialisation accepts only a valid rectangle (see [`Rect::is_valid`]), as the binary
+/// decoder does.
 #[must_use]
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Rect {
     /// Latitude interval in radians, range [-π/2, π/2].
     pub lat: r1::Interval,
@@ -141,6 +144,49 @@ impl PartialEq for Rect {
 impl Default for Rect {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+/// Deserialises the two fields that `Serialize` writes, unchanged in format, and accepts only
+/// a valid rectangle (see [`Rect::is_valid`]): both latitude bounds within \[-π/2, π/2\], a
+/// valid longitude interval, and latitudes that are empty exactly when the longitudes are.
+/// Anything else is an error naming the rule, as the binary decoder rejects an invalid
+/// rectangle (spec 003) and `Cell`'s and `CellUnion`'s `Deserialize` an inconsistent value. A
+/// valid rectangle is returned as read, bit for bit. No tolerance is needed: text formats such
+/// as `serde_json` without its `float_roundtrip` feature may move a bound by one ulp, but over
+/// 1,001,444 valid rectangles, the boundary values included, none came back invalid (spec 005
+/// research R6). A derived impl would accept any bounds: a way to build a rectangle that its
+/// own operations do not support.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Rect {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "Rect")]
+        struct Fields {
+            lat: r1::Interval,
+            lng: s1::Interval,
+        }
+
+        let f = Fields::deserialize(deserializer)?;
+        let r = Rect {
+            lat: f.lat,
+            lng: f.lng,
+        };
+        if !(r.lat.lo.abs() <= FRAC_PI_2 && r.lat.hi.abs() <= FRAC_PI_2) {
+            return Err(D::Error::custom("latitude bound outside [-π/2, π/2]"));
+        }
+        if !r.lng.is_valid() {
+            return Err(D::Error::custom("longitude is not a valid s1::Interval"));
+        }
+        if r.lat.is_empty() != r.lng.is_empty() {
+            return Err(D::Error::custom(
+                "latitude and longitude disagree on whether the rectangle is empty",
+            ));
+        }
+        debug_assert!(r.is_valid());
+        Ok(r)
     }
 }
 
@@ -172,6 +218,17 @@ impl Rect {
     }
 
     /// Constructs a rectangle containing a single point.
+    ///
+    /// The point must be valid ([`LatLng::is_valid`]). A latitude outside \[-π/2, π/2\] is not
+    /// checked in any build and gives a rectangle that is not valid.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the longitude is outside \[-π, π\] or NaN, through
+    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is a rectangle that is not
+    /// valid, as in
+    /// upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then checks the
+    /// longitude with `ABSL_DCHECK`.
     pub fn from_lat_lng(ll: LatLng) -> Self {
         Rect {
             lat: r1::Interval::from_point(ll.lat.radians()),
@@ -183,6 +240,14 @@ impl Rect {
     ///
     /// The latitude interval is clamped to [-π/2, π/2], and the longitude
     /// interval becomes full if the longitude size is ≥ 2π.
+    ///
+    /// The center must be valid, and the size must not be NaN.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the center's longitude is outside \[-π, π\] or NaN (as
+    /// [`Rect::from_lat_lng`]), or if the size's longitude is NaN (as [`Rect::expanded`]). In
+    /// release builds the checks are skipped and the result is unspecified.
     pub fn from_center_size(center: LatLng, size: LatLng) -> Self {
         let half = LatLng::new(size.lat * 0.5, size.lng * 0.5);
         Self::from_lat_lng(center).expanded(half)
@@ -265,6 +330,15 @@ impl Rect {
     // --- Containment ---
 
     /// Reports whether this rectangle contains the given `LatLng`.
+    ///
+    /// An invalid `LatLng` (a latitude outside \[-π/2, π/2\], a longitude outside \[-π, π\],
+    /// or NaN) is contained in no rectangle.
+    ///
+    /// # Deviation from upstream
+    ///
+    /// This follows Go (`Rect.ContainsLatLng` returns false for an invalid point). C++
+    /// `S2LatLngRect::Contains(const S2LatLng&)` only logs an invalid point in debug builds and
+    /// then tests it anyway, so it may report an out-of-range point as contained.
     #[inline]
     pub fn contains_lat_lng(self, ll: LatLng) -> bool {
         if !ll.is_valid() {
@@ -292,6 +366,16 @@ impl Rect {
     }
 
     /// Constructs the minimal bounding rectangle containing two points.
+    ///
+    /// Both points must be valid ([`LatLng::is_valid`]). A latitude outside \[-π/2, π/2\] is
+    /// not checked in any build and gives a rectangle that is not valid.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if a longitude is outside \[-π, π\] or NaN, through
+    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is unspecified, as in
+    /// upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then checks the
+    /// longitude with `ABSL_DCHECK`.
     pub fn from_point_pair(a: LatLng, b: LatLng) -> Self {
         Rect {
             lat: r1::Interval::from_point_pair(a.lat.radians(), b.lat.radians()),
@@ -318,6 +402,17 @@ impl Rect {
     }
 
     /// Reports whether the interior of this rectangle contains the given `LatLng`.
+    ///
+    /// The point must be valid. Unlike [`Rect::contains_lat_lng`], this does not screen out an
+    /// invalid point, as in upstream. An out-of-range latitude is not contained, since it
+    /// lies outside every valid rectangle's latitudes.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the longitude is outside \[-π, π\] or NaN, through
+    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is unspecified, as in
+    /// upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then checks the
+    /// longitude with `ABSL_DCHECK`.
     #[inline]
     pub fn interior_contains_lat_lng(self, ll: LatLng) -> bool {
         self.lat.interior_contains(ll.lat.radians()) && self.lng.interior_contains(ll.lng.radians())
@@ -347,6 +442,15 @@ impl Rect {
     // --- Set operations ---
 
     /// Increases the size of the rectangle to include the given point.
+    ///
+    /// An invalid `LatLng` (a latitude outside \[-π/2, π/2\], a longitude outside \[-π, π\],
+    /// or NaN) is ignored: the rectangle is returned unchanged.
+    ///
+    /// # Deviation from upstream
+    ///
+    /// This follows Go (`Rect.AddPoint` returns the rectangle for an invalid point), so that
+    /// an invalid point never silently widens a bound. C++ `S2LatLngRect::AddPoint` only logs
+    /// an invalid point in debug builds and then adds it.
     pub fn add_point(self, ll: LatLng) -> Rect {
         if !ll.is_valid() {
             return self;
@@ -373,6 +477,15 @@ impl Rect {
     /// Returns a rectangle expanded by margin.lat on each side in the
     /// latitude direction and by margin.lng on each side in the longitude
     /// direction.
+    ///
+    /// Neither margin may be NaN. A NaN latitude margin is not checked in any build, and gives
+    /// the full latitude range.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the longitude margin is NaN, through
+    /// [`s1::Interval::expanded`]'s check. In release builds the check is skipped and the
+    /// result is a rectangle that is not valid.
     pub fn expanded(self, margin: LatLng) -> Rect {
         let lat = self.lat.expanded(margin.lat.radians());
         let lng = self.lng.expanded(margin.lng.radians());
@@ -548,8 +661,7 @@ impl Rect {
         // cap size is achieved at one of the rectangle vertices.  For
         // rectangles that are larger than 180°, we punt and always return a
         // bounding cap centered at one of the two poles.
-        let lng_span = self.lng.hi - self.lng.lo;
-        if lng_span.rem_euclid(2.0 * PI) >= 0.0 && lng_span <= PI {
+        if self.lng.length() <= PI {
             let mut mid_cap = Cap::from_point(self.center().to_point());
             for v in RectVertex::iter() {
                 mid_cap = mid_cap.add_point(self.vertex(v).to_point());
@@ -2315,3 +2427,7 @@ mod quickcheck_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "rect_tests.rs"]
+mod rect_tests;

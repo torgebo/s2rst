@@ -1,0 +1,2557 @@
+<h1 id="what-the-proofs-guarantee-by-kind">What the proofs guarantee, by
+kind</h1>
+<p>Every property that <code>verify/</code> proves or tests, grouped by
+the kind of guarantee it gives, with a plain-language statement first.
+This is the place to start browsing. The four catalogues carry the exact
+statements against the models, the upstream sources, the bounds and the
+mutants: <a href="PROPERTIES.md"><code>PROPERTIES.md</code></a>
+(<code>CellId</code>), <a
+href="cell_union/PROPERTIES.md"><code>cell_union/PROPERTIES.md</code></a>
+(<code>CellUnion</code>), <a
+href="decoding/PROPERTIES.md"><code>decoding/PROPERTIES.md</code></a>
+(the decoding layer) and <a
+href="values/PROPERTIES.md"><code>values/PROPERTIES.md</code></a> (the
+value types: <code>Cell</code>, <code>s1::Interval</code>,
+<code>r1::Interval</code>, <code>s2::Rect</code>, <code>r2::Rect</code>,
+<code>s2::Point</code>, <code>s1::ChordAngle</code> and
+<code>s1::Angle</code>). The operation inventories carry the
+crash-freedom proofs.</p>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 58%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Kind</th>
+<th>It guarantees that…</th>
+<th>Entries</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#never-crashes">Never crashes</a></td>
+<td>an operation finishes without a panic, an arithmetic overflow,
+undefined behaviour or a hang, whatever its input</td>
+<td>every in-scope operation, plus 2</td>
+</tr>
+<tr class="even">
+<td><a href="#correct-result">Correct result</a></td>
+<td>an operation returns what the model says it should</td>
+<td>132</td>
+</tr>
+<tr class="odd">
+<td><a href="#round-trip">Round trip</a></td>
+<td>converting a value there and back gives the original</td>
+<td>17</td>
+</tr>
+<tr class="even">
+<td><a href="#exact-output">Exact output</a></td>
+<td>an encoder or printer writes exactly the bytes or text the format
+prescribes</td>
+<td>19</td>
+</tr>
+<tr class="odd">
+<td><a href="#exact-input">Exact input</a></td>
+<td>a decoder or parser accepts exactly the well-formed inputs, returns
+what they say, consumes exactly them and rejects the rest</td>
+<td>17</td>
+</tr>
+<tr class="even">
+<td><a href="#validity">Validity</a></td>
+<td>a validity check answers exactly, and results are well formed</td>
+<td>12</td>
+</tr>
+<tr class="odd">
+<td><a href="#laws">Laws</a></td>
+<td>operations relate to each other as they must: symmetry, idempotence,
+order independence, partition, consistency</td>
+<td>30</td>
+</tr>
+<tr class="even">
+<td><a href="#model-checks">Model checks</a></td>
+<td>the models and restated copies that the proofs compare against are
+themselves right</td>
+<td>5, plus the links</td>
+</tr>
+</tbody>
+</table>
+<h2 id="browsing-the-code-by-kind">Browsing the code by kind</h2>
+<p>Each property harness’s doc comment starts with its id and its kind
+in parentheses, then the plain-language statement, then the exact
+statement:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">/// P-HIER-01 (correct result): `children()` gives the cell&#39;s four children, in curve order.</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">///</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">/// `children()[k] == compose(child(d, k))` for `k &lt; 4`.</span></span></code></pre></div>
+<p>So <code>grep -rn '(round trip)' verify/src</code> lists every
+round-trip proof, and the same works for each kind. Crash-freedom
+harnesses start with their obligation, <code>C-&lt;operation&gt;:</code>
+(in <code>crash</code>, <code>cu_crash</code>, <code>cd_crash</code> and
+<code>cd_xlarge</code>), and the bounded links to the Verus copies with
+<code>Bounded agreement (model check)</code> (in <code>cd_agree</code>).
+<code>tests/property_kinds.rs</code> checks that every catalogue entry
+is listed here exactly once and that the code’s tags match this
+page.</p>
+<h2 id="words-used">Words used</h2>
+<ul>
+<li><strong>Cell, leaf, level, face.</strong> A cell is a square on one
+of the six faces of the cube that S2 projects the sphere onto. Level 0
+is a whole face; each level splits every cell into four children; level
+30 cells are leaves. A <strong>valid</strong> cell id is one that names
+such a cell.</li>
+<li><strong>Curve order.</strong> All cells of one level lie along a
+space-filling (Hilbert) curve that runs over face 0, then face 1, and so
+on. A cell covers a contiguous run of leaves along it.</li>
+<li><strong>Union.</strong> A <code>CellUnion</code> is a list of cells.
+It is <strong>valid</strong> when its cells are valid, sorted in curve
+order and do not overlap, and <strong>normalised</strong> when, in
+addition, no four consecutive cells are the four children of one parent
+(they would be replaced by it). A union <strong>covers</strong> a leaf
+if one of its cells contains it.</li>
+<li><strong>The models.</strong> <code>src/spec.rs</code> (cells),
+<code>src/union_spec.rs</code> (unions, as the set of leaves they cover)
+and <code>src/wire_spec.rs</code> (the wire formats) are written from
+upstream S2, independent of the library, and tested against vectors
+generated by the C++ library.</li>
+<li><strong>Holds for.</strong> <em>every</em> means the whole input
+domain. A bound such as <em>unions of up to 3 cells</em> or <em>inputs
+up to 11 bytes</em> means the proof covers exactly those inputs; the
+catalogue names the tests that exercise larger ones.
+<strong>Weekly</strong> members run in the slow tier
+(<code>make verify-slow</code>), the rest on every change.</li>
+<li><strong>Kani and Verus.</strong> Kani checks the library’s own code
+within the bound. Verus proves a restated copy of a codec for every
+size; the copy is tied to the library by the <a
+href="#links-between-the-verus-copies-and-the-library">links</a>.</li>
+</ul>
+<h2 id="never-crashes">Never crashes</h2>
+<p>No panic, arithmetic overflow, out-of-bounds access, undefined
+behaviour or hang, for every input in the operation’s documented domain.
+Kani checks for all of these in <em>every</em> harness, so a property
+harness also proves its operation crash-free over its own domain; the
+inventories say which harness discharges each operation.</p>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 39%" />
+<col style="width: 26%" />
+<col style="width: 19%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>What is proven</th>
+<th>Harnesses</th>
+<th>Record</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>CellId</code></td>
+<td>all 48 in-scope operations, over every input in their domain (the
+three text parsers up to 17 or 33 bytes, beyond which the length check
+rejects before any loop)</td>
+<td><code>crash::c_*</code>; the parsers by <code>enc::p_enc_06</code>,
+<code>p_enc_09</code>, <code>p_enc_10</code></td>
+<td><a href="INVENTORY.md"><code>INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
+<td><code>CellUnion</code></td>
+<td>all 27 in-scope operations, within each one’s union-size bound</td>
+<td><code>cu_crash::c_*</code>, and the property harnesses the inventory
+names</td>
+<td><a
+href="cell_union/INVENTORY.md"><code>cell_union/INVENTORY.md</code></a></td>
+</tr>
+<tr class="odd">
+<td>Decoding layer</td>
+<td>all 22 in-scope encoders and decoders: 13 over every input, 9 within
+bounds (the string vector decoder is a tool limit)</td>
+<td><code>cd_crash::c_*</code>, and the agreement harnesses of
+<code>cd_fw</code>, <code>cd_uv</code>, <code>cd_cv</code>,
+<code>cd_pv</code>, <code>cd_fx</code></td>
+<td><a
+href="decoding/INVENTORY.md"><code>decoding/INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
+<td><code>Cell</code></td>
+<td>all 21 in-scope operations, over every valid cell (and every edge,
+face, position and level), with no size bound</td>
+<td><code>cl_crash::c_*</code>, and the property harnesses the inventory
+names</td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="odd">
+<td><code>s1::Interval</code></td>
+<td>all 30 in-scope operations, over every valid pair of
+<code>f64</code> bounds, every point in [−π, π] and every margin but
+NaN, with no size bound</td>
+<td><code>iv_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
+<td><code>r1::Interval</code></td>
+<td>all 26 in-scope operations, over every pair of non-NaN bounds
+(infinities and empty intervals included) and every non-NaN number; the
+arithmetic ones except exactly their documented <code>∞ − ∞</code>
+corners; <code>project</code> on every non-empty interval</td>
+<td><code>ri_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="odd">
+<td><code>s2::Rect</code></td>
+<td>all 34 in-scope operations, over every valid rectangle, every
+latitude–longitude (NaN included) for the operations that screen it, and
+every valid one for those that check it only in debug builds</td>
+<td><code>rl_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
+<td><code>r2::Rect</code></td>
+<td>all 32 in-scope operations, over every valid rectangle and every
+non-NaN point; the arithmetic ones over finite bounds and margins;
+<code>project</code> on every non-empty rectangle; the constructors that
+check validity in debug builds on exactly the inputs their documentation
+admits</td>
+<td><code>ur_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="odd">
+<td><code>s2::Point</code></td>
+<td>the 24 in-scope operations and <code>rotate</code>: over every
+triple (NaN and infinities included) for the order, the conversions, the
+classifications and the scaling; every pair without <code>∞ − ∞</code>
+for addition and subtraction; the box <code>[−1, 1]³</code> for the
+geometric operations; <code>from_coords</code> and
+<code>normalize</code> per change for coordinates up to
+<code>2⁵¹¹</code>, the rest of the finite squared lengths weekly (the
+checker reports <code>1 / ∞</code> as NaN beyond). The five operations
+through <code>atan2</code> are a tool limit</td>
+<td><code>pt_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
+<td><code>s1::ChordAngle</code></td>
+<td>28 of the 35 in-scope operations: the constructors over every
+<code>f64</code>, <code>i32</code> and angle (NaN and the infinities
+included), the accessors, classifications, order, neighbours and
+<code>plus_error</code> over every canonical value, the error bounds,
+trigonometry and arithmetic over every length in [0, 4] (their
+documented domain, so their debug checks never fire). The seven through
+<code>asin</code> (<code>to_angle</code> and what reads it) are a tool
+limit</td>
+<td><code>ca_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="odd">
+<td><code>s1::Angle</code></td>
+<td>29 of the 30 in-scope operations, over every <code>f64</code> of
+radians (NaN and infinities included), <code>i32</code> and
+<code>u32</code>, except exactly where an operation makes a new NaN
+(<code>∞ − ∞</code>, <code>0 · ∞</code>, <code>0 / 0</code>) and the
+division by an infinity (a tool limit: the checker reports it as NaN);
+<code>normalized</code> over every angle but ±∞. <code>tan</code> is a
+tool limit</td>
+<td><code>ag_crash::c_*</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<p>Two catalogue entries are crash-freedom statements in their own
+right:</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UENC-04</a></td>
+<td>Decoding a <code>CellUnion</code> never panics or hangs, whatever
+the bytes.</td>
+<td><a href="src/cu_enc.rs"><code>cu_enc::p_uenc_04__b*</code></a></td>
+<td>inputs up to 24 bytes, 25 weekly</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-PV-03</a></td>
+<td>The point vector decoder’s compact format returns a value or an
+error on every input.</td>
+<td>—</td>
+<td>not proven: a tool limit from 2 bytes (the 1-byte inputs:
+<code>cd_crash::c_decode_s2point_vector__b1</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="correct-result">Correct result</h2>
+<p>The operation returns exactly what the model computes for the same
+input.</p>
+<h3 id="cellid-identity-and-bit-layout"><code>CellId</code>: identity
+and bit layout</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-VAL-05</a></td>
+<td><code>none()</code> is 0, <code>sentinel()</code> is all ones,
+<code>default()</code> is <code>none()</code>, and neither is a valid
+cell.</td>
+<td><a href="src/val.rs"><code>val::p_val_05</code></a></td>
+<td>every case</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-VAL-06</a></td>
+<td><code>face()</code>, <code>level()</code> and <code>pos()</code>
+read the face, the level and the position bits of the id.</td>
+<td><a href="src/val.rs"><code>val::p_val_06</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-VAL-07</a></td>
+<td><code>lsb()</code> is the level’s marker bit; <code>is_leaf()</code>
+holds exactly at level 30 and <code>is_face()</code> exactly at level
+0.</td>
+<td><a href="src/val.rs"><code>val::p_val_07</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-VAL-08</a></td>
+<td>The level constants: <code>lsb_for_level(l)</code> is the marker bit
+<code>2^(60−2l)</code>, and <code>size_ij(l)</code> is the cell’s edge,
+<code>2^(30−l)</code> leaves.</td>
+<td><a href="src/val.rs"><code>val::p_val_08</code></a></td>
+<td>every level</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-VAL-09</a></td>
+<td><code>from_face(f)</code> is the level-0 cell of face
+<code>f</code>.</td>
+<td><a href="src/val.rs"><code>val::p_val_09</code></a></td>
+<td>every face</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-VAL-10</a></td>
+<td><code>from_face_pos_level(f, pos, l)</code> is the
+level-<code>l</code> cell that contains the leaf at position
+<code>pos</code>.</td>
+<td><a href="src/val.rs"><code>val::p_val_10</code></a></td>
+<td>every face, position and level</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cellid-hierarchy"><code>CellId</code>: hierarchy</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-HIER-01</a></td>
+<td><code>children()</code> gives the cell’s four children, in curve
+order.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_01</code></a></td>
+<td>every non-leaf cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-HIER-03</a></td>
+<td><code>parent()</code> is the cell one level up that contains
+it.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_03</code></a></td>
+<td>every cell below level 0</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-HIER-04</a></td>
+<td><code>parent_at_level(l)</code> is the cell’s ancestor at level
+<code>l</code>.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_04</code></a></td>
+<td>every cell, every level from 0 to its own</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-HIER-05</a></td>
+<td><code>child_position(l)</code> tells which of its parent’s four
+children the cell’s level-<code>l</code> ancestor is.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_05</code></a></td>
+<td>every cell, levels 1 to its own</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-HIER-06</a></td>
+<td><code>child_begin()</code> is the first child and
+<code>child_end()</code> the position just after the last.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_06</code></a></td>
+<td>every non-leaf cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-HIER-07</a></td>
+<td><code>child_begin_at_level(l)</code> and
+<code>child_end_at_level(l)</code> bracket the cell’s descendants at
+level <code>l</code>.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_07</code></a></td>
+<td>every cell, every level from its own to 30</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-HIER-08</a></td>
+<td><code>begin(l)</code> is the first cell of level <code>l</code> and
+<code>end(l)</code> the position just after the last.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_08</code></a></td>
+<td>every level</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ANC-01</a></td>
+<td><code>common_ancestor_level(b)</code> is the finest level at which
+the two cells have the same ancestor, and none on different faces.</td>
+<td><a href="src/anc.rs"><code>anc::p_anc_01</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cellid-what-a-cell-contains"><code>CellId</code>: what a cell
+contains</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-RANGE-01</a></td>
+<td><code>range_min()</code> and <code>range_max()</code> are the first
+and the last leaf inside the cell.</td>
+<td><a href="src/range.rs"><code>range::p_range_01</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-RANGE-02</a></td>
+<td><code>a.contains(b)</code> holds exactly when <code>b</code> is
+<code>a</code> or lies inside it.</td>
+<td><a href="src/range.rs"><code>range::p_range_02</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-RANGE-03</a></td>
+<td><code>a.intersects(b)</code> holds exactly when one of the two
+contains the other.</td>
+<td><a href="src/range.rs"><code>range::p_range_03</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-RANGE-06</a></td>
+<td><code>maximum_tile(limit)</code> is the largest cell that starts
+where this one starts and ends before <code>limit</code> begins, or
+<code>limit</code> itself if this cell starts at or after it.</td>
+<td><a href="src/range.rs"><code>range::p_range_06</code></a></td>
+<td>every valid cell, every valid or end limit</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cellid-walking-along-the-curve"><code>CellId</code>: walking
+along the curve</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-TRAV-01</a></td>
+<td><code>next()</code> is the next cell of the same level along the
+curve; after the last one comes <code>end(level)</code>.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_01</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-TRAV-02</a></td>
+<td><code>prev()</code> is the previous cell; from <code>end(l)</code>
+it gives the last cell of the level; <code>next().prev()</code> returns
+to the cell.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_02</code></a></td>
+<td>every valid cell and every <code>end(l)</code></td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-TRAV-03</a></td>
+<td><code>next_wrap()</code> and <code>prev_wrap()</code> step like
+<code>next()</code> and <code>prev()</code>, but wrap from the last cell
+of the level to the first and back.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_03</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-TRAV-04</a></td>
+<td><code>advance(n)</code> moves <code>n</code> cells along the curve,
+stopping at the first cell or at <code>end(level)</code> rather than
+going past.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_04</code></a></td>
+<td>every valid cell, every <code>i64</code> step</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-TRAV-05</a></td>
+<td><code>advance_wrap(n)</code> moves <code>n</code> cells along the
+curve, wrapping around the level.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_05__l*</code></a></td>
+<td>every valid cell, every <code>i64</code> step</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-TRAV-06</a></td>
+<td><code>distance_from_begin()</code> is the cell’s position along the
+curve at its level.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_06</code></a></td>
+<td>every valid cell</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cellid-coordinates"><code>CellId</code>: coordinates</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ENC-01</a></td>
+<td><code>to_face_ij_orientation()</code> gives the face, the leaf
+coordinates <code>(i, j)</code> and the curve orientation that
+upstream’s tables give.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_01</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ENC-02</a></td>
+<td><code>from_face_ij(f, i, j)</code> is the leaf at coordinates
+<code>(i, j)</code> on face <code>f</code>.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_02</code></a></td>
+<td>every face and coordinate</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ENC-04</a></td>
+<td><code>get_center_si_ti()</code> is the cell’s centre, in units of
+half a leaf.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_04</code></a></td>
+<td>every valid cell</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cellunion-building-and-reading-a-union"><code>CellUnion</code>:
+building and reading a union</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UACC-01</a></td>
+<td><code>new()</code> is empty; <code>from_verbatim(v)</code> stores
+exactly <code>v</code>; <code>cell_ids()</code>, dereferencing and
+iterating give those ids in order; <code>num_cells()</code> counts
+them.</td>
+<td><a href="src/cu_acc.rs"><code>cu_acc::p_uacc_01__n*</code></a></td>
+<td>any sequence of up to 3 ids</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UNORM-02</a></td>
+<td><code>normalize</code> covers exactly the leaves its input
+covers.</td>
+<td><a
+href="src/cu_norm.rs"><code>cu_norm::p_unorm_02__n*</code></a></td>
+<td>inputs of up to 2 cells (2 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-URANGE-01</a></td>
+<td><code>from_begin_end(b, e)</code> covers exactly the leaves from
+<code>b</code> up to, not including, <code>e</code>, and is
+normalised.</td>
+<td>—</td>
+<td>not proven: a tool limit (tested)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-URANGE-02</a></td>
+<td><code>from_min_max(b, e)</code> covers exactly the leaves from
+<code>b</code> to <code>e</code>, both included, and is normalised.</td>
+<td>—</td>
+<td>not proven: a tool limit (tested)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-URANGE-03</a></td>
+<td><code>from_range(b, e)</code> covers exactly the leaves from
+<code>b</code> up to, not including, <code>e</code>.</td>
+<td>—</td>
+<td>not proven: a tool limit (tested)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-URANGE-04</a></td>
+<td><code>whole_sphere()</code> is the six face cells in order, and
+covers every leaf.</td>
+<td><a
+href="src/cu_range.rs"><code>cu_range::p_urange_04</code></a></td>
+<td>the one case</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UDEN-01</a></td>
+<td><code>denormalize(min_level, level_mod)</code> returns exactly what
+upstream’s algorithm returns, and the result is valid.</td>
+<td><a href="src/cu_den.rs"><code>cu_den::p_uden_01__n*</code></a></td>
+<td>valid unions of up to 1 cell (1 weekly), refined by at most 2
+levels</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UDEN-02</a></td>
+<td>Every cell <code>denormalize</code> returns is at
+<code>min_level</code> or finer, a multiple of <code>level_mod</code>
+levels below it (or a leaf), and together they cover exactly what the
+input covers.</td>
+<td><a href="src/cu_den.rs"><code>cu_den::p_uden_02__n*</code></a></td>
+<td>as P-UDEN-01</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UMEAS-01</a></td>
+<td><code>leaf_cells_covered()</code> is the number of leaves the union
+covers, and never overflows.</td>
+<td><a
+href="src/cu_meas.rs"><code>cu_meas::p_umeas_01__n*</code></a></td>
+<td>valid unions of up to 3 cells; no overflow at any size, by a written
+argument</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cellunion-queries-and-set-operations"><code>CellUnion</code>:
+queries and set operations</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UMEM-01</a></td>
+<td><code>contains_cell_id(c)</code> holds exactly when one of the
+union’s cells contains <code>c</code>.</td>
+<td><a href="src/cu_mem.rs"><code>cu_mem::p_umem_01__n*</code></a></td>
+<td>valid unions of up to 3 cells (2 and 3 weekly), every valid
+cell</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UMEM-02</a></td>
+<td><code>intersects_cell_id(c)</code> holds exactly when one of the
+union’s cells overlaps <code>c</code>.</td>
+<td><a href="src/cu_mem.rs"><code>cu_mem::p_umem_02__n*</code></a></td>
+<td>as P-UMEM-01</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UMEM-03</a></td>
+<td>When <code>contains_cell_id(c)</code> holds, the union covers every
+leaf of <code>c</code>.</td>
+<td><a href="src/cu_mem.rs"><code>cu_mem::p_umem_03__n*</code></a></td>
+<td>as P-UMEM-01</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UMEM-04</a></td>
+<td><code>contains_union(b)</code> holds exactly when every cell of
+<code>b</code> is contained in a cell of the union, and
+<code>intersects_union(b)</code> when some cell of <code>b</code>
+overlaps one.</td>
+<td><a
+href="src/cu_mem.rs"><code>cu_mem::p_umem_04__n*_n*</code></a></td>
+<td>pairs of valid unions of up to 3 cells each (larger pairs
+weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-USET-01</a></td>
+<td><code>union(a, b)</code> covers exactly the leaves that
+<code>a</code> or <code>b</code> covers, and is normalised.</td>
+<td><a
+href="src/cu_set.rs"><code>cu_set::p_uset_01__n*_n*</code></a></td>
+<td>unions of up to 1 cell each (1 × 1 weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-USET-02</a></td>
+<td><code>intersection(a, b)</code> covers exactly the leaves both
+cover; it is valid, and normalised when both inputs are.</td>
+<td><a
+href="src/cu_set.rs"><code>cu_set::p_uset_02__n*_n*</code></a></td>
+<td>as P-USET-01</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-USET-03</a></td>
+<td><code>intersection_with_cell_id(c)</code> covers exactly the union’s
+leaves that lie inside <code>c</code>, and is normalised when the union
+is.</td>
+<td><a href="src/cu_set.rs"><code>cu_set::p_uset_03__n*</code></a></td>
+<td>unions of up to 2 cells</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-USET-04</a></td>
+<td><code>difference(a, b)</code> covers exactly the leaves
+<code>a</code> covers and <code>b</code> does not.</td>
+<td>—</td>
+<td>not proven: a tool limit (tested)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cell-identity-children-containment-and-edges"><code>Cell</code>:
+identity, children, containment and edges</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CID-01</a></td>
+<td>A cell built from an identifier reports that identifier, and the
+face, level and orientation the model gives for it.</td>
+<td><a href="src/cl_id.rs"><code>cl_id::p_cid_01</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CID-02</a></td>
+<td>A cell is a leaf exactly when its level is 30, and its edge in (i,
+j) space is 2^(30 − level) long.</td>
+<td><a href="src/cl_id.rs"><code>cl_id::p_cid_02</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CID-03</a></td>
+<td>The face constructor, the face-position-level constructor,
+conversion from an identifier and the default value give the cell of the
+identifier the model gives (face 0 for the default).</td>
+<td><a href="src/cl_id.rs"><code>cl_id::p_cid_03</code></a></td>
+<td>every face, position and level</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CCHD-01</a></td>
+<td>A cell has children exactly when it is not a leaf. Child k is the
+cell of the model’s child k, on the same face, one level down, with the
+orientation the model gives.</td>
+<td><a href="src/cl_chd.rs"><code>cl_chd::p_cchd_01</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CCNT-01</a></td>
+<td>One cell contains another exactly when the model’s identifier
+containment holds, and two cells intersect exactly when one contains the
+other.</td>
+<td><a href="src/cl_cnt.rs"><code>cl_cnt::p_ccnt_01</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CCNT-02</a></td>
+<td>The region interface agrees with the inherent operations, and a
+cell’s covering is the union of its own identifier.</td>
+<td><a href="src/cl_cnt.rs"><code>cl_cnt::p_ccnt_02</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CBND-03</a></td>
+<td>Edge k’s u-v coordinate is the matching side of the bounds: bottom
+is v low, right is u high, top is v high, left is u low.</td>
+<td><a href="src/cl_bnd.rs"><code>cl_bnd::p_cbnd_03</code></a></td>
+<td>every valid cell and edge</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="s1interval-validity-membership-relations-set-operations-and-measures"><code>s1::Interval</code>:
+validity, membership, relations, set operations and measures</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IVAL-01</a></td>
+<td>The validity check agrees with the model’s for every pair of floats,
+NaN and the infinities included.</td>
+<td><a href="src/iv_val.rs"><code>iv_val::p_ival_01</code></a></td>
+<td>every pair of <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IVAL-03</a></td>
+<td>Empty, full and inverted agree with the model. The empty and full
+intervals are the only ones of their kind, the empty one is inverted,
+and none is both.</td>
+<td><a href="src/iv_val.rs"><code>iv_val::p_ival_03</code></a></td>
+<td>every valid interval</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IVAL-04</a></td>
+<td><code>bound(0)</code> is the low bound and <code>bound(1)</code> the
+high one; equality compares both bounds with float <code>==</code>.</td>
+<td><a href="src/iv_val.rs"><code>iv_val::p_ival_04</code></a></td>
+<td>every valid pair</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IMEM-01</a></td>
+<td>A point is in an interval exactly when the model says it is, and π
+and −π are one point.</td>
+<td><a href="src/iv_mem.rs"><code>iv_mem::p_imem_01</code></a></td>
+<td>every valid interval and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IMEM-02</a></td>
+<td>A point is in an interval’s interior exactly when the model says it
+is.</td>
+<td><a href="src/iv_mem.rs"><code>iv_mem::p_imem_02</code></a></td>
+<td>every valid interval and point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IREL-01</a></td>
+<td>If one interval contains another, every point of the second is in
+the first.</td>
+<td><a href="src/iv_rel.rs"><code>iv_rel::p_irel_01</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IREL-02</a></td>
+<td>Containment is exactly the containment of real arcs.</td>
+<td><a href="src/iv_rel.rs"><code>iv_rel::p_irel_02</code></a></td>
+<td>every pair of valid intervals</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IREL-03</a></td>
+<td>Interior containment is exactly the real-arc relation, and then
+every point of the second interval is in the first’s interior.</td>
+<td><a href="src/iv_rel.rs"><code>iv_rel::p_irel_03</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IREL-04</a></td>
+<td>Two intervals intersect exactly when one contains a bound of the
+other; a shared point implies it; it is symmetric.</td>
+<td><a href="src/iv_rel.rs"><code>iv_rel::p_irel_04</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IREL-06</a></td>
+<td>Interior intersection is exactly the real-arc relation: the second
+interval meets the first’s interior. It is not symmetric, as upstream
+documents.</td>
+<td><a href="src/iv_rel.rs"><code>iv_rel::p_irel_06</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ISET-01</a></td>
+<td>The complement holds every point outside the interval. Apart from a
+single point, it shares no interior point with the interval, and taking
+it twice gives the interval back.</td>
+<td><a href="src/iv_set.rs"><code>iv_set::p_iset_01</code></a></td>
+<td>every valid interval and point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ISET-02</a></td>
+<td>The union is valid and contains both intervals; its bounds are
+bounds of the two, or it is full.</td>
+<td><a href="src/iv_set.rs"><code>iv_set::p_iset_02</code></a></td>
+<td>every pair of valid intervals</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ISET-03</a></td>
+<td>The intersection is valid, holds every common point, and is empty
+exactly when the two do not intersect.</td>
+<td><a href="src/iv_set.rs"><code>iv_set::p_iset_03</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ISET-04</a></td>
+<td>Adding a point gives a valid interval that contains the point and
+the original, and changes nothing if the point was already in it.</td>
+<td><a href="src/iv_set.rs"><code>iv_set::p_iset_04</code></a></td>
+<td>every valid interval and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ISET-05</a></td>
+<td>The arc through two points contains both and is the shorter arc,
+within one ulp of π.</td>
+<td><a href="src/iv_set.rs"><code>iv_set::p_iset_05</code></a></td>
+<td>every pair of points</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ISET-06</a></td>
+<td>Projection gives a point of a non-empty interval: the point itself
+if it is in the interval, and otherwise one of its bounds.</td>
+<td><a href="src/iv_set.rs"><code>iv_set::p_iset_06</code></a></td>
+<td>every non-empty interval and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IMEA-04</a></td>
+<td>The centre of an interval that is neither empty nor full lies in
+it.</td>
+<td><a href="src/iv_mea.rs"><code>iv_mea::p_imea_04</code></a></td>
+<td>every valid interval</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IMEA-05</a></td>
+<td>The complement’s centre lies in the complement, for an interval that
+is neither empty nor full.</td>
+<td><a href="src/iv_mea.rs"><code>iv_mea::p_imea_05</code></a></td>
+<td>every valid interval</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IMEA-06</a></td>
+<td>The directed Hausdorff distance lies in [0, π]. It is 0 when the
+second interval contains the first (the converse holds up to rounding:
+across a one-ulp gap it rounds to 0), and π when only the second is
+empty.</td>
+<td><a href="src/iv_mea.rs"><code>iv_mea::p_imea_06</code></a>, <a
+href="src/iv_mea.rs"><code>iv_mea::p_imea_06_range__*</code></a></td>
+<td>every pair (the range for a non-inverted <code>y</code> weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IEXP-01</a></td>
+<td>Expanding by any margin except NaN gives a valid interval, and the
+empty and full intervals stay so; growing contains the original and
+shrinking is contained in it.</td>
+<td><a href="src/iv_exp.rs"><code>iv_exp::p_iexp_01</code></a>, <a
+href="src/iv_exp.rs"><code>iv_exp::p_iexp_01_grow__*</code></a>, <a
+href="src/iv_exp.rs"><code>iv_exp::p_iexp_01_shrink__*</code></a></td>
+<td>every interval and margin (containment weekly; see P-IEXP-03)</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="r1interval-representation-membership-relations-set-operations-and-measures"><code>r1::Interval</code>:
+representation, membership, relations, set operations and measures</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RIV-01</a></td>
+<td>An interval is empty exactly when its low bound exceeds its high
+one, and the constructors give the documented intervals: as given, a
+single point, two points in order, the pair conversion, and the empty
+default <code>[1, 0]</code>.</td>
+<td><a href="src/ri_val.rs"><code>ri_val::p_riv_01</code></a></td>
+<td>every interval and pair of numbers</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-RIV-03</a></td>
+<td><code>bound(Lo)</code> is the low bound and <code>bound(Hi)</code>
+the high one.</td>
+<td><a href="src/ri_val.rs"><code>ri_val::p_riv_03</code></a></td>
+<td>every interval</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RMEM-01</a></td>
+<td>A number is in an interval exactly when it lies between the
+bounds.</td>
+<td><a href="src/ri_mem.rs"><code>ri_mem::p_rmem_01</code></a></td>
+<td>every interval and number</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-RMEM-02</a></td>
+<td>A number is in the interior exactly when it lies strictly between
+the bounds.</td>
+<td><a href="src/ri_mem.rs"><code>ri_mem::p_rmem_02</code></a></td>
+<td>every interval and number</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RREL-01</a></td>
+<td>Containment and interior containment are those of the sets of real
+numbers.</td>
+<td><a href="src/ri_rel.rs"><code>ri_rel::p_rrel_01</code></a></td>
+<td>every pair of intervals</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-RREL-02</a></td>
+<td>Intersection and interior intersection are those of the sets of real
+numbers; intersection is symmetric.</td>
+<td><a href="src/ri_rel.rs"><code>ri_rel::p_rrel_02</code></a></td>
+<td>every pair of intervals</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RSET-01</a></td>
+<td>The union is the least interval containing both.</td>
+<td><a href="src/ri_set.rs"><code>ri_set::p_rset_01</code></a></td>
+<td>every three intervals</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-RSET-02</a></td>
+<td>The intersection holds exactly the numbers in both.</td>
+<td><a href="src/ri_set.rs"><code>ri_set::p_rset_02</code></a></td>
+<td>every pair and number</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RSET-03</a></td>
+<td>Adding a number gives the least interval containing it and the
+original; adding an interval is the union.</td>
+<td><a href="src/ri_set.rs"><code>ri_set::p_rset_03</code></a></td>
+<td>every interval, pair and number</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-RMEA-01</a></td>
+<td>The centre of a finite non-empty interval lies in it; the length is
+<code>hi − lo</code>, non-negative for a non-empty interval.</td>
+<td><a href="src/ri_mea.rs"><code>ri_mea::p_rmea_01</code></a></td>
+<td>every finite interval</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RMEA-02</a></td>
+<td>The directed Hausdorff distance is non-negative, 0 exactly when the
+second interval contains the first, and infinite when only the second is
+empty.</td>
+<td><a href="src/ri_mea.rs"><code>ri_mea::p_rmea_02</code></a></td>
+<td>every pair of finite intervals</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-REXP-01</a></td>
+<td>Expanding by a finite non-negative margin contains the original, by
+a non-positive one it is contained in it; the empty interval stays as it
+is.</td>
+<td><a href="src/ri_exp.rs"><code>ri_exp::p_rexp_01</code></a></td>
+<td>every finite interval and margin</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-REXP-02</a></td>
+<td>Projection gives the number itself if it is in the interval,
+otherwise the nearer bound.</td>
+<td><a href="src/ri_exp.rs"><code>ri_exp::p_rexp_02</code></a></td>
+<td>every non-empty interval and number</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="s2rect-validity-membership-relations-set-operations-bounds-and-expansion"><code>s2::Rect</code>:
+validity, membership, relations, set operations, bounds and
+expansion</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LVAL-01</a></td>
+<td>The validity check agrees with the description for every four
+bounds, NaN and the infinities included.</td>
+<td><a href="src/rl_val.rs"><code>rl_val::p_lval_01</code></a></td>
+<td>every four <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LVAL-03</a></td>
+<td>Empty, full, a single point and inverted longitudes agree with the
+description; the empty, full and default rectangles and the full ranges
+are the documented values.</td>
+<td><a href="src/rl_val.rs"><code>rl_val::p_lval_03</code></a></td>
+<td>every valid rectangle</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LMEM-01</a></td>
+<td>A latitude–longitude is in a rectangle exactly when it is valid and
+in both intervals; an invalid one is in none.</td>
+<td><a href="src/rl_mem.rs"><code>rl_mem::p_lmem_01</code></a></td>
+<td>every valid rectangle and every two <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LMEM-02</a></td>
+<td>A valid latitude–longitude is in the interior exactly when it is in
+both intervals’ interiors.</td>
+<td><a href="src/rl_mem.rs"><code>rl_mem::p_lmem_02</code></a></td>
+<td>every valid rectangle and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LREL-01</a></td>
+<td>Containment and interior containment are those of the product
+sets.</td>
+<td><a href="src/rl_rel.rs"><code>rl_rel::p_lrel_01</code></a></td>
+<td>every pair of valid rectangles</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LREL-02</a></td>
+<td>Intersection and interior intersection are those of the product
+sets; intersection is symmetric.</td>
+<td><a href="src/rl_rel.rs"><code>rl_rel::p_lrel_02</code></a></td>
+<td>every pair of valid rectangles</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LSET-01</a></td>
+<td>The union contains both rectangles.</td>
+<td><a href="src/rl_set.rs"><code>rl_set::p_lset_01</code></a></td>
+<td>every pair of valid rectangles</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LSET-02</a></td>
+<td>The intersection holds every common point, and is empty exactly when
+the two do not intersect.</td>
+<td><a href="src/rl_set.rs"><code>rl_set::p_lset_02</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LSET-03</a></td>
+<td>Adding a valid point gives a rectangle containing it and the
+original; an invalid point changes nothing; a rectangle from one or two
+points contains them.</td>
+<td><a href="src/rl_set.rs"><code>rl_set::p_lset_03</code></a></td>
+<td>every valid rectangle and point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LSET-04</a></td>
+<td>The polar closure contains the original, gives a rectangle at a pole
+every longitude, and changes nothing else.</td>
+<td><a href="src/rl_set.rs"><code>rl_set::p_lset_04</code></a></td>
+<td>every valid rectangle</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LBND-01</a></td>
+<td>The corners, the vertices in upstream’s order, the centre and the
+size are the corresponding combinations of the intervals’ bounds,
+centres and lengths.</td>
+<td><a href="src/rl_bnd.rs"><code>rl_bnd::p_lbnd_01</code></a></td>
+<td>every valid rectangle (weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LEXP-01</a></td>
+<td>Expanding keeps a valid rectangle; growing contains the original and
+shrinking is contained in it; a rectangle from a centre and a
+non-negative size contains the centre.</td>
+<td><a
+href="src/rl_exp.rs"><code>rl_exp::p_lexp_01_center_size</code></a>, <a
+href="src/rl_exp.rs"><code>rl_exp::p_lexp_01__mpos</code></a>, <a
+href="src/rl_exp.rs"><code>rl_exp::p_lexp_01__mneg</code></a></td>
+<td>every valid rectangle and margin (validity:
+<code>rl_val::p_lval_02__expanded</code>; containment weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LEQ-02</a></td>
+<td>The rectangle’s bound, inherent and through the region interface, is
+the rectangle itself.</td>
+<td><a href="src/rl_eq.rs"><code>rl_eq::p_leq_02</code></a></td>
+<td>every valid rectangle</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="r2rect-validity-corners-membership-relations-set-operations-measures-and-expansion"><code>r2::Rect</code>:
+validity, corners, membership, relations, set operations, measures and
+expansion</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QVAL-01</a></td>
+<td>The validity check is upstream’s emptiness rule for every four
+bounds, NaN included, so it agrees with the description wherever no
+bound is NaN; a NaN bound passes it.</td>
+<td><a href="src/ur_val.rs"><code>ur_val::p_qval_01</code></a></td>
+<td>every four <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QVAL-03</a></td>
+<td>The constructors give the documented rectangles, bit for bit: the
+two intervals, the corners’ axes, the empty <code>[1, 0]²</code>, a
+single point, ordered pairs, and centre ± half the size; a rectangle is
+empty exactly when its x-interval is.</td>
+<td><a href="src/ur_val.rs"><code>ur_val::p_qval_03__*</code></a></td>
+<td>every valid rectangle, every pair of points, every finite
+non-negative size (centre and size weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QVAL-04</a></td>
+<td>The corners and the four vertices, in upstream’s counter-clockwise
+order, for every <code>i32</code> index.</td>
+<td><a href="src/ur_val.rs"><code>ur_val::p_qval_04</code></a></td>
+<td>every valid rectangle and index</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QMEM-01</a></td>
+<td>A point is in a rectangle exactly when each coordinate is in its
+interval.</td>
+<td><a href="src/ur_mem.rs"><code>ur_mem::p_qmem_01</code></a></td>
+<td>every valid rectangle and non-NaN point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QMEM-02</a></td>
+<td>A point is in the interior exactly when each coordinate is in its
+interval’s interior.</td>
+<td><a href="src/ur_mem.rs"><code>ur_mem::p_qmem_02</code></a></td>
+<td>every valid rectangle and non-NaN point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QREL-01</a></td>
+<td>Containment and interior containment are the products of the
+intervals’.</td>
+<td><a href="src/ur_rel.rs"><code>ur_rel::p_qrel_01</code></a></td>
+<td>every pair of valid rectangles</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QREL-02</a></td>
+<td>Intersection and interior intersection are the products of the
+intervals’; intersection is symmetric.</td>
+<td><a href="src/ur_rel.rs"><code>ur_rel::p_qrel_02</code></a></td>
+<td>every pair of valid rectangles</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QSET-01</a></td>
+<td>The union is the least rectangle containing both, and adding a
+rectangle is the union.</td>
+<td><a href="src/ur_set.rs"><code>ur_set::p_qset_01</code></a></td>
+<td>every three valid rectangles</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QSET-02</a></td>
+<td>The intersection holds exactly the common points, and is empty
+exactly when the two do not intersect.</td>
+<td><a href="src/ur_set.rs"><code>ur_set::p_qset_02</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QSET-03</a></td>
+<td>Adding a point gives the least rectangle containing the original and
+the point.</td>
+<td><a href="src/ur_set.rs"><code>ur_set::p_qset_03</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QMEA-01</a></td>
+<td>The centre of a non-empty rectangle lies in it; the size is the two
+lengths, non-negative.</td>
+<td><a href="src/ur_mea.rs"><code>ur_mea::p_qmea_01__size</code></a>, <a
+href="src/ur_mea.rs"><code>ur_mea::p_qmea_01__center</code></a>
+(weekly)</td>
+<td>every rectangle with finite bounds</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QEXP-01</a></td>
+<td>Expanding by finite margins keeps a valid rectangle; growing
+contains the original, shrinking is contained in it; an emptied axis
+empties the rectangle.</td>
+<td><a href="src/ur_exp.rs"><code>ur_exp::p_qexp_01__*</code></a></td>
+<td>every finite rectangle and finite margins (the result weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QEXP-02</a></td>
+<td>Projection gives the point itself if it is inside, otherwise the
+nearest bound on each axis outside.</td>
+<td><a href="src/ur_exp.rs"><code>ur_exp::p_qexp_02</code></a></td>
+<td>every non-empty valid rectangle and non-NaN point</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="s2point-construction-classifications-scaling-order-arithmetic-orthogonal-directions-and-distance"><code>s2::Point</code>:
+construction, classifications, scaling, order, arithmetic, orthogonal
+directions and distance</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTVAL-01</a></td>
+<td>Building, converting and reading a point keep the bits; the default
+is <code>(0, 0, 0)</code>; <code>origin</code> is upstream’s point, of
+unit length.</td>
+<td><a href="src/pt_val.rs"><code>pt_val::p_ptval_01</code></a></td>
+<td>every triple, NaN included</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTVAL-02</a></td>
+<td><code>from_coords</code> maps zero to <code>origin</code> and
+everything else to <code>normalize</code>, which is upstream’s formula
+bit for bit (zero results have positive zeros, as Go).</td>
+<td><a
+href="src/pt_val.rs"><code>pt_val::p_ptval_02__zero_length</code></a>
+(weekly)</td>
+<td>the clauses without a square root, every finite triple; the rest is
+a tool limit (the checker’s <code>sqrt</code>), checked against the C++
+vectors</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTCLS-01</a></td>
+<td>A point is normalizable exactly when its largest coordinate is at
+least <code>2⁻²⁴²</code> in magnitude.</td>
+<td><a href="src/pt_cls.rs"><code>pt_cls::p_ptcls_01</code></a></td>
+<td>every triple without NaN</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTCLS-03</a></td>
+<td><code>from_coords</code> and <code>normalize</code> give a unit
+point where the squared length is a normal number; <code>ortho</code>
+and <code>reference_dir</code> give one for every normalizable point in
+the box.</td>
+<td><a
+href="src/pt_cls.rs"><code>pt_cls::p_ptcls_03__normalize</code></a>, <a
+href="src/pt_cls.rs"><code>pt_cls::p_ptcls_03__normalize_band</code></a>,
+<a href="src/pt_cls.rs"><code>pt_cls::p_ptcls_03__ortho</code></a></td>
+<td>not proven: the weekly members time out at 60 minutes, a tool limit;
+the C++ vectors and property tests check it</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTSCL-01</a></td>
+<td><code>ensure_normalizable</code> makes every non-zero finite vector
+normalizable, and leaves normalizable and zero vectors alone.</td>
+<td><a href="src/pt_scl.rs"><code>pt_scl::p_ptscl_01</code></a></td>
+<td>every finite triple</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTORD-01</a></td>
+<td><code>cmp_point</code> and <code>&lt;</code> are upstream’s
+lexicographic order, NaN included.</td>
+<td><a href="src/pt_ord.rs"><code>pt_ord::p_ptord_01</code></a></td>
+<td>every pair of triples</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTARI-01</a></td>
+<td>Negation, addition and subtraction are coordinate-wise, bit for bit;
+<code>−(−a)</code> is <code>a</code>, and <code>a − b</code> is
+<code>a + (−b)</code>.</td>
+<td><a href="src/pt_ari.rs"><code>pt_ari::p_ptari_01__*</code></a></td>
+<td>every pair of finite triples</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTORT-02</a></td>
+<td><code>ortho</code> and <code>point_cross</code> are never the zero
+vector for a normalizable point.</td>
+<td><a href="src/pt_ort.rs"><code>pt_ort::p_ptort_02__*</code></a>
+(weekly)</td>
+<td>every normalizable point in the box, every partner in it</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTDST-01</a></td>
+<td>The distance and the chord angle from a point to itself are zero;
+the chord angle is symmetric and at most a straight angle; the
+approximate equalities are reflexive.</td>
+<td><a href="src/pt_dst.rs"><code>pt_dst::p_ptdst_01__*</code></a></td>
+<td>every pair in the box, every finite tolerance <code>≥ 0</code>,
+except the chord angle’s symmetry, which times out at 60 minutes in the
+weekly tier</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="s1chordangle-construction-classifications-neighbours-error-bounds-and-arithmetic"><code>s1::ChordAngle</code>:
+construction, classifications, neighbours, error bounds and
+arithmetic</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CAVAL-01</a></td>
+<td>The constants are upstream’s, the default is <code>ZERO</code>, and
+<code>length2</code> returns the stored length.</td>
+<td><a href="src/ca_val.rs"><code>ca_val::p_caval_01</code></a></td>
+<td>every length in [0, 4]</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CAVAL-03</a></td>
+<td><code>from_length2</code> makes every negative input
+<code>NEGATIVE</code> (option B), keeps every length in [0, 4], and
+gives <code>STRAIGHT</code> above 4, at +∞ and for NaN, as
+upstream.</td>
+<td><a href="src/ca_val.rs"><code>ca_val::p_caval_03</code></a></td>
+<td>every <code>f64</code></td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CAVAL-04</a></td>
+<td><code>from_angle</code> gives <code>NEGATIVE</code> for a negative
+angle, <code>INFINITY</code> at +∞, and a length in [0, 4] otherwise;
+the other constructors follow it.</td>
+<td><a href="src/ca_val.rs"><code>ca_val::p_caval_04</code></a></td>
+<td>every angle, <code>f64</code> and <code>i32</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CACLS-01</a></td>
+<td>The five classifications are upstream’s; <code>is_infinity</code>
+holds at +∞ only and <code>is_valid</code> for every value.</td>
+<td><a href="src/ca_cls.rs"><code>ca_cls::p_cacls_01</code></a></td>
+<td>every canonical value</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CANBR-01</a></td>
+<td><code>successor</code> is the next canonical value up,
+<code>INFINITY</code> at the top.</td>
+<td><a href="src/ca_nbr.rs"><code>ca_nbr::p_canbr_01</code></a></td>
+<td>every canonical value</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CANBR-02</a></td>
+<td><code>predecessor</code> is the next canonical value down,
+<code>NEGATIVE</code> at the bottom.</td>
+<td><a href="src/ca_nbr.rs"><code>ca_nbr::p_canbr_02</code></a></td>
+<td>every canonical value</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CAERR-01</a></td>
+<td><code>plus_error</code> leaves a special value unchanged and clamps
+the rest to [0, 4] as upstream; a NaN sum gives
+<code>STRAIGHT</code>.</td>
+<td><a href="src/ca_err.rs"><code>ca_err::p_caerr_01</code></a></td>
+<td>every canonical value and every error</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CAARI-01</a></td>
+<td>The sum of two lengths is a length; adding zero changes nothing; a
+sum reaching 4 is <code>STRAIGHT</code>.</td>
+<td><a href="src/ca_ari.rs"><code>ca_ari::p_caari_01</code></a></td>
+<td>every pair of lengths in [0, 4]</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CAARI-02</a></td>
+<td>The difference of two lengths is a length; subtracting zero changes
+nothing; subtracting a larger length gives <code>ZERO</code>.</td>
+<td><a href="src/ca_ari.rs"><code>ca_ari::p_caari_02</code></a></td>
+<td>every pair of lengths in [0, 4]</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="s1angle-representation-conversions-e-forms-and-reduction"><code>s1::Angle</code>:
+representation, conversions, E-forms and reduction</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-AGVAL-01</a></td>
+<td>Building from radians and reading them keeps the bits; the constants
+are upstream’s; <code>abs</code>, negation and <code>is_infinite</code>
+are the IEEE operations.</td>
+<td><a href="src/ag_val.rs"><code>ag_val::p_agval_01</code></a></td>
+<td>every <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-AGCNV-02</a></td>
+<td>Upstream’s documented identities: whole degrees equal their E6 and
+E7 forms, E6 equals E7 times ten, and multiples of 45° are exactly
+multiples of π/4, at every power-of-two scale.</td>
+<td><a
+href="src/ag_cnv.rs"><code>ag_cnv::p_agcnv_02__degrees</code></a>;
+<code>tests/angle_enumeration.rs</code> (enumeration)</td>
+<td>every <code>i32</code> in range (enumerated); 45° multiples at
+scales <code>2⁻¹⁰⁰⁰</code> to <code>2⁹⁶⁰</code></td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-AGEF-02</a></td>
+<td>Converting an E5, E6 or E7 integer to an angle and back gives the
+integer.</td>
+<td><code>tests/angle_enumeration.rs</code> (enumeration)</td>
+<td>every <code>i32</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-AGNRM-01</a></td>
+<td><code>normalized</code> is upstream’s exact remainder by 2π, in (−π,
+π].</td>
+<td>—</td>
+<td>not proven: Kani’s <code>%</code> on <code>f64</code> is wrong (spec
+007 research R0); the C++ vectors and an exact big-integer property test
+check it</td>
+</tr>
+</tbody>
+</table>
+<h2 id="round-trip">Round trip</h2>
+<p>Converting a value one way and back gives the original value,
+consuming exactly what was written. For the vector codecs Kani proves it
+in three legs (the library’s encoder writes the model’s encoding, the
+library’s decoder agrees with the model’s decoder, and the model’s
+decoder inverts its encoder), so those entries name three harness
+families.</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-VAL-04</a></td>
+<td>Converting a <code>u64</code> to a <code>CellId</code> and back
+gives the same number.</td>
+<td><a href="src/val.rs"><code>val::p_val_04</code></a></td>
+<td>every <code>u64</code></td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ENC-03</a></td>
+<td>Converting a cell to face and leaf coordinates and back, then going
+up to the cell’s level, gives the cell.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_03</code></a></td>
+<td>every valid cell</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ENC-05</a></td>
+<td><code>from_token(to_token())</code> gives the cell back.</td>
+<td>—</td>
+<td>not proven: a tool limit (formatting)</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ENC-08</a></td>
+<td><code>to_debug_string()</code> writes upstream’s form, and
+<code>from_debug_string</code> reads it back.</td>
+<td>—</td>
+<td>not proven: a tool limit (formatting)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UENC-02</a></td>
+<td>Decoding an encoded valid union gives the same ids, normalised or
+not.</td>
+<td><a href="src/cu_enc.rs"><code>cu_enc::p_uenc_02__n*</code></a></td>
+<td>valid unions of up to 4 cells (4 weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FW-04</a></td>
+<td>Writing a number in <code>len</code> bytes and reading it back gives
+the number, whenever it fits.</td>
+<td><a href="src/cd_fw.rs"><code>cd_fw::p_fw_04</code></a>; Verus</td>
+<td>every number and width</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-VAR-02</a></td>
+<td>Every <code>u64</code> written as a varint reads back as itself,
+consuming exactly its bytes, whatever follows; the reader terminates on
+every input.</td>
+<td>Verus: <code>varint</code></td>
+<td>every <code>u64</code> (Verus)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-UV-01</a></td>
+<td>Every vector of <code>u64</code> round-trips through the integer
+vector encoding.</td>
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_01_enc__n*</code>,
+<code>p_uv_03__*</code>, <code>p_uv_mrt_u64__n*</code></a>; Verus</td>
+<td>encodings up to 11 bytes; every size (Verus)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-UV-02</a></td>
+<td>Every vector of <code>u32</code> round-trips through the integer
+vector encoding.</td>
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_02_enc__n*</code>,
+<code>p_uv_04__*</code>, <code>p_uv_mrt_u32__n*</code></a>; Verus</td>
+<td>vectors of up to 2 values; every size (Verus)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-CV-01</a></td>
+<td>Every vector of cell ids, of any bits, round-trips through the
+cell-id vector encoding.</td>
+<td><a href="src/cd_cv.rs"><code>cd_cv::p_cv_03__n0</code>,
+<code>p_cv_02__*</code>, <code>p_cv_mrt__n*</code></a>; Verus</td>
+<td>the empty vector; every size (Verus)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-SV-01</a></td>
+<td>Every vector of byte strings round-trips through the string vector
+encoding.</td>
+<td>Verus: <code>string_vector</code>; model leg <a
+href="src/cd_sv.rs"><code>cd_sv::p_sv_mrt__n*</code></a></td>
+<td>every size (Verus); not proven by Kani (the decoder is a tool
+limit)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-PV-01</a></td>
+<td>Every vector of points round-trips through the uncompressed (FAST)
+format, bit for bit.</td>
+<td><a href="src/cd_pv.rs"><code>cd_pv::p_pv_01_enc__n*</code>,
+<code>p_pv_02__b*</code>, <code>p_pv_mrt__n*</code></a></td>
+<td>the empty vector (the decoder is a tool limit from 2 bytes)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-01</a></td>
+<td>Every valid <code>CellId</code> round-trips through its 8-byte
+encoding.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_01</code></a></td>
+<td>every valid id</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FX-02</a></td>
+<td>Every <code>Point</code> round-trips through its encoding, bit for
+bit.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_02</code></a></td>
+<td>every bit pattern</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-03</a></td>
+<td>Every valid <code>Cap</code> round-trips through its encoding.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_03_enc</code>,
+<code>p_fx_08__b33</code>, <code>p_fx_03_mrt</code></a> (the last two
+weekly)</td>
+<td>every valid cap</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FX-04</a></td>
+<td>Every valid <code>Rect</code> round-trips through its encoding.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_04</code></a></td>
+<td>every valid rectangle</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-05</a></td>
+<td>Every <code>Cell</code> round-trips through its encoding.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_05</code></a></td>
+<td>every cell</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exact-output">Exact output</h2>
+<p>The encoder or printer writes exactly the bytes or text that
+upstream’s format prescribes, so other S2 implementations read it.</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ENC-07</a></td>
+<td><code>to_token()</code> writes upstream’s token: lowercase hex with
+the trailing zeros removed, <code>X</code> for 0.</td>
+<td>—</td>
+<td>not proven: a tool limit (formatting)</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ENC-11</a></td>
+<td>For an id that is not a valid cell, <code>to_debug_string()</code>
+is <code>Invalid:</code> and 16 zero-padded hex digits.</td>
+<td>—</td>
+<td>not proven: a tool limit (formatting)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UENC-01</a></td>
+<td><code>encode</code> writes a version byte, the cell count, then each
+id, as 8-byte little-endian numbers.</td>
+<td><a href="src/cu_enc.rs"><code>cu_enc::p_uenc_01__n*</code></a></td>
+<td>any sequence of up to 3 ids</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FW-01</a></td>
+<td><code>encode_uint_with_length(v, len)</code> writes the low
+<code>len</code> bytes of <code>v</code>, little-endian.</td>
+<td><a href="src/cd_fw.rs"><code>cd_fw::p_fw_01</code></a>; Verus</td>
+<td>every number and width</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-UV-05</a></td>
+<td>The integer vector encoder stores each value in the fewest bytes
+that hold all of them (at least one).</td>
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_05_*</code></a>; Verus</td>
+<td>vectors of up to 2 values; every size (Verus)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-UV-06</a></td>
+<td>The integer vector’s encoding is its header plus that many bytes per
+value, nothing more.</td>
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_05_*</code></a>; Verus</td>
+<td>as P-UV-05</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-CV-03</a></td>
+<td>The cell-id vector encoder chooses the base, the shift and the delta
+width as upstream’s search does.</td>
+<td><a href="src/cd_cv.rs"><code>cd_cv::p_cv_03__n0</code></a></td>
+<td>the empty vector (1 and 2 ids are in the xlarge tier, not yet
+run)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-SV-03</a></td>
+<td>The string vector’s encoding is the offsets’ integer vector followed
+by the strings’ bytes.</td>
+<td><a href="src/cd_sv.rs"><code>cd_sv::p_sv_03__n*</code></a>;
+Verus</td>
+<td>up to 2 strings of up to 2 bytes; every size (Verus)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CCHD-02</a></td>
+<td>Each child’s u-v bounds, which <code>children()</code> computes from
+the parent’s centre, are bit for bit those of the child built from its
+own identifier.</td>
+<td><a href="src/cl_bnd.rs"><code>cl_bnd::p_cchd_02__l*</code></a></td>
+<td>parents at levels 0–3 (4–6 weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CBND-01</a></td>
+<td>The stored u-v bounds are bit for bit upstream’s projection of the
+identifier’s (i, j) range.</td>
+<td><a href="src/cl_bnd.rs"><code>cl_bnd::p_cbnd_01__l*</code></a></td>
+<td>cells at levels 0–3 (4–12 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IMEA-01</a></td>
+<td>The seam fix (FR-020) changes the length of exactly one valid
+interval: every other length is bit for bit upstream’s arithmetic, and
+at the corner it is one ulp of π.</td>
+<td><a href="src/iv_mea.rs"><code>iv_mea::p_imea_01</code></a></td>
+<td>every valid interval (struct literals included)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IEXP-03</a></td>
+<td>The crossing fix (FR-023, U-011) changes an expansion only where
+upstream’s bounds cross: every other result is bit for bit upstream’s
+arithmetic, and there it is the empty interval (shrinking) or the full
+one (growing).</td>
+<td><a href="src/iv_exp.rs"><code>iv_exp::p_iexp_03__mneg</code></a>, <a
+href="src/iv_exp.rs"><code>iv_exp::p_iexp_03__mpos</code></a></td>
+<td>every valid interval and margin except NaN (both members time out at
+60 minutes)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTCLS-02</a></td>
+<td><code>is_unit</code> is upstream’s <code>IsUnitLength</code>, bit
+for bit.</td>
+<td><a href="src/pt_cls.rs"><code>pt_cls::p_ptcls_02</code></a></td>
+<td>every finite triple (weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTSCL-02</a></td>
+<td>A vector that is not normalizable is scaled by a power of two,
+exactly, into [1, 2), and equals upstream’s result wherever upstream’s
+is finite (U-012).</td>
+<td><a href="src/pt_scl.rs"><code>pt_scl::p_ptscl_02</code></a></td>
+<td>every finite triple that is not normalizable</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CAERR-02</a></td>
+<td>The chord angle’s two error bounds are upstream’s formulas, bit for
+bit.</td>
+<td><a href="src/ca_err.rs"><code>ca_err::p_caerr_02__*</code></a></td>
+<td>every length in [0, 4]</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CAARI-03</a></td>
+<td>The chord angle’s <code>sin2</code> and <code>cos</code> are
+upstream’s formulas, bit for bit, and its <code>sin</code> lies in [0,
+1].</td>
+<td><a href="src/ca_ari.rs"><code>ca_ari::p_caari_03__*</code></a></td>
+<td>every length in [0, 4]: <code>cos</code> proven per change;
+<code>sin2</code> and <code>sin</code> not proven (timeout at 60
+minutes)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-AGCNV-01</a></td>
+<td>The angle’s degree and E-form conversions are upstream’s products,
+bit for bit.</td>
+<td><a href="src/ag_cnv.rs"><code>ag_cnv::p_agcnv_01__*</code></a>;
+<code>tests/angle_enumeration.rs</code> (enumeration)</td>
+<td>every <code>i32</code> and <code>u32</code> (enumerated); every
+<code>f64</code> (weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-AGEF-01</a></td>
+<td><code>e5</code>, <code>e6</code> and <code>e7</code> round to the
+nearest integer with ties to even, as C++ on x86-64, and saturate
+outside the <code>i32</code> range.</td>
+<td><a
+href="src/ag_eform.rs"><code>ag_eform::p_agef_01__*</code></a></td>
+<td>every angle, NaN and the infinities included (weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-AGARI-01</a></td>
+<td>The angle’s arithmetic is the IEEE operations on radians, bit for
+bit.</td>
+<td><a href="src/ag_ari.rs"><code>ag_ari::p_agari_01__*</code></a></td>
+<td>every pair making no new NaN and dividing by no infinity: addition
+and subtraction per change, the products weekly; the quotients not
+proven (timeout at 60 minutes)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exact-input">Exact input</h2>
+<p>The decoder or parser accepts exactly the well-formed inputs, returns
+the value they encode, consumes exactly their bytes, and rejects
+everything else with an error (never a wrong value). “As upstream”
+means: as the C++ library, minus the library’s documented, stricter
+checks (listed in the catalogue).</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ENC-06</a></td>
+<td><code>from_token</code> accepts exactly 1 to 16 hex digits and
+returns the id they spell; anything else gives <code>none()</code>.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_06__b*</code></a></td>
+<td>every text (up to 17 bytes; longer ones are rejected before any
+loop)</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ENC-09</a></td>
+<td><code>from_debug_string</code> accepts exactly a face digit,
+<code>/</code> and up to 30 digits <code>0</code>–<code>3</code>, and
+returns that cell.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_09__b*</code></a></td>
+<td>every text (up to 33 bytes; as P-ENC-06)</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ENC-10</a></td>
+<td><code>str::parse::&lt;CellId&gt;</code> accepts and returns exactly
+what <code>from_debug_string</code> does.</td>
+<td><a href="src/enc.rs"><code>enc::p_enc_10__b*</code></a></td>
+<td>as P-ENC-09</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UENC-03</a></td>
+<td><code>CellUnion::decode</code> accepts exactly the encodings of
+valid unions, returns their ids unchanged, and rejects everything
+else.</td>
+<td><a href="src/cu_enc.rs"><code>cu_enc::p_uenc_03__b*</code></a></td>
+<td>inputs up to 24 bytes (17 to 24 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FW-02</a></td>
+<td><code>get_uint_with_length(d, len)</code> reads the first
+<code>len</code> bytes as a little-endian number.</td>
+<td><a href="src/cd_fw.rs"><code>cd_fw::p_fw_02__d*</code></a>;
+Verus</td>
+<td>every input and width</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FW-03</a></td>
+<td><code>decode_uint_with_length</code> returns that number and
+consumes exactly <code>len</code> bytes, or fails on a shorter
+input.</td>
+<td><a href="src/cd_fw.rs"><code>cd_fw::p_fw_03__b*</code></a>;
+Verus</td>
+<td>every input and width</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-VAR-01</a></td>
+<td>Every vector decoder reads its varint header as upstream does: at
+most 10 bytes, the tenth at most 1.</td>
+<td>inside <a href="src/cd_uv.rs"><code>cd_uv::p_uv_03__*</code>,
+<code>p_uv_04__*</code></a></td>
+<td>inputs up to 11 bytes (9 to 11 weekly); every input (Verus,
+P-VAR-02)</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-UV-03</a></td>
+<td>The <code>u64</code> integer vector decoder accepts and returns what
+upstream does, and consumes the same bytes.</td>
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_03__b*</code></a>;
+Verus</td>
+<td>inputs up to 11 bytes (9 to 11 weekly); every input (Verus)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-UV-04</a></td>
+<td>The same for the <code>u32</code> integer vector decoder.</td>
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_04__b*</code></a>;
+Verus</td>
+<td>as P-UV-03</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-CV-02</a></td>
+<td>The cell-id vector decoder accepts and returns what upstream does,
+including the extended shift code, and rejects shifts above 56.</td>
+<td><a href="src/cd_cv.rs"><code>cd_cv::p_cv_02__b*</code></a>;
+Verus</td>
+<td>inputs up to 11 bytes (5 to 11 weekly); every input (Verus)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-SV-02</a></td>
+<td>The string vector decoder returns what upstream does: an entry whose
+range is out of order or past the data is an empty string, and decoding
+continues.</td>
+<td>Verus: <code>string_vector</code></td>
+<td>every input (Verus); the library’s decoder is a Kani tool limit</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-PV-02</a></td>
+<td>The point vector decoder agrees with upstream on the uncompressed
+format, and rejects the unknown format tags 2 to 7.</td>
+<td><a href="src/cd_pv.rs"><code>cd_pv::p_pv_02__b*</code></a></td>
+<td>inputs up to 1 byte; tags 2 to 7 at every length</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-06</a></td>
+<td>The <code>CellId</code> decoder reads 8 bytes and rejects ids that
+are not valid cells (a stricter check than upstream’s).</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_06__b*</code></a></td>
+<td>every input</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FX-07</a></td>
+<td>The <code>Point</code> decoder reads three 8-byte floats, any
+bits.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_07__b*</code></a></td>
+<td>every input</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-08</a></td>
+<td>The <code>Cap</code> decoder reads a centre and a radius, and
+rejects caps that are not valid (a stricter check than upstream’s).</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_08__b*</code></a> (32, 33
+weekly)</td>
+<td>every input</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FX-09</a></td>
+<td>The <code>Rect</code> decoder reads a version byte and four bounds,
+and rejects rectangles that are not valid, as upstream does.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_09__b*</code></a></td>
+<td>every input</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-10</a></td>
+<td>The <code>Cell</code> decoder reads a cell id and rejects ids that
+are not valid cells.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_10__b*</code></a></td>
+<td>every input</td>
+</tr>
+</tbody>
+</table>
+<h2 id="validity">Validity</h2>
+<p>A validity check answers exactly, and an operation returns
+well-formed values.</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-VAL-03</a></td>
+<td><code>is_valid()</code> holds exactly for the ids that name a cell:
+a face from 0 to 5, and one of the 31 level marker bits set with every
+bit below it clear.</td>
+<td><a href="src/val.rs"><code>val::p_val_03</code></a></td>
+<td>every <code>u64</code></td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UINV-01</a></td>
+<td><code>is_valid()</code> holds exactly for lists of valid cells in
+curve order that do not overlap.</td>
+<td><a href="src/cu_inv.rs"><code>cu_inv::p_uinv_01__n*</code></a></td>
+<td>any sequence of up to 4 ids (3 and 4 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UINV-02</a></td>
+<td><code>is_normalized()</code> holds exactly for valid unions in which
+no four consecutive cells are the children of one parent.</td>
+<td><a href="src/cu_inv.rs"><code>cu_inv::p_uinv_02__n*</code></a></td>
+<td>as P-UINV-01</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UNORM-01</a></td>
+<td><code>normalize</code>, <code>from_cell_ids</code> and
+<code>collect</code> return a normalised union.</td>
+<td><a
+href="src/cu_norm.rs"><code>cu_norm::p_unorm_01__n*</code></a></td>
+<td>inputs of up to 2 valid cells (2 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-NBR-01</a></td>
+<td><code>edge_neighbors()</code> gives four distinct valid cells of the
+same level, none of them the cell itself.</td>
+<td><a href="src/nbr.rs"><code>nbr::p_nbr_01__f*_k*</code>,
+<code>p_nbr_01__f*_p*</code></a> (weekly)</td>
+<td>every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-NBR-03</a></td>
+<td><code>vertex_neighbors(l)</code> gives 3 or 4 distinct valid cells
+at level <code>l</code>, one of them the cell’s own ancestor.</td>
+<td><a href="src/nbr.rs"><code>nbr::p_nbr_03__f*_q*</code></a>
+(weekly)</td>
+<td>every valid cell, every coarser level</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-NBR-04</a></td>
+<td><code>all_neighbors(l)</code> is none exactly when <code>l</code> is
+coarser than the cell; otherwise every cell it returns is valid, at
+level <code>l</code>, and outside the cell.</td>
+<td>—</td>
+<td>not proven: the operation is excluded</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CBND-02</a></td>
+<td>The bounds are ordered and lie in [−1, 1].</td>
+<td><a href="src/cl_bnd.rs"><code>cl_bnd::p_cbnd_02__l*</code></a></td>
+<td>cells at levels 0–3 (4–12 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IVAL-02</a></td>
+<td>Every constructor returns a valid interval for its documented
+inputs, and <code>new</code> turns −π into π except in the full and
+empty intervals. The default interval is the empty one.</td>
+<td><a href="src/iv_val.rs"><code>iv_val::p_ival_02</code></a></td>
+<td>every pair of points</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LVAL-02</a></td>
+<td>Every in-scope operation that returns a rectangle returns a valid
+one.</td>
+<td><a href="src/rl_val.rs"><code>rl_val::p_lval_02__*</code></a></td>
+<td>every input in each operation’s domain</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QVAL-02</a></td>
+<td>Every in-scope operation that returns a u-v rectangle returns a
+valid one.</td>
+<td><a
+href="src/ur_val.rs"><code>ur_val::p_qval_02__constructors</code></a>,
+<a
+href="src/ur_val.rs"><code>ur_val::p_qval_02__set_operations</code></a>,
+<a
+href="src/ur_val.rs"><code>ur_val::p_qval_02__expanded</code></a></td>
+<td>every input in each operation’s domain</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CAVAL-02</a></td>
+<td>Every way to build a chord angle gives a canonical value: −1, a
+length in [0, 4], or +∞ (option B).</td>
+<td><a href="src/ca_val.rs"><code>ca_val::p_caval_02__*</code></a></td>
+<td>every input of the constructors, every canonical value, every pair
+of lengths</td>
+</tr>
+</tbody>
+</table>
+<h2 id="laws">Laws</h2>
+<p>Relations that must hold between operations, or between an
+operation’s arguments.</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-HIER-02</a></td>
+<td>A cell’s four children split its leaves into four consecutive runs
+in curve order, with no gap and no overlap.</td>
+<td><a href="src/hier.rs"><code>hier::p_hier_02</code></a></td>
+<td>every non-leaf cell</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-RANGE-04</a></td>
+<td><code>a.contains(b)</code> holds exactly when <code>b</code>’s id
+lies between <code>a.range_min()</code> and
+<code>a.range_max()</code>.</td>
+<td><a href="src/range.rs"><code>range::p_range_04</code></a></td>
+<td>every valid cell <code>a</code>, every valid or end
+<code>b</code></td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-RANGE-05</a></td>
+<td>Two cells are either nested or disjoint; they never partly
+overlap.</td>
+<td><a href="src/range.rs"><code>range::p_range_05</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-TRAV-07</a></td>
+<td>Moving <code>n</code> steps at once lands where <code>n</code>
+single <code>next()</code> or <code>prev()</code> steps would.</td>
+<td><a href="src/trav.rs"><code>trav::p_trav_07</code></a></td>
+<td>every valid cell, every step within the level</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-ANC-02</a></td>
+<td>The common ancestor level is symmetric, a cell’s with itself is its
+own level, and the two cells have the same ancestor at every level up to
+it.</td>
+<td><a href="src/anc.rs"><code>anc::p_anc_02</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-ENC-12</a></td>
+<td>Displaying a cell (<code>to_string()</code>) gives
+<code>to_debug_string()</code>.</td>
+<td>—</td>
+<td>not proven: a tool limit (formatting)</td>
+</tr>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-NBR-02</a></td>
+<td>Edge neighbours are mutual: a cell is an edge neighbour of each of
+its edge neighbours.</td>
+<td>—</td>
+<td>not proven: a tool limit (memory)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UNORM-03</a></td>
+<td>Normalising a normalised union changes nothing, so normalising twice
+is the same as once.</td>
+<td><a
+href="src/cu_norm.rs"><code>cu_norm::p_unorm_03__n*</code></a></td>
+<td>unions of up to 2 cells (2 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UNORM-04</a></td>
+<td>The order of the input cells does not change what
+<code>normalize</code> returns.</td>
+<td><a href="src/cu_norm.rs"><code>cu_norm::p_unorm_04__n2</code></a>
+(weekly)</td>
+<td>inputs of 2 cells</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UMEM-05</a></td>
+<td>The <code>Region</code> methods <code>contains_cell</code> and
+<code>intersects_cell</code> answer as the cell-id queries do on the
+cell’s id.</td>
+<td><a href="src/cu_mem.rs"><code>cu_mem::p_umem_05__n*</code></a></td>
+<td>valid unions of up to 3 cells (2 and 3 weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CCNT-03</a></td>
+<td>The generic <code>Region</code> laws hold for <code>Cell</code>:
+containing a cell implies intersecting it, and every cell a region
+contains is covered by its covering bound.</td>
+<td><a href="src/cl_cnt.rs"><code>cl_cnt::p_ccnt_03</code></a></td>
+<td>every pair of valid cells</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CEQ-01</a></td>
+<td>The generic equality laws hold for <code>Cell</code>: equality is an
+equivalence. Two cells are equal exactly when their identifiers
+are.</td>
+<td><a href="src/cl_eq.rs"><code>cl_eq::p_ceq_01</code></a></td>
+<td>every triple of valid cells</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CEQ-02</a></td>
+<td>Two cells built from the same identifier have identical fields,
+bounds included, so equal cells cannot differ in any field.</td>
+<td><a href="src/cl_eq.rs"><code>cl_eq::p_ceq_02</code></a>, <a
+href="src/cl_bnd.rs"><code>cl_bnd::p_ceq_02__l*</code></a></td>
+<td>every valid cell (bounds: levels 0–3, 4–10 weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IVAL-05</a></td>
+<td>The generic equality laws hold for the interval: equality is an
+equivalence on valid intervals. It is not bit identity:
+<code>[0, 0] == [−0, −0]</code>.</td>
+<td><a href="src/iv_val.rs"><code>iv_val::p_ival_05</code></a></td>
+<td>every triple of valid intervals</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IMEA-02</a></td>
+<td>Every non-empty interval has a non-negative length, positive unless
+it is a single point; the empty interval’s is −1 and the full one’s
+2π.</td>
+<td><a href="src/iv_mea.rs"><code>iv_mea::p_imea_02</code></a></td>
+<td>every valid interval</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IEXP-02</a></td>
+<td>Approximate equality is reflexive and symmetric for every error
+bound, and the default form uses 1e-15.</td>
+<td><a
+href="src/iv_exp.rs"><code>iv_exp::p_iexp_02_reflexive</code></a>, <a
+href="src/iv_exp.rs"><code>iv_exp::p_iexp_02_symmetric__*</code></a>, <a
+href="src/iv_exp.rs"><code>iv_exp::p_iexp_02_default</code></a></td>
+<td>every interval (reflexivity; symmetry and the default form time out
+at 60 minutes)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-RIV-02</a></td>
+<td>Equality of real intervals is an equivalence; every two empty
+intervals are equal, and otherwise the bounds are.</td>
+<td><a href="src/ri_val.rs"><code>ri_val::p_riv_02</code></a></td>
+<td>every three intervals</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-REXP-03</a></td>
+<td>Approximate equality of real intervals is reflexive and symmetric
+for every finite non-negative error bound, and the default form uses
+1e-15.</td>
+<td><a
+href="src/ri_exp.rs"><code>ri_exp::p_rexp_03_reflexive</code></a>, <a
+href="src/ri_exp.rs"><code>ri_exp::p_rexp_03_symmetric</code></a>, <a
+href="src/ri_exp.rs"><code>ri_exp::p_rexp_03_default</code></a></td>
+<td>every pair of finite intervals (symmetry weekly)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LEXP-02</a></td>
+<td>Approximate equality of rectangles is reflexive and symmetric.</td>
+<td><a
+href="src/rl_exp.rs"><code>rl_exp::p_lexp_02_reflexive</code></a>, <a
+href="src/rl_exp.rs"><code>rl_exp::p_lexp_02_symmetric</code></a></td>
+<td>every valid rectangle (reflexivity); the symmetry times out at 60
+minutes, a tool limit</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LEQ-01</a></td>
+<td>Equality of rectangles is an equivalence, and it is upstream’s:
+every two empty rectangles are equal, otherwise the bounds are.</td>
+<td><a href="src/rl_eq.rs"><code>rl_eq::p_leq_01</code></a></td>
+<td>every three valid rectangles</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-QEXP-03</a></td>
+<td>Approximate equality of u-v rectangles is reflexive and symmetric
+for every finite non-negative error bound, and is the product of the
+intervals’; the default uses 1e-15.</td>
+<td><a href="src/ur_exp.rs"><code>ur_exp::p_qexp_03__*</code></a></td>
+<td>every pair of finite rectangles (symmetry and the product
+weekly)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-QEQ-01</a></td>
+<td>Equality of u-v rectangles is an equivalence, and it is upstream’s:
+every two empty rectangles are equal, otherwise the bounds are.</td>
+<td><a href="src/ur_eq.rs"><code>ur_eq::p_qeq_01</code></a></td>
+<td>every three valid rectangles</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTVAL-03</a></td>
+<td>Equality of points without NaN is an equivalence
+(<code>(0, 0, 0) == (−0, −0, −0)</code>).</td>
+<td><a href="src/pt_val.rs"><code>pt_val::p_ptval_03</code></a></td>
+<td>every three triples without NaN</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTORD-02</a></td>
+<td>Without NaN, the order is total and its ties are exactly equality:
+the generic order laws.</td>
+<td><a href="src/pt_ord.rs"><code>pt_ord::p_ptord_02</code></a></td>
+<td>every three triples without NaN</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTORT-01</a></td>
+<td><code>ortho(−a)</code> is <code>−ortho(a)</code> as values,
+<code>reference_dir</code> is <code>ortho</code>, and <code>ortho</code>
+is upstream’s <code>S2::Ortho</code> (positive zeros where its cross
+product vanishes).</td>
+<td>—</td>
+<td>not proven: a tool limit (the checker’s <code>sqrt</code> is not a
+function); the C++ vectors check <code>ortho</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PTORT-03</a></td>
+<td><code>point_cross</code>’s sign laws hold as values wherever
+<code>(p + q) × (q − p)</code> is not zero; where it is (equal,
+antipodal, parallel or tiny points) the result is <code>ortho(p)</code>
+(K11, U-013).</td>
+<td><a href="src/pt_ort.rs"><code>pt_ort::p_ptort_03__*</code></a>
+(weekly)</td>
+<td>not proven: the weekly members time out at 60 minutes, and the
+<code>ortho</code> branch is a tool limit (the checker’s
+<code>sqrt</code>); tests pin it</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PTDST-02</a></td>
+<td>The distance and the stable angle are symmetric, bit for bit, in the
+default build.</td>
+<td>—</td>
+<td>not proven: a tool limit (<code>atan2</code>); the C++ vectors and a
+property test check it</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CAORD-01</a></td>
+<td>The chord angle’s order is a total order on all its values, the
+reals’ order.</td>
+<td><a href="src/ca_ord.rs"><code>ca_ord::p_caord_01</code></a></td>
+<td>every three canonical values</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CANBR-03</a></td>
+<td>The chord angle’s <code>successor</code> and
+<code>predecessor</code> undo each other.</td>
+<td><a href="src/ca_nbr.rs"><code>ca_nbr::p_canbr_03</code></a></td>
+<td>every canonical value</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-AGVAL-02</a></td>
+<td>Without NaN, the angle’s order is total and its ties are exactly
+equality.</td>
+<td><a href="src/ag_val.rs"><code>ag_val::p_agval_02</code></a></td>
+<td>every three angles without NaN</td>
+</tr>
+</tbody>
+</table>
+<h2 id="model-checks">Model checks</h2>
+<p>The other proofs compare the library with the models (and Verus
+proves restated copies), so these check the models and the copies
+themselves.</p>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="PROPERTIES.md">P-VAL-01</a></td>
+<td>In the cell model, building an id from a face, a level and a path,
+then splitting it, gives back the same parts.</td>
+<td><a href="src/val.rs"><code>val::p_val_01</code></a></td>
+<td>every well-formed face, level and path</td>
+</tr>
+<tr class="even">
+<td><a href="PROPERTIES.md">P-VAL-02</a></td>
+<td>In the cell model, every id that splits into parts is rebuilt
+exactly from them.</td>
+<td><a href="src/val.rs"><code>val::p_val_02</code></a></td>
+<td>every <code>u64</code></td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-PAR-01</a></td>
+<td>The wire-format model gives the C++ library’s answer on every row of
+the C++ coding vectors.</td>
+<td>test: <code>tests/wire_spec_vs_cpp.rs</code></td>
+<td>all 4,714 rows</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-IREL-05</a></td>
+<td>In the interval model, the real-arc relations are consistent with
+point membership.</td>
+<td><a href="src/iv_rel.rs"><code>iv_rel::p_irel_05</code></a></td>
+<td>every pair and point</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-IMEA-03</a></td>
+<td>In the interval model, the corner is the only valid, non-empty
+interval for which upstream’s length arithmetic gives a negative
+length.</td>
+<td><a href="src/iv_mea.rs"><code>iv_mea::p_imea_03</code></a></td>
+<td>every valid interval</td>
+</tr>
+</tbody>
+</table>
+<p>The cell and union models are tested the same way, against the C++
+vectors, by <code>tests/spec_vs_cpp.rs</code> and
+<code>tests/union_spec_vs_cpp.rs</code>, and the value types’ models
+(<code>cell_spec</code>, <code>arc_spec</code>, <code>real_spec</code>,
+<code>rect_spec</code>, <code>uv_spec</code> and
+<code>point_spec</code>) by
+<code>tests/values_spec_vs_cpp.rs</code>.</p>
+<h3 id="links-between-the-verus-copies-and-the-library">Links between
+the Verus copies and the library</h3>
+<p>Verus proves restated copies of the variable-length codecs
+(<code>deductive/</code>). Three links tie each copy to the library
+function it restates (<a
+href="deductive/README.md"><code>deductive/README.md</code></a>): -
+<strong>bounded agreement</strong>: Kani checks that the copy and the
+library give the same answer on every input within the bounds (<a
+href="src/cd_agree.rs"><code>cd_agree::a_*</code></a>); - <strong>tested
+agreement</strong>: the same on random inputs of up to 4 KiB and every
+C++ vector row (<code>deductive/tests/agree.rs</code>); - <strong>drift
+guard</strong>: a test fails when a mirrored library function, or a
+constant it uses, changes without its copy being reviewed
+(<code>deductive/tests/drift.rs</code>).</p>

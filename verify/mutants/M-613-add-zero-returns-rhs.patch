@@ -1,0 +1,17 @@
+Mutant: M-613
+Targets: P-CAARI-01
+Expect-Fail: ca_ari::p_caari_01
+Defect: `Add` returns the zero operand for a zero `rhs`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -439,7 +439,7 @@
+         let b2 = rhs.0;
+ 
+         if b2 == 0.0 {
+-            return self;
++            return rhs;
+         }
+         if a2 + b2 >= MAX_LENGTH2 {
+             return ChordAngle::STRAIGHT;

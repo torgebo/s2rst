@@ -1,0 +1,17 @@
+Mutant: M-309
+Targets: P-CBND-01
+Expect-Fail: cl_bnd::p_cbnd_01__l01
+Defect: from_cell_id() swaps i and j when it computes the u-v bounds
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -132,7 +132,7 @@
+             level: id.level(),
+             orientation: o,
+             id,
+-            uv: ij_level_to_bound_uv(i, j, id.level()),
++            uv: ij_level_to_bound_uv(j, i, id.level()),
+         }
+     }
+ 

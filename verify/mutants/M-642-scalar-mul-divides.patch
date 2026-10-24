@@ -1,0 +1,18 @@
+Mutant: M-642
+Targets: P-AGARI-01
+Expect-Fail: ag_ari::p_agari_01__mul
+Tier: slow
+Defect: `f64 * Angle` divides
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -264,7 +264,7 @@
+     type Output = Angle;
+     #[inline]
+     fn mul(self, rhs: Angle) -> Angle {
+-        Angle(self * rhs.0)
++        Angle(rhs.0 / self)
+     }
+ }
+ 

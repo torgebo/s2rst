@@ -1,0 +1,19 @@
+Mutant: M-522
+Targets: P-PTVAL-02
+Expect-Fail: pt_val::p_ptval_02__zero_length
+Defect: from_coords() normalises the zero vector instead of returning origin
+Tier: slow
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -79,9 +79,6 @@
+     /// - an infinite coordinate gives NaN (`∞ · 0`): `from_coords(f64::INFINITY, 0.0, 0.0)` is
+     ///   `(NaN, 0, 0)`.
+     pub fn from_coords(x: f64, y: f64, z: f64) -> Self {
+-        if x == 0.0 && y == 0.0 && z == 0.0 {
+-            return Self::origin();
+-        }
+         Point(Vector { x, y, z }.normalize())
+     }
+ 

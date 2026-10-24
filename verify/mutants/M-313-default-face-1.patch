@@ -1,0 +1,17 @@
+Mutant: M-313
+Targets: P-CID-03
+Expect-Fail: cl_id::p_cid_03
+Defect: Cell::default() is the face-1 cell
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -107,7 +107,7 @@
+ 
+ impl Default for Cell {
+     fn default() -> Self {
+-        Self::from_cell_id(CellId::from_face(0))
++        Self::from_cell_id(CellId::from_face(1))
+     }
+ }
+ 

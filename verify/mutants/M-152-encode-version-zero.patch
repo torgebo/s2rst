@@ -1,0 +1,18 @@
+Mutant: M-152
+Targets: P-UENC-01
+Expect-Fail: cu_enc::p_uenc_01__n0
+Defect: encode() writes version 0
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 537bd64..b10ee7b 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -271,7 +271,7 @@ impl S2Decode for Rect {
+ 
+ impl S2Encode for CellUnion {
+     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+-        w.write_all(&[ENCODING_VERSION])?;
++        w.write_all(&[0])?;
+         write_u64(w, self.len() as u64)?;
+         for &id in self {
+             id.encode(w)?;

@@ -1,0 +1,18 @@
+Mutant: M-337
+Targets: P-IEXP-02
+Expect-Fail: iv_exp::p_iexp_02_symmetric__xnoninv_ynoninv
+Defect: approx_eq_with() compares lengths without abs, so it is not symmetric
+Tier: slow
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -498,7 +498,7 @@
+         }
+         (ieee_remainder(y.lo - self.lo, 2.0 * PI)).abs() <= max_error
+             && (ieee_remainder(y.hi - self.hi, 2.0 * PI)).abs() <= max_error
+-            && (self.length() - y.length()).abs() <= 2.0 * max_error
++            && (self.length() - y.length()) <= 2.0 * max_error
+     }
+ 
+     /// Like [`approx_eq_with`](Interval::approx_eq_with) with a default

@@ -1,0 +1,17 @@
+Mutant: M-315
+Targets: P-CEQ-02
+Expect-Fail: cl_eq::p_ceq_02
+Defect: from_cell_id() keeps state, and corrupts the orientation of its second cell
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -127,6 +127,8 @@
+     #[inline]
+     pub fn from_cell_id(id: CellId) -> Self {
+         let (f, i, j, o) = id.to_face_ij_orientation();
++        static CALLS: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
++        let o = if CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) == 1 { o ^ 1 } else { o };
+         Cell {
+             face: f,
+             level: id.level(),

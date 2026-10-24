@@ -1,0 +1,17 @@
+Mutant: M-340
+Targets: P-IMEM-01
+Expect-Fail: iv_mem::p_imem_01
+Defect: arc_spec::member does not treat −π as π (a defect in the description)
+
+diff --git a/verify/src/arc_spec.rs b/verify/src/arc_spec.rs
+--- a/verify/src/arc_spec.rs
++++ b/verify/src/arc_spec.rs
+@@ -63,7 +63,7 @@
+ /// Whether the closed arc `x` contains the point `p` (in range).
+ #[must_use]
+ pub fn member(x: Interval, p: f64) -> bool {
+-    let q = canon(p);
++    let q = p;
+     if inverted(x) {
+         (q >= x.lo || q <= x.hi) && !empty(x)
+     } else {

@@ -1,0 +1,18 @@
+Mutant: M-153
+Targets: P-UENC-03
+Expect-Fail: cu_enc::p_uenc_03__b9
+Defect: decode() accepts encoding version 2
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 537bd64..472f715 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -338,7 +338,7 @@ impl From<CellUnionDecodeError> for io::Error {
+ impl S2Decode for CellUnion {
+     fn decode(r: &mut dyn Read) -> io::Result<Self> {
+         let version = read_u8(r)?;
+-        if version > ENCODING_VERSION {
++        if version > ENCODING_VERSION + 1 {
+             return Err(CellUnionDecodeError::Version(version).into());
+         }
+         let n = read_u64(r)?;

@@ -1,0 +1,17 @@
+Mutant: M-342
+Targets: P-IMEA-03
+Expect-Fail: iv_mea::p_imea_03
+Defect: arc_spec::is_corner names the two-ulp interval instead of the corner (a defect in the description)
+
+diff --git a/verify/src/arc_spec.rs b/verify/src/arc_spec.rs
+--- a/verify/src/arc_spec.rs
++++ b/verify/src/arc_spec.rs
+@@ -191,7 +191,7 @@
+ /// gets wrong (P-IMEA-03). The library deviates from upstream there and only there.
+ #[must_use]
+ pub fn is_corner(x: Interval) -> bool {
+-    x.lo == PI && x.hi.to_bits() == corner_hi().to_bits()
++    x.lo == PI && x.hi.to_bits() == corner_hi().to_bits() - 1
+ }
+ 
+ /// One ulp of π, `2^−51`: the corner's exact length.

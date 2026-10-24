@@ -1,0 +1,18 @@
+Mutant: M-053
+Targets: P-ENC-01, P-ENC-02
+Expect-Fail: enc::p_enc_01, enc::p_enc_02
+Defect: lookup-table mutant: POS_TO_IJ's canonical row swaps two entries, so the Hilbert lookup tables no longer match upstream
+
+diff --git a/core/src/s2/coords.rs b/core/src/s2/coords.rs
+index c6d7055..905a018 100644
+--- a/core/src/s2/coords.rs
++++ b/core/src/s2/coords.rs
+@@ -724,7 +724,7 @@ pub const IJ_TO_POS: [[u8; 4]; 4] = [
+ 
+ /// Maps `(orientation, pos)` to `(i,j)` index. Inverse of [`IJ_TO_POS`].
+ pub const POS_TO_IJ: [[u8; 4]; 4] = [
+-    [0, 1, 3, 2], // canonical order:    (0,0), (0,1), (1,1), (1,0)
++    [1, 0, 3, 2], // canonical order:    (0,0), (0,1), (1,1), (1,0)
+     [0, 2, 3, 1], // axes swapped:       (0,0), (1,0), (1,1), (0,1)
+     [3, 2, 0, 1], // bits inverted:      (1,1), (1,0), (0,0), (0,1)
+     [3, 1, 0, 2], // swapped & inverted: (1,1), (0,1), (0,0), (1,0)

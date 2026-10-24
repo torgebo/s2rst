@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <random>
+#include <string>
+#include <vector>
 
 #include "s2/s2cell_id.h"
 #include "s2/s2point.h"
@@ -31,6 +33,25 @@ S2CellId RandCell() {
 }
 
 unsigned long long Id(S2CellId c) { return static_cast<unsigned long long>(c.id()); }
+
+// The bytes of `s` as lowercase hex, so any text (NUL, ',', spaces, UTF-8) survives the CSV.
+std::string HexBytes(const std::string& s) {
+  static const char kDigits[] = "0123456789abcdef";
+  std::string out;
+  for (unsigned char c : s) {
+    out += kDigits[c >> 4];
+    out += kDigits[c & 15];
+  }
+  return out;
+}
+
+// A random string of 0..max_len pieces drawn from `alphabet` (pieces may be multi-byte).
+std::string RandString(const std::vector<std::string>& alphabet, int max_len) {
+  std::string s;
+  int n = static_cast<int>(rng() % (max_len + 1));
+  for (int k = 0; k < n; ++k) s += alphabet[rng() % alphabet.size()];
+  return s;
+}
 
 }  // namespace
 
@@ -96,6 +117,60 @@ int main() {
     int ci, cj, orientation;
     int face = c.ToFaceIJOrientation(&ci, &cj, &orientation);
     std::printf("%llu,%d,%d,%d,%d\n", Id(c), face, ci, cj, orientation);
+  }
+
+  // Sections below were appended for spec 001 (FR-015). They come after every older
+  // section, so the shared RNG stream, and therefore every older line, is unchanged.
+
+  // token (hex-encoded bytes) -> FromToken(token).id(). Any byte outside 0-9a-fA-F gives
+  // None (0); so does a token longer than 16 bytes.
+  std::printf("# CELLID_FROM_TOKEN\n");
+  {
+    std::vector<std::string> tokens = {
+        "", "X", "x", "0", "1", "+1", "-1", " 1", "1 ", "+", "+0", "+fffffffffffffff", "0x1",
+        "89c25", "89C25", std::string(16, 'f'), std::string(17, 'f'), "\xc3\xa9",
+        "\xe2\x82\xac" "1"};
+    for (int i = 0; i < 500; ++i) tokens.push_back(RandCell().ToToken());
+    const std::vector<std::string> alphabet = {
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", "A",
+        "B", "C", "D", "E", "F", "+", "-", "x", "X", " ", "/", std::string(1, '\0'),
+        "\xc3\xa9", "\xe2\x82\xac"};
+    for (int i = 0; i < 1000; ++i) tokens.push_back(RandString(alphabet, 17));
+    for (const std::string& t : tokens) {
+      std::printf("%s,%llu\n", HexBytes(t).c_str(), Id(S2CellId::FromToken(t)));
+    }
+  }
+
+  // debug string (hex-encoded bytes) -> FromDebugString(s).id(), 0 for None.
+  std::printf("# CELLID_FROM_DEBUG_STRING\n");
+  {
+    std::vector<std::string> strs = {
+        "0/", "5/", "6/0", "0/4", "0|0", "0/" + std::string(31, '0'), "", "/", "0"};
+    for (int i = 0; i < 500; ++i) strs.push_back(RandCell().ToString());
+    const std::vector<std::string> alphabet = {"0", "1", "2", "3", "4", "5",
+                                               "6", "7", "8", "9", "/"};
+    for (int i = 0; i < 1000; ++i) strs.push_back(RandString(alphabet, 33));
+    for (const std::string& s : strs) {
+      std::printf("%s,%llu\n", HexBytes(s).c_str(), Id(S2CellId::FromDebugString(s)));
+    }
+  }
+
+  // id -> ToString(), for invalid and valid ids (FR-016: an invalid id prints as
+  // "Invalid: " plus 16 zero-padded hex digits). ToString checks is_valid() before
+  // calling level(), so no input here reaches level()'s ABSL_ASSUME.
+  std::printf("# CELLID_TO_STRING\n");
+  {
+    std::vector<uint64_t> ids = {0, 2, 5, ~uint64_t{0}, uint64_t{1} << 61, uint64_t{1} << 62,
+                                 uint64_t{1} << 63};
+    for (int level = 0; level <= S2CellId::kMaxLevel; ++level) {
+      ids.push_back(S2CellId::End(level).id());
+    }
+    for (int i = 0; i < 1000; ++i) ids.push_back(rng());
+    for (int i = 0; i < 500; ++i) ids.push_back(RandCell().id());
+    for (uint64_t id : ids) {
+      std::printf("%llu,%s\n", static_cast<unsigned long long>(id),
+                  S2CellId(id).ToString().c_str());
+    }
   }
   return 0;
 }

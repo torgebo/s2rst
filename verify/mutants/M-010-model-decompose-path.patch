@@ -1,0 +1,18 @@
+Mutant: M-010
+Targets: P-VAL-01, P-VAL-02
+Expect-Fail: val::p_val_01, val::p_val_02
+Defect: model mutant: spec::decompose reads the path one bit too high (P-VAL-01/02 are properties of the reference model itself, so the defect is injected there)
+
+diff --git a/verify/src/spec.rs b/verify/src/spec.rs
+index 7bed23c..e1070c0 100644
+--- a/verify/src/spec.rs
++++ b/verify/src/spec.rs
+@@ -79,7 +79,7 @@ pub fn decompose(x: u64) -> Option<Decomposed> {
+                 return None;
+             }
+             let l = u32::from(level);
+-            let path = (x >> (61 - 2 * l)) & (pow4(l) - 1);
++            let path = (x >> (62 - 2 * l)) & (pow4(l) - 1);
+             return Some(Decomposed { face, level, path });
+         }
+         level += 1;

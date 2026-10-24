@@ -1,0 +1,17 @@
+Mutant: M-530
+Targets: P-PTARI-01
+Expect-Fail: pt_ari::p_ptari_01__sub
+Defect: subtraction adds
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -381,7 +381,7 @@
+     type Output = Point;
+     #[inline]
+     fn sub(self, rhs: Point) -> Point {
+-        Point(self.0 - rhs.0)
++        Point(self.0 + rhs.0)
+     }
+ }
+ 

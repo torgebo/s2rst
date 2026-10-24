@@ -1,0 +1,20 @@
+Mutant: M-050
+Targets: P-ENC-06
+Expect-Fail: enc::p_enc_06__b2
+Defect: the FR-015 defect again: from_token() accepts a leading '+' (the reverse of the fix)
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -720,7 +720,10 @@
+         // Every byte must be a hex digit, which rejects `X` (the token of `none`) and a leading
+         // `+` (which `u64::from_str_radix` would accept). At most 16 digits fit in a `u64`.
+         let mut n: u64 = 0;
+-        for b in token.bytes() {
++        for (k, b) in token.bytes().enumerate() {
++            if k == 0 && b == b'+' {
++                continue;
++            }
+             let Some(d) = char::from(b).to_digit(16) else {
+                 return CellId::none();
+             };

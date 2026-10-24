@@ -1,0 +1,19 @@
+Mutant: M-154
+Targets: P-UENC-02, P-UENC-03
+Expect-Fail: cu_enc::p_uenc_02__n1, cu_enc::p_uenc_03__b17
+Tier: slow
+Defect: decode() reads one id fewer than the count
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 537bd64..00821d9 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -346,7 +346,7 @@ impl S2Decode for CellUnion {
+             return Err(CellUnionDecodeError::TooManyCells(n).into());
+         }
+         let mut ids: Vec<CellId> = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
+-        for _ in 0..n {
++        for _ in 1..n {
+             let id = CellId::decode(r)?;
+             // A valid union: each cell's leaf range starts after the previous one ends.
+             if let Some(prev) = ids.last()

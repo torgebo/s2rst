@@ -1,0 +1,17 @@
+Mutant: M-515
+Targets: P-QSET-03
+Expect-Fail: ur_set::p_qset_03
+Defect: add_point() does not extend y
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -276,7 +276,7 @@
+     pub fn add_point(self, p: Point) -> Rect {
+         Rect {
+             x: self.x.add_point(p.x),
+-            y: self.y.add_point(p.y),
++            y: self.y,
+         }
+     }
+ 

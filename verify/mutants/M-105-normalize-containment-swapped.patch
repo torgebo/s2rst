@@ -1,0 +1,19 @@
+Mutant: M-105
+Targets: P-UNORM-01, P-UNORM-02
+Expect-Fail: cu_norm::p_unorm_01__n2, cu_norm::p_unorm_02__n2
+Tier: slow
+Defect: normalize() tests whether the new cell contains the previous one instead of the reverse, so it drops containers and keeps contained cells
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..a60161a 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -171,7 +171,7 @@ impl CellUnion {
+ 
+             // Check whether this cell is contained by the previous cell.
+             if let Some(&last) = output.last()
+-                && last.contains(ci)
++                && ci.contains(last)
+             {
+                 continue;
+             }

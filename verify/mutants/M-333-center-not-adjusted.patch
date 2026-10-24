@@ -1,0 +1,17 @@
+Mutant: M-333
+Targets: P-IMEA-04
+Expect-Fail: iv_mea::p_imea_04
+Defect: center() does not move an inverted interval's midpoint by π
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -146,7 +146,7 @@
+     /// intervals.
+     pub fn center(self) -> f64 {
+         let center = f64::midpoint(self.lo, self.hi);
+-        if !self.is_inverted() {
++        if self.lo == self.lo {
+             return center;
+         }
+         if center <= 0.0 {

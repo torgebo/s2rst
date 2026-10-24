@@ -1,0 +1,18 @@
+Mutant: M-215
+Targets: P-UV-01, P-VAR-01
+Expect-Fail: cd_uv::p_uv_01_enc__n16_zeros
+Defect: write_uvarint writes 128 as the single byte 0x80, a continuation byte with nothing after it
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 22fc49e..b489479 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -109,7 +109,7 @@ fn read_f64(r: &mut dyn Read) -> io::Result<f64> {
+ }
+ 
+ pub(crate) fn write_uvarint(w: &mut dyn Write, mut x: u64) -> io::Result<()> {
+-    while x >= 0x80 {
++    while x > 0x80 {
+         w.write_all(&[(x as u8) | 0x80])?;
+         x >>= 7;
+     }

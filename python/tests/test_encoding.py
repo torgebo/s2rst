@@ -40,6 +40,30 @@ def test_cell_union_roundtrip():
     assert s2rst.encode(cov2) == data
 
 
+def _raw_cell_union(ids):
+    """A hand-built S2CellUnion encoding: version 1, the count, then the raw ids."""
+    data = bytes([1]) + len(ids).to_bytes(8, "little")
+    for i in ids:
+        data += i.to_bytes(8, "little")
+    return data
+
+
+def test_decode_cell_union_rejects_unsorted():
+    # FR-017 (spec 002): ids that are not a valid union (here face 1, then face 0) are
+    # rejected, a documented deviation from C++, which accepts them.
+    data = _raw_cell_union([0x3000000000000000, 0x1000000000000000])
+    with pytest.raises(ValueError, match="not a valid cell union"):
+        s2rst.decode_cell_union(data)
+
+
+def test_decode_cell_union_keeps_four_siblings():
+    # FR-017: the ids are kept as encoded; four siblings are not merged into their parent.
+    children = s2rst.CellId.from_face(0).children()
+    cu = s2rst.decode_cell_union(_raw_cell_union([c.id for c in children]))
+    assert len(cu) == 4
+    assert cu.cell_ids() == list(children)
+
+
 def test_encode_rejects_unsupported():
     with pytest.raises(TypeError):
         s2rst.encode(42)

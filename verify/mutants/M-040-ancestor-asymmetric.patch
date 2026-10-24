@@ -1,0 +1,18 @@
+Mutant: M-040
+Targets: P-ANC-01, P-ANC-02
+Expect-Fail: anc::p_anc_01, anc::p_anc_02
+Defect: common_ancestor_level() ignores the other cell's lsb, so it is no longer symmetric
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..605cc7e 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -867,7 +867,7 @@ impl CellId {
+     /// is undefined behaviour, and Go returns level 30.
+     #[inline]
+     pub fn common_ancestor_level(self, other: CellId) -> Option<Level> {
+-        let diff_bits = (self.0 ^ other.0).max(self.lsb()).max(other.lsb());
++        let diff_bits = (self.0 ^ other.0).max(self.lsb());
+         let msb_pos = diff_bits.ilog2(); // bits::Len64(x) - 1
+         if msb_pos > 60 {
+             return None;

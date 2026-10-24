@@ -1,0 +1,17 @@
+Mutant: M-434
+Targets: P-LEQ-02
+Expect-Fail: rl_eq::p_leq_02
+Defect: rect_bound() returns the empty rectangle
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -676,7 +676,7 @@
+     /// Returns itself as the bounding rectangle.
+     #[inline]
+     pub fn rect_bound(self) -> Rect {
+-        self
++        Rect::empty()
+     }
+ 
+     /// Returns a small set of cells that cover this rectangle.

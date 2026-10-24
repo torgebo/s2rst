@@ -1,0 +1,17 @@
+Mutant: M-634
+Targets: P-AGCNV-01, P-AGCNV-02
+Expect-Fail: ag_cnv::p_agcnv_02__degrees
+Defect: `from_degrees` with 180/π
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -80,7 +80,7 @@
+     /// Creates an angle from a value in degrees.
+     #[inline]
+     pub fn from_degrees(degrees: f64) -> Self {
+-        Angle(degrees * (PI / 180.0))
++        Angle(degrees * (180.0 / PI))
+     }
+ 
+     /// Creates an angle from E5 representation (degrees × 10⁵).

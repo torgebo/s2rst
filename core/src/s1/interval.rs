@@ -61,6 +61,12 @@ pub struct Interval {
 impl Interval {
     /// Creates a new interval from endpoints. Both endpoints must be in
     /// \[-π, π\]. The value -π is normalized to π (except for full/empty).
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if an endpoint is outside \[-π, π\] or NaN. In release builds
+    /// the check is skipped and the returned interval is not valid, as in upstream, which
+    /// checks it with `ABSL_DCHECK`.
     pub fn new(lo: f64, hi: f64) -> Self {
         // Note: both checks use the *original* lo/hi values (matching C++
         // where the parameter names shadow nothing).
@@ -98,6 +104,11 @@ impl Interval {
 
     /// Returns the minimal interval containing the two given points.
     /// Both arguments must be in \[-π, π\].
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if a point is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
+    /// checks the same precondition with `ABSL_DCHECK`.
     pub fn from_point_pair(p1: f64, p2: f64) -> Self {
         debug_assert!(p1.abs() <= PI);
         debug_assert!(p2.abs() <= PI);
@@ -134,7 +145,7 @@ impl Interval {
     /// Returns the midpoint of the interval. Undefined for full and empty
     /// intervals.
     pub fn center(self) -> f64 {
-        let center = 0.5 * (self.lo + self.hi);
+        let center = f64::midpoint(self.lo, self.hi);
         if !self.is_inverted() {
             return center;
         }
@@ -146,14 +157,33 @@ impl Interval {
     }
 
     /// Returns the length of the interval. The length of an empty interval
-    /// is negative.
+    /// is negative (−1).
+    ///
+    /// # Deviation from upstream
+    ///
+    /// For the one-ulp interval across the seam, `[π, next_up(−π)]`, this returns its true
+    /// length, `2^−51` (one ulp of π). Upstream's `S1Interval::GetLength` computes `hi − lo`,
+    /// which rounds to exactly `−2π` there, adds `2π` and returns −1, the empty interval's
+    /// length, so expansion, approximate equality and a rectangle's area went wrong for it
+    /// (`UPSTREAM.md` U-007). Every other interval's length is upstream's, bit for bit: the
+    /// stable form is used only where upstream's arithmetic gives no positive length for a
+    /// non-empty interval, and the Kani proof P-IMEA-01 (`verify/src/iv_mea.rs`) shows that
+    /// this is that one interval.
     pub fn length(self) -> f64 {
         let length = self.hi - self.lo;
         if length >= 0.0 {
             return length;
         }
         let length = length + 2.0 * PI;
-        if length > 0.0 { length } else { -1.0 }
+        if length > 0.0 {
+            length
+        } else if self.is_empty() {
+            -1.0
+        } else {
+            // The one-ulp interval across the seam: `hi − lo` rounded to −2π. This form
+            // loses no bit (spec 004 FR-020).
+            (self.hi + PI) - (self.lo - PI)
+        }
     }
 
     /// Returns the complement of the interior of the interval.
@@ -185,6 +215,11 @@ impl Interval {
 
     /// Reports whether the interval contains the point `p`.
     /// Assumes `p` is in \[-π, π\].
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
+    /// checks the same precondition with `ABSL_DCHECK`.
     pub fn contains(self, p: f64) -> bool {
         debug_assert!(p.abs() <= PI);
         let p = if p == -PI { PI } else { p };
@@ -192,6 +227,11 @@ impl Interval {
     }
 
     /// Reports whether the interior of the interval contains the point `p`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
+    /// checks the same precondition with `ABSL_DCHECK`.
     pub fn interior_contains(self, p: f64) -> bool {
         debug_assert!(p.abs() <= PI);
         let p = if p == -PI { PI } else { p };
@@ -274,13 +314,16 @@ impl Interval {
             return positive_distance(y.hi, y_complement_center);
         }
         // The Hausdorff distance is realized by either two hi endpoints or two
-        // lo endpoints, whichever is farther apart.
-        let hi_hi = if Interval::new_checked(y.hi, y_complement_center).contains(self.hi) {
+        // lo endpoints, whichever is farther apart. The helper arcs go through the
+        // normalising constructor, as upstream's `S1Interval(lo, hi)` does
+        // (s1interval.cc:155–158): the complement's centre can be exactly -π, for a
+        // short `y` near 0, and `new_checked` would keep that invalid bound (D-005).
+        let hi_hi = if Interval::new(y.hi, y_complement_center).contains(self.hi) {
             positive_distance(y.hi, self.hi)
         } else {
             0.0
         };
-        let lo_lo = if Interval::new_checked(y_complement_center, y.lo).contains(self.lo) {
+        let lo_lo = if Interval::new(y_complement_center, y.lo).contains(self.lo) {
             positive_distance(self.lo, y.lo)
         } else {
             0.0
@@ -290,6 +333,11 @@ impl Interval {
     }
 
     /// Returns the interval expanded to contain the given point `p`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
+    /// checks the same precondition with `ABSL_DCHECK`.
     pub fn add_point(self, p: f64) -> Interval {
         debug_assert!(p.abs() <= PI);
         let p = if p == -PI { PI } else { p };
@@ -308,6 +356,12 @@ impl Interval {
 
     /// Returns the closest point in the interval to the given point `p`.
     /// The interval must be non-empty.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the interval is empty, or if `p` is outside \[-π, π\] or
+    /// NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
+    /// checks the same precondition with `ABSL_DCHECK`.
     pub fn project(self, p: f64) -> f64 {
         debug_assert!(!self.is_empty());
         debug_assert!(p.abs() <= PI);
@@ -326,6 +380,28 @@ impl Interval {
     /// interval may be empty or full. Any expansion (positive or negative) of
     /// a full interval remains full, and any expansion of an empty interval
     /// remains empty.
+    ///
+    /// Shrinking gives an interval this one contains, and growing one that contains this one.
+    ///
+    /// # Deviation from upstream
+    ///
+    /// Upstream returns the empty or full interval only when the new length is within 2·ε of
+    /// it, to allow for rounding in the two bounds. Rounding the bounds and reducing them
+    /// across the seam can exceed that allowance, and then the bounds cross. Shrinking an
+    /// interval to almost nothing then gives almost the full circle: upstream shrinks
+    /// [−0.4669189453124994, −2.7499821821795862] by 2.0000610351562496 to
+    /// [1.5331420898437502, 1.53314208984375], whose length is 2π (U-011). Where upstream's
+    /// result is not contained in this interval (shrinking), s2rst returns the empty interval,
+    /// and where it does not contain this interval (growing), the full one. Every other result
+    /// is upstream's, bit for bit (spec 004 FR-023). No growing case is known; that half is a
+    /// guard.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `margin` is NaN (through [`Interval::new`]'s check). In
+    /// release builds a NaN margin gives an interval that is not valid, as in upstream, whose
+    /// constructor checks validity with `ABSL_DCHECK`. Every other margin, including the
+    /// infinities, is accepted.
     pub fn expanded(self, margin: f64) -> Interval {
         if margin >= 0.0 {
             if self.is_empty() {
@@ -352,6 +428,13 @@ impl Interval {
         );
         if result.lo <= -PI {
             result.lo = PI;
+        }
+        // The bounds crossed (U-011): the result is within rounding of full or empty.
+        if margin >= 0.0 && !result.contains_interval(self) {
+            return Interval::full();
+        }
+        if margin < 0.0 && !self.contains_interval(result) {
+            return Interval::empty();
         }
         result
     }
@@ -985,6 +1068,65 @@ mod tests {
         assert_eq!(quad412().expanded(-FRAC_PI_2), quad1());
     }
 
+    /// Shrinking to almost nothing, where upstream's bounds cross and give almost the full
+    /// circle (U-011, spec 004 FR-023): Kani's counterexample, then three found by searching
+    /// the margins just past upstream's emptiness test.
+    const CROSSING: [(u64, u64, u64); 4] = [
+        (
+            0xBFDD_E1FF_FFFF_FFF5,
+            0xC005_FFF6_A888_5A30,
+            0xC000_001F_FFFF_FFFF,
+        ),
+        (
+            0xBFD4_3FFF_FFFF_FFF5,
+            0xC003_36FE_9A4B_5060,
+            0xC000_CA7C_071E_84E7,
+        ),
+        (
+            0xBFCB_909E_0000_0009,
+            0xC001_FFC8_0000_000E,
+            0xC000_FE9C_4444_2D11,
+        ),
+        (
+            0x4003_707C_24BB_E916,
+            0x3FCB_5C00_0000_0009,
+            0xC000_449D_41E6_388D,
+        ),
+    ];
+
+    #[test]
+    fn test_expanded_crossing_bounds_give_empty() {
+        for (lo, hi, m) in CROSSING {
+            let x = Interval::new(f64::from_bits(lo), f64::from_bits(hi));
+            let m = f64::from_bits(m);
+            // Upstream's arithmetic, which gives an inverted interval of length 2π.
+            let upstream = Interval::new(
+                ieee_remainder(x.lo - m, 2.0 * PI),
+                ieee_remainder(x.hi + m, 2.0 * PI),
+            );
+            assert!(
+                upstream.is_inverted() && !x.contains_interval(upstream),
+                "{x:?} {m:?}"
+            );
+            assert_eq!(x.expanded(m), empty(), "{x:?} {m:?}");
+        }
+    }
+
+    #[test]
+    fn test_expanded_keeps_containment_near_empty_and_full() {
+        for (lo, hi, _) in CROSSING {
+            let x = Interval::new(f64::from_bits(lo), f64::from_bits(hi));
+            let mut shrink = -x.length() / 2.0;
+            let mut grow = (2.0 * PI - x.length()) / 2.0;
+            for _ in 0..64 {
+                assert!(x.contains_interval(x.expanded(shrink)), "{x:?} {shrink:?}");
+                assert!(x.expanded(grow).contains_interval(x), "{x:?} {grow:?}");
+                shrink = shrink.next_up();
+                grow = grow.next_down();
+            }
+        }
+    }
+
     #[test]
     fn test_approx_equals() {
         let lo = 4.0 * f64::EPSILON;
@@ -1259,3 +1401,7 @@ mod quickcheck_tests {
         back == back2
     }
 }
+
+#[cfg(test)]
+#[path = "interval_tests.rs"]
+mod interval_tests;

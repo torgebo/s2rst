@@ -1,0 +1,20 @@
+Mutant: M-612
+Targets: P-CAARI-01
+Expect-Fail: ca_ari::p_caari_01
+Defect: `Add` without its `STRAIGHT` branch
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -441,10 +441,7 @@
+         if b2 == 0.0 {
+             return self;
+         }
+-        if a2 + b2 >= MAX_LENGTH2 {
+-            return ChordAngle::STRAIGHT;
+-        }
+-
++        
+         // Let a, b be the (non-squared) chord lengths.
+         // Let A, B be the corresponding half-angles (a = 2 sin(A), etc.).
+         // Then: c = a + b = 2 sin(A+B)

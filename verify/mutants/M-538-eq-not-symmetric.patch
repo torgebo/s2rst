@@ -1,0 +1,25 @@
+Mutant: M-538
+Targets: P-PTVAL-03
+Expect-Fail: pt_val::p_ptval_03
+Defect: equality compares x with <=, so it is not symmetric
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -48,9 +48,15 @@
+ /// assert!((dist.radians() - std::f64::consts::FRAC_PI_2).abs() < 1e-15);
+ /// ```
+ #[must_use]
+-#[derive(Clone, Copy, Debug, Default, PartialEq)]
++#[derive(Clone, Copy, Debug, Default)]
+ #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+ pub struct Point(pub Vector);
++
++impl PartialEq for Point {
++    fn eq(&self, other: &Self) -> bool {
++        self.0.x <= other.0.x && self.0.y == other.0.y && self.0.z == other.0.z
++    }
++}
+ 
+ impl Point {
+     /// Creates a new `Point` from a vector. The vector is **not** normalized.

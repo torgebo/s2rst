@@ -1,0 +1,17 @@
+Mutant: M-312
+Targets: P-CID-01
+Expect-Fail: cl_id::p_cid_01
+Defect: from_cell_id() stores the orientation with its swap bit flipped
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -130,7 +130,7 @@
+         Cell {
+             face: f,
+             level: id.level(),
+-            orientation: o,
++            orientation: o ^ 1,
+             id,
+             uv: ij_level_to_bound_uv(i, j, id.level()),
+         }

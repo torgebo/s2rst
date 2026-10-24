@@ -1,0 +1,18 @@
+Mutant: M-208
+Targets: P-PV-02
+Expect-Fail: cd_pv::p_pv_02__b1
+Defect: decode_s2point_vector reads the format tag from 2 bits, so tag 4 decodes as uncompressed
+
+diff --git a/core/src/s2/encoded_s2point_vector.rs b/core/src/s2/encoded_s2point_vector.rs
+index b07c046..594128c 100644
+--- a/core/src/s2/encoded_s2point_vector.rs
++++ b/core/src/s2/encoded_s2point_vector.rs
+@@ -148,7 +148,7 @@ pub fn decode_s2point_vector(r: &mut dyn Read) -> io::Result<Vec<Point>> {
+     // Peek at the first byte to determine the format.
+     let mut first_byte = [0u8; 1];
+     r.read_exact(&mut first_byte)?;
+-    let format = first_byte[0] & ((1 << ENCODING_FORMAT_BITS) - 1);
++    let format = first_byte[0] & ((1 << 2) - 1);
+     match format {
+         0 => {
+             // UNCOMPRESSED: the first byte is the start of a varint.

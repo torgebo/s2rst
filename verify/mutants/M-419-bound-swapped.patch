@@ -1,0 +1,17 @@
+Mutant: M-419
+Targets: P-RIV-03
+Expect-Fail: ri_val::p_riv_03
+Defect: bound(Lo) returns the high bound
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -363,7 +363,7 @@
+     /// Returns the lower or upper endpoint of the interval.
+     pub fn bound(self, i: Endpoint) -> f64 {
+         match i {
+-            Endpoint::Lo => self.lo,
++            Endpoint::Lo => self.hi,
+             Endpoint::Hi => self.hi,
+         }
+     }

@@ -1,0 +1,17 @@
+Mutant: M-513
+Targets: P-QSET-01
+Expect-Fail: ur_set::p_qset_01
+Defect: union() keeps this rectangle's x-interval
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -332,7 +332,7 @@
+     /// and `other`.
+     pub fn union(self, other: Rect) -> Rect {
+         Rect {
+-            x: self.x.union(other.x),
++            x: self.x,
+             y: self.y.union(other.y),
+         }
+     }

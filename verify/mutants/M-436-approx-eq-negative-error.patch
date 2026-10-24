@@ -1,0 +1,17 @@
+Mutant: M-436
+Targets: P-LEXP-02
+Expect-Fail: rl_exp::p_lexp_02_reflexive
+Defect: approx_eq() uses a negative latitude error, so no rectangle equals itself
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -850,7 +850,7 @@
+     /// Reports whether the latitude and longitude intervals of the two
+     /// rectangles are the same up to a small tolerance.
+     pub fn approx_eq(self, other: Rect) -> bool {
+-        self.lat.approx_eq_with(other.lat, 1e-15) && self.lng.approx_eq_with(other.lng, 1e-15)
++        self.lat.approx_eq_with(other.lat, -1.0) && self.lng.approx_eq_with(other.lng, 1e-15)
+     }
+ }
+ 

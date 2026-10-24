@@ -1214,7 +1214,7 @@ mod tests {
 
         // Without region: closest is p_out at (0,0) with data=1.
         let results_no_region = query.find_closest_points(&mut target);
-        assert!(results_no_region.len() == 3);
+        assert_eq!(results_no_region.len(), 3);
         assert_eq!(results_no_region[0].data, 1);
 
         // With region: p_out is excluded, closest should be p_in with data=0.

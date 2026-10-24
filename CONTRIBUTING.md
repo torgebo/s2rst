@@ -86,6 +86,32 @@ Integration-style tests live under `core/tests/` (e.g.
 Python tests run under `pytest` (`python/tests/`); wasm tests are
 `wasm-bindgen` tests run in Node via `wasm-pack`.
 
+### Formal verification
+
+`verify/` holds Kani proofs of `CellId`, `CellUnion`, the binary decoding layer and the value
+types `Cell`, `s1::Interval`, `r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`,
+`s1::ChordAngle` and `s1::Angle`, and `verify/deductive/` Verus proofs of the decoding layer's
+variable-length codecs (see
+[`verify/README.md`](verify/README.md); what they guarantee, by kind, is in
+[`verify/PROPERTIES_BY_KIND.md`](verify/PROPERTIES_BY_KIND.md)). They need their own toolchains and are not part of
+`make test`; CI runs them when the verified code changes. Before changing a decoder or an
+encoder in `core/src/s2/`, run `make verify-decoding` (Kani 0.68.0) and, for the
+variable-length codecs, `make verify-deductive` (Verus 0.2026.09.20.aef82ed). A change to a
+function that `verify/deductive/mirrors.toml` lists fails the drift guard until its restated
+copy in `verify/deductive/src/` has been reviewed against it (and updated and re-proved if
+the behaviour changed); then record the new fingerprint with `make verify-deductive-bless`.
+Before changing `core/src/s2/cell.rs`, `core/src/s2/region.rs`, `core/src/s1/interval.rs`,
+`core/src/r1/interval.rs`, `core/src/s2/rect.rs`, `core/src/s2/latlng.rs`,
+`core/src/r2/rect.rs`, `core/src/s2/point.rs`, `core/src/r3/vector.rs`, the scaling in
+`core/src/s2/edge_crossings.rs`, `core/src/s1/chord_angle.rs` or `core/src/s1/angle.rs`, run
+`make verify-values`; `s1::Interval::length` deviates
+from upstream at exactly one interval, and its proof (P-IMEA-01) fails if a change widens
+that.
+
+A change under `verify/` updates its records in the same change: the suite's `INVENTORY.md`
+and `PROPERTIES.md`, `verify/PROPERTIES_BY_KIND.md` and the rendered `.html` copies, and
+[`VERIFIED_TYPES.md`](VERIFIED_TYPES.md).
+
 ## Code style and lints
 
 - **Rust formatting:** `cargo fmt`. CI checks it with `make fmt-check`.
@@ -96,6 +122,11 @@ Python tests run under `pytest` (`python/tests/`); wasm tests are
   lint genuinely doesn't fit, prefer adjusting the shared config over scattering
   `#[allow]`s — and note that `allow_attributes_without_reason` is on, so any
   `#[allow]` needs a `reason = "…"`.
+- **Allocation:** when a collection's final size is known up front from trusted
+  data, allocate it once at that size (`Vec::with_capacity`, a fixed-size array)
+  instead of letting it grow. Never reserve from a size read from untrusted input,
+  such as a decoded count: those collections grow on demand (see the
+  [constitution](.specify/memory/constitution.md), Technical Constraints).
 - **Docs:** public items are documented (`missing_docs` is a warning and
   `make doc` denies warnings).
 - **Python:** [`ruff`](https://docs.astral.sh/ruff/) for lint and format

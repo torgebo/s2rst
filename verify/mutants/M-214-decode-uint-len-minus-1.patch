@@ -1,0 +1,18 @@
+Mutant: M-214
+Targets: P-FW-03, P-FW-04
+Expect-Fail: cd_fw::p_fw_03__b8, cd_fw::p_fw_04
+Defect: decode_uint_with_length reads one byte fewer than length
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..407d397 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -67,7 +67,7 @@ pub fn decode_uint_with_length(r: &mut dyn Read, length: usize) -> io::Result<u6
+         return Ok(0);
+     }
+     let mut buf = [0u8; 8];
+-    r.read_exact(&mut buf[..length])?;
++    r.read_exact(&mut buf[..length - 1])?;
+     Ok(u64::from_le_bytes(buf))
+ }
+ 

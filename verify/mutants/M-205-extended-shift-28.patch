@@ -1,0 +1,18 @@
+Mutant: M-205
+Targets: P-CV-02
+Expect-Fail: cd_cv::p_cv_02__b4
+Defect: decode_base_shift adds 28 instead of 29 to the extended shift byte
+
+diff --git a/core/src/s2/encoded_s2cell_id_vector.rs b/core/src/s2/encoded_s2cell_id_vector.rs
+index d6de035..5c6b7f4 100644
+--- a/core/src/s2/encoded_s2cell_id_vector.rs
++++ b/core/src/s2/encoded_s2cell_id_vector.rs
+@@ -154,7 +154,7 @@ fn decode_base_shift(r: &mut dyn Read) -> io::Result<(u64, u32)> {
+ 
+     if shift_code == 31 {
+         r.read_exact(&mut buf)?;
+-        shift_code = 29 + i32::from(buf[0]);
++        shift_code = 28 + i32::from(buf[0]);
+         if shift_code > 56 {
+             return Err(io::Error::new(
+                 io::ErrorKind::InvalidData,

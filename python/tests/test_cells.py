@@ -284,6 +284,14 @@ class TestCellUnion:
         assert all_faces.contains_union(one_face)
         assert not one_face.contains_union(all_faces)
 
+    def test_from_range_covers_exactly_the_range(self):
+        # D-002: five leaves are a level-29 cell plus one leaf, as C++ FromBeginEnd gives.
+        begin = s2rst.CellId.from_face(1).child_begin_at_level(30)
+        end = begin.advance(5)
+        cu = s2rst.CellUnion.from_range(begin, end)
+        assert cu.leaf_cells_covered() == 5
+        assert [c.level() for c in cu.cell_ids()] == [29, 30]
+
     def test_normalize(self):
         face0 = s2rst.CellId.from_face(0)
         children = face0.children()

@@ -526,7 +526,8 @@ impl ShapeIndex {
         if tracker.shape_ids.is_empty() {
             return;
         }
-        let skipped = CellUnion::from_range(begin, end);
+        // C++ MutableS2ShapeIndex::SkipCellRange: the cells of FromBeginEnd(begin, end).
+        let skipped = CellUnion::from_begin_end(begin, end);
         for &cell_id in skipped.cell_ids() {
             let mut pcell = PaddedCell::from_cell_id(cell_id, CELL_PADDING);
             let empty_face_edges: Vec<FaceEdge> = Vec::new();
@@ -1878,3 +1879,7 @@ mod tests {
         assert!(count > 0, "built index should have cells");
     }
 }
+
+#[cfg(test)]
+#[path = "shape_index_tests.rs"]
+mod shape_index_tests;

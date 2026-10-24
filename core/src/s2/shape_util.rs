@@ -746,7 +746,7 @@ pub fn sort_edges_ccw(origin: Point, first: Edge, data: &mut [Edge]) {
     } else {
         first.v0
     };
-    debug_assert!(first_vertex != origin);
+    debug_assert_ne!(first_vertex, origin);
 
     data.sort_unstable_by(|a, b| {
         debug_assert!(a.v0 == origin || a.v1 == origin);

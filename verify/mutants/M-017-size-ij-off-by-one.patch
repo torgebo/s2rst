@@ -1,0 +1,18 @@
+Mutant: M-017
+Targets: P-VAL-08
+Expect-Fail: val::p_val_08
+Defect: size_ij() returns one less than the edge length
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..7c7443b 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -966,7 +966,7 @@ pub fn lsb_for_level(level: impl Into<Level>) -> u64 {
+ /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
+ #[inline]
+ pub fn size_ij(level: impl Into<Level>) -> i32 {
+-    1 << (MAX_CELL_LEVEL - level.into().as_u8())
++    (1 << (MAX_CELL_LEVEL - level.into().as_u8())) - 1
+ }
+ 
+ /// Returns a leaf cell given its cube face and (i, j) coordinates.

@@ -11,6 +11,39 @@ use crate::point::Point;
 #[wasm_bindgen]
 pub struct CellUnion(pub(crate) s2rst::s2::CellUnion);
 
+/// Checks a leaf-cell range against C++ `S2CellUnion::FromBeginEnd`'s `DCHECK`s: both ends
+/// are leaf cells (either may also be the end of the leaves, when `end_allowed`) and
+/// `lo <= hi`. The core checks them only in debug builds, as C++ does; in release builds an
+/// invalid id can make it loop forever, so a bad call throws here instead.
+fn check_leaf_range(
+    lo: s2rst::s2::CellId,
+    hi: s2rst::s2::CellId,
+    names: (&str, &str),
+    end_allowed: bool,
+) -> Result<(), JsValue> {
+    let leaf_end = s2rst::s2::CellId::end(s2rst::s2::Level::MAX);
+    let is_leaf = |id: s2rst::s2::CellId| id.is_valid() && id.is_leaf();
+    if !is_leaf(lo) && !(end_allowed && lo == leaf_end) {
+        return Err(crate::error::js_err(format!(
+            "{} must be a leaf cell",
+            names.0
+        )));
+    }
+    if !is_leaf(hi) && !(end_allowed && hi == leaf_end) {
+        return Err(crate::error::js_err(format!(
+            "{} must be a leaf cell",
+            names.1
+        )));
+    }
+    if lo > hi {
+        return Err(crate::error::js_err(format!(
+            "{} must not be after {}",
+            names.0, names.1
+        )));
+    }
+    Ok(())
+}
+
 impl Default for CellUnion {
     fn default() -> Self {
         Self::new()
@@ -32,22 +65,32 @@ impl CellUnion {
         CellUnion(s2rst::s2::CellUnion::from_cell_ids(inner))
     }
 
-    /// Normalized union covering the leaf-cell range `[begin, end)`.
+    /// Normalized union covering the leaf-cell range `[begin, end)`. Throws unless `begin`
+    /// and `end` are leaf cells (either may also be the end of the leaves) and
+    /// `begin <= end`. Deprecated: the same as `fromBeginEnd`.
     #[wasm_bindgen(js_name = "fromRange")]
-    pub fn from_range(begin: &CellId, end: &CellId) -> CellUnion {
-        CellUnion(s2rst::s2::CellUnion::from_range(begin.0, end.0))
+    pub fn from_range(begin: &CellId, end: &CellId) -> Result<CellUnion, JsValue> {
+        Self::from_begin_end(begin, end)
     }
 
-    /// Union covering the inclusive leaf-cell range `[min, max]`.
+    /// Union covering the inclusive leaf-cell range `[min, max]`. Throws unless `min_id` and
+    /// `max_id` are leaf cells and `min_id <= max_id`.
     #[wasm_bindgen(js_name = "fromMinMax")]
-    pub fn from_min_max(min_id: &CellId, max_id: &CellId) -> CellUnion {
-        CellUnion(s2rst::s2::CellUnion::from_min_max(min_id.0, max_id.0))
+    pub fn from_min_max(min_id: &CellId, max_id: &CellId) -> Result<CellUnion, JsValue> {
+        check_leaf_range(min_id.0, max_id.0, ("min_id", "max_id"), false)?;
+        Ok(CellUnion(s2rst::s2::CellUnion::from_min_max(
+            min_id.0, max_id.0,
+        )))
     }
 
-    /// Union covering the leaf-cell range `[begin, end)`.
+    /// Union covering the leaf-cell range `[begin, end)`. Throws unless `begin` and `end` are
+    /// leaf cells (either may also be the end of the leaves) and `begin <= end`.
     #[wasm_bindgen(js_name = "fromBeginEnd")]
-    pub fn from_begin_end(begin: &CellId, end: &CellId) -> CellUnion {
-        CellUnion(s2rst::s2::CellUnion::from_begin_end(begin.0, end.0))
+    pub fn from_begin_end(begin: &CellId, end: &CellId) -> Result<CellUnion, JsValue> {
+        check_leaf_range(begin.0, end.0, ("begin", "end"), true)?;
+        Ok(CellUnion(s2rst::s2::CellUnion::from_begin_end(
+            begin.0, end.0,
+        )))
     }
 
     /// Create from token strings (normalizes).
@@ -188,7 +231,9 @@ impl CellUnion {
         buf
     }
 
-    /// Decode from the S2 binary format. Throws on malformed data.
+    /// Decode from the S2 binary format, keeping the cells as encoded (not normalized).
+    /// Throws on malformed data, or cells that are not a valid union (an invalid cell, or
+    /// cells unsorted or overlapping).
     pub fn decode(bytes: &[u8]) -> Result<CellUnion, JsValue> {
         use s2rst::s2::encoding::S2Decode;
         let mut cur = std::io::Cursor::new(bytes);

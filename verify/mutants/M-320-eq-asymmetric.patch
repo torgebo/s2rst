@@ -1,0 +1,17 @@
+Mutant: M-320
+Targets: P-IVAL-05, P-IVAL-04
+Expect-Fail: iv_val::p_ival_05
+Defect: interval equality compares the high bounds with <=
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -535,7 +535,7 @@
+ 
+ impl PartialEq for Interval {
+     fn eq(&self, other: &Self) -> bool {
+-        self.lo == other.lo && self.hi == other.hi
++        self.lo == other.lo && self.hi <= other.hi
+     }
+ }
+ 

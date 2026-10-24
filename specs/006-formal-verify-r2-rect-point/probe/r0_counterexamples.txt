@@ -1,0 +1,151 @@
+# R0 run, 2026-10-14: the concrete playback of each failing harness (run-verify, filtered).
+---- counterexample for r0::r0_pt_distance_symmetric (concrete playback) ----
+Concrete playback unit test for `r0::r0_pt_distance_symmetric`:
+```
+/// Test generated for harness `r0::r0_pt_distance_symmetric`
+///
+/// Check for `unsupported_construct`: "call to foreign "C" function `atan2` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423"
+#[test]
+fn kani_concrete_playback_r0_pt_distance_symmetric_10359981724810317947() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // -1.491668e-154
+        vec![255, 255, 255, 255, 255, 255, 255, 159],
+        // -1.491668e-154
+        vec![255, 255, 255, 255, 255, 255, 255, 159],
+        // -1.491668e-154
+        vec![255, 255, 255, 255, 255, 255, 255, 159],
+        // -1.491668e-154
+        vec![255, 255, 255, 255, 255, 255, 255, 159],
+        // -1.491668e-154
+        vec![255, 255, 255, 255, 255, 255, 255, 159],
+        // 1.491668e-154
+        vec![255, 255, 255, 255, 255, 255, 255, 31],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_pt_distance_symmetric);
+}
+```
+Failed Checks: call to foreign "C" function `atan2` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423
+ File: "/home/runner/.rustup/toolchains/nightly-2026-08-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/cmath.rs", line 11, in std::f64::<impl f64>::atan2
+---- end counterexample for r0::r0_pt_distance_symmetric ----
+---- counterexample for r0::r0_pt_ensure_normalizable_library (concrete playback) ----
+Concrete playback unit test for `r0::r0_pt_ensure_normalizable_library`:
+```
+/// Test generated for harness `r0::r0_pt_ensure_normalizable_library`
+///
+/// Check for `assertion`: "assertion failed: p.ensure_normalizable().is_normalizable()"
+#[test]
+fn kani_concrete_playback_r0_pt_ensure_normalizable_library_8713850933509676543() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // -4.172013e-309
+        vec![1, 0, 0, 0, 0, 0, 3, 128],
+        // -4.172013e-309
+        vec![1, 0, 0, 0, 0, 0, 3, 128],
+        // -4.172013e-309
+        vec![1, 0, 0, 0, 0, 0, 3, 128],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_pt_ensure_normalizable_library);
+}
+```
+Failed Checks: assertion failed: p.ensure_normalizable().is_normalizable()
+ File: "specs/006-formal-verify-r2-rect-point/probe/r0_harnesses.rs", line 241, in r0::r0_pt_ensure_normalizable_library
+Failed Checks: NaN on division
+ File: "core/src/s2/point.rs", line 235, in s2rst::s2::Point::ensure_normalizable
+---- end counterexample for r0::r0_pt_ensure_normalizable_library ----
+---- counterexample for r0::r0_pt_from_coords_finite (concrete playback) ----
+Concrete playback unit test for `r0::r0_pt_from_coords_finite`:
+```
+/// Test generated for harness `r0::r0_pt_from_coords_finite`
+///
+/// Check for `NaN`: "NaN on division"
+#[test]
+fn kani_concrete_playback_r0_pt_from_coords_finite_12083193729498499521() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+        // -2.681562e+154
+        vec![255, 255, 255, 255, 255, 255, 255, 223],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_pt_from_coords_finite);
+}
+```
+Failed Checks: NaN on division
+ File: "core/src/r3/vector.rs", line 151, in s2rst::r3::Vector::normalize
+---- end counterexample for r0::r0_pt_from_coords_finite ----
+---- counterexample for r0::r0_pt_from_coords_infinite (concrete playback) ----
+Concrete playback unit test for `r0::r0_pt_from_coords_infinite`:
+```
+/// Test generated for harness `r0::r0_pt_from_coords_infinite`
+///
+/// Check for `NaN`: "NaN on division"
+#[test]
+fn kani_concrete_playback_r0_pt_from_coords_infinite_15312187717034711871() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // -2
+        vec![255, 255, 255, 255, 255, 255, 255, 191],
+        // -2.681562e+154
+        vec![255, 255, 255, 255, 255, 255, 255, 223],
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_pt_from_coords_infinite);
+}
+```
+Failed Checks: NaN on division
+ File: "core/src/r3/vector.rs", line 151, in s2rst::r3::Vector::normalize
+Failed Checks: NaN on multiplication
+ File: "core/src/r3/vector.rs", line 340, in <s2rst::r3::Vector as std::ops::Mul<f64>>::mul
+Failed Checks: NaN on multiplication
+ File: "core/src/r3/vector.rs", line 341, in <s2rst::r3::Vector as std::ops::Mul<f64>>::mul
+---- end counterexample for r0::r0_pt_from_coords_infinite ----
+---- counterexample for r0::r0_pt_ortho_odd (concrete playback) ----
+Concrete playback unit test for `r0::r0_pt_ortho_odd`:
+```
+/// Test generated for harness `r0::r0_pt_ortho_odd`
+///
+/// Check for `assertion`: "assertion failed: bits(ortho(-a)) == bits(-ortho(a))"
+#[test]
+fn kani_concrete_playback_r0_pt_ortho_odd_523469021850978219() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // -0
+        vec![0, 0, 0, 0, 0, 0, 0, 128],
+        // -7.640599e-249
+        vec![64, 65, 71, 60, 48, 90, 107, 140],
+        // 0
+        vec![0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_pt_ortho_odd);
+}
+```
+Failed Checks: assertion failed: bits(ortho(-a)) == bits(-ortho(a))
+ File: "specs/006-formal-verify-r2-rect-point/probe/r0_harnesses.rs", line 309, in r0::r0_pt_ortho_odd
+---- end counterexample for r0::r0_pt_ortho_odd ----
+---- counterexample for r0::r0_pt_point_cross_antisymmetric (concrete playback) ----
+Concrete playback unit test for `r0::r0_pt_point_cross_antisymmetric`:
+```
+/// Test generated for harness `r0::r0_pt_point_cross_antisymmetric`
+///
+/// Check for `assertion`: "assertion failed: bits(q.point_cross(p)) == bits(-p.point_cross(q))"
+#[test]
+fn kani_concrete_playback_r0_pt_point_cross_antisymmetric_17508149840354640608() {
+    let concrete_vals: Vec<Vec<u8>> = vec![
+        // 7.120236e-307
+        vec![20, 0, 0, 0, 0, 0, 96, 0],
+        // -1.652467e-301
+        vec![5, 119, 219, 166, 130, 84, 124, 129],
+        // 2.061190e-301
+        vec![234, 166, 239, 154, 45, 171, 129, 1],
+        // 7.120236e-307
+        vec![243, 255, 255, 255, 255, 255, 95, 0],
+        // -1.215669e-301
+        vec![214, 77, 223, 53, 115, 215, 116, 129],
+        // 1.215669e-301
+        vec![214, 77, 223, 53, 115, 215, 116, 1],
+    ];
+    kani::concrete_playback_run(concrete_vals, r0_pt_point_cross_antisymmetric);
+}
+```
+Failed Checks: assertion failed: bits(q.point_cross(p)) == bits(-p.point_cross(q))
+ File: "specs/006-formal-verify-r2-rect-point/probe/r0_harnesses.rs", line 324, in r0::r0_pt_point_cross_antisymmetric
+---- end counterexample for r0::r0_pt_point_cross_antisymmetric ----

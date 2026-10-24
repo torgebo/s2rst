@@ -1,0 +1,18 @@
+Mutant: M-022
+Targets: P-HIER-05
+Expect-Fail: hier::p_hier_05
+Defect: child_position() reads the bits two positions too high
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..f6ae697 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -329,7 +329,7 @@ impl CellId {
+         debug_assert!(self.is_valid());
+         debug_assert!(level >= Level::new(1));
+         debug_assert!(level <= self.level());
+-        ((self.0 >> (2 * (u32::from(MAX_CELL_LEVEL) - level.as_u32()) + 1)) & 3) as u8
++        ((self.0 >> (2 * (u32::from(MAX_CELL_LEVEL) - level.as_u32()) + 3)) & 3) as u8
+     }
+ 
+     // =======================================================================

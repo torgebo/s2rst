@@ -1,0 +1,17 @@
+Mutant: M-601
+Targets: P-CAVAL-03, P-CAVAL-02
+Expect-Fail: ca_val::p_caval_03 ca_val::p_caval_02__ctor
+Defect: the FR-017 fix removed: `from_length2` keeps negatives above −1e300 (option B undone)
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -126,7 +126,7 @@
+     /// - NaN gives `STRAIGHT`, as upstream (`std::min(4.0, NaN)` is 4.0).
+     #[inline]
+     pub fn from_length2(length2: f64) -> Self {
+-        if length2 < 0.0 {
++        if length2 < -1.0e300 {
+             ChordAngle::NEGATIVE
+         } else if length2 <= MAX_LENGTH2 {
+             ChordAngle(length2)

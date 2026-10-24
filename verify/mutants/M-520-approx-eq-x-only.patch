@@ -1,0 +1,18 @@
+Mutant: M-520
+Targets: P-QEXP-03
+Expect-Fail: ur_exp::p_qexp_03__product
+Defect: approx_eq_with() compares x only
+Tier: slow
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -358,7 +358,7 @@
+     /// bound is not approximately equal to itself, as in upstream: `[0, ∞] × [0, 1]` is not,
+     /// for any `max_error`.
+     pub fn approx_eq_with(self, other: Rect, max_error: f64) -> bool {
+-        self.x.approx_eq_with(other.x, max_error) && self.y.approx_eq_with(other.y, max_error)
++        self.x.approx_eq_with(other.x, max_error)
+     }
+ 
+     /// Like [`approx_eq_with`](Rect::approx_eq_with) with a default

@@ -36,7 +36,15 @@ use crate::shapes::PyShape;
 
 /// The orientation of an ordered triple of points, as reported by
 /// [`robust_sign`].
-#[pyclass(eq, eq_int, hash, frozen, name = "Direction", module = "s2rst")]
+#[pyclass(
+    skip_from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "Direction",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyDirection {
     #[pyo3(name = "CLOCKWISE")]
@@ -62,7 +70,15 @@ impl PyDirection {
 /// - `CROSS`: the edges cross at an interior point.
 /// - `MAYBE_CROSS`: two vertices from different edges coincide.
 /// - `DO_NOT_CROSS`: the edges do not cross.
-#[pyclass(eq, eq_int, hash, frozen, name = "Crossing", module = "s2rst")]
+#[pyclass(
+    skip_from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "Crossing",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyCrossing {
     #[pyo3(name = "CROSS")]
@@ -85,7 +101,15 @@ impl PyCrossing {
 
 /// The relation between two non-empty wedges, as reported by
 /// [`wedge_relation`].
-#[pyclass(eq, eq_int, hash, frozen, name = "WedgeRel", module = "s2rst")]
+#[pyclass(
+    skip_from_py_object,
+    eq,
+    eq_int,
+    hash,
+    frozen,
+    name = "WedgeRel",
+    module = "s2rst"
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyWedgeRel {
     #[pyo3(name = "EQUAL")]

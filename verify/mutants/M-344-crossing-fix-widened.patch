@@ -1,0 +1,18 @@
+Mutant: M-344
+Targets: P-IEXP-03
+Expect-Fail: iv_exp::p_iexp_03__mneg
+Defect: FR-023's shrink guard tests interior containment, so a result touching a bound becomes empty
+Tier: slow
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -433,7 +433,7 @@
+         if margin >= 0.0 && !result.contains_interval(self) {
+             return Interval::full();
+         }
+-        if margin < 0.0 && !self.contains_interval(result) {
++        if margin < 0.0 && !self.interior_contains_interval(result) {
+             return Interval::empty();
+         }
+         result

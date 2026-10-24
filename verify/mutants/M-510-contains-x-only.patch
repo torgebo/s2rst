@@ -1,0 +1,17 @@
+Mutant: M-510
+Targets: P-QREL-01
+Expect-Fail: ur_rel::p_qrel_01
+Defect: contains() checks x only
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -252,7 +252,7 @@
+ 
+     /// Reports whether the rectangle contains the given other rectangle.
+     pub fn contains(self, other: Rect) -> bool {
+-        self.x.contains_interval(other.x) && self.y.contains_interval(other.y)
++        self.x.contains_interval(other.x)
+     }
+ 
+     /// Reports whether the interior of this rectangle contains all points

@@ -1,0 +1,21 @@
+Mutant: M-155
+Targets: P-UENC-04
+Expect-Fail: cu_enc::p_uenc_04__b17
+Defect: decode()'s order check unwraps the previous id, which panics on the first id
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+index 537bd64..16fd8f8 100644
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -349,9 +349,8 @@ impl S2Decode for CellUnion {
+         for _ in 0..n {
+             let id = CellId::decode(r)?;
+             // A valid union: each cell's leaf range starts after the previous one ends.
+-            if let Some(prev) = ids.last()
+-                && prev.range_max() >= id.range_min()
+-            {
++            let prev = *ids.last().unwrap();
++            if prev.range_max() >= id.range_min() {
+                 return Err(CellUnionDecodeError::NotValid.into());
+             }
+             ids.push(id);

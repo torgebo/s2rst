@@ -1,0 +1,19 @@
+Mutant: M-125
+Targets: P-USET-01
+Expect-Fail: cu_set::p_uset_01__n1_n1
+Tier: slow
+Defect: union() concatenates without normalising
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..98ea1b5 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -333,7 +333,7 @@ impl CellUnion {
+         let mut ids = Vec::with_capacity(self.0.len() + other.0.len());
+         ids.extend_from_slice(&self.0);
+         ids.extend_from_slice(&other.0);
+-        CellUnion::from_cell_ids(ids)
++        CellUnion::from_verbatim(ids)
+     }
+ 
+     /// Returns the intersection of this cell union with `other`.

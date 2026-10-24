@@ -1,0 +1,18 @@
+Mutant: M-534
+Targets: P-QVAL-01
+Expect-Fail: ur_val::p_qval_01
+Defect: uv_spec::valid forgets the emptiness rule (a defect in the description)
+
+diff --git a/verify/src/uv_spec.rs b/verify/src/uv_spec.rs
+--- a/verify/src/uv_spec.rs
++++ b/verify/src/uv_spec.rs
+@@ -33,8 +33,7 @@
+ /// NaN, since a bound is a number (`r1interval.h`; spec 006 K4).
+ #[must_use]
+ pub fn valid(r: Rect) -> bool {
+-    emptiness_rule(r)
+-        && !r.x.lo.is_nan()
++    !r.x.lo.is_nan()
+         && !r.x.hi.is_nan()
+         && !r.y.lo.is_nan()
+         && !r.y.hi.is_nan()

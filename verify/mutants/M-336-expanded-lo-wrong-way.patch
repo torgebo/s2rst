@@ -1,0 +1,18 @@
+Mutant: M-336
+Targets: P-IEXP-01
+Expect-Fail: iv_exp::p_iexp_01_grow__xnoninv
+Defect: expanded() moves the low bound the wrong way
+Tier: slow
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -408,7 +408,7 @@
+             }
+         }
+         let mut result = Interval::new(
+-            f64::rem_euclid_workaround(self.lo - margin, 2.0 * PI),
++            f64::rem_euclid_workaround(self.lo + margin, 2.0 * PI),
+             f64::rem_euclid_workaround(self.hi + margin, 2.0 * PI),
+         );
+         if result.lo <= -PI {

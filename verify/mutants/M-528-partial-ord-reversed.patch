@@ -1,0 +1,17 @@
+Mutant: M-528
+Targets: P-PTORD-01
+Expect-Fail: pt_ord::p_ptord_01
+Defect: partial_cmp() compares the other way round
+
+diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
+--- a/core/src/s2/point.rs
++++ b/core/src/s2/point.rs
+@@ -401,7 +401,7 @@
+ 
+ impl PartialOrd for Point {
+     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+-        Some(self.cmp_point(*other))
++        Some(other.cmp_point(*self))
+     }
+ }
+ 

@@ -1,0 +1,18 @@
+Mutant: M-432
+Targets: P-LBND-01
+Expect-Fail: rl_bnd::p_lbnd_01
+Defect: size() swaps the latitude and longitude extents
+Tier: slow
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -315,7 +315,7 @@
+     /// Returns the size of the rectangle as a `LatLng`.
+     #[inline]
+     pub fn size(self) -> LatLng {
+-        LatLng::from_radians(self.lat.length(), self.lng.length())
++        LatLng::from_radians(self.lng.length(), self.lat.length())
+     }
+ 
+     /// Returns the surface area of the rectangle on the unit sphere.

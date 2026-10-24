@@ -1,0 +1,17 @@
+Mutant: M-407
+Targets: P-RSET-01
+Expect-Fail: ri_set::p_rset_01
+Defect: union() takes the larger low bound
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -315,7 +315,7 @@
+             return self;
+         }
+         Interval {
+-            lo: self.lo.min(y.lo),
++            lo: self.lo.max(y.lo),
+             hi: self.hi.max(y.hi),
+         }
+     }

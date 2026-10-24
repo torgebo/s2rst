@@ -1,0 +1,17 @@
+Mutant: M-408
+Targets: P-RSET-02
+Expect-Fail: ri_set::p_rset_02
+Defect: intersection() takes the larger high bound
+
+diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
+--- a/core/src/r1/interval.rs
++++ b/core/src/r1/interval.rs
+@@ -326,7 +326,7 @@
+     pub fn intersection(self, y: Interval) -> Interval {
+         Interval {
+             lo: self.lo.max(y.lo),
+-            hi: self.hi.min(y.hi),
++            hi: self.hi.max(y.hi),
+         }
+     }
+ 

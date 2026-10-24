@@ -1,0 +1,18 @@
+Mutant: M-014
+Targets: P-VAL-06
+Expect-Fail: val::p_val_06
+Defect: pos() masks one face bit too many
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+index 9a961e1..003d049 100644
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -282,7 +282,7 @@ impl CellId {
+     /// Returns the position along the Hilbert curve (0..2^61 − 1).
+     #[inline]
+     pub fn pos(self) -> u64 {
+-        self.0 & (!0u64 >> FACE_BITS)
++        self.0 & (!0u64 >> (FACE_BITS + 1))
+     }
+ 
+     /// Returns the subdivision level (0–30).

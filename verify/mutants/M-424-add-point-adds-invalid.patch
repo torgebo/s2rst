@@ -1,0 +1,18 @@
+Mutant: M-424
+Targets: P-LSET-03
+Expect-Fail: rl_set::p_lset_03
+Defect: add_point() adds an invalid point (C++'s behaviour, K2)
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -452,9 +452,6 @@
+     /// an invalid point never silently widens a bound. C++ `S2LatLngRect::AddPoint` only logs
+     /// an invalid point in debug builds and then adds it.
+     pub fn add_point(self, ll: LatLng) -> Rect {
+-        if !ll.is_valid() {
+-            return self;
+-        }
+         Rect {
+             lat: self.lat.add_point(ll.lat.radians()),
+             lng: self.lng.add_point(ll.lng.radians()),

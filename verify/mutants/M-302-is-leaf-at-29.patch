@@ -1,0 +1,17 @@
+Mutant: M-302
+Targets: P-CID-02
+Expect-Fail: cl_id::p_cid_02
+Defect: is_leaf() is true at level 29
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -201,7 +201,7 @@
+     /// Returns whether this is a leaf cell (level 30).
+     #[inline]
+     pub fn is_leaf(self) -> bool {
+-        self.level == Level::MAX
++        self.level.as_u8() >= 29
+     }
+ 
+     /// Returns the edge length of this cell in (i,j)-space.

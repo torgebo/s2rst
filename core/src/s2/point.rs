@@ -63,6 +63,21 @@ impl Point {
     /// Creates a normalized point from the given coordinates.
     ///
     /// If the input is the zero vector, returns [`Point::origin`].
+    ///
+    /// # Range
+    ///
+    /// The result is unit length only where the squared length `x² + y² + z²` is a normal
+    /// number, as [`normalize`](Point::normalize)'s; outside that range it computes upstream's
+    /// arithmetic, as C++'s `Normalize` and Go's `PointFromCoords` do:
+    ///
+    /// - where the squared length overflows (a coordinate above about `1.34·10¹⁵⁴`), the zero
+    ///   vector: `from_coords(1e200, 1.0, 1.0)` is `(0, 0, 0)`;
+    /// - where it underflows, the zero vector too, not `origin`:
+    ///   `from_coords(1e-170, 1e-170, 0.0)`;
+    /// - where it is subnormal, a vector off unit length: `from_coords(1e-160, 0.0, 0.0)` has
+    ///   `x = 1.0000055664551362`;
+    /// - an infinite coordinate gives NaN (`∞ · 0`): `from_coords(f64::INFINITY, 0.0, 0.0)` is
+    ///   `(NaN, 0, 0)`.
     pub fn from_coords(x: f64, y: f64, z: f64) -> Self {
         if x == 0.0 && y == 0.0 && z == 0.0 {
             return Self::origin();
@@ -119,6 +134,18 @@ impl Point {
     }
 
     /// Returns a normalized copy of this point.
+    ///
+    /// Unit length where the squared length is a normal number; the zero vector where it
+    /// overflows or underflows, and a vector off unit length where it is subnormal, as
+    /// [`from_coords`](Point::from_coords) documents. Infinite coordinates give NaN.
+    ///
+    /// # Deviation from upstream
+    ///
+    /// Where the squared length is zero (the zero vector, or coordinates so small that their
+    /// squares underflow), this returns `(+0, +0, +0)`, as Go's `Vector.Normalize` does.
+    /// C++'s `Normalize` multiplies by zero there, so each zero keeps its coordinate's sign:
+    /// `(−1e-170, 1e-170, −0)` gives `(−0, 0, −0)` in C++ and `(0, 0, 0)` here. The two are
+    /// equal as values; elsewhere the result is C++'s, bit for bit.
     #[inline]
     pub fn normalize(self) -> Self {
         Point(self.0.normalize())
@@ -139,7 +166,9 @@ impl Point {
     }
 
     /// Returns the chord angle between this point and `other`.
-    /// Both points must be unit length.
+    /// Both points must be unit length (upstream's `ABSL_DCHECK`). For any points in the box
+    /// `[−1, 1]³` the squared length is computed without overflow and clamped to at most 4, as
+    /// upstream's `std::min(4.0, …)`.
     #[inline]
     pub fn chord_angle(self, other: Point) -> ChordAngle {
         ChordAngle::from_length2((self.0 - other.0).norm2().min(4.0))
@@ -178,11 +207,25 @@ impl Point {
     /// orthogonality when the points are nearly parallel. It also returns a
     /// non-zero result when `self == other` or `self == -other`.
     ///
-    /// Properties:
-    /// 1. `f(p, q) != 0` for all p, q
-    /// 2. `f(q, p) == -f(p, q)` unless `p == q` or `p == -q`
-    /// 3. `f(-p, q) == -f(p, q)` unless `p == q` or `p == -q`
-    /// 4. `f(p, -q) == -f(p, q)` unless `p == q` or `p == -q`
+    /// It computes `(p + q) × (q − p)`, twice the cross product, and returns [`ortho(p)`](ortho)
+    /// when that is exactly the zero vector. For points in the box `[−1, 1]³` (every unit point
+    /// is), with `f(p, q) = p.point_cross(q)`:
+    ///
+    /// 1. `f(p, q)` is not the zero vector when `p` is normalizable
+    ///    ([`is_normalizable`](Point::is_normalizable));
+    /// 2. `f(p, q)` is `ortho(p)` whenever `(p + q) × (q − p)` is exactly the zero vector: for
+    ///    equal and antipodal points, but also for distinct parallel points, and for points so
+    ///    small that the products underflow;
+    /// 3. elsewhere `f(q, p) == −f(p, q)`, `f(−p, q) == −f(p, q)` and `f(p, −q) == −f(p, q)`,
+    ///    as values (a zero coordinate's sign may differ).
+    ///
+    /// Go's `PointCross` documents (2)–(4) "unless p == op or p == −op", and behaves as this
+    /// does: for `p = (1, 0, 0)` and `q = (1 + 2ε, 0, 0)`, both unit length, `f(q, p)` is
+    /// `ortho(q)`, which is `f(p, q)` up to rounding, not its negation (`UPSTREAM.md` U-013).
+    /// C++'s `RobustCrossProd` perturbs parallel points symbolically instead, and keeps the laws.
+    ///
+    /// For equal points this returns `ortho(p)`, upstream's `S2::Ortho`, as C++'s
+    /// `RobustCrossProd` does; Go returns the axis-aligned `Vector.Ortho` (spec 006 K10).
     pub fn point_cross(self, other: Point) -> Point {
         // (p + q) × (q - p) = 2(p × q), but more numerically stable.
         let x = (self.0 + other.0).cross(other.0 - self.0);
@@ -196,6 +239,9 @@ impl Point {
 
     /// Returns a unit-length reference direction for this point, guaranteed
     /// to be different from `self`. Used for semi-open boundary vertex tests.
+    ///
+    /// It is [`ortho(self)`](ortho), so it is unit length for a normalizable point in the box
+    /// `[−1, 1]³` and may be the zero vector for a smaller one.
     #[inline]
     pub fn reference_dir(self) -> Point {
         ortho(self)
@@ -204,6 +250,17 @@ impl Point {
     // --- Comparison ---
 
     /// Lexicographic comparison of points (x, then y, then z).
+    ///
+    /// Upstream's `operator<`: the first coordinate where one point is below the other decides.
+    ///
+    /// # NaN
+    ///
+    /// A NaN coordinate counts as equal and the comparison moves on to the next one, as in C++'s
+    /// `std::lexicographical_compare`. So with NaN the order is not transitive:
+    /// `(1, 0, 0) < (NaN, 5, 0) < (0, 9, 0) < (1, 0, 0)` is a cycle, in C++ too. And a point
+    /// with a NaN coordinate compares `Equal` to itself while `==` says it differs, so
+    /// [`PartialOrd`] and [`PartialEq`] disagree there. Without NaN, the order is total and its
+    /// ties are exactly `==`.
     #[inline]
     pub fn cmp_point(self, other: Point) -> Ordering {
         self.0.cmp(other.0)
@@ -213,7 +270,12 @@ impl Point {
 
     /// Reports whether this point's magnitude is large enough that the angle
     /// to another vector can be measured without loss of precision due to
-    /// floating-point underflow.
+    /// floating-point underflow: its largest absolute coordinate is at least `2⁻²⁴²`
+    /// (upstream's `IsNormalizable`, `s2edge_crossings.cc:276`).
+    ///
+    /// A NaN coordinate is ignored ([`f64::max`] drops it): `(NaN, 1, 0)` is normalizable.
+    /// Upstream's `std::max` chain keeps or drops a NaN depending on its position, so it says
+    /// no for `(NaN, 1, 0)` and yes for `(1, NaN, 0)`.
     #[inline]
     pub fn is_normalizable(self) -> bool {
         let max = self.0.x.abs().max(self.0.y.abs()).max(self.0.z.abs());
@@ -221,30 +283,43 @@ impl Point {
     }
 
     /// Scales this vector as necessary to ensure that it can be normalized
-    /// without loss of precision. Returns self unchanged if already normalizable.
-    /// Requires `self != (0,0,0)`.
+    /// without loss of precision.
+    ///
+    /// Returns `self` unchanged if it is already normalizable
+    /// ([`is_normalizable`](Point::is_normalizable)), and the zero vector unchanged. Otherwise
+    /// the result is `self · 2^e` with `e = −ilogb(p_max)`, `p_max` the largest absolute
+    /// coordinate, computed exactly, so its largest absolute coordinate is in [1, 2) and it is
+    /// normalizable. The domain is every finite vector without NaN.
+    ///
+    /// Where upstream's `EnsureNormalizable` (`ldexp(2, −1 − ilogb(p_max)) * p`,
+    /// `s2edge_crossings.cc:294`) is finite, that is for a largest coordinate of at least
+    /// `2⁻¹⁰²³`, the result is upstream's, bit for bit. Below that, upstream's factor overflows
+    /// and it returns infinities and NaN (`UPSTREAM.md` U-012); this returns the scaled vector.
     pub fn ensure_normalizable(self) -> Point {
-        if self.0 == Vector::default() {
+        if self.0 == Vector::default() || self.is_normalizable() {
             return self;
         }
-        if self.is_normalizable() {
-            self
-        } else {
-            let p_max = self.0.x.abs().max(self.0.y.abs()).max(self.0.z.abs());
-            // Scale by a power of two so the largest component is in [1, 2).
-            let scale = f64::from_bits(((1023 + 1) as u64) << 52)
-                / f64::from_bits(((ilogb(p_max) + 1 + 1023) as u64) << 52);
-            Point(self.0 * scale)
-        }
+        let p_max = self.0.x.abs().max(self.0.y.abs()).max(self.0.z.abs());
+        // `e` is in (242, 1074], so `2^e` itself may overflow: scale in two steps of at most
+        // 2^537 each. Each factor is a normal power of two and each product is exact, since it
+        // scales up a vector whose largest coordinate stays below 2.
+        let e = -ilogb(p_max);
+        Point(self.0 * pow2(e / 2) * pow2(e - e / 2))
     }
 }
 
 /// Returns the S2 "ortho" vector: a unit-length vector orthogonal to `a`
-/// that avoids zero coordinates. Satisfies `ortho(-a) == -ortho(a)`.
+/// that avoids zero coordinates. Satisfies `ortho(-a) == -ortho(a)`, as values (a zero
+/// coordinate's sign may differ).
 ///
 /// This is the S2-specific version that uses a perturbation vector to
 /// reduce degenerate cases (unlike `r3::Vector::ortho()` which may
 /// return axis-aligned results).
+///
+/// The result is unit length for a normalizable point in the box `[−1, 1]³`
+/// ([`Point::is_normalizable`]). For a smaller point the cross product with the perturbation
+/// vector underflows: the result may be off unit length, or the zero vector
+/// (`ortho((1e-200, 0, 0))` is `(0, 0, 0)`), as upstream's `S2::Ortho` computes.
 pub fn ortho(p: Point) -> Point {
     Point(ortho_impl(p.0))
 }
@@ -262,6 +337,12 @@ fn ortho_impl(a: Vector) -> Vector {
         _ => temp.y = 1.0,
     }
     a.cross(temp).normalize()
+}
+
+/// `2^k` for `k` in `[−1022, 1023]`, exactly, from its exponent bits.
+fn pow2(k: i32) -> f64 {
+    debug_assert!((-1022..=1023).contains(&k), "2^{k} is not a normal f64");
+    f64::from_bits(((1023 + k) as u64) << 52)
 }
 
 /// Returns the floor of the base-2 logarithm of `|x|`.
@@ -381,7 +462,7 @@ mod tests {
         // Check that origin is not too close to the north pole (≥ 50km).
         let earth_radius_km = 6371.01;
         let dist = origin.z().acos() * earth_radius_km;
-        assert!(dist >= 50.0, "origin too close to north pole: {dist}km",);
+        assert!(dist >= 50.0, "origin too close to north pole: {dist}km");
     }
 
     #[test]
@@ -942,7 +1023,7 @@ mod tests {
             y: 0.0,
             z: 0.0,
         });
-        assert!(p1 == p3);
+        assert_eq!(p1, p3);
         assert!(p1 >= p3);
         assert!(p1 <= p3);
     }
@@ -1267,7 +1348,9 @@ pub(super) fn from_frame(m: &Matrix3x3, q: Point) -> Point {
 }
 
 /// Rotates point `p` about the given `axis` by the given `angle`.
-/// Both `p` and `axis` must be unit length.
+/// Both `p` and `axis` must be unit length (upstream checks it with `ABSL_DCHECK`,
+/// `s2pointutil.cc:63–64`); any points in the box `[−1, 1]³` and a finite angle keep every
+/// intermediate finite.
 pub fn rotate(p: Point, axis: Point, angle: Angle) -> Point {
     let center = axis.0 * p.0.dot(axis.0);
     let dx = p.0 - center;
@@ -1362,7 +1445,7 @@ mod point_property_tests {
         let q = Point::from_coords(0.0, 1.0, 0.0);
         let d = p.distance(q).radians();
         let sa = p.stable_angle(q).radians();
-        assert!((d - sa).abs() < 1e-14, "distance={d}, stable_angle={sa}",);
+        assert!((d - sa).abs() < 1e-14, "distance={d}, stable_angle={sa}");
     }
 
     #[test]
@@ -1527,3 +1610,7 @@ mod quickcheck_tests {
         back == back2
     }
 }
+
+#[cfg(test)]
+#[path = "point_tests.rs"]
+mod point_tests;

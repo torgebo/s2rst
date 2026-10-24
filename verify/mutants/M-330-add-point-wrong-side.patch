@@ -1,0 +1,17 @@
+Mutant: M-330
+Targets: P-ISET-04
+Expect-Fail: iv_set::p_iset_04
+Defect: add_point() extends from the wrong bound
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -348,7 +348,7 @@
+             return Interval::from_point(p);
+         }
+         if positive_distance(p, self.lo) < positive_distance(self.hi, p) {
+-            Interval::new_checked(p, self.hi)
++            Interval::new_checked(self.hi, p)
+         } else {
+             Interval::new_checked(self.lo, p)
+         }

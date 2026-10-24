@@ -18,7 +18,7 @@ use crate::s2point::{PyLatLng, PyS2Point};
 
 /// A spherical cap: the set of all points within a given angle of a center
 /// point. Equivalently, a disc on the unit sphere.
-#[pyclass(name = "Cap", module = "s2rst")]
+#[pyclass(from_py_object, name = "Cap", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyCap(pub(crate) s2::Cap);
 
@@ -248,7 +248,7 @@ impl PyCap {
 // ---------------------------------------------------------------------------
 
 /// A latitude-longitude rectangle on the unit sphere.
-#[pyclass(name = "Rect", module = "s2rst")]
+#[pyclass(from_py_object, name = "Rect", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyRect(pub(crate) s2::Rect);
 

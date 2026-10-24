@@ -714,8 +714,7 @@ mod tests {
         let diff = diff_layers
             .into_iter()
             .next()
-            .map(take_lax_polygon)
-            .unwrap_or_else(LaxPolygon::empty);
+            .map_or_else(LaxPolygon::empty, take_lax_polygon);
         assert!(
             diff.is_empty(),
             "Result differs from expected. Actual: {}",

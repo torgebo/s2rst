@@ -318,3 +318,72 @@ def test_a11_r2_rect_vertex_out_of_range_raises_index_error():
         r.vertex(-1)
     with pytest.raises(IndexError):
         r.vertex(99)
+
+
+# ---------------------------------------------------------------------------
+# A12: CellUnion.denormalize argument checks (the core checks level_mod only
+# in debug builds, as upstream's DCHECK; a level_mod above 3 used to expand a
+# face cell to leaf level, which never finishes)
+# ---------------------------------------------------------------------------
+
+
+def test_a12_denormalize_valid_arguments_work():
+    cu = s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(0)])
+    assert len(cu.denormalize(2, 1)) == 16
+    assert len(cu.denormalize(1, 2)) == 4
+
+
+def test_a12_denormalize_rejects_bad_level_mod():
+    cu = s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(0)])
+    for level_mod in (0, 4, 200):
+        with pytest.raises(ValueError):
+            cu.denormalize(0, level_mod)
+
+
+def test_a12_denormalize_rejects_bad_min_level():
+    cu = s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(0)])
+    with pytest.raises(ValueError):
+        cu.denormalize(31, 1)
+
+
+# ---------------------------------------------------------------------------
+# A13: CellUnion.from_range / from_min_max argument checks (C++ FromBeginEnd
+# requires leaf cells with begin <= end and checks only in debug builds; in a
+# release build, CellId(0) as begin looped forever)
+# ---------------------------------------------------------------------------
+
+
+def _leaf(face, k=0):
+    return s2rst.CellId.from_face(face).child_begin_at_level(30).advance(k)
+
+
+def test_a13_from_range_valid_arguments_work():
+    leaf_end = _leaf(5).parent_at_level(0).range_max().next()
+    assert len(s2rst.CellUnion.from_range(_leaf(1), _leaf(1, 5))) == 2
+    assert len(s2rst.CellUnion.from_range(_leaf(1), _leaf(1))) == 0
+    assert len(s2rst.CellUnion.from_range(_leaf(5), leaf_end)) == 1
+    assert len(s2rst.CellUnion.from_min_max(_leaf(1), _leaf(1, 4))) == 2
+
+
+def test_a13_from_range_rejects_bad_arguments():
+    for begin, end in [
+        (s2rst.CellId(0), _leaf(0, 3)),  # looped forever in release builds
+        (s2rst.CellId.from_face(1), _leaf(2)),  # not a leaf
+        (_leaf(1), s2rst.CellId.from_face(4)),
+        (_leaf(3), _leaf(1)),  # begin after end
+        (_leaf(0), s2rst.CellId(2**64 - 1)),  # not a valid cell
+    ]:
+        with pytest.raises(ValueError):
+            s2rst.CellUnion.from_range(begin, end)
+
+
+def test_a13_from_min_max_rejects_bad_arguments():
+    leaf_end = _leaf(5).parent_at_level(0).range_max().next()
+    for lo, hi in [
+        (s2rst.CellId(0), _leaf(0, 3)),
+        (_leaf(1), s2rst.CellId.from_face(4)),
+        (_leaf(3), _leaf(1)),
+        (_leaf(5), leaf_end),  # max_id must be a valid cell
+    ]:
+        with pytest.raises(ValueError):
+            s2rst.CellUnion.from_min_max(lo, hi)

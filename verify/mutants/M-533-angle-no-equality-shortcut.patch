@@ -1,0 +1,18 @@
+Mutant: M-533
+Targets: P-PTDST-01
+Expect-Fail: pt_dst::p_ptdst_01__self
+Defect: the angle has no short-cut for equal vectors, so distance(p, p) reaches atan2
+
+diff --git a/core/src/r3/vector.rs b/core/src/r3/vector.rs
+--- a/core/src/r3/vector.rs
++++ b/core/src/r3/vector.rs
+@@ -183,9 +183,6 @@
+         // would no longer return exactly 0. Short-circuit to preserve the
+         // angle(p, p) == 0 invariant relied on by boundary_equals and
+         // interpolate(_, p, p).
+-        if self == other {
+-            return 0.0;
+-        }
+         f64::atan2(self.cross(other).norm(), self.dot(other))
+     }
+ 

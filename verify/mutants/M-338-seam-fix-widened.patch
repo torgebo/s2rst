@@ -1,0 +1,20 @@
+Mutant: M-338
+Targets: P-IMEA-01
+Expect-Fail: iv_mea::p_imea_01
+Defect: FR-020's stable form is used for every inverted interval, not only the corner (about 22% of inverted lengths change in their last bit)
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -174,10 +174,7 @@
+         if length >= 0.0 {
+             return length;
+         }
+-        let length = length + 2.0 * PI;
+-        if length > 0.0 {
+-            length
+-        } else if self.is_empty() {
++        if self.is_empty() {
+             -1.0
+         } else {
+             // The one-ulp interval across the seam: `hi − lo` rounded to −2π. This form

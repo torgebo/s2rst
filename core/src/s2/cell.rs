@@ -90,7 +90,7 @@ impl CellEdge {
 /// ```
 #[must_use]
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Cell {
     face: Face,
     level: Level,
@@ -115,6 +115,15 @@ impl Cell {
     // --- Constructors ---
 
     /// Constructs a `Cell` corresponding to the given [`CellId`].
+    ///
+    /// # Panics
+    ///
+    /// The identifier must be a valid cell ([`CellId::is_valid`]); upstream's `S2Cell(S2CellId)`
+    /// states no precondition, and reaches undefined behaviour on such ids. Panics on the null
+    /// identifier (an arithmetic overflow in debug builds, "level must be 0..=30" in release
+    /// builds) and on an identifier with face 6 or 7 (an index out of bounds). Any other
+    /// invalid identifier, one whose lowest set bit is at an odd position, gives a cell whose
+    /// fields are unspecified.
     #[inline]
     pub fn from_cell_id(id: CellId) -> Self {
         let (f, i, j, o) = id.to_face_ij_orientation();
@@ -140,12 +149,24 @@ impl Cell {
     }
 
     /// Constructs a cell for the given face (level-0 cell).
+    ///
+    /// # Panics
+    ///
+    /// The face must be 0–5, as for [`CellId::from_face`]. Faces 6 and 7 give an invalid
+    /// identifier, on which [`Cell::from_cell_id`] panics; larger values are outside the domain
+    /// and give an unspecified cell.
     #[inline]
     pub fn from_face(face: impl Into<u8>) -> Self {
         Self::from_cell_id(CellId::from_face(face))
     }
 
     /// Constructs a cell from face, Hilbert curve position, and level.
+    ///
+    /// # Panics
+    ///
+    /// Panics where [`CellId::from_face_pos_level`] does (a level above 30, or an overflow in
+    /// debug builds). The face must be 0–5: faces 6 and 7 give an invalid identifier, on which
+    /// [`Cell::from_cell_id`] panics.
     #[inline]
     pub fn from_face_pos_level(face: impl Into<u8>, pos: u64, level: impl Into<Level>) -> Self {
         Self::from_cell_id(CellId::from_face_pos_level(face, pos, level))
@@ -762,9 +783,82 @@ fn chord_max(a: ChordAngle, b: ChordAngle) -> ChordAngle {
     if a > b { a } else { b }
 }
 
+/// The cell of an identifier, as [`Cell::from_cell_id`].
+///
+/// # Panics
+///
+/// Panics if `id` is not a valid cell, as [`Cell::from_cell_id`] documents.
 impl From<CellId> for Cell {
     fn from(id: CellId) -> Self {
         Cell::from_cell_id(id)
+    }
+}
+
+/// Deserialises the five fields that `Serialize` writes, unchanged in format, and accepts only
+/// a consistent cell: the cell of a valid identifier.
+///
+/// The identifier must be a valid cell, and the face, level and orientation must be those it
+/// gives, exactly. Each stored u-v bound may differ from the identifier's by at most one ulp,
+/// because text formats such as `serde_json` without its `float_roundtrip` feature parse
+/// floating-point numbers to within one ulp: an honest JSON round trip moved a bound in
+/// 375,836 of 1,598,279 cells (spec 004 research R6). The result is
+/// [`Cell::from_cell_id`] of the identifier, so a consistent cell deserialises unchanged, bit
+/// for bit. Anything else is an error naming the field, as the binary decoder rejects an
+/// invalid identifier (spec 003 `DEV_VALID_ID`) and `CellUnion`'s `Deserialize` an invalid
+/// union. A derived impl would accept any field values: a way to build a cell whose fields
+/// disagree with its identifier, which still compares equal to the consistent one.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Cell {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "Cell")]
+        struct Fields {
+            face: Face,
+            level: Level,
+            orientation: u8,
+            id: CellId,
+            uv: r2::Rect,
+        }
+
+        /// Equal, or adjacent floats of the same sign.
+        fn within_one_ulp(a: f64, b: f64) -> bool {
+            a == b
+                || (a.is_sign_negative() == b.is_sign_negative()
+                    && a.to_bits().abs_diff(b.to_bits()) <= 1)
+        }
+
+        let f = Fields::deserialize(deserializer)?;
+        if !f.id.is_valid() {
+            return Err(D::Error::custom("cell id is not a valid cell"));
+        }
+        let c = Cell::from_cell_id(f.id);
+        if f.face != c.face {
+            return Err(D::Error::custom("face is not the cell id's face"));
+        }
+        if f.level != c.level {
+            return Err(D::Error::custom("level is not the cell id's level"));
+        }
+        if f.orientation != c.orientation {
+            return Err(D::Error::custom(
+                "orientation is not the cell id's orientation",
+            ));
+        }
+        let (got, want) = (f.uv, c.uv);
+        for (name, a, b) in [
+            ("uv.x.lo", got.x.lo, want.x.lo),
+            ("uv.x.hi", got.x.hi, want.x.hi),
+            ("uv.y.lo", got.y.lo, want.y.lo),
+            ("uv.y.hi", got.y.hi, want.y.hi),
+        ] {
+            if !within_one_ulp(a, b) {
+                return Err(D::Error::custom(format_args!(
+                    "{name} is more than one ulp from the cell id's bound"
+                )));
+            }
+        }
+        Ok(c)
     }
 }
 
@@ -1382,3 +1476,7 @@ mod quickcheck_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cell_tests.rs"]
+mod cell_tests;

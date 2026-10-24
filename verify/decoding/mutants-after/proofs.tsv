@@ -1,0 +1,24 @@
+A-001	missed	core/src/s2/encoded_s2cell_id_vector.rs:108:47: replace | with ^ in encode_base_shift	undetected
+A-002	missed	core/src/s2/encoded_s2cell_id_vector.rs:72:88: replace + with * in encode_s2cell_id_vector	undetected
+A-003	missed	core/src/s2/encoded_s2point_vector.rs:220:14: replace < with <= in reconstruct_uvarint	undetected
+A-004	missed	core/src/s2/encoded_s2point_vector.rs:237:57: replace | with ^ in encode_fast	undetected
+A-005	missed	core/src/s2/encoded_s2point_vector.rs:252:14: replace > with == in decode_uncompressed	undetected
+A-006	missed	core/src/s2/encoded_s2point_vector.rs:252:14: replace > with >= in decode_uncompressed	undetected
+A-007	missed	core/src/s2/encoded_s2point_vector.rs:445:38: replace > with >= in decode_cell_ids_raw	undetected
+A-008	missed	core/src/s2/encoded_s2point_vector.rs:453:20: replace + with * in decode_cell_ids_raw	undetected
+A-009	missed	core/src/s2/encoded_s2point_vector.rs:453:35: replace > with == in decode_cell_ids_raw	undetected
+A-010	missed	core/src/s2/encoded_s2point_vector.rs:453:35: replace > with >= in decode_cell_ids_raw	undetected
+A-011	missed	core/src/s2/encoded_s2point_vector.rs:580:26: replace | with ^ in value_to_point	undetected
+A-012	missed	core/src/s2/encoded_s2point_vector.rs:581:26: replace | with ^ in value_to_point	undetected
+A-013	missed	core/src/s2/encoded_s2point_vector.rs:582:43: replace | with ^ in value_to_point	undetected
+A-014	missed	core/src/s2/encoded_string_vector.rs:70:18: replace > with == in decode_string_vector	undetected
+A-015	missed	core/src/s2/encoded_string_vector.rs:70:18: replace > with >= in decode_string_vector	undetected
+A-016	missed	core/src/s2/encoded_uint_vector.rs:104:41: replace | with ^ in encode_uint_vector_u64	undetected
+A-017	missed	core/src/s2/encoded_uint_vector.rs:131:14: replace > with == in decode_uint_vector_u32	undetected
+A-018	missed	core/src/s2/encoded_uint_vector.rs:131:14: replace > with >= in decode_uint_vector_u32	undetected
+A-019	missed	core/src/s2/encoded_uint_vector.rs:158:14: replace > with == in decode_uint_vector_u64	undetected
+A-020	missed	core/src/s2/encoded_uint_vector.rs:158:14: replace > with >= in decode_uint_vector_u64	undetected
+A-021	missed	core/src/s2/encoded_uint_vector.rs:86:59: replace | with ^ in encode_uint_vector_u32	killed by cd_uv::p_uv_02_enc__n2
+A-022	missed	core/src/s2/encoded_uint_vector.rs:88:41: replace | with ^ in encode_uint_vector_u32	undetected
+A-023	missed	core/src/s2/encoding.rs:49:31: replace << with >>	undetected
+A-024	timeout	core/src/s2/encoding.rs:112:13: replace >= with < in write_uvarint	killed by cd_uv::p_uv_01_enc__n0

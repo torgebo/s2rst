@@ -1,0 +1,18 @@
+Mutant: M-126
+Targets: P-USET-03
+Expect-Fail: cu_set::p_uset_03__n1
+Defect: intersection_with_cell_id() uses < for <=, so it drops a member equal to the cell's last leaf
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+index 4669eb0..d51eb51 100644
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -360,7 +360,7 @@ impl CellUnion {
+         let pos = self.0.partition_point(|c| *c < id.range_min());
+         let id_max = id.range_max();
+         let mut i = pos;
+-        while i < self.0.len() && self.0[i] <= id_max {
++        while i < self.0.len() && self.0[i] < id_max {
+             result.push(self.0[i]);
+             i += 1;
+         }

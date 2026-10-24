@@ -1,0 +1,17 @@
+Mutant: M-502
+Targets: P-QVAL-03
+Expect-Fail: ur_val::p_qval_03__empty
+Defect: is_empty() calls a rectangle with a single-point x-interval empty
+
+diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
+--- a/core/src/r2/rect.rs
++++ b/core/src/r2/rect.rs
+@@ -182,7 +182,7 @@
+ 
+     /// Reports whether the rectangle is empty.
+     pub fn is_empty(self) -> bool {
+-        self.x.is_empty()
++        self.x.is_empty() || self.x.lo == self.x.hi
+     }
+ 
+     /// Returns the k-th vertex of the rectangle (k = 0,1,2,3) in CCW order.

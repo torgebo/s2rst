@@ -19,7 +19,7 @@ use crate::angle::PyAngle;
 
 /// A snap function that does not move vertices; `snap_radius` only controls the
 /// minimum vertex separation.
-#[pyclass(name = "IdentitySnapFunction", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "IdentitySnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyIdentitySnapFunction {
     snap_radius: Angle,
@@ -54,7 +54,7 @@ impl PyIdentitySnapFunction {
 }
 
 /// A snap function that snaps vertices to S2 cell centers at a given level.
-#[pyclass(name = "S2CellIdSnapFunction", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "S2CellIdSnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyS2CellIdSnapFunction {
     level: u8,
@@ -89,7 +89,7 @@ impl PyS2CellIdSnapFunction {
 
 /// A snap function that snaps vertices to integer lat/lng coordinates with the
 /// given power-of-ten `exponent` (e.g. 6 for E6 / micro-degrees).
-#[pyclass(name = "IntLatLngSnapFunction", module = "s2rst")]
+#[pyclass(skip_from_py_object, name = "IntLatLngSnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyIntLatLngSnapFunction {
     exponent: i32,
@@ -128,11 +128,11 @@ pub(crate) fn resolve_snap(obj: Option<&Bound<'_, PyAny>>) -> PyResult<Box<dyn S
     let Some(o) = obj else {
         return Ok(Box::new(IdentitySnapFunction::new(Angle::ZERO)));
     };
-    if let Ok(s) = o.downcast::<PyIdentitySnapFunction>() {
+    if let Ok(s) = o.cast::<PyIdentitySnapFunction>() {
         Ok(s.borrow().to_boxed())
-    } else if let Ok(s) = o.downcast::<PyS2CellIdSnapFunction>() {
+    } else if let Ok(s) = o.cast::<PyS2CellIdSnapFunction>() {
         Ok(s.borrow().to_boxed())
-    } else if let Ok(s) = o.downcast::<PyIntLatLngSnapFunction>() {
+    } else if let Ok(s) = o.cast::<PyIntLatLngSnapFunction>() {
         Ok(s.borrow().to_boxed())
     } else {
         Err(PyTypeError::new_err(

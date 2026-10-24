@@ -123,17 +123,22 @@ pub(crate) fn read_uvarint(r: &mut dyn Read) -> io::Result<u64> {
         let mut buf = [0u8; 1];
         r.read_exact(&mut buf)?;
         let b = buf[0];
-        result |= u64::from(b & 0x7F) << shift;
-        if b < 0x80 {
-            return Ok(result);
-        }
-        shift += 7;
-        if shift >= 64 {
+        // The tenth byte carries bit 63 only: upstream rejects anything above 1 as "too long
+        // to be a varint64" (`util/coding/varint.cc`, `Parse64WithLimit`), and so does this
+        // decoder, instead of dropping the extra bits (spec 003 D-003).
+        if shift == 63 && b > 1 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "varint overflow",
             ));
         }
+        result |= u64::from(b & 0x7F) << shift;
+        if b < 0x80 {
+            return Ok(result);
+        }
+        // At most 56 here, so the next shift is at most 63: at 63 the byte above was either
+        // rejected or below 0x80.
+        shift += 7;
     }
 }
 
@@ -145,12 +150,23 @@ impl S2Encode for CellId {
     }
 }
 
+/// Decodes the 8-byte little-endian identifier.
+///
+/// # Errors
+///
+/// [`io::ErrorKind::UnexpectedEof`] if fewer than 8 bytes are left, and
+/// [`io::ErrorKind::InvalidData`] if the identifier is not a valid cell (`!is_valid()`: a face
+/// above 5, or no valid level marker, as 0 has none). That rejection is a deliberate deviation
+/// (Constitution I): upstream `S2CellId::Decode` (`s2cell_id.cc:261–265`) accepts any 64
+/// bits. Here a decoded value always satisfies its type's invariants, and an invalid id
+/// would panic in later operations or break a decoded `CellUnion`.
 impl S2Decode for CellId {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
         let id = CellId(read_u64(r)?);
         // The raw u64 is untrusted; an invalid id (face bits >= 6 or a malformed
-        // level mask) panics in `to_face_ij_orientation`/`CellUnion::normalize`.
-        // Both callers (CellUnion and Cell decode) require valid ids.
+        // level mask) panics in `to_face_ij_orientation`, and breaks the validity
+        // invariant of a decoded `CellUnion`. Both callers (CellUnion and Cell decode)
+        // require valid ids.
         if !id.is_valid() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -172,6 +188,12 @@ impl S2Encode for Point {
     }
 }
 
+/// Decodes three little-endian `f64` coordinates. Any 24 bytes decode, as upstream: the
+/// point is not checked for unit length.
+///
+/// # Errors
+///
+/// [`io::ErrorKind::UnexpectedEof`] if fewer than 24 bytes are left.
 impl S2Decode for Point {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
         let x = read_f64(r)?;
@@ -194,12 +216,37 @@ impl S2Encode for Cap {
     }
 }
 
+/// Decodes the centre (three little-endian `f64`) and the radius's squared chord length,
+/// through [`ChordAngle::from_length2`]: a length above 4 is clamped to 4, as upstream's
+/// `S1ChordAngle::FromLength2`, and a negative length becomes [`ChordAngle::NEGATIVE`].
+///
+/// # Deviation from upstream
+///
+/// Upstream keeps a negative length as it is. Here every negative radius decodes as `NEGATIVE`
+/// (−1), the one value `ChordAngle` keeps for "below every distance" (spec 007 FR-017): the cap
+/// is the same empty cap, but bytes holding another negative radius, such as −5, re-encode as
+/// −1's, so they do not round-trip, where C++ keeps them.
+///
+/// # Errors
+///
+/// [`io::ErrorKind::UnexpectedEof`] if fewer than 32 bytes are left, and
+/// [`io::ErrorKind::InvalidData`] if the cap is not valid: its centre is not of unit length
+/// (NaN included), or its squared length is NaN. That rejection is a deliberate deviation
+/// (Constitution I): upstream `S2Cap::Decode` (`s2cap.cc:340–353`) accepts any values, and
+/// decodes a NaN length as a full cap through `std::min(4.0, NaN)` (spec 003 D-004). The NaN is
+/// checked before the chord angle is built, since `from_length2` maps NaN to `STRAIGHT` as
+/// upstream does (spec 007 FR-018). Here a decoded value always satisfies its type's
+/// invariants.
 impl S2Decode for Cap {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
         let x = read_f64(r)?;
         let y = read_f64(r)?;
         let z = read_f64(r)?;
         let radius = read_f64(r)?;
+        // D-004: reject a NaN length before `from_length2`, which maps it to a full cap.
+        if radius.is_nan() {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid cap"));
+        }
         let cap = Cap::from_center_chord_angle(
             Point(crate::r3::Vector { x, y, z }),
             ChordAngle::from_length2(radius),
@@ -229,14 +276,46 @@ impl S2Encode for Rect {
     }
 }
 
+/// Why decoding a [`Rect`] failed.
+///
+/// The message is formatted only when the error is displayed, never while decoding, with the
+/// same text as before. Formatting it from the decoded version byte put `core::fmt` into every
+/// decoding proof (spec 003, research R0 and R6).
+#[derive(Debug)]
+enum RectDecodeError {
+    /// The version byte is newer than this library writes.
+    Version(u8),
+}
+
+impl std::fmt::Display for RectDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Version(v) => write!(f, "unsupported encoding version {v}"),
+        }
+    }
+}
+
+impl std::error::Error for RectDecodeError {}
+
+impl From<RectDecodeError> for io::Error {
+    fn from(e: RectDecodeError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, e)
+    }
+}
+
+/// Decodes the version byte and the four bounds (little-endian `f64`).
+///
+/// # Errors
+///
+/// [`io::ErrorKind::UnexpectedEof`] if fewer than 33 bytes are left, and
+/// [`io::ErrorKind::InvalidData`] for a version above 1, or bounds that do not form a valid
+/// rectangle (`!is_valid()`: a latitude beyond ±π/2, an invalid longitude interval, or only
+/// one of the two intervals empty).
 impl S2Decode for Rect {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
         let version = read_u8(r)?;
         if version > ENCODING_VERSION {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("unsupported encoding version {version}"),
-            ));
+            return Err(RectDecodeError::Version(version).into());
         }
         let lat_lo = read_f64(r)?;
         let lat_hi = read_f64(r)?;
@@ -279,27 +358,83 @@ impl S2Encode for CellUnion {
     }
 }
 
+/// Why decoding a [`CellUnion`] failed.
+///
+/// The message is formatted only when the error is displayed, never while decoding, with the
+/// same text as before. Formatting it from the decoded values put `core::fmt` into every
+/// decoding proof (spec 002, research R0 and R11).
+#[derive(Debug)]
+enum CellUnionDecodeError {
+    /// The version byte is newer than this library writes.
+    Version(u8),
+    /// The cell count exceeds [`MAX_ENCODED_CELLS`].
+    TooManyCells(u64),
+    /// The ids are unsorted, duplicated or overlapping.
+    NotValid,
+}
+
+impl std::fmt::Display for CellUnionDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Version(v) => write!(f, "unsupported encoding version {v}"),
+            Self::TooManyCells(n) => {
+                write!(f, "too many cells ({n}; max is {MAX_ENCODED_CELLS})")
+            }
+            Self::NotValid => {
+                f.write_str("cell ids are not a valid cell union: unsorted or overlapping")
+            }
+        }
+    }
+}
+
+impl std::error::Error for CellUnionDecodeError {}
+
+impl From<CellUnionDecodeError> for io::Error {
+    fn from(e: CellUnionDecodeError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, e)
+    }
+}
+
+/// Decodes the C++ `S2CellUnion` lossless format: a version byte, the cell count as 8
+/// little-endian bytes, then each id as 8 little-endian bytes. Trailing bytes are not read.
+///
+/// The ids are kept exactly as encoded and are not normalised, as in C++
+/// `S2CellUnion::Decode`: an encoding of four sibling cells decodes to those four cells, not
+/// to their parent.
+///
+/// **Deliberate deviation from C++**: C++ validates nothing, not even single ids (upstream
+/// finding U-003 of spec 002). This decoder rejects any input whose ids are not a valid
+/// union: an invalid id, or ids that are unsorted, duplicated or overlapping. A decoded union
+/// therefore always satisfies [`CellUnion::is_valid`], which the other operations rely on,
+/// even when the bytes are untrusted.
+///
+/// # Errors
+///
+/// Returns an [`io::ErrorKind::InvalidData`] error if the version byte is above 1, the count
+/// exceeds 1,000,000, an id is not a valid cell, or the ids are not a valid union, and an
+/// [`io::ErrorKind::UnexpectedEof`] error if the input ends before the last id.
 impl S2Decode for CellUnion {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
         let version = read_u8(r)?;
         if version > ENCODING_VERSION {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("unsupported encoding version {version}"),
-            ));
+            return Err(CellUnionDecodeError::Version(version).into());
         }
         let n = read_u64(r)?;
         if n > MAX_ENCODED_CELLS {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("too many cells ({n}; max is {MAX_ENCODED_CELLS})"),
-            ));
+            return Err(CellUnionDecodeError::TooManyCells(n).into());
         }
-        let mut ids = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
+        let mut ids: Vec<CellId> = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
         for _ in 0..n {
-            ids.push(CellId::decode(r)?);
+            let id = CellId::decode(r)?;
+            // A valid union: each cell's leaf range starts after the previous one ends.
+            if let Some(prev) = ids.last()
+                && prev.range_max() >= id.range_min()
+            {
+                return Err(CellUnionDecodeError::NotValid.into());
+            }
+            ids.push(id);
         }
-        Ok(CellUnion::from_cell_ids(ids))
+        Ok(CellUnion::from_verbatim(ids))
     }
 }
 
@@ -891,6 +1026,13 @@ impl S2Encode for Cell {
     }
 }
 
+/// Decodes the cell's identifier, as [`CellId`] does.
+///
+/// # Errors
+///
+/// The errors of `CellId`'s decoder, including its rejection of an invalid identifier, which
+/// is what keeps `Cell::from` from panicking. Upstream `S2Cell::Decode` builds the cell from an
+/// unchecked identifier (U-004 candidate, spec 003 T074).
 impl S2Decode for Cell {
     fn decode(r: &mut dyn Read) -> io::Result<Self> {
         let id = CellId::decode(r)?;
@@ -1593,3 +1735,7 @@ mod quickcheck_tests {
         polygon.num_loops() == back.num_loops()
     }
 }
+
+#[cfg(test)]
+#[path = "encoding_tests.rs"]
+mod encoding_tests;

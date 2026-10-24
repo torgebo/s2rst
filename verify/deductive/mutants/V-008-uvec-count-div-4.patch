@@ -1,0 +1,17 @@
+Mutant: V-008
+Theorem: decode_uint_vector_u64's ensures
+Defect: the u64 decoder divides the header by 4
+
+diff --git a/verify/deductive/src/uint_vector.rs b/verify/deductive/src/uint_vector.rs
+index 57dc4fa..c470fa7 100644
+--- a/verify/deductive/src/uint_vector.rs
++++ b/verify/deductive/src/uint_vector.rs
+@@ -284,7 +284,7 @@ pub fn decode_uint_vector_u64(buf: &[u8], pos: usize) -> (r: Option<(Vec<u64>, u
+         r is None ==> dec_uvec(buf@, pos as int, 8) is None,
+ {
+     let (size_len, mut p) = match read_uvarint(buf, pos) { Some(x) => x, None => return None };
+-    let count: u64 = size_len / 8;
++    let count: u64 = size_len / 4;
+     if count > MAX_DECODE_COUNT {
+         return None;
+     }

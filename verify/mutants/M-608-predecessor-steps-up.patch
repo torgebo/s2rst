@@ -1,0 +1,17 @@
+Mutant: M-608
+Targets: P-CANBR-02, P-CANBR-03
+Expect-Fail: ca_nbr::p_canbr_02 ca_nbr::p_canbr_03
+Defect: `predecessor` steps up
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -301,7 +301,7 @@
+         } else if self.0 > MAX_LENGTH2 {
+             ChordAngle::STRAIGHT
+         } else {
+-            ChordAngle(f64_next_after(self.0, -10.0))
++            ChordAngle(f64_next_after(self.0, 10.0))
+         }
+     }
+ 

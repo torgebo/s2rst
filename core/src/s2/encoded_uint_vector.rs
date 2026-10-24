@@ -22,28 +22,46 @@ use crate::s2::encoding::{read_uvarint, write_uvarint};
 
 // ─── Encoding ───────────────────────────────────────────────────────────
 
-/// Writes `value` in little-endian format using exactly `length` bytes.
+/// Writes `value` in little-endian format using exactly `length` bytes: its low `length`
+/// bytes, as upstream `EncodeUintWithLength`.
 ///
 /// # Errors
 ///
 /// Returns an I/O error if the write fails.
+///
+/// # Panics
+///
+/// Panics if `length > 8`. Upstream states the same precondition as a debug-only check
+/// (`ABSL_DCHECK`, `encoded_uint_vector.h:145`).
 pub fn encode_uint_with_length(w: &mut dyn Write, value: u64, length: usize) -> io::Result<()> {
     let bytes = value.to_le_bytes();
     w.write_all(&bytes[..length])
 }
 
-/// Reads a little-endian unsigned integer of `length` bytes.
+/// Reads a little-endian unsigned integer of `length` bytes from the start of `data`.
+///
+/// # Panics
+///
+/// Panics if `length > 8` or `data.len() < length`. Upstream `GetUintWithLength` checks the
+/// length only in debug builds (`ABSL_DCHECK`, `encoded_uint_vector.h:159`) and cannot check
+/// the input's size, since it takes a pointer.
 pub fn get_uint_with_length(data: &[u8], length: usize) -> u64 {
     let mut buf = [0u8; 8];
     buf[..length].copy_from_slice(&data[..length]);
     u64::from_le_bytes(buf)
 }
 
-/// Reads and consumes a little-endian unsigned integer of `length` bytes.
+/// Reads and consumes a little-endian unsigned integer of `length` bytes. A `length` of 0
+/// reads nothing and returns 0.
 ///
 /// # Errors
 ///
-/// Returns an I/O error if the read fails.
+/// Returns [`io::ErrorKind::UnexpectedEof`] if fewer than `length` bytes are left, and any
+/// other error of the reader as it is.
+///
+/// # Panics
+///
+/// Panics if `length > 8`, the precondition of [`encode_uint_with_length`].
 pub fn decode_uint_with_length(r: &mut dyn Read, length: usize) -> io::Result<u64> {
     if length == 0 {
         return Ok(0);
@@ -98,7 +116,15 @@ const MAX_DECODE_COUNT: usize = 50_000_000;
 ///
 /// # Errors
 ///
-/// Returns an error if the data is malformed or the read fails.
+/// - [`io::ErrorKind::UnexpectedEof`]: the input ends inside the header or an element.
+/// - [`io::ErrorKind::InvalidData`]: the header varint's tenth byte is above 1 (more than 64
+///   bits; upstream rejects it too), or the header declares more than 50,000,000 elements.
+///   The count limit is a deliberate deviation: upstream has none, and rejects a count only
+///   when its bytes are missing. Here a short input declaring a huge count is rejected
+///   before anything is reserved for it.
+///
+/// Any other error of the reader is returned as it is. Nothing else is validated: every
+/// width of 1–4 bytes and every value is accepted, as upstream.
 pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
     let size_len = read_uvarint(r)?;
     let count = (size_len / 4) as usize; // sizeof(u32) == 4
@@ -109,7 +135,11 @@ pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
         ));
     }
     let len = ((size_len & 3) + 1) as usize;
-    let mut result = Vec::with_capacity(count);
+    // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
+    // declaring a huge count must not reserve memory for it). Not even a capped reservation:
+    // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
+    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    let mut result = Vec::new();
     for _ in 0..count {
         result.push(decode_uint_with_length(r, len)? as u32);
     }
@@ -120,7 +150,10 @@ pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
 ///
 /// # Errors
 ///
-/// Returns an error if the data is malformed or the read fails.
+/// As [`decode_uint_vector_u32`]: [`io::ErrorKind::UnexpectedEof`] for a truncated input,
+/// and [`io::ErrorKind::InvalidData`] for a header varint whose tenth byte is above 1 or a
+/// count above 50,000,000 elements (the deliberate deviation described there). Every width
+/// of 1–8 bytes and every value is accepted, as upstream.
 pub fn decode_uint_vector_u64(r: &mut dyn Read) -> io::Result<Vec<u64>> {
     let size_len = read_uvarint(r)?;
     let count = (size_len / 8) as usize; // sizeof(u64) == 8
@@ -131,7 +164,11 @@ pub fn decode_uint_vector_u64(r: &mut dyn Read) -> io::Result<Vec<u64>> {
         ));
     }
     let len = ((size_len & 7) + 1) as usize;
-    let mut result = Vec::with_capacity(count);
+    // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
+    // declaring a huge count must not reserve memory for it). Not even a capped reservation:
+    // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
+    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    let mut result = Vec::new();
     for _ in 0..count {
         result.push(decode_uint_with_length(r, len)?);
     }
@@ -264,3 +301,7 @@ mod tests {
         assert_eq!(get_uint_with_length(&[], 0), 0);
     }
 }
+
+#[cfg(test)]
+#[path = "encoded_uint_vector_tests.rs"]
+mod encoded_uint_vector_tests;

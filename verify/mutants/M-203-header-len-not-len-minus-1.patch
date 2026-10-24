@@ -1,0 +1,18 @@
+Mutant: M-203
+Targets: P-UV-01
+Expect-Fail: cd_uv::p_uv_01_enc__n1
+Defect: encode_uint_vector_u64 writes the width as len instead of len - 1 (quickstart §4)
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+index 459f2bf..300cf35 100644
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -101,7 +101,7 @@ pub fn encode_uint_vector_u32(v: &[u32], w: &mut dyn Write) -> io::Result<()> {
+ pub fn encode_uint_vector_u64(v: &[u64], w: &mut dyn Write) -> io::Result<()> {
+     let one_bits: u64 = v.iter().fold(1u64, |acc, &x| acc | x);
+     let len = byte_length_u64(one_bits);
+-    let size_len = (v.len() as u64 * 8) | (len as u64 - 1);
++    let size_len = (v.len() as u64 * 8) | (len as u64);
+     write_uvarint(w, size_len)?;
+     for &x in v {
+         encode_uint_with_length(w, x, len)?;

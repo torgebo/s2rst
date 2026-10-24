@@ -1,0 +1,18 @@
+Mutant: M-647
+Targets: P-AGNRM-01
+Expect-Fail: 
+Test: core --lib s1::angle::angle_tests
+Defect: the FR-021 fix removed: `normalized` reduces with the old inexact formula (K7)
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -179,7 +179,7 @@
+         // (Sterbenz: π ≤ |r| ≤ 2·2π), and at |r| = π either choice ends at π, as upstream maps
+         // −π to π (spec 007 FR-021, research R6).
+         let y = 2.0 * PI;
+-        let r = self.0 % y;
++        let r = self.0 - (self.0 / y).round() * y;
+         if r > PI {
+             Angle(r - y)
+         } else if r <= -PI {
