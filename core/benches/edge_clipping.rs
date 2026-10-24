@@ -8,7 +8,8 @@
 //! Benchmarks ported from C++: `s2edge_clipping_test.cc`
 //! `BM_EdgeClippingDisjoint`
 #![allow(missing_docs, clippy::exit, reason = "benchmarks")]
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+#![allow(unused_qualifications, reason = "gungraun macro expansion")]
+use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
 use s2rst::s2::edge_clipping::clip_to_face;

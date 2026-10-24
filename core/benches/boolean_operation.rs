@@ -6,7 +6,8 @@
 // Version 2.0, and are Copyright Google Inc. See LICENSE.
 
 #![allow(missing_docs, clippy::exit, reason = "benchmarks")]
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+#![allow(unused_qualifications, reason = "gungraun macro expansion")]
+use gungraun::{library_benchmark, library_benchmark_group, main};
 
 use s2rst::s2::boolean_operation::{OpType, Options, S2BooleanOperation};
 use s2rst::s2::builder::lax_polygon_layer::LaxPolygonLayer;

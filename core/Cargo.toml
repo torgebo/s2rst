@@ -31,7 +31,7 @@ geo-types = { version = "0.7", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["plotters", "cargo_bench_support"] }
-iai-callgrind = "0.16.1"
+gungraun = "0.20.0"
 quickcheck = "1.0.3"
 quickcheck_macros = "1.1.0"
 rand = { version = "0.8", features = ["small_rng"] }
@@ -231,8 +231,8 @@ name = "uv_edge_clipper"
 harness = false
 
 # --- Wall-clock Criterion benches ---
-# These mirror the iai-callgrind benches by name with a `wall_` prefix so
-# `cargo bench --bench predicates` still invokes the iai-callgrind harness
+# These mirror the Gungraun benches by name with a `wall_` prefix so
+# `cargo bench --bench predicates` still invokes the Gungraun harness
 # and `cargo bench --bench wall_predicates` invokes the Criterion one.
 # Added progressively; start with the P0 hot paths.
 

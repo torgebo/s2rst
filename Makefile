@@ -38,8 +38,9 @@ test: ## Run the full local verification suite (check, fmt, clippy, core/python/
 # ===== Phase 0 benchmarking infrastructure =====
 #
 # Two harnesses live side-by-side:
-#   * iai-callgrind  — deterministic instruction counts, used as the
-#                      regression gate. Bench targets are the plain names
+#   * Gungraun       — deterministic instruction counts, used as the
+#                      regression gate (formerly iai-callgrind; the
+#                      `iai` names below are kept for continuity). Bench targets are the plain names
 #                      (predicates, point_angle, edge_crossing, ...).
 #   * Criterion       — wall-clock, used to detect ILP/FMA/SIMD wins that do
 #                       not show in instruction count. Bench targets are
@@ -58,9 +59,9 @@ BASELINE_DIR := core/benches/baselines
 deny: ## Audit dependencies for license/security/advisory issues (cargo-deny)
 	cargo-deny check
 
-# Run the full iai-callgrind suite.
+# Run the full Gungraun (callgrind) suite.
 .PHONY: bench-iai
-bench-iai: ## Run the iai-callgrind benchmarks (deterministic instruction counts; the regression gate)
+bench-iai: ## Run the Gungraun benchmarks (deterministic instruction counts; the regression gate)
 	cargo bench -p s2rst $(foreach b,$(P0_IAI),--bench $(b))
 
 # Run the full Criterion wall-clock suite.
@@ -70,7 +71,7 @@ bench-wall: ## Run the Criterion wall-clock benchmarks
 
 # Both, in sequence.
 .PHONY: bench-all
-bench-all: bench-iai bench-wall ## Run both benchmark suites (iai-callgrind then Criterion)
+bench-all: bench-iai bench-wall ## Run both benchmark suites (Gungraun then Criterion)
 
 # Native-CPU Criterion run — enables FMA/AVX2/AVX-512 if the host has them.
 # Do NOT use for baselines; for tuning experiments only.
@@ -79,13 +80,13 @@ bench-native: ## Run the wall-clock benches with target-cpu=native (FMA/AVX2/AVX
 	RUSTFLAGS="-C target-cpu=native" \
 		cargo bench -p s2rst $(foreach b,$(P0_WALL),--bench $(b))
 
-# Record baselines: capture both iai and Criterion JSON output under
+# Record baselines: capture both Gungraun and Criterion JSON output under
 # $(BASELINE_DIR)/<date>-<rev>/.
 #
 # Exit gate for Phase 0: running this twice in a row must produce stable
 # numbers (± Criterion noise bands).
 .PHONY: baseline
-baseline: ## Record iai + Criterion baselines under core/benches/baselines/<date>-<rev>/
+baseline: ## Record Gungraun + Criterion baselines under core/benches/baselines/<date>-<rev>/
 	@set -e; \
 	rev=$$(git rev-parse --short HEAD); \
 	date=$$(date -u +%Y%m%d); \

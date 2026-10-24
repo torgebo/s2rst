@@ -8,7 +8,8 @@
 //! Benchmarks ported from C++: `s2builder_test.cc`, `s2builderutil_find_polygon_degeneracies_test.cc`
 //! `BM_NearlyParallelCrossingEdges`, `BM_FindPolygonDegeneracies`
 #![allow(missing_docs, clippy::exit, reason = "benchmarks")]
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+#![allow(unused_qualifications, reason = "gungraun macro expansion")]
+use gungraun::{library_benchmark, library_benchmark_group, main};
 
 use s2rst::s2::LatLng;
 use s2rst::s2::builder::polygon_layer::S2PolygonLayer;

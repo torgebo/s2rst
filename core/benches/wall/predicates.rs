@@ -8,7 +8,7 @@
 #![allow(missing_docs, clippy::exit, reason = "benchmarks")]
 //! Wall-clock mirror of `benches/predicates.rs`.
 //!
-//! Input points and function calls MUST match the iai-callgrind benchmarks
+//! Input points and function calls MUST match the Gungraun benchmarks
 //! 1:1 so numbers are directly comparable.
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};

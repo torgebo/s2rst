@@ -8,8 +8,8 @@
 #![allow(missing_docs, clippy::exit, reason = "benchmarks")]
 //! Wall-clock mirror of `benches/shape_index.rs` build benches.
 //!
-//! Phase 7 (rayon per-face parallelism) needs cycle-level numbers; iai-
-//! callgrind sees instruction count but cannot show wall-clock parallel
+//! Phase 7 (rayon per-face parallelism) needs cycle-level numbers; Gungraun
+//! sees instruction count but cannot show wall-clock parallel
 //! speedup. Inputs match `benches/shape_index.rs` 1:1 — `build_polyline_*`
 //! and `build_10000_polyline_shapes` are the parallel-eligible polyline-only
 //! workloads.
@@ -20,7 +20,7 @@ use s2rst::s2::shape_index::ShapeIndex;
 use s2rst::s2::{LatLng, Point};
 
 // Mirrors `make_zigzag_points` from `benches/shape_index.rs` so the wall
-// numbers compare 1:1 with the iai bench.
+// numbers compare 1:1 with the Gungraun bench.
 #[inline(never)]
 fn make_zigzag_points(n: usize) -> Vec<Point> {
     (0..n)

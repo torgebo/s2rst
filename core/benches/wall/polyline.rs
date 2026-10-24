@@ -9,9 +9,9 @@
 //! Wall-clock mirror of `benches/polyline.rs` length and centroid groups.
 //!
 //! Phase 2 (ILP in reductions) needs cycle-level numbers on the long-tail
-//! sums; iai-callgrind sees the per-instruction count but cannot show the
+//! sums; Gungraun sees the per-instruction count but cannot show the
 //! benefit of breaking the accumulator dependency chain. Inputs match the
-//! iai bench 1:1 so a `--bench polyline` and `--bench wall_polyline`
+//! Gungraun bench 1:1 so a `--bench polyline` and `--bench wall_polyline`
 //! describe the same workload.
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};

@@ -8,7 +8,8 @@
 //! Benchmarks ported from C++: `s2latlng_rect_bounder_test.cc`
 //! `BM_AddPoints`, `BM_AddLatLngAsPoints`, `BM_AddLatLngAsLatLng`
 #![allow(missing_docs, clippy::exit, reason = "benchmarks")]
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+#![allow(unused_qualifications, reason = "gungraun macro expansion")]
+use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
 use s2rst::s2::latlng_rect_bounder::LatLngRectBounder;
