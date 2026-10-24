@@ -19,7 +19,7 @@ use crate::angle::PyAngle;
 
 /// A snap function that does not move vertices; `snap_radius` only controls the
 /// minimum vertex separation.
-#[pyclass(skip_from_py_object, name = "IdentitySnapFunction", module = "s2rst")]
+#[pyclass(name = "IdentitySnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyIdentitySnapFunction {
     snap_radius: Angle,
@@ -54,7 +54,7 @@ impl PyIdentitySnapFunction {
 }
 
 /// A snap function that snaps vertices to S2 cell centers at a given level.
-#[pyclass(skip_from_py_object, name = "S2CellIdSnapFunction", module = "s2rst")]
+#[pyclass(name = "S2CellIdSnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyS2CellIdSnapFunction {
     level: u8,
@@ -89,7 +89,7 @@ impl PyS2CellIdSnapFunction {
 
 /// A snap function that snaps vertices to integer lat/lng coordinates with the
 /// given power-of-ten `exponent` (e.g. 6 for E6 / micro-degrees).
-#[pyclass(skip_from_py_object, name = "IntLatLngSnapFunction", module = "s2rst")]
+#[pyclass(name = "IntLatLngSnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyIntLatLngSnapFunction {
     exponent: i32,

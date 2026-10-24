@@ -970,7 +970,7 @@ impl Graph {
                 e = next;
             }
             if loop_type == LoopType::Simple {
-                debug_assert!(path.is_empty());
+                debug_assert_eq!(path, Vec::<EdgeId>::new());
             } else {
                 Self::canonicalize_loop_order(&min_input_ids, &mut path);
                 loops.push(std::mem::take(&mut path));
@@ -1150,7 +1150,7 @@ impl Graph {
                     e = next;
                 }
                 if loop_type == LoopType::Simple {
-                    debug_assert!(path.is_empty());
+                    debug_assert_eq!(path, Vec::<EdgeId>::new());
                 } else {
                     Self::canonicalize_loop_order(&min_input_ids, &mut path);
                     component[slot as usize].push(path);

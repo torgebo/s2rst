@@ -14,7 +14,7 @@ use crate::interval::PyR1Interval;
 // ---------------------------------------------------------------------------
 
 /// A point (or vector) in 2D Euclidean space.
-#[pyclass(skip_from_py_object, name = "R2Point", module = "s2rst")]
+#[pyclass(name = "R2Point", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyR2Point(pub(crate) r2::Point);
 
@@ -147,7 +147,7 @@ impl PyR2Point {
 // ---------------------------------------------------------------------------
 
 /// A vector in 3D Euclidean space. Foundation type for S2Point.
-#[pyclass(skip_from_py_object, name = "Vector", module = "s2rst")]
+#[pyclass(name = "Vector", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyVector(pub(crate) r3::Vector);
 
@@ -312,7 +312,7 @@ impl PyVector {
 // ---------------------------------------------------------------------------
 
 /// A 3x3 matrix in row-major order.
-#[pyclass(skip_from_py_object, name = "Matrix3x3", module = "s2rst")]
+#[pyclass(name = "Matrix3x3", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyMatrix3x3(pub(crate) r3::Matrix3x3);
 
@@ -426,7 +426,7 @@ impl PyMatrix3x3 {
 // ---------------------------------------------------------------------------
 
 /// A closed axis-aligned rectangle in the (x, y) plane.
-#[pyclass(skip_from_py_object, name = "R2Rect", module = "s2rst")]
+#[pyclass(name = "R2Rect", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyR2Rect(pub(crate) r2::Rect);
 

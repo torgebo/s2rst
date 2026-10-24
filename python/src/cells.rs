@@ -379,7 +379,7 @@ impl PyCellId {
 // ---------------------------------------------------------------------------
 
 /// A concrete S2 cell with precomputed geometric bounds.
-#[pyclass(skip_from_py_object, name = "Cell", module = "s2rst")]
+#[pyclass(name = "Cell", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyCell(pub(crate) s2::Cell);
 
