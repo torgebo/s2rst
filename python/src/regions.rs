@@ -287,9 +287,27 @@ impl PyRect {
     }
 
     /// A rectangle with the given center and size (as LatLng).
+    ///
+    /// Raises `ValueError` if the center's longitude is outside [-π, π] or NaN, or the size's
+    /// longitude is NaN, which the core checks only in debug builds.
     #[classmethod]
-    fn from_center_size(_cls: &Bound<'_, PyType>, center: &PyLatLng, size: &PyLatLng) -> Self {
-        PyRect(s2::Rect::from_center_size(center.0, size.0))
+    fn from_center_size(
+        _cls: &Bound<'_, PyType>,
+        center: &PyLatLng,
+        size: &PyLatLng,
+    ) -> PyResult<Self> {
+        let lng = center.0.lng.radians();
+        if lng.is_nan() || lng.abs() > std::f64::consts::PI {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "center longitude must be in [-pi, pi], got {lng}"
+            )));
+        }
+        if size.0.lng.radians().is_nan() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "size longitude must not be NaN",
+            ));
+        }
+        Ok(PyRect(s2::Rect::from_center_size(center.0, size.0)))
     }
 
     // --- Accessors ---

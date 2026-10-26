@@ -1370,7 +1370,7 @@ impl S2Builder {
                 chain.push(site_id);
             }
         }
-        debug_assert_ne!(*chain, Vec::<usize>::new());
+        debug_assert!(!chain.is_empty());
     }
 
     /// Adds a new extra site and records which edges need resnapping.

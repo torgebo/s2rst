@@ -423,6 +423,11 @@ impl S2Decode for CellUnion {
         if n > MAX_ENCODED_CELLS {
             return Err(CellUnionDecodeError::TooManyCells(n).into());
         }
+        // A capped reservation (at most `MAX_PREALLOC` ids, 512 KiB), so a short input that
+        // declares a huge count reserves little. The spec 003 vector decoders reserve nothing
+        // instead, even where the length is known, because any reservation sized from decoded
+        // data puts them out of their Kani proofs' reach; this decoder's proofs (spec 002,
+        // `cu_enc`) hold with it.
         let mut ids: Vec<CellId> = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
         for _ in 0..n {
             let id = CellId::decode(r)?;

@@ -7,11 +7,11 @@ diff --git a/core/src/s2/point.rs b/core/src/s2/point.rs
 --- a/core/src/s2/point.rs
 +++ b/core/src/s2/point.rs
 @@ -171,7 +171,7 @@
-     /// upstream's `std::min(4.0, …)`.
+     /// to 4, as upstream's `std::min(4.0, …)`.
      #[inline]
      pub fn chord_angle(self, other: Point) -> ChordAngle {
--        ChordAngle::from_length2((self.0 - other.0).norm2().min(4.0))
-+        ChordAngle::from_length2((self.0 + other.0).norm2().min(4.0))
+-        ChordAngle::from_length2((self.0 - other.0).norm2())
++        ChordAngle::from_length2((self.0 + other.0).norm2())
      }
  
      /// Returns a stable angle between this point and `other`, using

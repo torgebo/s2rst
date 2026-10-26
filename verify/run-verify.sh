@@ -22,15 +22,17 @@
 #   VERIFY_HARNESS_TIMEOUT  per-harness time limit (default 12m, the R15 hard limit on CI;
 #                           use 8m on a workstation as the CI proxy). Uses Kani's unstable
 #                           --harness-timeout.
+#   VERIFY_BATCH            harnesses per Kani driver (default: 32 per 4 GiB of the ceiling;
+#                           the driver keeps memory for every harness it has run, KI-010)
 #   VERIFY_PLAYBACK         0 skips the concrete-playback re-run of failed harnesses
 #                           (run-mutants.sh sets it: a kill needs only the FAILED status, and
 #                           the re-run can take as long as the time limit)
 #
 # Statuses: SUCCESSFUL, FAILED, OOM (hit the ceiling, in the solver or before it: CBMC's
 # exit status 6), TIMEOUT (hit the time limit), ERROR (the tool failed without a failed
-# check), KNOWN-DEFECT D-NNN (listed in known-defects.txt), KNOWN-TIMEOUT (a TIMEOUT listed
-# in known-timeouts.txt, a recorded tool limit). The run fails on any FAILED/OOM/ERROR and
-# unlisted TIMEOUT, on any unsatisfied cover (Kani 0.68.0 itself exits 0 then), on a stale
+# check), NOT-RUN (its Kani driver crashed before reaching it), KNOWN-DEFECT D-NNN (listed in
+# known-defects.txt), KNOWN-TIMEOUT (a TIMEOUT listed in known-timeouts.txt, a recorded tool
+# limit). The run fails on any FAILED/OOM/ERROR/NOT-RUN and unlisted TIMEOUT, on any unsatisfied cover (Kani 0.68.0 itself exits 0 then), on a stale
 # known-defect or known-timeout entry, and when the memory backstop is hit. Failed harnesses
 # are re-run with concrete playback, so the output shows a concrete counterexample.
 set -euo pipefail
@@ -109,6 +111,29 @@ if ! cargo kani --only-codegen "${stub_flag[@]}" "$@" > "$log_dir/codegen.log" 2
     exit 1
 fi
 
+# ---- the harness list, for step 2's batches ---------------------------------------------
+# Kani's driver keeps about 20 MB for each harness it has run until it exits (KI-010: 2.3 GB
+# after 127 harnesses), under the same `ulimit -v` as the harnesses, so one driver cannot
+# run the whole suite. Step 2 runs the harnesses in batches, one driver each. The list is
+# the metadata of the build above, which holds exactly the harnesses "$@" selects; cargo
+# hard-links that build's rlib to debug/libs2rst_verify.rlib, which finds its directory.
+harnesses="$log_dir/harnesses.txt"
+: > "$harnesses"
+listed=false
+rlib=$(ls "${CARGO_TARGET_DIR:-target}"/kani/*/debug/libs2rst_verify.rlib 2> /dev/null | head -n 1)
+if [ -n "$rlib" ]; then
+    built=$(find "$(dirname "$rlib")/build/s2rst-verify" -samefile "$rlib" 2> /dev/null | head -n 1)
+    meta=$(ls "$(dirname "${built:-/nonexistent/x}")"/*.kani-metadata.json 2> /dev/null | head -n 1)
+    if [ -n "$meta" ]; then
+        python3 -c 'import json, sys
+for h in sorted(p["pretty_name"] for p in json.load(open(sys.argv[1]))["proof_harnesses"]):
+    print(h)' "$meta" > "$harnesses" && listed=true
+    fi
+fi
+# 32 harnesses at the default 4 GiB ceiling: a batch of 64 peaked at 3.6 GB (KI-010).
+batch=${VERIFY_BATCH:-$(( ceiling_kib / (128 * 1024) ))}
+[ "$batch" -lt 1 ] && batch=1
+
 # ---- the memory guard ------------------------------------------------------------------
 backstop=()
 unit=""
@@ -156,7 +181,7 @@ backstop_hit() {   # $1 = unit suffix
 # "Checking harness" line (a TIMEOUT block has no "VERIFICATION RESULT:" line).
 IFS= read -r -d '' parse_py <<'PY' || true
 import re, sys, time
-out, progress_path, known_path, timeouts_path = sys.argv[1:5]
+out, progress_path, known_path, timeouts_path, listed_path = sys.argv[1:6]
 def entries(path):
     d = {}
     for line in open(path):
@@ -245,6 +270,9 @@ for line in sys.stdin:
         cur = None
 for h in started:                      # started without a result: the run was cut short
     res.setdefault(h, new())
+for h in entries(listed_path):         # never started: its driver died first
+    if h not in res:
+        res[h] = dict(new(), status='NOT-RUN')
 for h in sorted(res):
     show(h)
 with open(out, 'w') as f:
@@ -261,21 +289,57 @@ progress="$log_dir/progress.log"
 echo "run-verify: jobs=$jobs, ceiling $(( ceiling_kib / 1024 )) MiB and" \
      "${VERIFY_HARNESS_TIMEOUT:-12m} per harness, playback $(( playback_kib / 1024 )) MiB," \
      "cgroup backstop $([ -n "$unit" ] && echo on || echo off)"
+if $listed; then
+    n_listed=$(wc -l < "$harnesses")
+    echo "run-verify: $n_listed harnesses in batches of up to $batch, one Kani driver each"
+else
+    echo "run-verify: WARNING: no harness list from the build; one Kani driver runs every" \
+         "harness, and it runs out of memory after a few hundred (KI-010)" >&2
+fi
 echo "run-verify: one line per harness as it finishes (also verify/$progress)"
+
+# Runs the batches one after the other (each with $jobs jobs), or "$@" in one driver
+# without a list. Writes the last nonzero exit status, and any backstop hit, to $log_dir.
+rm -f "$log_dir/kani_rc" "$log_dir/backstop"
+run_main() {
+    local rc=0 r i=0 names=() sel
+    if ! $listed; then
+        guarded main cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" "${time_limit[@]}" \
+            "$@" < /dev/null 2>&1
+        rc=$?
+        backstop_hit main && echo main >> "$log_dir/backstop"
+    else
+        mapfile -t names < "$harnesses"
+        while [ "$i" -lt "${#names[@]}" ]; do
+            sel=()
+            for h in "${names[@]:i:batch}"; do sel+=(--harness "$h"); done
+            guarded "main$i" cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" \
+                "${time_limit[@]}" "${build_args[@]}" --exact "${sel[@]}" < /dev/null 2>&1
+            r=$?
+            [ "$r" -ne 0 ] && rc=$r
+            backstop_hit "main$i" && echo "main$i" >> "$log_dir/backstop"
+            i=$(( i + batch ))
+        done
+    fi
+    echo "$rc" > "$log_dir/kani_rc"
+}
 set +e
-guarded main cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" "${time_limit[@]}" "$@" \
-    < /dev/null 2>&1 | tee "$log" \
-    | python3 -c "$parse_py" "$results" "$progress" known-defects.txt known-timeouts.txt
+run_main "$@" | tee "$log" \
+    | python3 -c "$parse_py" "$results" "$progress" known-defects.txt known-timeouts.txt "$harnesses"
 rcs=("${PIPESTATUS[@]}")
 set -e
-kani_rc=${rcs[0]}
-if backstop_hit main; then
+kani_rc=$(cat "$log_dir/kani_rc" 2> /dev/null || echo 1)
+if [ -s "$log_dir/backstop" ]; then
     echo "run-verify: memory backstop hit (cgroup oom-kill); log: verify/$log" >&2
     exit 1
 fi
 if [ "${rcs[1]}" -ne 0 ] || [ "${rcs[2]}" -ne 0 ]; then
     echo "run-verify: logging or parsing the run failed (tee ${rcs[1]}, parser ${rcs[2]})" >&2
     exit 1
+fi
+if grep -q '^No exit code?' "$log"; then
+    echo "run-verify: Kani's driver crashed; harnesses it had not finished are ERROR or" \
+         "NOT-RUN (KI-010; log: verify/$log)" >&2
 fi
 echo "run-verify: main run done; the report follows (sorted, with OOM and counterexamples)"
 

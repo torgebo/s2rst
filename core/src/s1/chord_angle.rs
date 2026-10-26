@@ -76,20 +76,67 @@ const MAX_LENGTH2: f64 = 4.0;
 pub struct ChordAngle(f64);
 
 /// Deserialises the squared length, a bare number as the derived `Serialize` writes it, and
-/// rejects it unless it is canonical (−1, a length in `[0, 4]`, or +∞), with an error naming
-/// the rule (spec 007 FR-020). A canonical value is returned as read, bit for bit. A derived
-/// impl would accept any number, a way to build a value no constructor returns (spec 007 K6).
+/// returns a canonical value (spec 007 FR-020):
+///
+/// - a length in `[0, 4]`, −1 or +∞ is returned as read, bit for bit;
+/// - any other negative number, −∞ included, gives [`NEGATIVE`](Self::NEGATIVE), as
+///   [`from_length2`](Self::from_length2) and the binary decoders do. Versions before 0.5
+///   kept negative lengths, so their JSON for an empty cap can hold one (−1/π for
+///   `from_center_area(c, -1.0)`);
+/// - in a human-readable format, `null` gives [`INFINITY`](Self::INFINITY): `serde_json`
+///   writes +∞ as `null`;
+/// - anything else (a length above 4, NaN) is an error naming the rule.
+///
+/// A derived impl would accept any number, a way to build a value no constructor returns
+/// (spec 007 K6).
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for ChordAngle {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de::Error;
+        use serde::de::{Error, Visitor};
 
-        let l = f64::deserialize(deserializer)?;
-        if l == -1.0 || (0.0..=MAX_LENGTH2).contains(&l) || l == f64::INFINITY {
+        /// A number, or `null` for +∞ (what `serde_json` writes for it).
+        struct Length2;
+
+        impl Visitor<'_> for Length2 {
+            type Value = f64;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a squared chord length, or null for INFINITY")
+            }
+
+            fn visit_f64<E: Error>(self, v: f64) -> Result<f64, E> {
+                Ok(v)
+            }
+
+            fn visit_i64<E: Error>(self, v: i64) -> Result<f64, E> {
+                Ok(v as f64)
+            }
+
+            fn visit_u64<E: Error>(self, v: u64) -> Result<f64, E> {
+                Ok(v as f64)
+            }
+
+            fn visit_unit<E: Error>(self) -> Result<f64, E> {
+                Ok(f64::INFINITY)
+            }
+
+            fn visit_none<E: Error>(self) -> Result<f64, E> {
+                Ok(f64::INFINITY)
+            }
+        }
+
+        let l = if deserializer.is_human_readable() {
+            deserializer.deserialize_any(Length2)?
+        } else {
+            f64::deserialize(deserializer)?
+        };
+        if (0.0..=MAX_LENGTH2).contains(&l) || l == -1.0 || l == f64::INFINITY {
             Ok(ChordAngle(l))
+        } else if l < 0.0 {
+            Ok(ChordAngle::NEGATIVE)
         } else {
             Err(D::Error::custom(format_args!(
-                "{l} is not a canonical chord angle length (-1, [0, 4] or +inf)"
+                "{l} is not a chord angle length (a negative number, [0, 4] or +inf)"
             )))
         }
     }

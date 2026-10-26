@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use crate::angle::Angle;
 use crate::cap::Cap;
 use crate::cell_id::CellId;
+use crate::error::js_err;
 use crate::latlng::LatLng;
 use crate::point::Point;
 
@@ -39,9 +40,21 @@ impl Rect {
     }
 
     /// Create from center and size (both as LatLng).
+    ///
+    /// Throws if the center's longitude is outside [-π, π] or NaN, or the size's longitude is
+    /// NaN, which the core checks only in debug builds.
     #[wasm_bindgen(js_name = "fromCenterSize")]
-    pub fn from_center_size(center: &LatLng, size: &LatLng) -> Rect {
-        Rect(s2rst::s2::Rect::from_center_size(center.0, size.0))
+    pub fn from_center_size(center: &LatLng, size: &LatLng) -> Result<Rect, JsValue> {
+        let lng = center.0.lng.radians();
+        if lng.is_nan() || lng.abs() > std::f64::consts::PI {
+            return Err(js_err(format!(
+                "center longitude must be in [-pi, pi], got {lng}"
+            )));
+        }
+        if size.0.lng.radians().is_nan() {
+            return Err(js_err("size longitude must not be NaN"));
+        }
+        Ok(Rect(s2rst::s2::Rect::from_center_size(center.0, size.0)))
     }
 
     #[wasm_bindgen(js_name = "isValid")]

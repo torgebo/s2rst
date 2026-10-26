@@ -471,9 +471,25 @@ impl PyR2Rect {
     }
 
     /// Create from center point and size (width, height).
+    ///
+    /// A negative component empties its axis. Raises `ValueError` if exactly one axis is
+    /// empty: the rectangle would be invalid, which the core checks only in debug builds.
     #[classmethod]
-    fn from_center_size(_cls: &Bound<'_, PyType>, center: &PyR2Point, size: &PyR2Point) -> Self {
-        PyR2Rect(r2::Rect::from_center_size(center.0, size.0))
+    fn from_center_size(
+        _cls: &Bound<'_, PyType>,
+        center: &PyR2Point,
+        size: &PyR2Point,
+    ) -> PyResult<Self> {
+        // The core's own axis formula, so the check agrees with its `is_valid` bit for bit.
+        let axis_empty =
+            |c: f64, s: f64| s2rst::r1::Interval::new(c - 0.5 * s, c + 0.5 * s).is_empty();
+        if axis_empty(center.0.x, size.0.x) != axis_empty(center.0.y, size.0.y) {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "size ({}, {}) empties one axis but not the other: an invalid rectangle",
+                size.0.x, size.0.y
+            )));
+        }
+        Ok(PyR2Rect(r2::Rect::from_center_size(center.0, size.0)))
     }
 
     /// X-axis interval.

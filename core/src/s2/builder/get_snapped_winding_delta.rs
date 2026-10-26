@@ -84,8 +84,8 @@ fn build_chain(
     chain_out: &mut Vec<Point>,
     error: &mut S2Error,
 ) -> bool {
-    debug_assert_eq!(*chain_in, Vec::<Point>::new());
-    debug_assert_eq!(*chain_out, Vec::<Point>::new());
+    debug_assert!(chain_in.is_empty());
+    debug_assert!(chain_out.is_empty());
 
     // First look for an incoming edge to the reference vertex.
     let mut start_key: Option<OrderedPoint> = None;
@@ -166,7 +166,7 @@ fn build_chain(
 /// Returns the change in winding number along the edge AB with respect to
 /// the given edge chain.
 fn get_edge_winding_delta(a: &Point, b: &Point, chain: &[Point]) -> i32 {
-    debug_assert_ne!(chain, Vec::<Point>::new());
+    debug_assert!(!chain.is_empty());
     let mut delta = 0;
     let mut crosser = EdgeCrosser::new(*a, *b);
     crosser.restart_at(chain[0]);

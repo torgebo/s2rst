@@ -3,6 +3,8 @@
 
 use wasm_bindgen::prelude::*;
 
+use crate::error::js_err;
+
 // ---------------------------------------------------------------------------
 // Angle
 // ---------------------------------------------------------------------------
@@ -321,29 +323,51 @@ impl ChordAngle {
         self.0.max_angle_error()
     }
 
-    pub fn sin(&self) -> f64 {
-        self.0.sin()
+    /// Throws for `NEGATIVE` and `INFINITY`.
+    pub fn sin(&self) -> Result<f64, JsValue> {
+        Ok(non_special(self.0, "sin")?.sin())
     }
-    pub fn sin2(&self) -> f64 {
-        self.0.sin2()
+    /// Throws for `NEGATIVE` and `INFINITY`.
+    pub fn sin2(&self) -> Result<f64, JsValue> {
+        Ok(non_special(self.0, "sin2")?.sin2())
     }
-    pub fn cos(&self) -> f64 {
-        self.0.cos()
+    /// Throws for `NEGATIVE` and `INFINITY`.
+    pub fn cos(&self) -> Result<f64, JsValue> {
+        Ok(non_special(self.0, "cos")?.cos())
     }
-    pub fn tan(&self) -> f64 {
-        self.0.tan()
+    /// Throws for `NEGATIVE` and `INFINITY`.
+    pub fn tan(&self) -> Result<f64, JsValue> {
+        Ok(non_special(self.0, "tan")?.tan())
     }
 
-    pub fn add(&self, other: &ChordAngle) -> ChordAngle {
-        ChordAngle(self.0 + other.0)
+    /// Throws if either operand is `NEGATIVE` or `INFINITY`.
+    pub fn add(&self, other: &ChordAngle) -> Result<ChordAngle, JsValue> {
+        Ok(ChordAngle(
+            non_special(self.0, "add")? + non_special(other.0, "add")?,
+        ))
     }
 
-    pub fn sub(&self, other: &ChordAngle) -> ChordAngle {
-        ChordAngle(self.0 - other.0)
+    /// Throws if either operand is `NEGATIVE` or `INFINITY`.
+    pub fn sub(&self, other: &ChordAngle) -> Result<ChordAngle, JsValue> {
+        Ok(ChordAngle(
+            non_special(self.0, "sub")? - non_special(other.0, "sub")?,
+        ))
     }
 
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string_js(&self) -> String {
         format!("{}", self.0)
     }
+}
+
+/// Returns `ca`, or an error if it is `NEGATIVE` or `INFINITY`. The core's trigonometry and
+/// arithmetic require a non-special chord angle and check it only in debug builds (upstream
+/// `ABSL_DCHECK`): a debug build would trap, and a release build returns a meaningless number.
+fn non_special(ca: s2rst::s1::ChordAngle, op: &str) -> Result<s2rst::s1::ChordAngle, JsValue> {
+    if ca.is_special() {
+        return Err(js_err(format!(
+            "{op} needs a chord angle other than NEGATIVE and INFINITY, got {ca}"
+        )));
+    }
+    Ok(ca)
 }
