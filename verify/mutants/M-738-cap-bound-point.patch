@@ -1,0 +1,17 @@
+Mutant: M-738
+Targets: P-CPREG-03
+Expect-Fail: cp_reg::p_cpreg_03, cp_bnd::p_cpbnd_01
+Defect: `cap_bound` is the centre's point cap (bounds too little)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -395,7 +395,7 @@
+     /// Returns this cap as its own bounding cap.
+     #[inline]
+     pub fn cap_bound(self) -> Cap {
+-        self
++        Cap::from_point(self.center)
+     }
+ 
+     /// Returns a bounding latitude-longitude rectangle for this cap.

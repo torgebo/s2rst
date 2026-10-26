@@ -1,0 +1,17 @@
+Mutant: M-711
+Targets: P-CPMEM-01
+Expect-Fail: cp_mem::p_cpmem_01
+Defect: `interior_contains_point` without the full-cap case (the antipode is outside)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -244,7 +244,7 @@
+     /// [`contains_point`](Cap::contains_point).
+     #[inline]
+     pub fn interior_contains_point(self, p: Point) -> bool {
+-        self.is_full() || self.center.chord_angle(p) < self.radius
++        self.center.chord_angle(p) < self.radius
+     }
+ 
+     /// Reports whether this cap contains the other cap.

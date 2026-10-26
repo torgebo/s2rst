@@ -1,0 +1,17 @@
+Mutant: M-703
+Targets: P-CPCON-02
+Expect-Fail: cp_con::p_cpcon_02
+Defect: `from_center_angle` does not clamp the angle to π
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -113,7 +113,7 @@
+     pub fn from_center_angle(center: Point, angle: Angle) -> Self {
+         // Match C++: clamp to π before converting to chord angle.
+         let clamped = if angle.radians() > PI {
+-            Angle::from_radians(PI)
++            angle
+         } else {
+             angle
+         };

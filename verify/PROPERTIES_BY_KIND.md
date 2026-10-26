@@ -7,18 +7,18 @@ mutants: [`PROPERTIES.md`](PROPERTIES.md) (`CellId`),
 [`cell_union/PROPERTIES.md`](cell_union/PROPERTIES.md) (`CellUnion`),
 [`decoding/PROPERTIES.md`](decoding/PROPERTIES.md) (the decoding layer) and
 [`values/PROPERTIES.md`](values/PROPERTIES.md) (the value types: `Cell`, `s1::Interval`,
-`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle` and `s1::Angle`). The operation
+`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle` and `s2::Cap`). The operation
 inventories carry the crash-freedom proofs.
 
 | Kind | It guarantees that… | Entries |
 |------|---------------------|---------|
 | [Never crashes](#never-crashes) | an operation finishes without a panic, an arithmetic overflow, undefined behaviour or a hang, whatever its input | every in-scope operation, plus 2 |
-| [Correct result](#correct-result) | an operation returns what the model says it should | 132 |
+| [Correct result](#correct-result) | an operation returns what the model says it should | 146 |
 | [Round trip](#round-trip) | converting a value there and back gives the original | 17 |
-| [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 19 |
+| [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 22 |
 | [Exact input](#exact-input) | a decoder or parser accepts exactly the well-formed inputs, returns what they say, consumes exactly them and rejects the rest | 17 |
-| [Validity](#validity) | a validity check answers exactly, and results are well formed | 12 |
-| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 30 |
+| [Validity](#validity) | a validity check answers exactly, and results are well formed | 14 |
+| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 39 |
 | [Model checks](#model-checks) | the models and restated copies that the proofs compare against are themselves right | 5, plus the links |
 
 ## Browsing the code by kind
@@ -182,6 +182,7 @@ The operation returns exactly what the model computes for the same input.
 | [P-CCNT-01](values/PROPERTIES.md) | One cell contains another exactly when the model's identifier containment holds, and two cells intersect exactly when one contains the other. | [`cl_cnt::p_ccnt_01`](src/cl_cnt.rs) | every pair of valid cells |
 | [P-CCNT-02](values/PROPERTIES.md) | The region interface agrees with the inherent operations, and a cell's covering is the union of its own identifier. | [`cl_cnt::p_ccnt_02`](src/cl_cnt.rs) | every pair of valid cells |
 | [P-CBND-03](values/PROPERTIES.md) | Edge k's u-v coordinate is the matching side of the bounds: bottom is v low, right is u high, top is v high, left is u low. | [`cl_bnd::p_cbnd_03`](src/cl_bnd.rs) | every valid cell and edge |
+| [P-CCAP-01](values/PROPERTIES.md) | The cell's bounding cap contains the cell's centre and four vertices (spec 008, from `Cap`'s `add_point` law). | [`cl_cnt::p_ccap_01`](src/cl_cnt.rs) (weekly) | every valid cell, by composition (stubs: the vertices, the centre's normalisation, the distance) |
 
 ### `s1::Interval`: validity, membership, relations, set operations and measures
 
@@ -275,7 +276,7 @@ The operation returns exactly what the model computes for the same input.
 | [P-PTORD-01](values/PROPERTIES.md) | `cmp_point` and `<` are upstream's lexicographic order, NaN included. | [`pt_ord::p_ptord_01`](src/pt_ord.rs) | every pair of triples |
 | [P-PTARI-01](values/PROPERTIES.md) | Negation, addition and subtraction are coordinate-wise, bit for bit; `−(−a)` is `a`, and `a − b` is `a + (−b)`. | [`pt_ari::p_ptari_01__*`](src/pt_ari.rs) | every pair of finite triples |
 | [P-PTORT-02](values/PROPERTIES.md) | `ortho` and `point_cross` are never the zero vector for a normalizable point. | [`pt_ort::p_ptort_02__*`](src/pt_ort.rs) (weekly) | every normalizable point in the box, every partner in it |
-| [P-PTDST-01](values/PROPERTIES.md) | The distance and the chord angle from a point to itself are zero; the chord angle is symmetric and at most a straight angle; the approximate equalities are reflexive. | [`pt_dst::p_ptdst_01__*`](src/pt_dst.rs) | every pair in the box, every finite tolerance `≥ 0`, except the chord angle's symmetry, which times out at 60 minutes in the weekly tier |
+| [P-PTDST-01](values/PROPERTIES.md) | The distance and the chord angle from a point to itself are zero; the chord angle is symmetric and at most a straight angle; the approximate equalities are reflexive. | [`pt_dst::p_ptdst_01__*`](src/pt_dst.rs) | every pair in the box, every finite tolerance `≥ 0`; the chord angle's symmetry by composition (spec 008's L-CP-03, L-CP-04) |
 ### `s1::ChordAngle`: construction, classifications, neighbours, error bounds and arithmetic
 
 | ID | What is guaranteed | Proved by | Holds for |
@@ -298,6 +299,25 @@ The operation returns exactly what the model computes for the same input.
 | [P-AGCNV-02](values/PROPERTIES.md) | Upstream's documented identities: whole degrees equal their E6 and E7 forms, E6 equals E7 times ten, and multiples of 45° are exactly multiples of π/4, at every power-of-two scale. | [`ag_cnv::p_agcnv_02__degrees`](src/ag_cnv.rs); `tests/angle_enumeration.rs` (enumeration) | every `i32` in range (enumerated); 45° multiples at scales `2⁻¹⁰⁰⁰` to `2⁹⁶⁰` |
 | [P-AGEF-02](values/PROPERTIES.md) | Converting an E5, E6 or E7 integer to an angle and back gives the integer. | `tests/angle_enumeration.rs` (enumeration) | every `i32` |
 | [P-AGNRM-01](values/PROPERTIES.md) | `normalized` is upstream's exact remainder by 2π, in (−π, π]. | — | not proven: Kani's `%` on `f64` is wrong (spec 007 research R0); the C++ vectors and an exact big-integer property test check it |
+
+
+### `s2::Cap`: construction, classifications, membership, growth, complement, bounds and equality
+
+| ID | What is guaranteed | Proved by | Holds for |
+|----|--------------------|-----------|-----------|
+| [P-CPCON-01](values/PROPERTIES.md) | The constructors keep their arguments or apply upstream's formulas (a negative length becomes `NEGATIVE`, option B); `empty()` and `full()` are upstream's. | [`cp_con::p_cpcon_01`](src/cp_con.rs), [`cp_con::p_cpcon_01__area`](src/cp_con.rs) (weekly) | every box point and `f64`; `from_center_area` not proven (timeout at 60 minutes) |
+| [P-CPCON-02](values/PROPERTIES.md) | `from_center_angle` clamps the angle to π, makes a negative angle empty, and never fails its validity check on a unit centre. | [`cp_con::p_cpcon_02`](src/cp_con.rs) | every unit centre and non-NaN angle, by composition |
+| [P-CPCLS-01](values/PROPERTIES.md) | `is_valid`, `is_empty` and `is_full` are upstream's, and a cap is never both empty and full. | [`cp_cls::p_cpcls_01`](src/cp_cls.rs) | every box cap, by composition |
+| [P-CPMEM-01](values/PROPERTIES.md) | A cap contains a point exactly when upstream's test says so; its interior is the strict test, inside it; a point cap contains its point. | [`cp_mem::p_cpmem_01`](src/cp_mem.rs) | every box cap and point, by composition |
+| [P-CPGRO-01](values/PROPERTIES.md) | After `add_point(p)` the cap contains `p`, and it did not shrink. | [`cp_gro::p_cpgro_01`](src/cp_gro.rs) | every box cap and point, by composition |
+| [P-CPGRO-02](values/PROPERTIES.md) | After `add_cap(b)` the cap contains `b`, and it did not shrink. | [`cp_gro::p_cpgro_02`](src/cp_gro.rs) | every pair of box caps, by composition |
+| [P-CPGRO-03](values/PROPERTIES.md) | Expanding a cap keeps it inside the result; an empty cap stays empty. | [`cp_gro::p_cpgro_03`](src/cp_gro.rs), [`cp_gro::p_cpgro_03__real`](src/cp_gro.rs) (weekly) | every box cap, every finite distance `≥ 0` |
+| [P-CPCMP-03](values/PROPERTIES.md) | Taking the complement twice gives the cap back where `4 − r²` is exact (every r² ≥ 2), within 2⁻⁵¹ elsewhere. | [`cp_cmp::p_cpcmp_03`](src/cp_cmp.rs) | every box cap neither empty nor full, r² ≥ 2⁻⁵¹ |
+| [P-CPBND-01](values/PROPERTIES.md) | The bounding cap is the cap itself, and the `Region` methods are the inherent ones. | [`cp_bnd::p_cpbnd_01`](src/cp_bnd.rs) | every box cap and point, by composition |
+| [P-CPBND-02](values/PROPERTIES.md) | The covering's level is upstream's and keeps the cells at least twice as wide as the radius. | [`cp_bnd::p_cpbnd_02`](src/cp_bnd.rs) | every finite radius |
+| [P-CPBND-03](values/PROPERTIES.md) | The covering has at most six cells. | [`cp_crash::c_cell_union_bound`](src/cp_crash.rs) (weekly) | not proven: timeout at 60 minutes; the C++ vectors check the covering |
+| [P-CPEQ-02](values/PROPERTIES.md) | Approximate equality is upstream's `ApproxEquals`, with the tolerance for the centres too. | [`cp_eq::p_cpeq_02`](src/cp_eq.rs) | every pair of box caps and every tolerance, by composition |
+| [P-CPDES-01](values/PROPERTIES.md) | Deserialisation accepts exactly the valid caps. | — | not proven: tested (`cap_tests`) |
 
 ## Round trip
 
@@ -352,6 +372,9 @@ so other S2 implementations read it.
 | [P-AGCNV-01](values/PROPERTIES.md) | The angle's degree and E-form conversions are upstream's products, bit for bit. | [`ag_cnv::p_agcnv_01__*`](src/ag_cnv.rs); `tests/angle_enumeration.rs` (enumeration) | every `i32` and `u32` (enumerated); every `f64` (weekly) |
 | [P-AGEF-01](values/PROPERTIES.md) | `e5`, `e6` and `e7` round to the nearest integer with ties to even, as C++ on x86-64, and saturate outside the `i32` range. | [`ag_eform::p_agef_01__*`](src/ag_eform.rs) | every angle, NaN and the infinities included (weekly) |
 | [P-AGARI-01](values/PROPERTIES.md) | The angle's arithmetic is the IEEE operations on radians, bit for bit. | [`ag_ari::p_agari_01__*`](src/ag_ari.rs) | every pair making no new NaN and dividing by no infinity: addition and subtraction per change, the products weekly; the quotients not proven (timeout at 60 minutes) |
+| [P-CPMEA-01](values/PROPERTIES.md) | A cap's height, area and centroid are upstream's formulas, bit for bit, and the area is never negative. | [`cp_mea::p_cpmea_01`](src/cp_mea.rs), [`cp_mea::p_cpmea_01__area`](src/cp_mea.rs) (weekly), [`cp_mea::p_cpmea_01__centroid`](src/cp_mea.rs) (weekly) | every box cap: the height, the area's sign and the area bit for bit (weekly, since D-009's fix); the centroid times out at 60 minutes |
+| [P-CPCMP-01](values/PROPERTIES.md) | A cap's complement is upstream's: the opposite centre and radius `4 − r²`, bit for bit. | [`cp_cmp::p_cpcmp_01`](src/cp_cmp.rs) | every box cap |
+| [P-CPBND-05](values/PROPERTIES.md) | `rect_bound`'s longitude reduction changes a value by exactly 0 or ±2π and lands in [−π, π]. | [`cp_bnd::p_cpbnd_05`](src/cp_bnd.rs) | every \|x\| ≤ 3π/2 (a drift-guarded copy) |
 ## Exact input
 
 The decoder or parser accepts exactly the well-formed inputs, returns the value they encode,
@@ -397,6 +420,8 @@ A validity check answers exactly, and an operation returns well-formed values.
 | [P-LVAL-02](values/PROPERTIES.md) | Every in-scope operation that returns a rectangle returns a valid one. | [`rl_val::p_lval_02__*`](src/rl_val.rs) | every input in each operation's domain |
 | [P-QVAL-02](values/PROPERTIES.md) | Every in-scope operation that returns a u-v rectangle returns a valid one. | [`ur_val::p_qval_02__constructors`](src/ur_val.rs), [`ur_val::p_qval_02__set_operations`](src/ur_val.rs), [`ur_val::p_qval_02__expanded`](src/ur_val.rs) | every input in each operation's domain |
 | [P-CAVAL-02](values/PROPERTIES.md) | Every way to build a chord angle gives a canonical value: −1, a length in [0, 4], or +∞ (option B). | [`ca_val::p_caval_02__*`](src/ca_val.rs) | every input of the constructors, every canonical value, every pair of lengths |
+| [P-CPCMP-02](values/PROPERTIES.md) | The complement of a valid cap is valid. | [`cp_cmp::p_cpcmp_02`](src/cp_cmp.rs) | every valid cap, by composition |
+| [P-CPBND-04](values/PROPERTIES.md) | A cap's bounding rectangle is valid, and empty exactly for the empty cap. | [`cp_bnd::p_cpbnd_04`](src/cp_bnd.rs) | every box cap, under the `asin`, `atan2`, `cos` contracts |
 ## Laws
 
 Relations that must hold between operations, or between an operation's arguments.
@@ -433,6 +458,15 @@ Relations that must hold between operations, or between an operation's arguments
 | [P-CAORD-01](values/PROPERTIES.md) | The chord angle's order is a total order on all its values, the reals' order. | [`ca_ord::p_caord_01`](src/ca_ord.rs) | every three canonical values |
 | [P-CANBR-03](values/PROPERTIES.md) | The chord angle's `successor` and `predecessor` undo each other. | [`ca_nbr::p_canbr_03`](src/ca_nbr.rs) | every canonical value |
 | [P-AGVAL-02](values/PROPERTIES.md) | Without NaN, the angle's order is total and its ties are exactly equality. | [`ag_val::p_agval_02`](src/ag_val.rs) | every three angles without NaN |
+| [P-CPREL-01](values/PROPERTIES.md) | `contains` is reflexive; the full cap contains every cap and every cap the empty one. | [`cp_rel::p_cprel_01`](src/cp_rel.rs) | every box cap |
+| [P-CPREL-02](values/PROPERTIES.md) | Containing a non-empty cap implies intersecting it, and so does the interiors' intersecting; the empty cap intersects nothing, and a cap without interior intersects no interior. | [`cp_rel::p_cprel_02`](src/cp_rel.rs) | every pair of box caps, by composition |
+| [P-CPREL-03](values/PROPERTIES.md) | Two caps intersect both ways or neither. | [`cp_rel::p_cprel_03`](src/cp_rel.rs) | every pair of box caps, by composition |
+| [P-CPEQ-01](values/PROPERTIES.md) | The generic equality laws hold for `Cap`; empty caps are all equal, and full caps. | [`cp_eq::p_cpeq_01`](src/cp_eq.rs) | every triple of box caps |
+| [P-CPREG-01](values/PROPERTIES.md) | The generic `Region` law holds for `Cap` with upstream's cell tests: containing a cell implies intersecting it. | [`cp_reg::p_cpreg_01__abstract`](src/cp_reg.rs), [`cp_reg::p_cpreg_01__real`](src/cp_reg.rs) (weekly) | every box cap and abstract cell, by composition |
+| [P-CPREG-02](values/PROPERTIES.md) | A cell the cap does not intersect has no vertex the cap contains. | [`cp_reg::p_cpreg_02`](src/cp_reg.rs) | every box cap and abstract cell, by composition |
+| [P-CPREG-03](values/PROPERTIES.md) | The bounding cap contains every point the cap contains. | [`cp_reg::p_cpreg_03`](src/cp_reg.rs) | every box cap and point, by composition |
+| [P-CPREG-04](values/PROPERTIES.md) | Every cell the cap contains lies in its covering. | — | not proven: the covering's level needs `asin`'s value, not its range |
+| [P-CPCOD-01](values/PROPERTIES.md) | Every valid cap round-trips through its encoding under its own equality. | [`cp_eq::p_cpcod_01`](src/cp_eq.rs) | every valid cap, by composition |
 ## Model checks
 
 The other proofs compare the library with the models (and Verus proves restated copies), so

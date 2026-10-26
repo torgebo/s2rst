@@ -6,7 +6,8 @@ implementation steps.
 
 State on branch `003-next-specs/1` at commit `537e7fd` (2026-10-07), with the six value types
 of specs 004–006 added on 2026-10-14 (sections 2.4–2.6) and spec 007's two on 2026-10-18
-(section 2.7; the counts in section 1 and the tables of sections 3 and 4 include them). Sources: the inventories (`verify/INVENTORY.md`,
+(section 2.7; the counts in section 1 and the tables of sections 3 and 4 include them), and
+spec 008's `Cap` on 2026-10-25 (section 2.9). Sources: the inventories (`verify/INVENTORY.md`,
 `verify/cell_union/INVENTORY.md`, `verify/decoding/INVENTORY.md`, `verify/values/INVENTORY.md`),
 their property catalogues and evaluations, and `cargo kani list` on the current tree.
 
@@ -22,13 +23,13 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 |---|---|
 | Crate size | 113,700 non-test lines in 127 files; `s2/` alone is 105,200, of which `builder/` 18,300 and `boolean_operation/` 6,300 |
 | Public items | 196 structs, 35 enums, 13 trait definitions (9 names; `Target` and `DistanceTarget` are defined in several query modules) |
-| Code the proofs exercise | about 6,500 lines (5.7 %): `cell_id.rs`, `cell_union.rs`, the four vector codec files, and the codec impls in `encoding.rs`; and the value types' files, about 9,400 lines with their tests' files left out (`s2/cell.rs`, `s1/interval.rs`, `r1/interval.rs`, `s2/rect.rs`, `r2/rect.rs`, `s2/point.rs`, `s1/chord_angle.rs`, `s1/angle.rs`). Not every line of those files is proven (section 2) |
-| Types with their own proof suite | `CellId` (spec 001), `CellUnion` (spec 002), the decoding layer (spec 003), `Cell` and `s1::Interval` (spec 004, section 2.4), `r1::Interval` and `s2::Rect` (spec 005, section 2.5), `r2::Rect` and `s2::Point` (spec 006, section 2.6), `s1::ChordAngle` and `s1::Angle` (spec 007, section 2.7) |
-| Types reached only through other proofs | `Level`, `Face`, `Cap` (section 2.8) |
-| Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for 2 methods of 1 implementor (`CellUnion`) and the generic laws for `Cell`; the equality laws for the eight value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
-| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 221 for the value types (spec 007 adds 36); 173 more weekly (91, 45, 37) and 75 for the value types (spec 007 adds 10); 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
+| Code the proofs exercise | about 6,500 lines (5.7 %): `cell_id.rs`, `cell_union.rs`, the four vector codec files, and the codec impls in `encoding.rs`; and the value types' files, about 9,400 lines with their tests' files left out (`s2/cell.rs`, `s1/interval.rs`, `r1/interval.rs`, `s2/rect.rs`, `r2/rect.rs`, `s2/point.rs`, `s1/chord_angle.rs`, `s1/angle.rs`, `s2/cap.rs`). Not every line of those files is proven (section 2) |
+| Types with their own proof suite | `CellId` (spec 001), `CellUnion` (spec 002), the decoding layer (spec 003), `Cell` and `s1::Interval` (spec 004, section 2.4), `r1::Interval` and `s2::Rect` (spec 005, section 2.5), `r2::Rect` and `s2::Point` (spec 006, section 2.6), `s1::ChordAngle` and `s1::Angle` (spec 007, section 2.7), `s2::Cap` (spec 008, section 2.9) |
+| Types reached only through other proofs | `Level`, `Face` (section 2.8) |
+| Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for 2 methods of 1 implementor (`CellUnion`) and the generic laws for `Cell` and `Cap` (three of `Cap`'s four, with lemma stubs); the codec round trip under `Cap`'s own equality; the equality laws for the nine value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
+| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`); 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
 | Verus | 5 restated codecs, 132 obligations, 17 s |
-| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 38 `M-6NN` for spec 007 (campaign pending) |
+| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007 and 41 `M-7NN` for spec 008, all killed |
 
 ## 2. Types with proofs
 
@@ -147,8 +148,10 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
   and `P=point`).
 - **Not proven:** comparisons of two normalisations (the checker's `sqrt` does not fix its
   result: P-PTVAL-02's normalising clause, P-PTORT-01), anything after `atan2` (P-PTDST-02), and
-  three statements that time out at 60 minutes, also on the points whose largest coordinate is
-  at least ½ (unit length, `point_cross`'s sign laws, the chord angle's symmetry). The C++ vectors and property tests check each.
+  two statements that time out at 60 minutes, also on the points whose largest coordinate is
+  at least ½ (unit length, `point_cross`'s sign laws). The C++ vectors and property tests check
+  each. The chord angle's symmetry, a third such timeout, is proven by composition since spec 008
+  (`cp_lem::l_cp_03`, `l_cp_04`: the differences negate exactly and their squares agree).
 - **Records:** `verify/values/INVENTORY.md` §5–6, `PROPERTIES.md` §6–7, the spec-006 part of
   `EVALUATION.md`, `MUTANTS.md` (`M-501` … `M-540`).
 
@@ -172,8 +175,9 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
   compared bit for bit time out at 12 minutes. In the weekly runs (2026-10-18), 6 of `Angle`'s
   are proven (6 to 16 minutes each), so P-AGCNV-01 and P-AGEF-01 are `proven`; `sin2`, `sin`
   and the two quotients time out at 60 minutes (`verify/known-timeouts.txt`).
-- **Not proven:** `normalized`'s value (Kani's `%` on `f64` is wrong); `ChordAngle`'s `sin2`
-  and `sin` and the angle's quotients (timeouts); everything through `asin` and `Angle::tan`.
+- **Not proven:** `normalized`'s value (Kani's `%` on `f64` is wrong, KI-002 in
+  `KANI_ISSUES.md`); `ChordAngle`'s `sin2` and `sin` and the angle's quotients (timeouts);
+  everything through `asin` and `Angle::tan`.
   The C++ vectors (bit for bit) and an exact big-integer property test check them.
 - **Records:** `verify/values/INVENTORY.md` §7–8, `PROPERTIES.md` §8–9, the spec-007 part of
   `EVALUATION.md`, `MUTANTS.md` (`M-601` … `M-648`, all 39 killed).
@@ -183,14 +187,51 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 | Type | What the proofs touch | What has no proof |
 |------|-----------------------|-------------------|
 | `Level`, `Face` (`coords.rs`) | built and read by every `CellId` harness; the Hilbert tables as `CellId`'s traversal uses them | the conversions as functions of their own (`st_to_ij`, `si_ti_to_st`), and the tables' own laws |
-| `Cap` | its codec and validity (`Cap::is_valid` is trusted, research R18) | containment, union, bounds, its `Region` impl |
+
+### 2.9 `s2::Cap` (spec 008)
+
+- **Scope:** 42 of 43 entries (the 32 inherent operations, `PartialEq`, the six `Region`
+  methods, the codec and `Deserialize`; `Display` excluded).
+- **Changed first (K1–K7, FR-017 to FR-023):** the covering level, the cell tests (upstream's
+  vertex-and-edge algorithm in place of the bounding-cap test), the complement's radius, the
+  longitude reduction of `rect_bound`, `approx_eq_with`'s centre tolerance, and a validating
+  `Deserialize`; each with a test that failed before. Then K8: the empty cap's covering is
+  upstream's four cells (it was none). Differential tests against new C++ vectors
+  (`cpp_cap_diff`) pin the remaining differences: K9 and U-015 (neither union always contains
+  both caps) and K10 (the region coverer, a follow-up).
+- **Two new methods.** *Function contracts* replace `asin`, `atan2` and `cos` (unsupported or
+  loosely modelled by the checker) by their ranges, tested against libm: 8 entries are crash-proven
+  under contract. *Lemma stubs* replace a function a law computes twice on one input by a pure
+  function whose facts (L-CP-01 to -08) are proven on the real code: every law that timed out in
+  the first probe round proves per change in seconds to minutes.
+- **Proven:** crash freedom of 31 entries on the real code or with lemma stubs and 5 under
+  contract, over their whole documented domains; of the 25 counted catalogue entries, 22 (88 %):
+  construction (but `from_center_area`), classifications, membership, containment and
+  intersection laws, growth, the complement, the bounds' delegation, level, validity and longitude
+  reduction, equality and approximate equality, and three of the four generic `Region` laws and
+  the codec round trip under `Cap`'s equality. Spec 006's chord-angle symmetry is proven by
+  composition, and `Cell::cap_bound` contains the cell's vertices (P-CCAP-01, weekly).
+- **Weekly:** 13 members (`make verify-slow F=values P=...`, the `values-cap` legs). In the run of
+  2026-10-25, 6 prove (5 to 17 minutes; `expanded` on the real code with no stub), 5 time out at
+  60 minutes (`verify/known-timeouts.txt`), `union`'s crash proof runs out of memory at 8 GiB (and
+  times out at 16 GiB), and the area's bit-for-bit statement failed on D-009. Since D-009's fix it
+  proves (20 minutes).
+- **Not proven:** the covering law (P-CPREG-04: the level needs `asin`'s value); the values of
+  everything through `asin` and `atan2` (crash proofs only); `from_center_area`'s and the
+  centroid's products and `cell_union_bound`'s crash proof (timeouts); `union` (out of memory, and
+  no property holds); `Deserialize` (tested). The C++ vectors check each.
+- **Found and fixed:** D-009, the area of a cap with radius length² −0 was −0 in a debug build
+  (upstream +0); fixed with the maintainer's go-ahead (`1b26156`).
+- **Records:** `verify/values/INVENTORY.md` §9, `PROPERTIES.md` §10, the spec-008 part of
+  `EVALUATION.md`, `TRUSTED_BASE.md` (the contracts and stubs), `MUTANTS.md` (`M-701` …
+  `M-741`).
 
 ## 3. Traits
 
 | Trait | Implementors | With proofs | Without |
 |-------|--------------|-------------|---------|
-| `S2Encode` / `S2Decode` | 12 | `CellId`, `Point`, `Cap`, `Rect`, `Cell` (003); `CellUnion` (002) | `Polyline`, `Loop`, `Polygon`, `LaxPolyline`, `LaxPolygon`, `PointVector` |
-| `Region` | 12 | `CellUnion::contains_cell` and `intersects_cell`, within size bounds (002); for `Cell`, the generic laws and `contains_cell`, `intersects_cell` and `cell_union_bound` (004); for `Rect`, `rect_bound` (005) | `CellUnion`'s float methods (`cap_bound`, `rect_bound`, `cell_union_bound`, `contains_point`); `Cell`'s `cap_bound`, `rect_bound` and `contains_point`; `Rect`'s other five; and every method of `Cap`, `Loop`, `Polygon`, `Polyline`, `PointRegion`, `RegionUnion`, `RegionIntersection`, `ShapeIndexRegion`, `ShapeIndexBufferedRegion` |
+| `S2Encode` / `S2Decode` | 12 | `CellId`, `Point`, `Cap`, `Rect`, `Cell` (003), with `Cap`'s round trip also under its own equality (008); `CellUnion` (002) | `Polyline`, `Loop`, `Polygon`, `LaxPolyline`, `LaxPolygon`, `PointVector` |
+| `Region` | 12 | `CellUnion::contains_cell` and `intersects_cell`, within size bounds (002); for `Cell`, the generic laws and `contains_cell`, `intersects_cell` and `cell_union_bound` (004); for `Rect`, `rect_bound` (005); for `Cap`, three of the four generic laws (containment implies intersection, no vertex of a non-intersected cell, the bounding cap) with lemma stubs, the crash freedom of five of the six methods (`cell_union_bound`'s, under contract, times out weekly) and `Cell::cap_bound` containing the cell's vertices (008) | `Cap`'s covering law (needs `asin`'s value); `CellUnion`'s float methods (`cap_bound`, `rect_bound`, `cell_union_bound`, `contains_point`); `Cell`'s `cap_bound`, `rect_bound` and `contains_point`; `Rect`'s other five; and every method of `Loop`, `Polygon`, `Polyline`, `PointRegion`, `RegionUnion`, `RegionIntersection`, `ShapeIndexRegion`, `ShapeIndexBufferedRegion` |
 | `Shape` | 13 | none | all (the other branch has pilots, section 6, step 4) |
 | `Target` / `DistanceTarget` | 5 | none | `PointTarget`, `EdgeTarget`, `CellTarget`, `CellUnionTarget`, `ShapeIndexTarget` |
 | `Projection` | 2 | none | `PlateCarreeProjection`, `MercatorProjection` |
@@ -198,7 +239,7 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 | `Layer` | 15 | none | every builder layer |
 | Standard traits on `CellId` | | `Default`, `From<u64>`, `From<CellId> for u64`, `FromStr` | `Display`, `From<&Point>`, `From<&LatLng>` |
 | Standard traits on `CellUnion` | | `Deref`, `FromIterator`, both `IntoIterator` | `Display` |
-| Standard traits on the value types (004–006) | | `PartialEq` (the equivalence laws, and upstream's meaning where it differs from field equality), `Default`, `From` conversions; `Point`'s `PartialOrd` (a total order without NaN) | `Display` |
+| Standard traits on the value types (004–008) | | `PartialEq` (the equivalence laws, and upstream's meaning where it differs from field equality, as `Cap`'s empty and full caps whatever their centres), `Default`, `From` conversions; `Point`'s `PartialOrd` (a total order without NaN) | `Display` |
 
 The decoding layer states its contract once, generically, over a `Codec` trait in
 `verify/src/codec.rs`, and instantiates it per codec. That is the pattern to reuse for the
@@ -365,7 +406,8 @@ type-level invariants: the evaluations of specs 005 and 006 rank them after the 
 breaking change for the maintainer. *(2026-10-18):* spec 007 added `ChordAngle` (after the
 maintainer chose option B, which makes it the first value type to keep its own invariant) and
 `Angle` (section 2.7). `coords` has no spec yet; `LatLng` and `Cap` are ranked in spec 007's
-evaluation.
+evaluation. *(2026-10-25):* spec 008 added `Cap` (section 2.9); its evaluation ranks `LatLng`
+next as a value type, now with an `atan2` contract.
 
 ### Step 4: trait laws
 
@@ -380,6 +422,15 @@ State each law once, generically, as 003's `Codec` does, and instantiate it per 
    cell; the bounds contain the region's points, for `Cap`, `Cell`, `Rect`, `CellUnion`,
    `PointRegion` and the two region adaptors over them. The integer laws first; laws that
    need float geometry go to step 6.
+   *Status (2026-10-25):* `laws::region` holds four laws (spec 008 added "no intersection, no
+   contained vertex" and "the bounding cap contains the contained points"). Proven for `Cell`
+   (004) and for `Cap` (008: three of four; the covering law needs `asin`'s value). For `Cap`
+   the float laws became provable through *lemma stubs*: a function the law computes twice on one
+   input (`chord_angle`, the chord-angle sum, `is_unit`) is replaced by a pure function of its
+   input's bits whose facts are proven on the real code, so the two calls agree by construction
+   (`verify/TRUSTED_BASE.md`). That is the method for laws that recompute float values; it does
+   not help bit-for-bit comparisons with an identical restatement. `Rect` is next (spec 008's
+   evaluation).
 3. **`S2Encode`/`S2Decode`:** the round trip for the six remaining implementors comes with
    step 5.
 

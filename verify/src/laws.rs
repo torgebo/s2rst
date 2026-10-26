@@ -13,7 +13,7 @@
 
 /// The integer laws of the `Region` trait (`CORE_TRAITS.md`, "Region").
 pub mod region {
-    use s2rst::s2::{Cell, Region};
+    use s2rst::s2::{Cell, Point, Region};
 
     /// Containing a cell implies intersecting it.
     ///
@@ -54,6 +54,46 @@ pub mod region {
     pub fn all<R: Region, const MAX: usize>(r: &R, c: &Cell) {
         contains_implies_intersects(r, c);
         covering_covers::<R, MAX>(r, c);
+    }
+
+    /// A cell the region does not intersect has no vertex the region contains (`CORE_TRAITS.md`,
+    /// "Non-intersection implies non-containment").
+    ///
+    /// Not every implementor satisfies it: a region whose cell test is by id and whose point set
+    /// is closed (`Cell`, as upstream's `S2Cell`) contains the shared vertices of a neighbour it
+    /// does not intersect. It is a law of regions whose cell test checks the vertices first, as
+    /// `Cap`'s (upstream's `MayIntersect`).
+    ///
+    /// The vertices are those of `c.vertex(k)`. An instance whose region computes them itself
+    /// (`Cap`'s upstream cell tests) stubs `Cell::vertex` with a pure function, so the law reads
+    /// the values the region's test read: a recomputed normalisation is not one value to the
+    /// checker (spec 008 spec Edge Cases, "Two `sqrt` results"; research R7).
+    ///
+    /// Instances: P-CPREG-02 (`Cap`). Quickcheck twin: `region_no_intersect_no_vertex` in
+    /// `core/tests/trait_property_tests.rs`.
+    pub fn no_intersect_no_vertex<R: Region>(r: &R, c: &Cell) {
+        if !r.intersects_cell(c) {
+            for k in 0..4 {
+                assert!(
+                    !r.contains_point(&c.vertex(k)),
+                    "a vertex of a cell the region does not intersect is contained"
+                );
+            }
+        }
+    }
+
+    /// The bounding cap contains every point the region contains (`CORE_TRAITS.md`, "Bounding
+    /// cap contains contained points").
+    ///
+    /// Instances: P-CPREG-03 (`Cap`). Quickcheck twin: `region_cap_bound_contains_point` in
+    /// `core/tests/trait_property_tests.rs`.
+    pub fn cap_bound_contains_points<R: Region>(r: &R, p: &Point) {
+        if r.contains_point(p) {
+            assert!(
+                r.cap_bound().contains_point(*p),
+                "a contained point outside the bounding cap"
+            );
+        }
     }
 }
 

@@ -1,0 +1,18 @@
+Mutant: M-702
+Targets: P-CPCON-01
+Expect-Fail: 
+Test: core --test cpp_cap_diff cap_ops_match_cpp
+Defect: `from_center_area` divides by 2π
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -142,7 +142,7 @@
+     /// an area of 4π or more yields a full cap.
+     #[inline]
+     pub fn from_center_area(center: Point, area: f64) -> Self {
+-        Self::from_center_chord_angle(center, ChordAngle::from_length2(area / PI))
++        Self::from_center_chord_angle(center, ChordAngle::from_length2(area / (2.0 * PI)))
+     }
+ 
+     /// Returns an empty cap (contains no points).

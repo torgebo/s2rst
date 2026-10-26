@@ -1,0 +1,17 @@
+Mutant: M-712
+Targets: P-CPREL-01
+Expect-Fail: cp_rel::p_cprel_01
+Defect: `contains` without the empty-cap case
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -249,7 +249,7 @@
+ 
+     /// Reports whether this cap contains the other cap.
+     pub fn contains(self, other: Cap) -> bool {
+-        if self.is_full() || other.is_empty() {
++        if self.is_full() {
+             return true;
+         }
+         self.radius >= self.center.chord_angle(other.center) + other.radius

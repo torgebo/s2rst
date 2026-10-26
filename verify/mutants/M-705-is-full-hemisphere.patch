@@ -1,0 +1,17 @@
+Mutant: M-705
+Targets: P-CPCLS-01
+Expect-Fail: cp_cls::p_cpcls_01
+Defect: `is_full` holds from the hemisphere on
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -223,7 +223,7 @@
+     /// Reports whether the cap is full (contains all points).
+     #[inline]
+     pub fn is_full(self) -> bool {
+-        self.radius == ChordAngle::STRAIGHT
++        self.radius >= ChordAngle::RIGHT
+     }
+ 
+     // --- Containment & intersection ---

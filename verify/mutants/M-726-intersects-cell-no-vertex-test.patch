@@ -1,0 +1,18 @@
+Mutant: M-726
+Targets: P-CPREG-02
+Expect-Fail: cp_reg::p_cpreg_02
+Defect: `Region::intersects_cell` without the vertex test
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -506,9 +506,6 @@
+             cell.vertex(2),
+             cell.vertex(3),
+         ];
+-        if vertices.iter().any(|&v| self.contains_point(v)) {
+-            return true;
+-        }
+         self.intersects_cell_edges(cell, &vertices)
+     }
+ 

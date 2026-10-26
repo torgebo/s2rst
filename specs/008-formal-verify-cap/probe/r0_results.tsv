@@ -1,0 +1,26 @@
+# R0 run, 2026-10-24 13:21-14:12 (run-verify copy: 4 GiB, 12 minutes per harness, 3 jobs, -Z stubbing). Kani 0.68.0, CBMC 6.11.0.
+# harness	result	seconds
+r0::r0_add_cap_contains	TIMEOUT	-
+r0::r0_add_point_contains	TIMEOUT	-
+r0::r0_cell_union_bound_len	TIMEOUT	-
+r0::r0_codec_round_trip_eq	TIMEOUT	-
+r0::r0_complement_draft_valid	TIMEOUT	-
+r0::r0_complement_library_vs_upstream	FAILED	3.3
+r0::r0_contains_implies_intersects	TIMEOUT	-
+r0::r0_contains_reflexive	SUCCESSFUL	13.5
+r0::r0_eq_laws	SUCCESSFUL	1.9
+r0::r0_expanded_contains	SUCCESSFUL	336.9
+r0::r0_from_center_angle_crash	TIMEOUT	-
+r0::r0_intersects_symmetric	TIMEOUT	-
+r0::r0_level_draft_margin	SUCCESSFUL	13.8
+r0::r0_level_library_margin	FAILED	7.7
+r0::r0_nostub_asin_to_angle	FAILED	0.9
+r0::r0_rect_bound_draft_valid	FAILED	46.3
+r0::r0_rect_bound_library_valid	FAILED	168.9
+r0::r0_reduce_draft_exact	SUCCESSFUL	2.9
+r0::r0_region_cell_tests_crash	OOM	15.7
+r0::r0_region_contains_implies_may_intersect	OOM	16.3
+r0::r0_region_no_intersect_no_vertex	TIMEOUT	-
+r0::r0_stub_asin_to_angle	SUCCESSFUL	1.4
+r0::r0_stub_atan2_latitude	SUCCESSFUL	2.7
+r0::r0_union_crash	TIMEOUT	-

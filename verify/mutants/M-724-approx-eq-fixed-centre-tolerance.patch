@@ -1,0 +1,17 @@
+Mutant: M-724
+Targets: P-CPEQ-02
+Expect-Fail: cp_eq::p_cpeq_02
+Defect: the FR-022 fix removed: the centres compared at a fixed 10⁻¹⁵ (K6)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -588,7 +588,7 @@
+         // a fixed 10⁻¹⁵ ignored the tolerance (spec 008 K6, FR-022).
+         (self
+             .center
+-            .approx_eq_angle(other.center, Angle::from_radians(max_error))
++            .approx_eq_angle(other.center, Angle::from_radians(1e-15))
+             && (r2 - other_r2).abs() <= max_error)
+             || (self.is_empty() && other_r2 <= max_error)
+             || (other.is_empty() && r2 <= max_error)

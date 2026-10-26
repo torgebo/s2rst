@@ -75,7 +75,7 @@ exactly one valid interval (213 s). The mutant campaign has not run yet.
   `arc_spec` ordered points by a `(bool, f64)` key, and 8 property harnesses reported failures
   whose counterexamples passed when replayed concretely. `arc_spec::ccw_le`/`ccw_lt` now use
   float comparisons and boolean equality only. Nothing in the 001–003 harnesses or models
-  orders booleans (checked). Worth reporting to Kani.
+  orders booleans (checked). Recorded as KI-001 in `KANI_ISSUES.md` (2026-10-25).
 - **Real arcs, not float sets.** `[next_up(−π), π]` holds every float, but C++ says it does not
   contain the full circle: the reals between −π and `next_up(−π)` are outside it. The first
   draft characterised containment by float witness points, and the C++ vectors refuted it
@@ -932,8 +932,8 @@ computed products bit for bit times out. Native enumeration covered the integer 
 
 Ranked:
 
-1. **Report U-014 upstream** (T061), and Kani's `%` mis-model to the Kani project (T062), with
-   the maintainer's approval.
+1. **Report U-014 upstream** (T061), with the maintainer's approval. Kani's `%` mis-model is
+   recorded as KI-002 in `KANI_ISSUES.md` (T062, 2026-10-25), not filed with Kani.
 2. **`LatLng` next**, reusing `angle_spec` and this suite; then `Cap`.
 3. **Use enumeration** wherever a property's domain is one 32-bit integer, rather than slicing
    it into weekly Kani members.
@@ -973,5 +973,395 @@ workstation only.
 | SC-009 panics documented | met | "`# Panics` and domain documentation added". |
 | SC-010 differential tests | met | `cpp_values_diff` passes on every `CHORD_ANGLE` and `ANGLE` row; the deviation rows are exactly FR-024's (`deviation:negative-canonical`, `deviation:eform-saturate`). |
 | SC-011 index by kind | met | Every new id appears once in `PROPERTIES_BY_KIND.md`; `property_kinds` passes; the HTML is re-rendered. |
-| SC-012 upstream findings | met | U-014 (T061) and Kani's `%` (T062), both under "Upstream findings"; reporting waits on the maintainer. |
+| SC-012 upstream findings | met | U-014 (T061) and Kani's `%` (T062), both under "Upstream findings"; reporting waits on the maintainer. Kani's `%` is recorded as KI-002 in `KANI_ISSUES.md` (2026-10-25). |
 | SC-013 answerable from the evaluation | met | "The canonical-value invariant" answers whether it paid off and whether the other types should follow; "Recommendations" ranks what next. |
+
+# Spec 008: `s2::Cap`
+
+## Summary (spec 008)
+
+Spec 008 verified `s2::Cap`, the first composite type of the suite and the first `Region`
+implementor, after a survey against running C++ that found seven differences (K1–K7) and fixed
+them. It is also the first part with function contracts (`asin`, `atan2`, `cos`) and lemma
+stubs.
+
+- **Crash freedom:** 42 in-scope entries. 31 have crash proofs on the real code or by
+  composition, 5 under the function contracts per change, and the two codec entries are 003's;
+  `Deserialize` is tested. 3 contract entries are tool limits: `union` (out of memory at 8 GiB,
+  timeout at 16 GiB) and both `cell_union_bound`s (timeout at 60 minutes). Per change: 14 crash
+  harnesses, 285.8 s of harness time, every cover satisfied.
+- **Meaning:** 22 of the 25 counted catalogue entries proven (88%), and P-CCAP-01 for
+  `Cell::cap_bound`. Every generic law SC-004 names is proven: three equality laws, three
+  `Region` laws (containment implies intersection, the vertex law, the bound contains the
+  points) and the codec round trip. The covering law (P-CPREG-04) is not proven, as planned:
+  the level needs `asin`'s value. Not proven: P-CPCON-01 (`from_center_area`'s product times
+  out), P-CPMEA-01 (the centroid's products time out; the area's proves since D-009's fix),
+  P-CPBND-03 (times out).
+- **Lemma stubs** made the laws that timed out in R0's first round prove in 7.5 s to 207.2 s,
+  and closed spec 006's open P-PTDST-01 symmetry by composition.
+- **Library changes:** K1–K7 (FR-017 to FR-023), fixed in six commits, each with a test that
+  failed before.
+  **D-009**, found by Kani: the area of a cap with r² = −0 was −0 in debug builds; fixed with
+  the maintainer's go-ahead (`1b26156`), and the area's proof now passes. **K8**: the empty cap's
+  covering is now upstream's four cells, at the maintainer's choice (`8c91967`).
+- **Findings:** U-015 (upstream's `Union` does not enclose both caps on 337 of 1,089 rows) and
+  Kani's compiler crash on a `thread_local!` stub. Neither is reported yet: both need the
+  maintainer's approval. U-015 is recorded in `UPSTREAM.md`, the place for upstream reports
+  (T060). K9 is a documented deviation; K10 is in the coverer.
+- **Non-vacuity:** all 41 mutants `M-701` … `M-741` are killed.
+
+## Lemma stubs and function contracts (spec 008)
+
+Spec 008 is the first part of the suite whose proofs replace library code (FR-003, FR-003a;
+`verify/TRUSTED_BASE.md`, "`s2::Cap` (spec 008)").
+
+- **Function contracts** stand in for `f64::asin`, `atan2` and `cos`, which CBMC lacks (`asin`,
+  `atan2`) or models loosely (`cos` returned 0 near 0, research R0). Each returns any value in
+  the function's range with the right sign, and the special values exactly. Their tests
+  (`verify/tests/libm_contracts.rs`) check them against the real functions on the special
+  values and 10⁶ random inputs each, in 0.07 s. They buy crash proofs, not values: 8 entries
+  are "proven under contract", and nothing that needs `asin`'s value (P-CPREG-04) is proven.
+- **Lemma stubs** replace a library function that a law computes twice on the same input
+  (`Point::chord_angle`, `ChordAngle`'s `+`, `Point::is_unit`, `approx_eq_angle`,
+  `ChordAngle::from_angle`, `Vector::normalize`) by a pure function of the input's bits: the
+  first call draws a value allowed by the stub's lemmas, the second returns it. The lemmas
+  (L-CP-01 to -08) are proven on the real code. A stub can make a law fail that holds, if it
+  lacks a fact, but cannot make one pass that fails, because each stub only allows values the
+  real function can return (research R6, "Soundness"). The mutants `M-730` and `M-731` remove a
+  stub's fact and must make their law fail.
+- **What they cost:** `stubs.rs` (350 lines, `static Mutex` tables of ten slots), 9 lemma
+  harnesses, a `-Z stubbing` flag on every Kani call, unwinding bounds of at least 11 where a
+  table is searched (P-CCAP-01 first failed on an unwinding assertion at 9), and a trust
+  argument per stub in the trusted base. Two Kani pitfalls: a `thread_local!` table crashes Kani
+  0.68.0's compiler (KI-003 in `KANI_ISSUES.md`), and a `Vec` table runs the cell laws out of memory.
+- **What they gained:** every law that timed out in R0's first round proves per change, in
+  7.5 s to 207.2 s: `add_point` and `add_cap` contain what they added, `intersects` is
+  symmetric, containment implies intersection (for caps and for cells), no vertex of a
+  non-intersected cell is contained, the complement of a valid cap is valid, and the codec round
+  trip under `Cap`'s equality. Spec 006's open P-PTDST-01 symmetry is now proven by
+  composition from L-CP-03 and L-CP-04, and its 60-minute weekly harness is gone.
+- **For the other types' open timeouts:** the method helps where a law recomputes a value the
+  operation already computed (symmetry, "contains what it added"). It does not help where a
+  statement compares the library's expression with an identical restatement bit for bit (007's
+  `sin2`, `sin` and the quotients, the products of P-CPMEA-01): stubbing the expression would
+  reduce the proof to "the code calls the same function", a code review. Candidates: 006's
+  P-PTORT-03 (`point_cross`'s sign laws recompute the cross product) and 004's P-IEXP-02/03 and
+  005's P-LEXP-02 (symmetric `expanded`, which recomputes the bounds); not 006's P-PTCLS-03
+  (unit length needs `sqrt`'s value).
+
+## Effort log (spec 008)
+
+- 2026-10-24 (morning): the survey against running C++ (K1–K6) and the library, the spec and
+  its clarification (option A: contracts for `asin` and `atan2`).
+- 2026-10-24: the plan with three Kani probe rounds (R0, R0b, R0c: 51 harnesses; lemma stubs
+  found; CBMC's `cos` and `log2` and Kani's `%` replayed as checker artefacts), the tasks.
+- 2026-10-24: Phases 1–3: the stubs, the description, the C++ generator and vectors, the
+  contract tests, the domains, the two new `Region` laws; the library changes K1–K7, each a
+  commit with its failing test (`7ab5b66` … `5d961d4`), the differential test (`59f3fe2`), the
+  quickcheck twins (`68bdf75`), the probe re-run (`30be646`).
+- 2026-10-24: the harnesses of Phases 4–6; the per-change run (47 harnesses, then three fixed and
+  re-run); P-CCAP-01; the records. The workstation then lost power during the weekly run.
+- 2026-10-25: the weekly run again, the mutants, the CI legs, the records and this evaluation.
+
+## Exclusions and tool limits (FR-002, FR-003) (spec 008)
+
+| Entry or statement | Reason | Evidence instead |
+|--------------------|--------|------------------|
+| `Display for Cap` | `core::fmt` | — |
+| `Deserialize for Cap` (P-CPDES-01) | serde is out of Kani's reach, as in 004–007 | `cap_tests::deserialise_rejects_invalid_caps` |
+| P-CPREG-04, the covering covers every contained cell | the level depends on `asin`'s value, which the contract leaves open | `CAP_BOUNDS`, `CAP_CELL` (bit for bit) and the quickcheck twins |
+| the values of `angle_radius`, `rect_bound`, `union`, `cell_union_bound`, `approx_eq` | they read `asin` or `atan2`: crash proofs under contract only | the C++ vectors (`cpp_cap_diff`) |
+| `union`'s meaning | no property holds: neither union contains both caps on every row (K9, U-015) | the pinned counts in `cpp_cap_diff` |
+| `union`'s crash freedom (`c_union`) | out of memory at 8 GiB; alone at 16 GiB, timeout at 60 minutes (2026-10-25). In no CI leg (the runner would report the OOM) | the C++ vectors, the native probe of T028 |
+| `cell_union_bound`'s crash freedom (P-CPBND-03), both cell tests on a real cell, `from_center_area`'s and the centroid's products (P-CPCON-01, P-CPMEA-01), L-CP-06a | timeout at 60 minutes (2026-10-25), `verify/known-timeouts.txt` | the C++ vectors; L-CP-06a is trusted as an IEEE-754 fact |
+| P-CPBND-02 at an infinite radius | CBMC reports `x / ∞` as NaN (memory, "CBMC NaN check"); replayed natively: level −1 both ways | `cap_tests::covering_level_*` |
+
+## Upstream findings (FR-025) (spec 008)
+
+- **U-015** (`UPSTREAM.md`): `S2Cap::Union` (`s2cap.cc:121–141`) does not contain both caps on
+  337 of the 1,089 `CAP_OPS` and `CAP_SPECIAL` rows, by rounding (an ulp of the radius in the
+  example), though `s2cap.h` says it "encloses" them. Follow-up T060; not reported (needs the
+  maintainer's approval).
+- **Kani 0.68.0's compiler crash** on a stub with a `thread_local!` table
+  (`kani-compiler/src/intrinsics.rs:243`). Recorded as KI-003 in `KANI_ISSUES.md` (T057,
+  2026-10-25), with a minimal reproduction: any harness reaching a `thread_local!` whose value
+  has a destructor, stub or not. Not filed with Kani.
+- **Checker artefacts, replayed natively** (research R0; memory): CBMC's `log2` and `cos` are
+  loose over-approximations, and division by ±∞ is flagged as NaN. Not upstream findings;
+  recorded in `TRUSTED_BASE.md`.
+
+## `# Panics` and domain documentation added (SC-010) (spec 008)
+
+- `contains_point`, `interior_contains_point`: a unit point, as upstream checks in debug builds,
+  and what another point gives (T020).
+- `expanded`: `# Panics` in debug builds for a negative distance (upstream's check) and for +∞
+  (the chord-angle sum's check, 007 FR-019).
+- `from_center_angle`: `# Panics` in debug builds when the result is invalid (a non-unit
+  centre; a NaN angle gives `STRAIGHT`, still valid).
+- `union`: the documented deviation (the added margin) and K9; `cell_union_bound`: the empty
+  cap's covering, upstream's since K8;
+  `Deserialize`: why it validates; `contains_cell`, `intersects_cell`: parity with upstream.
+- **No precondition beyond these** (T028): every crash harness's domain is a documented one or
+  wider. `union` and `cell_union_bound` are proven over valid caps, because their meaning needs
+  unit centres; a native probe found no panic for non-unit centres either (a zero centre,
+  centres of length 2, parallel and antipodal).
+
+## Defects found (spec 008)
+
+One proof failed on a library defect:
+
+- **D-009** (`cp_mea::p_cpmea_01__area`, weekly, failed in 1.5 s on 2026-10-25): the area of a cap
+  whose radius has length² −0 (`ChordAngle::from_length2(-0.0)` keeps the sign) is −0 in a debug
+  build, where upstream's `2π · std::max(0.0, height)` gives +0. `Cap::area` computes
+  `0.0_f64.max(h)`, and Rust leaves the sign of `max(+0, −0)` unspecified: the unoptimised build
+  returns −0 and the optimised one +0 (replayed natively on the library, both builds). The value
+  compares equal to 0, so only the sign bit differs, and the centroid, which multiplies by the
+  area, inherits it. **Fixed** with the maintainer's go-ahead (2026-10-25, `1b26156`, T062):
+  upstream's comparison, `if 0.0 < h { h } else { 0.0 }`, with the test
+  `area_of_a_negative_zero_radius_is_positive_zero`, which failed before (bits
+  `0x8000000000000000`) and passes after in both builds. The line left `known-defects.txt`, and
+  `p_cpmea_01__area` proves in 1,195.3 s (2026-10-25, 60 minutes and 8 GiB). `M-741` puts the old
+  expression back.
+
+The survey's findings, each fixed in its own commit with a test that failed before (SC-007):
+
+- **K1** (FR-017, `7ab5b66`): the covering level through `floor(log2(…))` was one too fine for
+  radii just below a power of two: level 2 for 0.11785113019775795, upstream's 1.
+- **K2, K3** (FR-018, `a21b7e6`): `contains_cell` and `intersects_cell` tested the cell's
+  bounding cap, weaker than upstream: 38 of the 65 grid cases upstream contains were refused, and
+  K3's cap reported an intersection upstream does not.
+- **K4** (FR-019, `75707f7`): the complement's radius was `STRAIGHT − r`: 2.99999999999999956
+  for r² = 1, upstream's 3.
+- **K5** (FR-020, `9766059`): `rect_bound` reduced longitudes with `rem_euclid`, so a cap at a
+  tiny longitude got the rectangle `[0, 0]`, missing its own centre.
+- **K6** (FR-022, `136ef45`): `approx_eq_with` compared the centres at a fixed 10⁻¹⁵: centres
+  5.02·10⁻¹⁵ apart were not approximately equal at the default 10⁻¹⁴.
+- **K7** (FR-023, `80e0ed8`): the derived `Deserialize` accepted invalid caps (a NaN centre, a
+  centre of length 2).
+
+Found by the C++ vectors (T008, T021):
+
+- **K8**: `cell_union_bound` of the empty cap was empty; upstream's gives four cells at level 29.
+  Both cover the empty set. First documented as a deviation (T059); the maintainer chose to match
+  upstream (2026-10-25, `8c91967`), with the test `empty_cap_covering_matches_upstream`
+  (`CAP_BOUNDS`'s empty row; it failed before, with no cells). `cpp_cap_diff` now compares that
+  row bit for bit. `Loop`, `Polyline`, `RegionUnion` and `RegionIntersection`, which bound
+  themselves through their cap bound, follow upstream for an empty bound too.
+
+Found by the C++ vectors, documented, not changed:
+
+- **K9**: the library's `union` misses part of one cap on 7 of 1,089 rows, all with a single-point
+  or nearly single-point cap; upstream's misses on 337 (U-015). Documented; `add_cap` keeps its
+  guarantee (P-CPGRO-02).
+- **K10**: `RegionCoverer`'s coverings of caps differ from C++'s on 38 of 836 rows, though the
+  cap's cell tests and `cell_union_bound` match on every row: in the coverer (T061).
+
+Harness faults found on the way (no library change): P-CPBND-02 at +∞ (CBMC's `x / ∞`),
+L-CP-08 at −0 (`ZERO + −0` is +0: the statement then excluded zero; since the code review it
+states both zeros on both sides), and P-CCAP-01's unwinding
+bound.
+
+## Measurements (spec 008)
+
+Per change: `make verify-values P=cap` with 4 jobs on the 8-thread workstation (2026-10-25,
+T052, at `dd4a551`). 45 harnesses, 1,246.8 s of harness time, 7 min 39 s of wall time with the
+crate's tests and a cached build:
+
+| Group | Harnesses | Harness time | Longest |
+|-------|-----------|--------------|---------|
+| crash (`cp_crash`) | 14 | 285.8 s | `c_rect_bound` 118.9 s |
+| lemmas (`cp_lem`) | 7 | 210.0 s | `l_cp_04` 111.1 s |
+| properties and laws | 24 | 751.0 s | `p_cpeq_02` 173.7 s |
+
+The final run found seven per-change crash harnesses without the `kani::cover!` that T024
+asks for: `c_contains`, `c_intersects`, `c_expanded`, `c_add_point`, `c_add_cap`,
+`c_rect_bound` and `c_approx_eq`. Each gained two covers, both outcomes, and all seven were
+re-run alone with 4 jobs: every cover satisfied, 214.1 s in all (196.7 s before), the longest
+`c_rect_bound` at 66.6 s.
+
+Weekly: one at a time at 60 minutes and 8 GiB, 2 jobs (2026-10-25, after the power loss; P-CCAP-01 on 2026-10-24):
+
+| Member | Result | Time |
+|--------|--------|------|
+| `cp_reg::p_cpreg_01__real` | SUCCESSFUL | 1,037.1 s |
+| `cp_crash::c_cell_tests__edges_contains` | SUCCESSFUL | 704.2 s |
+| `cp_crash::c_cell_tests__edges_intersects` | SUCCESSFUL | 402.0 s |
+| `cp_lem::l_cp_05` | SUCCESSFUL | 551.6 s |
+| `cl_cnt::p_ccap_01` | SUCCESSFUL | 341.9 s |
+| `cp_gro::p_cpgro_03__real` | SUCCESSFUL | 307.4 s |
+| `cp_mea::p_cpmea_01__area` | FAILED (D-009); after the fix SUCCESSFUL | 1.5 s; 1,195.3 s |
+| `cp_con::p_cpcon_01__area`, `cp_mea::p_cpmea_01__centroid`, `cp_lem::l_cp_06a` | TIMEOUT | 60 min |
+| `cp_crash::c_cell_tests__real`, `cp_crash::c_cell_union_bound` | TIMEOUT | 60 min |
+| `cp_crash::c_union` | out of memory at 8 GiB; alone at 16 GiB, TIMEOUT | 60 min |
+
+The two edge-test members re-ran after they gained their covers (2026-10-25, same limits):
+`__edges_contains` took 627.4 s and `__edges_intersects` 512.8 s, both with 2 of 2 covers
+satisfied.
+
+The timeouts are in `verify/known-timeouts.txt`; D-009's line left `known-defects.txt` with the
+fix. CI runs
+the six proven members and `p_cpmea_01__area` in the `slow` job's `values-cap` leg, and the
+timeouts in `values-limits-f` and `values-limits-g`. `c_union` is in no leg: the runner would
+report its out-of-memory as a failure. In all, the value-type suite has 87 weekly members,
+about 34 hours one at a time.
+
+The whole `make verify-values` (all nine parts, 4 jobs, 12 minutes each) ran 272 harnesses in
+30 min 25 s, with 6,466.8 s of harness time ("Final run").
+
+## Non-vacuity (spec 008)
+
+`make verify-mutants M='M-7*'` with `VERIFY_SLOW_HARNESS_TIMEOUT=60m` (2026-10-25, T052, at
+`dd4a551`): all 40 of `M-701` … `M-740` killed in 22 min 25 s (`verify/MUTANTS.md`). After
+D-009's fix, `M-708` was regenerated against the new `area` and `M-741` added (the fix
+reverted); both killed (2026-10-25, 1 min 16 s together), so 41 of 41.
+
+- **By Kani:** 32, among them `M-740` and `M-741` in the slow tier. `M-741` is also killed by
+  its regression test, and both must fail for the kill. `M-740` (`Cell::cap_bound` loops over three
+  vertices; killed by `cl_cnt::p_ccap_01`). `M-730` and `M-731` remove a fact from a lemma stub
+  and make its law fail, which shows the laws depend on the stubs' facts, not just on their
+  purity.
+- **By ordinary tests** (the `Test:` headers, run in the mutant's worktree): 9 edits that the
+  proofs cannot catch, either by design or because the member that would catch them times out:
+  - `from_center_area`'s and the centroid's products (`M-702`, `M-709`), whose members time out;
+  - the complement and edge tests inside the cell tests (`M-725`, `M-727`), which are
+    abstracted per change;
+  - the copied level and longitude expressions (`M-720`, `M-721`);
+  - the description's own membership test (`M-728`);
+  - two edits that keep a bound true but change the value: `add_cap` without upstream's
+    round-up (`M-716`) and `expanded` returning the cap unchanged (`M-717`).
+
+  The C++ vectors (`cpp_cap_diff`), `cap_tests` and the description's tests kill them.
+- **Coverage:** every proven entry of §10 has at least one mutant (`PROPERTIES.md`, the
+  Mutants column). The exceptions are P-CPBND-03, P-CPREG-04 and P-CPDES-01, which are not
+  proven. All 14 per-change crash harnesses satisfy their covers, and so do the two weekly
+  edge-test members.
+
+## What next: `LatLng`, and the other `Region` implementors (spec 008)
+
+- **`LatLng`: go.** Two `Angle`s with a range, so `angle_spec` carries its construction,
+  validity and normalisation. Its conversions from and to `Point` go through `atan2` and `sin`/
+  `cos`, which now have contracts: their crash freedom is provable under contract, as
+  `rect_bound`'s was (84.6 s in R0b), and their values stay with the C++ vectors.
+- **The generic `Region` laws reach next:**
+  1. **`Rect`** (`s2::Rect`, spec 005's description): its cell tests check the vertices first,
+     as `Cap`'s do, so `no_intersect_no_vertex` applies, and the abstract cell and the stubs
+     carry over. Its edge tests go through `edge_crossings`, heavier than `Cap`'s.
+  2. **`Cell`**, through P-CCAP-01: its `cap_bound` contains its vertices; `contains_point` and
+     `rect_bound` remain.
+  3. **`PointRegion`** (a cap of radius zero: `Cap`'s proofs nearly apply as they stand) and
+     **`CellUnion`**'s float methods (`cap_bound`, `rect_bound`, through `Cell`'s).
+  `Loop`, `Polygon` and `Polyline` need edge geometry over symbolic vertex lists: research
+  first.
+
+## Comparison with 004–007 (spec 008)
+
+004–007 proved each value type's operations whole; spec 008 is the first to prove a composite
+type by composing proofs: lemmas about `Point` and `ChordAngle` on the real code, and laws about
+`Cap` with those operations replaced by pure stubs. The laws that timed out in 006 and in R0's
+first round take seconds to a few minutes. It is also the first part with function contracts,
+and the first whose library changes port upstream algorithms (the cell tests) rather than fix
+arithmetic. As in 007, the checker's arithmetic models (`log2`, `cos`, `x / ∞`) set limits that
+native replays had to sort from real failures.
+
+## Limitations (spec 008)
+
+- **Trust:** the function contracts (tested, not proven, against the platform's libm), the
+  stubs' purity argument (each lemma proven on the real code but L-CP-06a, IEEE multiplication's
+  commutativity, which times out at 60 minutes and is trusted as an IEEE-754 fact), and the
+  abstract cell (its
+  vertices and edges any box points, an over-approximation of every real cell). All recorded in
+  `TRUSTED_BASE.md`.
+- **Values through `asin` and `atan2`** have crash proofs only; the C++ vectors check them bit
+  for bit. P-CPREG-04 is not proven for the same reason.
+- **Copies of library expressions:** P-CPBND-02 is stated on the level expression of
+  `cell_union_bound`, and P-CPBND-05 on a drift-guarded copy of the private `reduce_longitude`.
+  A change to the library's expression is caught by the drift guard and the ordinary tests
+  (`M-720`, `M-721`), not by these harnesses.
+- **Weekly tool limits:** `from_center_area`'s and the centroid's products, `cell_union_bound`'s
+  crash proof and both cell tests on a real cell time out at 60 minutes; `union`'s crash proof runs
+  out of memory at 8 GiB and, alone at 16 GiB, times out. The C++ vectors check each.
+- **The edge part of the cell tests** is abstracted per change (`any_edge_result`); its crash
+  proofs and the law with the real edge test are weekly (both proven, over the abstract cell). The `Region` laws never reach the edge
+  test's value, so its mutant (`M-727`) is killed by the tests and the C++ vectors.
+
+## Recommendations (FR-016) (spec 008)
+
+U-015 is recorded in `UPSTREAM.md` (T060) and Kani's `thread_local!` crash in `KANI_ISSUES.md`
+(T057); D-009 is fixed and K8 matches upstream (all 2026-10-25). Ranked:
+
+1. **`Rect` next for the `Region` laws**, reusing `laws::region`, the abstract cell and the stubs;
+   then `LatLng` as the next value type, with the `atan2` contract.
+2. **Use lemma stubs for laws that recompute a value**, not for bit-for-bit comparisons with an
+   identical restatement; candidates in "Lemma stubs and function contracts".
+3. **State P-CPBND-02 on the library's own function**: a `#[doc(hidden)]` level helper in `cap.rs`
+   would let the harness call it instead of a copy of its expression.
+4. **Follow-ups outside this spec:** K10 (the coverer, T061); the inexact private
+   `ieee_remainder` of `core/src/s1/interval.rs:589`, whose comment says "same as C
+   `remainder()`" (T058; spec 004's `expanded`).
+
+## Final run (spec 008)
+
+2026-10-25 (T052), at `dd4a551` (this part's records committed, before D-009's and K8's fixes), one run at a
+time on the workstation:
+
+- **`make test`** passed twice. First at 04:55–04:57, before the records. Then at 06:19, after
+  the covers and the records, with cached builds: the Rust suites with `cap_tests` and
+  `cpp_cap_diff`, 914 Python tests, mypy and stubtest, the wasm suite (277) and `cargo-deny`.
+  `cargo test` in `verify/` passed after the covers too.
+- **`make verify-values`, all nine parts** (`VERIFY_JOBS=4`, 12 minutes each, 05:02–05:32): 272
+  of 272 harnesses successful in 30 min 25 s, with the `-Z stubbing` flag across every part.
+  The crate's tests ran first, all passing: the unit tests (87), `libm_contracts` (4),
+  `property_kinds` (3), `values_spec_vs_cpp` (11), `spec_vs_cpp`, `union_spec_vs_cpp`,
+  `wire_spec_vs_cpp` and `uv_projection`, then the enumeration (7 tests, 21.6 s). Every cover
+  the harnesses declare was satisfied. Seven of `Cap`'s crash harnesses declared none, so they
+  gained covers and were re-run (see "Measurements").
+- **`make verify-values P=cap`** (05:32–05:40): 45 of 45 successful, 7 min 39 s.
+- **`make verify-mutants M='M-7*'`** (05:40–06:02): 40 killed, 0 survived.
+- **The weekly members** ran before, one at a time (see "Measurements"). After they gained
+  covers, the two edge-test members re-ran (627.4 s and 512.8 s, 2 of 2 covers each).
+
+After the maintainer's answers (2026-10-25: fix D-009, match upstream on K8, keep upstream
+reports in `UPSTREAM.md`, never push), at `8c91967`:
+
+- **`p_cpmea_01__area`** (weekly, 60 minutes, 8 GiB): SUCCESSFUL in 1,195.3 s.
+- **`make verify-mutants M='M-708 M-741'`**: both killed.
+- **`make verify-values P=cap`**: 45 of 45 successful in 7 min 13 s, 1,219.6 s of harness
+  time.
+- **`make test`** passed (07:55–07:57), and `cargo test` in `verify/` passed too.
+
+After a code review of the branch (2026-10-25):
+
+- **L-CP-08 covers −0.** `pure_add`'s two zero rules test `== 0.0`, so they also fire for a
+  −0 length, which the domain allows; L-CP-08 proved only `ZERO + b`, and P-CAARI-01 only
+  `a + ZERO`. L-CP-08 now states both rules for both zeros: proven in 11.9 s, covers 2/2;
+  `M-732` still killed. `pure_add` rests on L-CP-08 and L-CP-05 alone.
+- **`union`'s centre is compared with C++** in `cpp_cap_diff`, within 10⁻¹⁵ (2.8·10⁻¹⁶ at
+  most, from the larger radius). The 30 rows with antipodal centres are skipped: the direction
+  is ill-conditioned there (up to 5.3·10⁻³ apart). A mutant that interpolates from the wrong
+  cap now fails the test.
+- **The empty region's bound is documented** on `Region::cell_union_bound` and
+  `RegionCoverer::fast_covering`: an empty `Cap`, `Rect` or `CellUnion` gives the four
+  level-29 cells around (1, 0, 0) (K8, as upstream); `covering` gives none (measured).
+- **The three harnesses that never finish** (`c_cell_union_bound`, `c_cell_tests__real`,
+  `c_union`) now say so in their doc comments.
+
+## Success criteria (SC-001 … SC-013) (spec 008)
+
+Checked one by one against the records above (T053, 2026-10-25). 11 of the 13 are met, SC-006
+on the workstation only. SC-001 is met in part and SC-003 is not met.
+
+| Criterion | Result | Evidence |
+|-----------|--------|----------|
+| SC-001 crash freedom, whole domain | met in part | 39 of the 42 entries are proven over their whole documented domain, with no size bound: 31 on the real code or by composition, 5 under contract, and the codec's 2 (003). The other 3 are contract entries that are tool limits: `union` (out of memory at 8 GiB, timeout at 16 GiB) and both `cell_union_bound`s (timeout at 60 minutes). See `INVENTORY.md` §9. |
+| SC-002 every in-scope entry | met | 38 crash proofs and 3 tool limits, each with its 60-minute measurement. `Deserialize` is out of the checker's reach (serde, as in 004–007) and tested; `Display` is excluded with a reason ("Exclusions and tool limits"). The contracts pass their tests against the real functions (`libm_contracts`, 4 tests, 10⁶ inputs each). |
+| SC-003 at least 90% of the counted entries | not met (88%) | 27 entries in §10. P-CPREG-04 (needs `asin`'s value) and P-CPDES-01 (serde) are not counted. Of the 25 counted, 22 are proven. Against: P-CPCON-01 (`from_center_area`'s product times out at 60 minutes), P-CPMEA-01 (the centroid times out; the area proves since D-009's fix) and P-CPBND-03 (times out). Fixing D-009 did not reach 90%: the centroid half of P-CPMEA-01 still times out. |
+| SC-004 the generic laws | met | Three equality laws (P-CPEQ-01, `laws::eq`), the three `Region` laws (P-CPREG-01 per change with the edge test abstracted and weekly with the real one, P-CPREG-02, P-CPREG-03), and the codec round trip (P-CPCOD-01). The fourth `Region` law, P-CPREG-04, is not proven: its level needs `asin`'s value, as the amended SC-004 allows. |
+| SC-005 non-vacuity | met | All 41 mutants are killed, and every proven §10 entry has one ("Non-vacuity"). All 14 per-change crash harnesses satisfy their covers, the seven added at T052 included, and so do the two weekly edge-test members. The lemmas L-CP-* are facts the stubs rely on, not catalogue entries; `M-730` and `M-731` show the laws depend on them. |
+| SC-006 per change under 10 minutes on CI | met on the workstation | `P=cap`: 7 min 39 s of wall time with 4 jobs, build and crate tests included; 1,246.8 s of harness time. Not measured on the hosted runner: that needs a push (T056). |
+| SC-007 regression tests; the probe's differences gone | met | K1–K7 are fixed in six commits (K2 and K3 share one), each with a test that failed before its fix (`7ab5b66` … `80e0ed8`). After the fixes, every probe case matches C++ (`probe/rust/survey_rust_after.txt`, `30be646`). |
+| SC-008 differential tests | met | `cpp_cap_diff` passes on every row. Its deviation rows are those the rustdoc documents: K9 (`union`'s margin, 7 rows); K8's empty-cap row is exact since the change (`8c91967`). K10's 38 rows are the coverer's, outside `Cap` (T061). |
+| SC-009 API and behaviour unchanged otherwise | met | The commits change only FR-017 to FR-023, then D-009 and K8 at the maintainer's choice (2026-10-25). `make test` passed before the records (04:55), after them, and after the two fixes ("Final run"). |
+| SC-010 panics documented | met | "`# Panics` and domain documentation added". |
+| SC-011 index by kind | met | Every new id appears once in `PROPERTIES_BY_KIND.md`, `property_kinds` passes, and the HTML is re-rendered. |
+| SC-012 upstream findings | met | U-015 (T060) and Kani's `thread_local!` crash (T057), both under "Upstream findings", are recorded in `UPSTREAM.md` and `KANI_ISSUES.md` (2026-10-25); neither is filed. |
+| SC-013 answerable from the evaluation | met | "Summary" says how much of `Cap` is proven. "What next" names the `Region` implementors the laws reach next (`Rect`, `Cell`, `PointRegion`, `CellUnion`) and gives `LatLng` a go. |

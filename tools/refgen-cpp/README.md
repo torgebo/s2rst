@@ -243,3 +243,30 @@ On the `S2POINT_*` rows (spec 006), `note` lists, joined with `+`:
   multiplies by zero and keeps each coordinate's sign, where the library returns
   `(+0, +0, +0)`, as Go does (spec 006 K12). `Normalize`'s result and, where its cross product
   is zero, `Ortho`'s differ in the zeros' signs.
+
+## Cap oracle (`generate_cap`)
+
+`generate_cap` writes
+[`core/tests/data/cpp_cap_vectors.csv`](../../core/tests/data/cpp_cap_vectors.csv), which
+[`core/tests/cpp_cap_diff.rs`](../../core/tests/cpp_cap_diff.rs) diffs `s2::Cap` against and
+[`verify/tests/values_spec_vs_cpp.rs`](../../verify/tests/values_spec_vs_cpp.rs) checks
+`verify/src/cap_spec.rs` against (spec 008, FR-024, research R9). It is a file of its own
+because `cpp_values_vectors.csv` is already 9.6 MB.
+
+```sh
+cmake --build build --target generate_cap
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_cap > ../../core/tests/data/cpp_cap_vectors.csv
+```
+
+The reference build needs no rebuilding from source if `/home/t/sources/s2geometry/build`
+exists: `cmake --install /home/t/sources/s2geometry/build --prefix /tmp/s2-install` installs it.
+
+| Section | Rows | Library operations checked | Oracle (`S2Cap`) |
+|---------|------|----------------------------|------------------|
+| `CAP_OPS` | 1,000 random caps, a point and a second cap each | the classifications, `height`, `area`, `centroid`, `contains_point`, `interior_contains_point`, `contains`, `intersects`, `interior_intersects`, `complement`, `expanded`, `union`, `add_point`, `add_cap`, `approx_eq`, `approx_eq_with`, `==`, `from_center_height`, `from_center_area`, `from_center_angle`, `angle_radius` | the same, by name |
+| `CAP_SPECIAL` | 89: empty, zero, full and hemisphere caps with identical and antipodal partners; K4's radii and the constructors' clamps; K6's pair; the poles and the antimeridian | as `CAP_OPS` | as `CAP_OPS` |
+| `CAP_BOUNDS` | 836: 600 random caps, the radii next to each covering level's power of two (K1), K5's cap, the poles, the antimeridian, empty and full | `rect_bound`, `cell_union_bound`, `RegionCoverer` with 8 cells | `GetRectBound`, `GetCellUnionBound`, `S2RegionCoverer` |
+| `CAP_CELL` | 1,066: random caps against cells at levels 0–10 within two radii of the centre; K2's grid and K3's cap against face 0 | `Region::contains_cell`, `Region::intersects_cell` | `Contains(S2Cell)`, `MayIntersect` |
+
+`Union` differs from the library by design: the library adds an error margin so that the union
+contains both caps (`cap.rs`, a documented deviation); the diff test checks containment there.

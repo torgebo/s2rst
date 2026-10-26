@@ -23,3 +23,6 @@ target_link_libraries(generate_coding PRIVATE s2::s2)
 
 add_executable(generate_values generate_values.cc)
 target_link_libraries(generate_values PRIVATE s2::s2)
+
+add_executable(generate_cap generate_cap.cc)
+target_link_libraries(generate_cap PRIVATE s2::s2)

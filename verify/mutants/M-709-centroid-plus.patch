@@ -1,0 +1,18 @@
+Mutant: M-709
+Targets: P-CPMEA-01
+Expect-Fail: 
+Test: core --test cpp_cap_diff cap_ops_match_cpp
+Defect: `centroid` scales by `1 + h/2`
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -473,7 +473,7 @@
+         if self.is_empty() {
+             return Point::default();
+         }
+-        let r = 1.0 - 0.5 * self.height();
++        let r = 1.0 + 0.5 * self.height();
+         Point(self.center.vector() * (r * self.area()))
+     }
+ 

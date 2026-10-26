@@ -1,0 +1,17 @@
+Mutant: M-739
+Targets: P-CPCOD-01
+Expect-Fail: cp_eq::p_cpcod_01
+Defect: the cap decoder swaps the centre's y and z
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -248,7 +248,7 @@
+             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid cap"));
+         }
+         let cap = Cap::from_center_chord_angle(
+-            Point(crate::r3::Vector { x, y, z }),
++            Point(crate::r3::Vector { x, y: z, z: y }),
+             ChordAngle::from_length2(radius),
+         );
+         // The center xyz and radius are raw `f64` from untrusted bytes; a

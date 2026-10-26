@@ -238,7 +238,7 @@ too.
   geometry, which CBMC models bit for bit. The `edge_neighbors` and `vertex_neighbors` crash
   proofs and P-NBR-01 and P-NBR-03 need 20.6 CPU-hours per run, so they run weekly, not
   per change. P-NBR-02 (symmetry) runs out of memory at 4 GiB in every split tried.
-- **Kani issues met** (Kani 0.68.0):
+- **Kani issues met** (Kani 0.68.0; every spec's are in `KANI_ISSUES.md`):
   - an unsatisfied `kani::cover!` does not fail a run (Kani exits 0); `run-verify.sh`
     enforces covers itself;
   - terse output gives no counterexample values; `run-verify.sh` re-runs failures with

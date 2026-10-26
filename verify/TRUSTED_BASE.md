@@ -13,6 +13,9 @@ Design: `specs/001-formal-verify-base-type/` (data-model §7, research R6, R12, 
 | CBMC | 6.11.0, from the Kani 0.68.0 bundle | Bounded model checking: symbolic execution, then a SAT query per harness |
 | SAT solver | CaDiCaL, Kani's default, for every harness | Decides each query. No harness overrides it (`grep -rn kani::solver verify/src` is empty) |
 
+The known bugs of these tools, with reproducers and the workarounds below, are in
+`KANI_ISSUES.md` at the repository root.
+
 Kani builds with debug assertions and overflow checks on. A `debug_assert!` that can fail,
 or integer arithmetic that can overflow, is therefore a failed check. A release build
 compiles both out, but on a proven domain no overflow happens, so release computes the same
@@ -151,7 +154,7 @@ the cell model is taken from 001's proof instead of being proven again:
 | `is_valid`, `range_min`, `range_max` | the validity of each id in P-UENC-03's model decode (`union_spec::decode_with` with `union_domain::impl_cell_range`), and output validity (`out_valid`) | P-VAL-03, P-RANGE-01 |
 | `contains`, `intersects` | covers only (reachability, not a property statement) | P-RANGE-02, P-RANGE-03 |
 
-Nothing is stubbed. Every `CellUnion` proof executes the real `CellId` code (`parent`,
+Nothing is stubbed (spec 008's stubs apply only to its own harnesses). Every `CellUnion` proof executes the real `CellId` code (`parent`,
 `children`, `child_begin_at_level`, `maximum_tile` where reached, `to_face_ij_orientation`
 for the `Region` queries), so a bad interaction between the two types would still be found.
 
@@ -348,7 +351,7 @@ which apply unchanged, spec 004's included. Design: `specs/005-formal-verify-r1-
 | the generator pattern (struct literals filtered by a description, never by `is_valid`) | `any_real`, `any_rect` | spec 004 research R4 |
 
 The rectangle's proofs do **not** take 004's proofs of the circular interval as lemmas: there
-is no stubbing (contracts). Every rectangle proof executes the circular interval's real code
+is no stubbing (contracts; spec 008's stubs apply only to its own harnesses). Every rectangle proof executes the circular interval's real code
 (`contains`, `union`, `intersection`, `expanded`, `approx_eq_with` with `ieee_remainder`, the
 debug checks of `new` and `new_checked`), so a bad interaction between the two types would
 still be found. The reuse is of the description: a rectangle statement is the product of
@@ -415,7 +418,7 @@ and the spec-006 part of `values/EVALUATION.md`.
 | `any_real`, `any_number` and the generator pattern | `any_uv_rect`, `any_uv_point`, the constructors' domains | spec 005 |
 | `laws::eq` | P-QEQ-01, P-PTVAL-03 | spec 004 |
 
-As in 005, nothing is stubbed: every u-v rectangle proof executes `r1::Interval`'s real code
+As in 005, nothing is stubbed (spec 008's stubs apply only to its own harnesses): every u-v rectangle proof executes `r1::Interval`'s real code
 (the comparisons, `f64::min` and `max`, `f64::clamp`, `f64::midpoint`, `expanded`,
 `approx_eq_with`). The new generic laws `laws::ord` (reflexive, dual, transitive, ties are
 equality) are instantiated by P-PTORD-02 and are ready for `ChordAngle` (FR-025).
@@ -488,7 +491,7 @@ research R0, R3, R4, R6, R11, R12). Records: sections 7–8 of `values/INVENTORY
 | `laws::ord` | P-CAORD-01 (every canonical value), P-AGVAL-02 (angles without NaN) | spec 006, ready for this type since its FR-025 |
 | `any_finite_angle` and the generator pattern | `any_chord`, `any_chord_length`, `any_angle` | spec 006 |
 
-Nothing is stubbed: every proof executes the library's code, `f64::sin`, `f64::sqrt`,
+Nothing is stubbed (spec 008's stubs apply only to its own harnesses): every proof executes the library's code, `f64::sin`, `f64::sqrt`,
 `round_ties_even` and the `%` of `normalized` included.
 
 ### The checker's model of floating point
@@ -551,3 +554,117 @@ its 7 tests with five threads on the workstation (2026-10-18).
   angle's quotients by an infinity; the members that time out at 60 minutes (`ChordAngle`'s
   `sin2` and `sin`, the angle's two quotients). Each is covered by the C++ vectors or ordinary
   tests.
+
+## `s2::Cap` (spec 008)
+
+Everything the cap proofs rely on, in addition to the sections above, which apply unchanged.
+Design: `specs/008-formal-verify-cap/` (data-model §1–§3; research R0, R4–R7). Records:
+section 9 of `values/INVENTORY.md`, section 10 of `values/PROPERTIES.md`, and the spec-008 part
+of `values/EVALUATION.md`.
+
+**Spec 008 is the first to replace code in a proof.** Every proof of specs 001–007 runs the
+library's code, and still does. Spec 008's proofs replace some functions, always through
+`src/stubs.rs`, and always named in the harness's documentation; a row's status says which:
+`proven` (nothing replaced), `proven-by-composition` (lemma stubs), `proven-under-contract`
+(function contracts).
+
+### Reliance on 004, 006 and 007
+
+| Used | For | Taken from |
+|------|-----|------------|
+| `laws::eq` | P-CPEQ-01 | spec 004 |
+| `laws::region::contains_implies_intersects` | P-CPREG-01 | spec 004 |
+| `any_box_point` (the box `[−1, 1]³` holds every unit point) | `BoxCap`, `BoxPoint` | spec 006 |
+| `any_chord_length` | `NonEmptyCap`, the lemmas | spec 007 |
+| P-CAVAL-04 (`from_angle`'s range) | the facts `pure_from_angle` allows (`pure_add`'s zero rules rest on L-CP-08, which includes P-CAARI-01's `a + ZERO`) | spec 007 |
+| the `Cap` codec's proofs (P-FX-03) | P-CPCOD-01 states the trait law; the bytes are 003's | spec 003 |
+
+### Function contracts (spec 008 FR-003)
+
+`asin_contract`, `atan2_contract` and `cos_contract` replace `f64::asin`, `f64::atan2` and
+`f64::cos` in the harnesses that name them: any value in the function's documented range,
+narrowed by the arguments' signs, NaN for NaN.
+
+- **Why:** `asin` and `atan2` are C library calls Kani replaces with a failing check; CBMC
+  models `cos`, but let `cos(1.1e-308)` and `cos(−0)` be 0 (research R0), which faked a division
+  by zero in `rect_bound`.
+- **What it trusts:** that the platform's `libm` returns, for every input, a value its contract
+  allows. `tests/libm_contracts.rs` checks every special value (±0, ±1, ±(1 ± ε), ±∞, NaN,
+  subnormals, `FRAC_PI_2` and its neighbours, π, `atan2`'s signed-zero and infinite pairs) and
+  10⁶ random inputs per function (uniform bit patterns and uniform values in the domain), 0.07 s
+  in release mode. It is a test, not a proof; the ranges are the C standard's (C11 F.10.1).
+- **What it cannot give:** any property that needs two calls of the function on one input to
+  agree, or the exact value (the covering law, P-CPREG-04; `union`'s values).
+- **Proofs relying on it:** P-CPBND-04, and the crash proofs of `angle_radius`, `rect_bound`,
+  `approx_eq`, `approx_eq_with`, and (weekly) `cell_union_bound` and `union`.
+
+### Lemma stubs (spec 008 FR-003a)
+
+A law that recomputes a float value the operation computed (a distance, `is_unit`, a sum)
+times out in CBMC, which does not see that two copies of the same products are one value
+(research R0: `add_point`, `add_cap`, `contains ⇒ intersects`, `intersects` symmetric, the
+unit-centre domain). A lemma stub replaces the recomputed function by a pure function: one value
+per input, from a fixed-size table, any value the named lemmas allow.
+
+| Stub | Replaces | Allows | Rests on |
+|------|----------|--------|----------|
+| `pure_chord` | `Point::chord_angle` | 0 for `(p, p)`; else any length in [0, 4] | L-CP-01, L-CP-02 |
+| `pure_chord_sym` | the same | as `pure_chord`, by unordered pair | L-CP-01 to L-CP-04 |
+| `pure_add` | `<ChordAngle as Add>::add` | the left operand for a zero right one, the right one for a zero left one (either zero `+0` or −0); else [0, 4] and at least each operand | L-CP-08, L-CP-05 |
+| `pure_add_sym` | the same | the zero rules, then by unordered pair | also L-CP-06 |
+| `pure_is_unit` | `Point::is_unit` | true at (±1, 0, 0); else one value per point, signs ignored | L-CP-07, L-CP-04 |
+| `pure_from_angle` | `ChordAngle::from_angle` | `NEGATIVE`, `INFINITY`, `STRAIGHT` at negative, +∞, NaN; else [0, 4] | P-CAVAL-04 |
+| `pure_approx_eq_angle` | `Point::approx_eq_angle` | one boolean per pair and tolerance | purity only |
+| `pure_normalize` | `Vector::normalize` | one finite vector per input (two slots) | purity only (P-CCAP-01: `Cell::cap_bound` normalises the centre, and the law reads the same centre) |
+
+- **Soundness:** for each input the real function returns a value its lemmas allow (proven on
+  the real code) and returns it every time (purity), so every behaviour of the real code is one
+  of the stubbed code. A stub that lacks a fact only adds behaviours: it can fail a law, never
+  pass one. Three R0b laws failed for that reason (`chord(p, p) = 0`, adding zero, the
+  constants' unit centre) and pass with the facts stated (R0c).
+- **Purity** is a property of the library: Rust never contracts floating-point expressions on
+  its own, `r3::Vector` chooses `mul_add` per build (`cfg!(target_feature = "fma")`), and
+  `sqrt` is correctly rounded (IEEE-754).
+- **L-CP-06a** (`u · v` is `v · u`, bit for bit) does not finish in 12 minutes (two symbolic
+  multipliers) and timed out at 60 minutes weekly too (2026-10-25), so it is trusted: IEEE-754
+  defines the product as the correctly rounded exact product, which is symmetric. L-CP-06 (the chord-angle sum is commutative for non-zero lengths)
+  rests on it and on L-CP-06b (addition, 32 s); the composition argument is in `cp_lem.rs`. A
+  direct L-CP-06 failed on the checker's two different square roots of one subnormal argument
+  (replayed natively: the sums agree) and timed out with `sqrt` stubbed purely.
+- **Tables** are `static Mutex<Table<K>>` with ten slots and element-wise keys. A `thread_local!`
+  table crashes Kani 0.68.0's compiler (`kani-compiler/src/intrinsics.rs:243`, an intrinsic
+  expected to return `i32`), and a growable `Vec` table runs the cell laws out of memory
+  (research R0b).
+
+### The abstract cell (research R7)
+
+The cell laws and the cell tests' crash proofs stub `Cell::vertex`, `Cell::edge_raw` and
+`Cell::contains_point` with a table of any four box points and any four box vectors, and, where
+named, upstream's edge test (`Cap::intersects_cell_edges`) with any answer. The laws depend only
+on the order of upstream's tests (vertices first), so a law proven for any values holds for every
+real cell; the crash proofs cover every value a real cell's vertices and edges can take, since
+those are box values. The real vertices' computation is spec 006's normalisation.
+
+### The checker's model of floating point
+
+- As for 004–007, plus: **`log2`** is loose (R0: it let `floor(log2(1.9375))` be at least 1);
+  after FR-017 no proven code uses it.
+- **`%`** is wrong (spec 007): after FR-020 `rect_bound` no longer uses it (the library's
+  `rem_euclid` did; R0b's validity failure on the old code was that).
+
+### The reference description and the drift guard
+
+- **`cap_spec`** recomputes the squared chord as upstream's `S1ChordAngle(a, b)` defines it and
+  reads a cap through `center()` and `chord_radius()` only. Its restatements (height, area,
+  centroid, the two constructors with upstream's `FromLength2`, the complement, `AddCap`'s
+  margin, the covering level through an exact `ilogb`) are checked against every `CAP_*` row of
+  `core/tests/data/cpp_cap_vectors.csv` (`tests/values_spec_vs_cpp.rs`).
+- **`reduce_longitude_copy`** is a copy of the library's private `reduce_longitude`, on which
+  P-CPBND-05 is proven; `cap_spec_tests` fails if the bodies differ.
+
+### Bounds and gaps
+
+- **Not proven:** P-CPREG-04 (the covering law: the covering's level depends on `asin`'s value,
+  which the contract does not fix); `union`'s values (C++ vectors: the radius within 10⁻¹² of
+  C++'s, and K9's containment counts); the deserialiser (tested, as 004–007's).
+- **Weekly:** listed in `values/PROPERTIES.md` §10.

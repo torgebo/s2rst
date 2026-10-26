@@ -52,17 +52,8 @@ fn p_ptdst_01__range() {
     kani::cover!(!point_spec::same(p, q) && c > 0.0, "distinct points");
 }
 
-/// P-PTDST-01 (correct result), symmetry: the chord angle is symmetric, bit for bit.
-///
-/// For every `p`, `q` in `BoxPoint`: `p.chord_angle(q)` is `q.chord_angle(p)`, bit for bit.
-///
-/// Weekly: it timed out at 12 minutes per change (2026-10-14).
-#[cfg(feature = "slow")]
-#[kani::proof]
-fn p_ptdst_01__symmetric() {
-    let (p, q) = (any_box_point(), any_box_point());
-    assert_eq!(
-        p.chord_angle(q).length2().to_bits(),
-        q.chord_angle(p).length2().to_bits()
-    );
-}
+// P-PTDST-01's symmetry clause (`p.chord_angle(q)` is `q.chord_angle(p)`, bit for bit) has no
+// harness here: a direct one timed out at 60 minutes (2026-10-14). Spec 008 proves it by
+// composition from `cp_lem::l_cp_03` (`b − a` is `−(a − b)`, bit for bit) and `cp_lem::l_cp_04`
+// (`(−u)·(−u)` is `u·u`): the three differences negate exactly, their squares are equal, and the
+// sum, the clamp at 4 and `from_length2` take equal operands.

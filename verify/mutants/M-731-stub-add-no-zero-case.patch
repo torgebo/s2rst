@@ -1,0 +1,21 @@
+Mutant: M-731
+Targets: P-CPGRO-02
+Expect-Fail: cp_gro::p_cpgro_02
+Defect: stub: `pure_add` without the facts `a + 0 = a` and `0 + b = b` (P-CAARI-01, L-CP-08): the law needs them
+
+diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs
+--- a/verify/src/stubs.rs
++++ b/verify/src/stubs.rs
+@@ -225,12 +225,6 @@
+ /// the right one when the left is zero (L-CP-08), otherwise any length in [0, 4] at least each operand (L-CP-05), one per ordered pair.
+ pub fn pure_add(a: ChordAngle, b: ChordAngle) -> ChordAngle {
+     let (la, lb) = (a.length2(), b.length2());
+-    if lb == 0.0 {
+-        return a;
+-    }
+-    if la == 0.0 {
+-        return b;
+-    }
+     let v = ADD.lock().unwrap().get([la.to_bits(), lb.to_bits()], || {
+         let v: f64 = kani::any();
+         kani::assume((0.0..=4.0).contains(&v));

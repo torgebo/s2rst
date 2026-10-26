@@ -1,0 +1,19 @@
+Mutant: M-721
+Targets: P-CPBND-05
+Expect-Fail: 
+Test: core --lib s2::cap::cap_tests::reduce_longitude_is_the_exact_remainder
+Test: verify --lib cap_spec::cap_spec_tests::reduce_longitude_copy_is_the_librarys
+Defect: `reduce_longitude` maps π to −π (P-CPBND-05 is on the drift-guarded copy, whose guard fails)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -608,7 +608,7 @@
+ /// `[0, 0]`, without its own centre; spec 008 K5, FR-020.)
+ fn reduce_longitude(x: f64) -> f64 {
+     let two_pi = 2.0 * PI;
+-    if x > PI {
++    if x >= PI {
+         x - two_pi
+     } else if x < -PI {
+         x + two_pi

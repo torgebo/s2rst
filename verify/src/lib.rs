@@ -6,7 +6,7 @@
 //! (spec 002), the decoding layer (spec 003) and the value types `s2rst::s2::Cell` and
 //! `s2rst::s1::Interval` (spec 004), `s2rst::r1::Interval` and `s2rst::s2::Rect` (spec 005),
 //! `s2rst::r2::Rect` and `s2rst::s2::Point` (spec 006), `s2rst::s1::ChordAngle` and
-//! `s2rst::s1::Angle` (spec 007).
+//! `s2rst::s1::Angle` (spec 007), and `s2rst::s2::Cap` (spec 008).
 //!
 //! - [`spec`] is the reference model of the S2 cell hierarchy, written from upstream
 //!   `s2cell_id.h` / `s2coords.h` and independent of `core/src/s2/cell_id.rs` (FR-006). It is
@@ -42,6 +42,13 @@
 //!   007). The `ca_*` (`s1::ChordAngle`) and `ag_*` (`s1::Angle`) modules are their harnesses,
 //!   in the same `values` suite and records; `tests/angle_enumeration.rs` proves the E-form
 //!   round trips by enumerating every `i32` (spec 007 research R12).
+//! - [`cap_spec`] describes a cap as the points within a chord distance of its centre, with
+//!   restatements of upstream's arithmetic kept apart (spec 008). The `cp_*` (`s2::Cap`)
+//!   modules are its harnesses, in the same `values` suite and records. `stubs` holds the only
+//!   replacements of library code in any proof: the function contracts of `asin`, `atan2` and
+//!   `cos`, and the lemma stubs, each resting on lemmas proven on the real code (spec 008
+//!   FR-003, FR-003a; research R5, R6); `tests/libm_contracts.rs` checks the contracts against
+//!   the real functions.
 //!
 //! Every property harness's doc comment starts with its catalogue id and its kind, then a
 //! plain-language statement, then the exact one: `P-HIER-01 (correct result): …`. The kinds
@@ -57,6 +64,7 @@
 
 pub mod angle_spec;
 pub mod arc_spec;
+pub mod cap_spec;
 pub mod cell_spec;
 pub mod chord_spec;
 pub mod point_spec;
@@ -72,6 +80,10 @@ mod domain;
 // The generic trait laws (spec 004 research R15): every suite may instantiate them.
 #[cfg(kani)]
 mod laws;
+// Function contracts and lemma stubs (spec 008 research R5, R6): every `#[kani::stub]` names
+// one of these.
+#[cfg(kani)]
+mod stubs;
 
 #[cfg(kani)]
 mod anc;
@@ -262,3 +274,28 @@ mod ag_crash;
 mod ag_eform;
 #[cfg(all(kani, feature = "values"))]
 mod ag_val;
+
+#[cfg(all(kani, feature = "values"))]
+mod cp_bnd;
+#[cfg(all(kani, feature = "values"))]
+mod cp_cls;
+#[cfg(all(kani, feature = "values"))]
+mod cp_cmp;
+#[cfg(all(kani, feature = "values"))]
+mod cp_con;
+#[cfg(all(kani, feature = "values"))]
+mod cp_crash;
+#[cfg(all(kani, feature = "values"))]
+mod cp_eq;
+#[cfg(all(kani, feature = "values"))]
+mod cp_gro;
+#[cfg(all(kani, feature = "values"))]
+mod cp_lem;
+#[cfg(all(kani, feature = "values"))]
+mod cp_mea;
+#[cfg(all(kani, feature = "values"))]
+mod cp_mem;
+#[cfg(all(kani, feature = "values"))]
+mod cp_reg;
+#[cfg(all(kani, feature = "values"))]
+mod cp_rel;

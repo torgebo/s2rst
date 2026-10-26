@@ -1,0 +1,17 @@
+Mutant: M-737
+Targets: P-CPBND-01
+Expect-Fail: cp_bnd::p_cpbnd_01
+Defect: `cap_bound` is the full cap (still a bound, not the cap)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -395,7 +395,7 @@
+     /// Returns this cap as its own bounding cap.
+     #[inline]
+     pub fn cap_bound(self) -> Cap {
+-        self
++        Cap::full()
+     }
+ 
+     /// Returns a bounding latitude-longitude rectangle for this cap.

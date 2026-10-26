@@ -1,0 +1,20 @@
+Mutant: M-718
+Targets: P-CPCMP-01
+Expect-Fail: cp_cmp::p_cpcmp_01
+Defect: the FR-019 fix removed: the complement's radius is `STRAIGHT − r` (K4)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -289,10 +289,7 @@
+         }
+         // Upstream's radius, `FromLength2(4 − r²)`. (`STRAIGHT − radius` squared a square root
+         // and differed in the last bits; spec 008 K4, FR-019.)
+-        Cap::from_center_chord_angle(
+-            -self.center,
+-            ChordAngle::from_length2(4.0 - self.radius.length2()),
+-        )
++        Cap::from_center_chord_angle(-self.center, ChordAngle::STRAIGHT - self.radius)
+     }
+ 
+     /// Returns a cap expanded by the given distance. If the cap is empty,

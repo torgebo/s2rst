@@ -416,3 +416,60 @@ operation are in `PROPERTIES.md` §9.
 | 28 | `impl Display for s1::Angle` | excluded | tool limit: formats through `core::fmt`, as 001's and 004's `Display` |  |  |  | n/a |
 | 29 | `PartialEq, PartialOrd (derived)` | in scope |  | `AnyAngle`², NaN included |  | `ag_crash::c_order` | proven |
 | 30 | `Default (derived)` | in scope |  | (no input) |  | `ag_crash::c_construction_and_accessors` | proven |
+
+## 9. `s2::Cap` (43 entries)
+
+Spec 008 (`specs/008-formal-verify-cap/data-model.md` §5). The 32 inherent operations; the
+hand-written `PartialEq` and `Display`; the six `Region` methods; `S2Encode` and `S2Decode`
+(proven by spec 003, `verify/decoding/`); the hand-written `Deserialize` (FR-023). The derived
+`Clone`, `Copy` and `Debug` are not entries.
+
+Statuses as section 8's, plus **under contract** (the proof replaces `asin`, `atan2` or `cos`
+by its range contract, spec 008 FR-003) and **by composition** (lemma stubs, FR-003a); the
+stubs a harness uses are named in its row.
+
+**Summary** (T027, 2026-10-24): 42 in scope, 1 excluded (`Display`). The 32 rows group the 43
+entries (several share a row). 31 entries have crash proofs on the real code or with lemma stubs,
+8 under the function contracts (5 per change, 3 weekly), and the two codec entries are spec
+003's; `Deserialize` is tested. The per-change crash harnesses: 14 in `cp_crash`, every one
+`SUCCESSFUL`, all covers satisfied (`make verify-values P=cap`; seven gained their covers at
+T052, 2026-10-25). The weekly members, one at a
+time at 60 minutes and 8 GiB (2026-10-25): `c_cell_tests__edges_contains` (704.2 s) and
+`c_cell_tests__edges_intersects` (402.0 s) prove the edge test over the abstract cell;
+`c_cell_tests__real` and `c_cell_union_bound` time out (`verify/known-timeouts.txt`); `c_union` runs
+out of memory, and alone at 16 GiB times out. So 3 of the 8 contract entries (`union`, both `cell_union_bound`s) are tool limits.
+
+| # | entry | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|-------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `s2::Cap::from_center_chord_angle` | in scope |  | `BoxPoint` × every `f64` (through `from_length2`) |  | `cp_crash::c_construction_and_measures` (9.0 s) | proven |
+| 2 | `s2::Cap::from_center_angle` | in scope |  | a unit centre × every non-NaN angle | a unit centre (upstream's debug check, `# Panics`) | `cp_crash::c_from_center_angle` (6.7 s; stub `pure_is_unit`) | proven-by-composition |
+| 3 | `s2::Cap::from_point` | in scope |  | `BoxPoint` |  | `cp_crash::c_construction_and_measures` | proven |
+| 4 | `s2::Cap::from_center_height` | in scope |  | `BoxPoint` × every `f64` |  | `cp_crash::c_construction_and_measures` | proven |
+| 5 | `s2::Cap::from_center_area` | in scope |  | `BoxPoint` × every `f64` |  | `cp_crash::c_construction_and_measures` | proven |
+| 6 | `s2::Cap::empty`, `full` | in scope |  | — |  | `cp_crash::c_construction_and_measures` | proven |
+| 7 | `s2::Cap::center`, `chord_radius` | in scope |  | `BoxCap` |  | `cp_crash::c_construction_and_measures` | proven |
+| 8 | `s2::Cap::angle_radius` | in scope (under contract) |  | `BoxCap` |  | `cp_crash::c_angle_radius` (1.1 s; `asin_contract`) | proven-under-contract |
+| 9 | `s2::Cap::height`, `area`, `centroid` | in scope |  | `BoxCap` |  | `cp_crash::c_construction_and_measures` | proven |
+| 10 | `s2::Cap::is_valid`, `is_empty`, `is_full` | in scope |  | `BoxCap` |  | `cp_crash::c_classifications_and_equality` (1.8 s) | proven |
+| 11 | `s2::Cap::contains_point`, `interior_contains_point` | in scope |  | `BoxCap` × `BoxPoint` | a unit point (upstream's debug check; documented) | `cp_crash::c_point_containment` (5.2 s) | proven |
+| 12 | `s2::Cap::contains` | in scope |  | `BoxCap²` |  | `cp_crash::c_contains` (6.2 s) | proven |
+| 13 | `s2::Cap::intersects`, `interior_intersects` | in scope |  | `BoxCap²` |  | `cp_crash::c_intersects` (36.7 s) | proven |
+| 14 | `s2::Cap::complement` | in scope |  | `BoxCap` |  | `cp_crash::c_complement` (0.8 s) | proven |
+| 15 | `s2::Cap::expanded` | in scope |  | `BoxCap` × `FiniteNonNegAngle` | a finite non-negative distance (upstream's debug check; `# Panics`) | `cp_crash::c_expanded` (10.7 s) | proven |
+| 16 | `s2::Cap::union` | in scope (under contract) |  | `ValidCap²` |  | weekly: `cp_crash::c_union` (`asin_contract`, `atan2_contract`, `pure_is_unit`; out of memory at 8 GiB, timeout at 60 minutes at 16 GiB, 2026-10-25) | not proven (tool limit) |
+| 17 | `s2::Cap::add_point` | in scope |  | `BoxCap` × `BoxPoint` |  | `cp_crash::c_add_point` (1.4 s) | proven |
+| 18 | `s2::Cap::add_cap` | in scope |  | `BoxCap²` |  | `cp_crash::c_add_cap` (15.1 s) | proven |
+| 19 | `s2::Cap::cap_bound` | in scope |  | `BoxCap` |  | `cp_crash::c_classifications_and_equality` | proven |
+| 20 | `s2::Cap::rect_bound` | in scope (under contract) |  | `BoxCap` |  | `cp_crash::c_rect_bound` (180.2 s; `asin_contract`, `atan2_contract`, `cos_contract`) | proven-under-contract |
+| 21 | `s2::Cap::cell_union_bound` | in scope (under contract) |  | `ValidCap` |  | weekly: `cp_crash::c_cell_union_bound` (`asin_contract`, `pure_is_unit`; timeout at 60 minutes, 2026-10-25) | not proven (tool limit) |
+| 22 | `s2::Cap::equal`, `PartialEq` | in scope |  | `BoxCap²` |  | `cp_crash::c_classifications_and_equality` | proven |
+| 23 | `s2::Cap::approx_eq`, `approx_eq_with` | in scope (under contract) |  | `BoxCap²` × every `f64` |  | `cp_crash::c_approx_eq` (31.5 s; `atan2_contract`) | proven-under-contract |
+| 24 | `Region for Cap::cap_bound` | in scope |  | `BoxCap` |  | `cp_crash::c_classifications_and_equality` | proven |
+| 25 | `Region for Cap::rect_bound` | in scope (under contract) |  | `BoxCap` |  | `cp_crash::c_rect_bound` | proven-under-contract |
+| 26 | `Region for Cap::cell_union_bound` | in scope (under contract) |  | `ValidCap` |  | weekly: `cp_crash::c_cell_union_bound` (timeout at 60 minutes) | not proven (tool limit) |
+| 27 | `Region for Cap::contains_cell` | in scope |  | `BoxCap` × the abstract cell |  | `cp_crash::c_cell_tests__vertices` (170.6 s; the edge test abstracted); weekly: `cp_crash::c_cell_tests__edges_contains` (704.2 s; the abstract cell's edges), `cp_crash::c_cell_tests__real` (timeout at 60 minutes) | proven-by-composition (vertex part and edge test, over the abstract cell) |
+| 28 | `Region for Cap::intersects_cell` | in scope |  | `BoxCap` × the abstract cell |  | `cp_crash::c_cell_tests__vertices`; weekly: `cp_crash::c_cell_tests__edges_intersects` (402.0 s), `cp_crash::c_cell_tests__real` (timeout at 60 minutes) | proven-by-composition (vertex part and edge test, over the abstract cell) |
+| 29 | `Region for Cap::contains_point` | in scope |  | `BoxCap` × `BoxPoint` |  | `cp_crash::c_point_containment` | proven |
+| 30 | `S2Encode for Cap`, `S2Decode for Cap` | in scope (spec 003) |  | every valid cap; every byte string |  | `cd_fx::p_fx_03__*`, `cd_fx::p_fx_08__*` (spec 003) | proven (spec 003) |
+| 31 | `Deserialize for Cap` | in scope (tested) |  | every serialised cap |  | `cap_tests::deserialise_rejects_invalid_caps` (not a Kani entry) | tested |
+| 32 | `Display for Cap` | excluded | `core::fmt` is too slow for Kani, and `asin` (as 004–007) |  |  |  | — |

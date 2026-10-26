@@ -43,7 +43,8 @@
 )]
 use crate::r3::Vector;
 use crate::s1::{Angle, ChordAngle};
-use crate::s2::{CellId, LatLng, Point};
+use crate::s2::metric::MIN_WIDTH;
+use crate::s2::{Cell, CellEdge, CellId, LatLng, Point};
 use std::f64::consts::{FRAC_PI_2, PI};
 use std::fmt;
 
@@ -82,7 +83,7 @@ use std::fmt;
 /// ```
 #[must_use]
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Cap {
     center: Point,
     radius: ChordAngle,
@@ -102,6 +103,12 @@ impl Cap {
     ///
     /// The angle is clamped to at most π. A negative angle yields an empty
     /// cap, and an angle of π or more yields a full cap.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when the result is not valid: the centre is not unit length (or the
+    /// angle is NaN, which gives the radius `STRAIGHT`, still valid). Upstream's constructor
+    /// checks validity in debug builds too.
     #[inline]
     pub fn from_center_angle(center: Point, angle: Angle) -> Self {
         // Match C++: clamp to π before converting to chord angle.
@@ -196,7 +203,10 @@ impl Cap {
     /// Returns the surface area of the cap on the unit sphere.
     #[inline]
     pub fn area(self) -> f64 {
-        2.0 * PI * 0.0_f64.max(self.height())
+        // Upstream's `std::max(0.0, height)`, which gives +0 for a height of −0;
+        // `0.0_f64.max(h)` leaves that sign unspecified (spec 008 D-009).
+        let h = self.height();
+        2.0 * PI * if 0.0 < h { h } else { 0.0 }
     }
 
     // --- Predicates ---
@@ -222,13 +232,19 @@ impl Cap {
     // --- Containment & intersection ---
 
     /// Reports whether the cap contains the given point.
+    ///
+    /// `p` should be unit length, as upstream requires (`S2Cap::Contains` checks it in debug
+    /// builds; the library does not). For another point the result compares the straight-line
+    /// distance from the centre to `p` with the radius's chord, which has no meaning on the
+    /// sphere.
     #[inline]
     pub fn contains_point(self, p: Point) -> bool {
         self.center.chord_angle(p) <= self.radius
     }
 
     /// Reports whether the point is within the interior of this cap (i.e.
-    /// the cap minus its boundary).
+    /// the cap minus its boundary). `p` should be unit length, as for
+    /// [`contains_point`](Cap::contains_point).
     #[inline]
     pub fn interior_contains_point(self, p: Point) -> bool {
         self.is_full() || self.center.chord_angle(p) < self.radius
@@ -274,11 +290,22 @@ impl Cap {
         if self.is_empty() {
             return Cap::full();
         }
-        Cap::from_center_chord_angle(-self.center, ChordAngle::STRAIGHT - self.radius)
+        // Upstream's radius, `FromLength2(4 − r²)`. (`STRAIGHT − radius` squared a square root
+        // and differed in the last bits; spec 008 K4, FR-019.)
+        Cap::from_center_chord_angle(
+            -self.center,
+            ChordAngle::from_length2(4.0 - self.radius.length2()),
+        )
     }
 
     /// Returns a cap expanded by the given distance. If the cap is empty,
     /// it returns an empty cap.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when `distance` is negative or NaN (upstream's `ABSL_DCHECK_GE`), and
+    /// when it is +∞: its chord angle is `INFINITY`, and the chord-angle sum checks for special
+    /// operands (spec 007 FR-019), as upstream's does.
     pub fn expanded(self, distance: Angle) -> Cap {
         debug_assert!(distance.radians() >= 0.0);
         if self.is_empty() {
@@ -288,6 +315,18 @@ impl Cap {
     }
 
     /// Returns the smallest cap which encloses both this cap and `other`.
+    ///
+    /// **Deviation from upstream:** `S2Cap::Union` returns the cap through the computed centre
+    /// and radius as they are; the library then adds the chord angle's conversion and point
+    /// errors (`max_angle_error`, `max_point_error`) to the radius, to absorb the rounding of the
+    /// conversion between `Angle` and `ChordAngle` and of the interpolated centre. The radius can
+    /// therefore be a few ulps larger than C++'s.
+    ///
+    /// Neither version is guaranteed to contain both caps: on the C++ reference vectors
+    /// (`core/tests/cpp_cap_diff.rs`), upstream's result misses part of one cap on 337 of 1,089
+    /// rows, by rounding, and the library's on 7, all where one cap is a single point or nearly
+    /// one (spec 008 K9; upstream's comment says "encloses", `UPSTREAM.md` U-015). Use
+    /// [`add_cap`](Cap::add_cap), whose margin keeps the centre, when containment matters.
     pub fn union(self, other: Cap) -> Cap {
         // If the other cap is larger, swap.
         if self.radius < other.radius {
@@ -392,32 +431,28 @@ impl Cap {
             let sin_c = center_lat.cos();
             if sin_a <= sin_c {
                 let angle_a = (sin_a / sin_c).asin();
-                lng.lo = (center_lng - angle_a + PI).rem_euclid(2.0 * PI) - PI;
-                lng.hi = (center_lng + angle_a + PI).rem_euclid(2.0 * PI) - PI;
-                // Normalize to s1::Interval conventions
-                lng = crate::s1::Interval::new(lng.lo, lng.hi);
+                lng = crate::s1::Interval::new(
+                    reduce_longitude(center_lng - angle_a),
+                    reduce_longitude(center_lng + angle_a),
+                );
             }
         }
 
         Rect::new(lat, lng)
     }
 
-    /// Computes a covering of the cap (at most 4-6 cells).
+    /// Computes a covering of the cap (at most 4-6 cells): the six faces, or the four cells at
+    /// upstream's level around the cell vertex nearest the centre.
+    ///
+    /// As upstream's `GetCellUnionBound`, the empty cap is not treated apart: its radius, −1
+    /// radian, gives level 29 and the four cells around its centre (spec 008 K8).
     pub fn cell_union_bound(self) -> Vec<CellId> {
-        if self.is_empty() {
-            return Vec::new();
-        }
-
-        // MinWidthMetric: dim=1, deriv = 2*sqrt(2)/3
-        let min_width_deriv = 2.0 * std::f64::consts::SQRT_2 / 3.0;
+        // Upstream: the maximum level such that the cap contains at most one cell vertex,
+        // `kMinWidth.GetLevelForMinValue(radius) - 1`, through the exact `ilogb` of
+        // `MIN_WIDTH.max_level`. (`floor(log2(...))` rounds a quotient just below a power of
+        // two up to it, which gave a level one too fine; spec 008 K1, FR-017.)
         let radius = self.angle_radius().radians();
-
-        let level = if radius <= 0.0 {
-            i32::from(crate::s2::coords::MAX_CELL_LEVEL)
-        } else {
-            let raw = (min_width_deriv / radius).log2().floor() as i32;
-            raw.clamp(0, i32::from(crate::s2::coords::MAX_CELL_LEVEL))
-        } - 1;
+        let level = i32::from(MIN_WIDTH.max_level(radius).as_u8()) - 1;
 
         if level < 0 {
             return (0..6).map(CellId::from_face).collect();
@@ -439,6 +474,91 @@ impl Cap {
         Point(self.center.vector() * (r * self.area()))
     }
 
+    // --- Cell tests (upstream's `Contains(const S2Cell&)` and `MayIntersect`) ---
+
+    /// Reports whether the cap contains the cell: upstream's `S2Cap::Contains(const S2Cell&)`.
+    /// The four vertices first; then the complement of the cap must not intersect the cell's
+    /// edges (slightly conservative, as upstream: technically the complement's interior). The
+    /// vertices are tested before the complement is taken, because the complement of a very
+    /// small cap cannot be represented accurately.
+    pub(crate) fn contains_cell_upstream(self, cell: &Cell) -> bool {
+        let vertices = [
+            cell.vertex(0),
+            cell.vertex(1),
+            cell.vertex(2),
+            cell.vertex(3),
+        ];
+        if !vertices.iter().all(|&v| self.contains_point(v)) {
+            return false;
+        }
+        !self.complement().intersects_cell_edges(cell, &vertices)
+    }
+
+    /// Reports whether the cap may intersect the cell: upstream's `S2Cap::MayIntersect`. True if
+    /// the cap contains a vertex, otherwise the edge test.
+    pub(crate) fn may_intersect_cell(self, cell: &Cell) -> bool {
+        let vertices = [
+            cell.vertex(0),
+            cell.vertex(1),
+            cell.vertex(2),
+            cell.vertex(3),
+        ];
+        if vertices.iter().any(|&v| self.contains_point(v)) {
+            return true;
+        }
+        self.intersects_cell_edges(cell, &vertices)
+    }
+
+    /// Reports whether the cap intersects any point of the cell other than its vertices, which
+    /// the caller has already tested: upstream's private
+    /// `S2Cap::Intersects(const S2Cell&, const S2Point* vertices)` (`s2cap.cc:225–264`).
+    fn intersects_cell_edges(self, cell: &Cell, vertices: &[Point; 4]) -> bool {
+        // If the cap is a hemisphere or larger, the cell and the complement of the cap are both
+        // convex. Therefore, since no vertex of the cell is contained, no other interior point
+        // of the cell is contained either.
+        if self.radius >= ChordAngle::RIGHT {
+            return false;
+        }
+        // We need to check for empty caps due to the center check just below.
+        if self.is_empty() {
+            return false;
+        }
+        // Optimization: return true if the cell contains the cap center. (This allows half of
+        // the edge checks below to be skipped.)
+        if cell.contains_point(self.center) {
+            return true;
+        }
+        // At this point we know that the cell does not contain the cap center, and the cap
+        // does not contain any cell vertex. The only way that they can intersect is if the cap
+        // intersects the interior of some edge.
+        let sin2_angle = self.radius.sin2();
+        let center = self.center.vector();
+        for (k, &edge_id) in CellEdge::ALL.iter().enumerate() {
+            let edge = cell.edge_raw(edge_id).vector();
+            let dot = center.dot(edge);
+            if dot > 0.0 {
+                // The center is in the interior half-space defined by the edge. We don't need
+                // to consider these edges, since if the cap intersects this edge then it also
+                // intersects the edge on the opposite side of the cell (because we know the
+                // center is not contained with the cell).
+                continue;
+            }
+            // The norm2() factor is necessary because "edge" is not normalized.
+            if dot * dot > sin2_angle * edge.norm2() {
+                return false; // Entire cap is on the exterior side of this edge.
+            }
+            // Otherwise, the great circle containing this edge intersects the interior of the
+            // cap. We just need to check whether the point of closest approach occurs between
+            // the two edge endpoints.
+            let dir = edge.cross(center);
+            if dir.dot(vertices[k].vector()) < 0.0 && dir.dot(vertices[(k + 1) & 3].vector()) > 0.0
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     // --- Comparison ---
 
     /// Reports whether this cap is equal to the other cap, handling the
@@ -449,8 +569,9 @@ impl Cap {
             || (self.is_full() && other.is_full())
     }
 
-    /// Reports whether this cap is approximately equal to the other cap
-    /// within a default tolerance of 1e-14 radians.
+    /// Reports whether this cap is approximately equal to the other cap within upstream's
+    /// default tolerance of 10⁻¹⁴, for the centres' angle and the radii's squared lengths alike
+    /// (upstream's `ApproxEquals` with its default `max_error`).
     pub fn approx_eq(self, other: Cap) -> bool {
         self.approx_eq_with(other, 1e-14)
     }
@@ -460,11 +581,36 @@ impl Cap {
     pub fn approx_eq_with(self, other: Cap, max_error: f64) -> bool {
         let r2 = self.radius.length2();
         let other_r2 = other.radius.length2();
-        (self.center.approx_eq(other.center) && (r2 - other_r2).abs() <= max_error)
+        // Upstream compares the centres within `max_error` radians too (`S2::ApproxEquals`);
+        // a fixed 10⁻¹⁵ ignored the tolerance (spec 008 K6, FR-022).
+        (self
+            .center
+            .approx_eq_angle(other.center, Angle::from_radians(max_error))
+            && (r2 - other_r2).abs() <= max_error)
             || (self.is_empty() && other_r2 <= max_error)
             || (other.is_empty() && r2 <= max_error)
             || (self.is_full() && other_r2 >= 2.0 - max_error)
             || (other.is_full() && r2 >= 2.0 - max_error)
+    }
+}
+
+/// Reduces a longitude bound of [`Cap::rect_bound`] to [−π, π]: the IEEE remainder by the
+/// `f64` nearest 2π, as upstream's `remainder(x, 2 * M_PI)`, exactly, without `%`.
+///
+/// The argument is a centre longitude in [−π, π] plus or minus an `asin` result in [0, π/2], so
+/// |x| ≤ 3π/2 (plus a rounding). Then one correction by 2π is the remainder, and it is exact:
+/// for π < |x| ≤ 4π, `x ∓ 2π` has no rounding error (Sterbenz). At |x| = π exactly, the
+/// remainder's quotient rounds to the even 0, so `x` is kept, as here. (The previous
+/// `(x + π).rem_euclid(2π) − π` rounded `x + π`: a cap at longitude 10⁻¹⁴° got the rectangle
+/// `[0, 0]`, without its own centre; spec 008 K5, FR-020.)
+fn reduce_longitude(x: f64) -> f64 {
+    let two_pi = 2.0 * PI;
+    if x > PI {
+        x - two_pi
+    } else if x < -PI {
+        x + two_pi
+    } else {
+        x
     }
 }
 
@@ -483,6 +629,36 @@ fn interpolate_at_distance(ax: Angle, a: Point, b: Point) -> Point {
         return a;
     }
     Point((a.vector() * cos_a + tangent * (sin_a / t_norm)).normalize())
+}
+
+/// Deserialises a cap only if it is valid (`is_valid`: a unit-length centre and a radius of
+/// length² at most 4), as the binary decoder accepts only valid caps. Anything else is an error
+/// naming the rule. A derived impl would accept any centre, NaN included: a way to build a cap
+/// that no constructor and no decoder returns (spec 008 K7, FR-023). The serialised form is
+/// unchanged.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Cap {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "Cap")]
+        struct Fields {
+            center: Point,
+            radius: ChordAngle,
+        }
+
+        let f = Fields::deserialize(deserializer)?;
+        if !f.center.is_unit() {
+            return Err(D::Error::custom("cap centre is not unit length"));
+        }
+        // Unreachable through `ChordAngle`'s own deserialiser (spec 007 FR-020), kept so that
+        // this impl states the whole rule.
+        if f.radius.length2() > 4.0 {
+            return Err(D::Error::custom("cap radius is above STRAIGHT"));
+        }
+        Ok(Cap::from_center_chord_angle(f.center, f.radius))
+    }
 }
 
 impl PartialEq for Cap {
@@ -1562,3 +1738,7 @@ mod quickcheck_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cap_tests.rs"]
+mod cap_tests;

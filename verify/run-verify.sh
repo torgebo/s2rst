@@ -52,6 +52,10 @@ to_kib() {   # to_kib <value> <variable name, for the error message>
 }
 ceiling_kib=$(to_kib "${VERIFY_MEM_PER_HARNESS:-4G}" VERIFY_MEM_PER_HARNESS)
 time_limit=(-Z unstable-options --harness-timeout "${VERIFY_HARNESS_TIMEOUT:-12m}")
+# The crate has `#[kani::stub]` attributes (spec 008 research R2, R6), for which Kani needs
+# `-Z stubbing` on every build. It changes nothing for harnesses without stubs: Kani applies
+# stubs per harness.
+stub_flag=(-Z stubbing)
 playback_kib=$(( 3 * ceiling_kib ))
 [ -n "${VERIFY_PLAYBACK_MEM:-}" ] && playback_kib=$(to_kib "$VERIFY_PLAYBACK_MEM" VERIFY_PLAYBACK_MEM)
 
@@ -99,7 +103,7 @@ fi
 
 # ---- step 1: build once, without a memory limit ---------------------------------------
 echo "run-verify: building harnesses (cargo kani --only-codegen)"
-if ! cargo kani --only-codegen "$@" > "$log_dir/codegen.log" 2>&1; then
+if ! cargo kani --only-codegen "${stub_flag[@]}" "$@" > "$log_dir/codegen.log" 2>&1; then
     tail -n 40 "$log_dir/codegen.log"
     echo "run-verify: codegen failed (full log: verify/$log_dir/codegen.log)" >&2
     exit 1
@@ -259,7 +263,7 @@ echo "run-verify: jobs=$jobs, ceiling $(( ceiling_kib / 1024 )) MiB and" \
      "cgroup backstop $([ -n "$unit" ] && echo on || echo off)"
 echo "run-verify: one line per harness as it finishes (also verify/$progress)"
 set +e
-guarded main cargo kani -j "$jobs" --output-format terse "${time_limit[@]}" "$@" \
+guarded main cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" "${time_limit[@]}" "$@" \
     < /dev/null 2>&1 | tee "$log" \
     | python3 -c "$parse_py" "$results" "$progress" known-defects.txt known-timeouts.txt
 rcs=("${PIPESTATUS[@]}")
@@ -298,7 +302,7 @@ report="$log_dir/report.txt"
 while IFS=$'\t' read -r h st cov t; do
     if [ "$st" = ERROR ]; then          # re-run alone in regular output to tell OOM apart
         set +e
-        guarded "rerun$RANDOM" cargo kani "${build_args[@]}" --exact --harness "$h" "${time_limit[@]}" \
+        guarded "rerun$RANDOM" cargo kani "${stub_flag[@]}" "${build_args[@]}" --exact --harness "$h" "${time_limit[@]}" \
             < /dev/null > "$log_dir/rerun.log" 2>&1
         set -e
         # CBMC's own messages: the solver's "ran out of memory", the pre-solver "Out of
@@ -342,7 +346,7 @@ while IFS=$'\t' read -r h st cov t; do
         echo "---- counterexample for $h (concrete playback) ----"
         set +e
         guard_kib=$playback_kib guarded "play$RANDOM" cargo kani -Z concrete-playback \
-            --concrete-playback=print "${build_args[@]}" --exact --harness "$h" \
+            --concrete-playback=print "${stub_flag[@]}" "${build_args[@]}" --exact --harness "$h" \
             --output-format terse "${time_limit[@]}" < /dev/null > "$log_dir/playback.log" 2>&1
         set -e
         if grep -q '^Concrete playback unit test for' "$log_dir/playback.log"; then

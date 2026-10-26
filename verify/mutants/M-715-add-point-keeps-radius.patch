@@ -1,0 +1,17 @@
+Mutant: M-715
+Targets: P-CPGRO-01
+Expect-Fail: cp_gro::p_cpgro_01
+Defect: `add_point` keeps the old radius
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -365,7 +365,7 @@
+         }
+         let new_rad = self.center.chord_angle(p);
+         if new_rad > self.radius {
+-            Cap::from_center_chord_angle(self.center, new_rad)
++            Cap::from_center_chord_angle(self.center, self.radius)
+         } else {
+             self
+         }

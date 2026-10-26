@@ -1,0 +1,17 @@
+Mutant: M-701
+Targets: P-CPCON-01
+Expect-Fail: cp_con::p_cpcon_01
+Defect: `from_center_height` takes the height as the length² (no `2 ·`)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -133,7 +133,7 @@
+     /// yields an empty cap; a height of 2 or more yields a full cap.
+     #[inline]
+     pub fn from_center_height(center: Point, height: f64) -> Self {
+-        Self::from_center_chord_angle(center, ChordAngle::from_length2(2.0 * height))
++        Self::from_center_chord_angle(center, ChordAngle::from_length2(height))
+     }
+ 
+     /// Creates a cap with the given center and surface area. The area can

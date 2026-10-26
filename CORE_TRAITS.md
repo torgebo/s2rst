@@ -157,9 +157,15 @@ Internal (non-public):
 - **Bounding rect contains contained points.** If `contains_point(p)` is `true`, then `rect_bound().contains_latlng(LatLng::from_point(p))` is `true`.
 - **Cell-union cover covers the region.** Every cell in `cell_union_bound()` either intersects the region or is redundant; taken together, they cover every contained point.
 - **Containment implies intersection.** `contains_cell(c) ⇒ intersects_cell(c)` for all cells `c`.
-- **Non-intersection implies non-containment.** If `!intersects_cell(c)`, then `!contains_cell(c)` and `!contains_point(&v)` for every vertex `v` of `c`.
+- **Non-intersection implies non-containment.** If `!intersects_cell(c)`, then `!contains_cell(c)`. For a region whose cell test checks the vertices first (`Cap`, `Rect`), also `!contains_point(&v)` for every vertex `v` of `c`; this second part does not hold for `Cell`, whose `intersects_cell` compares ids while its closed region contains the shared vertices of a neighbour (as upstream's `S2Cell`; spec 008 T022).
 - **Determinism.** All methods are pure functions of `(&self, inputs)`; repeated calls yield identical results.
 - **Debug is implemented** (from supertrait).
+
+**Proven instances (Kani, `verify/src/laws.rs`):** containment implies intersection for `Cell`
+(P-CCNT-03) and `Cap` (P-CPREG-01, by composition, spec 008); the vertex part of
+non-intersection for `Cap` (P-CPREG-02); the bounding cap for `Cap` (P-CPREG-03); the
+cell-union cover for `Cell` (P-CCNT-03; for `Cap` not proven, P-CPREG-04). Every invariant
+also has quickcheck instances (below).
 
 **Implementations (12):** `Cap`, `Rect`, `Cell`, `PointRegion`, `RegionIntersection`, `RegionUnion`, `Polyline`, `Loop`, `Polygon`, `CellUnion`, `ShapeIndexRegion<'_>`, `ShapeIndexBufferedRegion<'_>`.
 
@@ -223,6 +229,9 @@ Internal (non-public):
 **Invariants (paired with `S2Encode`):**
 - **Round-trip.** For every value `v: T` where `T: S2Encode + S2Decode`, decoding the bytes produced by `v.encode(&mut buf)` yields a value equal (by the type's domain equality, e.g., set-equality for `CellUnion`) to `v`.
 - **Decode rejects empty/truncated input** by returning `Err`.
+
+**Proven instances (Kani):** the round trip of every codec of spec 003 (`verify/decoding/`),
+bytes for bytes; for `Cap`, also under `Cap`'s own equality (P-CPCOD-01, spec 008).
 
 **Implementations (12 each):** `CellId`, `Point`, `Cap`, `Rect`, `CellUnion`, `Polyline`, `Loop`, `Polygon`, `LaxPolyline`, `LaxPolygon`, `PointVector`, `Cell`.
 
@@ -367,6 +376,18 @@ tests come for free via the shared harness.
 See `core/tests/trait_property_tests.rs` for the generic property
 functions (e.g., `region_properties::cap_bound_contains_points`)
 and their instantiations for each concrete type.
+
+The same laws are stated once more for the Kani model checker, in
+`verify/src/laws.rs` (`laws::region`, `laws::eq`, `laws::ord`), and
+instantiated over symbolic values in the `values` suite: the `Region`
+laws for `Cell` (P-CCNT-03) and `Cap` (P-CPREG-01 to -03), equality for
+`Cell`, `s1::Interval`, `r2::Rect`, `Point` and `Cap`. Spec 008 added two
+`Region` laws to both harnesses: a cell the region does not intersect
+has no vertex the region contains (`no_intersect_no_vertex`; a law for
+`Cap` and `Rect`, not for `Cell`), and the bounding cap contains every
+contained point (`cap_bound_contains_points`). Each Kani law names its
+quickcheck twin in its doc comment; the catalogue is
+`verify/values/PROPERTIES.md` §3.
 
 ---
 

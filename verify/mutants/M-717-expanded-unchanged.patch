@@ -1,0 +1,18 @@
+Mutant: M-717
+Targets: P-CPGRO-03
+Expect-Fail: 
+Test: core --test cpp_cap_diff cap_ops_match_cpp
+Defect: `expanded` returns the cap unchanged (still contains it: P-CPGRO-03 is a bound; the C++ vectors are exact)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -308,7 +308,7 @@
+         if self.is_empty() {
+             return Cap::empty();
+         }
+-        Cap::from_center_chord_angle(self.center, self.radius + ChordAngle::from_angle(distance))
++        self
+     }
+ 
+     /// Returns the smallest cap which encloses both this cap and `other`.

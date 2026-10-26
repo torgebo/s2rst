@@ -71,3 +71,35 @@ fn p_ccnt_03() {
         "a contained descendant"
     );
 }
+
+/// P-CCAP-01 (correct result): the cell's bounding cap contains the cell's centre and its four
+/// vertices, as `Cell::cap_bound` computed them (spec 008 FR-012, a composition).
+///
+/// For every valid cell and every abstract vertex table: `cell.cap_bound()` contains its own
+/// centre and `cell.vertex(k)` for k = 0..3. `Cell::cap_bound` is `Cap::from_point(centre)` and
+/// four `add_point(vertex(k))`, so this is P-CPGRO-01 (spec 008) applied five times; the
+/// harness runs the real `cap_bound`, with the vertices any box points (their normalisation is
+/// spec 006's), the centre any finite point, and the distance pure.
+///
+/// Weekly: 341.9 s (2026-10-24), over the `values-cell` leg's per-change budget.
+///
+/// Stubs: `fixed_vertex` (the abstract cell's vertices), `pure_normalize` (the centre: any
+/// finite point; with a symbolic cell the real projection and normalisation timed out at 12
+/// minutes, 2026-10-24), `pure_chord` (L-CP-01, L-CP-02; it holds for any finite points).
+#[cfg(feature = "slow")]
+#[kani::proof]
+// 11: the stub table's ten slots, plus the exit (the cell model's loops need 9).
+#[kani::unwind(11)]
+#[kani::stub(s2rst::s2::Cell::vertex, crate::stubs::fixed_vertex)]
+#[kani::stub(s2rst::r3::Vector::normalize, crate::stubs::pure_normalize)]
+#[kani::stub(s2rst::s2::Point::chord_angle, crate::stubs::pure_chord)]
+fn p_ccap_01() {
+    crate::stubs::reset();
+    crate::stubs::draw_abstract_cell();
+    let (cell, _) = any_cell();
+    let cap = cell.cap_bound();
+    assert!(cap.contains_point(cap.center()));
+    for k in 0..4 {
+        assert!(cap.contains_point(cell.vertex(k)));
+    }
+}

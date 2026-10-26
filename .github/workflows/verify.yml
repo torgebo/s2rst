@@ -72,6 +72,8 @@ on:
       - 'core/src/s2/region.rs'
       - 'core/src/r2/**'
       - 'core/tests/data/cpp_values_vectors.csv'
+      - 'core/tests/data/cpp_cap_vectors.csv'
+      - 'core/src/s2/metric.rs'
       - 'core/tests/trait_property_tests.rs'
       - 'verify/**'
       - 'Makefile'
@@ -106,6 +108,8 @@ on:
       - 'core/src/s2/region.rs'
       - 'core/src/r2/**'
       - 'core/tests/data/cpp_values_vectors.csv'
+      - 'core/tests/data/cpp_cap_vectors.csv'
+      - 'core/src/s2/metric.rs'
       - 'core/tests/trait_property_tests.rs'
       - 'verify/**'
       - 'Makefile'
@@ -130,7 +134,7 @@ jobs:
       matrix:
         # The decoding suite runs as three parts, so each leg stays under SC-006's 10 minutes,
         # and the value types as four (spec 004 research R12, spec 005 research R8).
-        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle]
+        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap]
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -226,16 +230,19 @@ jobs:
       matrix:
         part: ['0', '1', '2', '3', '4', '5', vertex, union, decoding-vectors, decoding-links, decoding-codecs,
                values-cell-a, values-cell-b, values-interval-rect, values-uvrect-point, values-chord-angle,
-               values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e]
-        # The value-type suite's 75 weekly members take about 29 hours one at a time on the
-        # workstation (2026-10-14, 2026-10-18), so they run as ten legs of
-        # `make verify-slow F=values`, each a list of harness filters. The first five hold the members that prove; their
-        # longest, `iv_mea::p_imea_06_range__ynoninv_xnoninv`, took 44 minutes there. The
-        # `limits` legs hold the 20 members that time out at 60 minutes (tool limits, listed in
-        # verify/known-timeouts.txt), at most four to a leg, so each leg stays inside the job's 6
-        # hours: the runner reports them as KNOWN-TIMEOUT and fails the leg only if one fails,
-        # runs out of memory or starts to prove (then record it and remove its line). A new
-        # weekly member must join one of these lists.
+               values-cap, values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e,
+               values-limits-f, values-limits-g]
+        # The value-type suite's 87 weekly members take about 34 hours one at a time on the
+        # workstation (2026-10-14, 2026-10-18, 2026-10-25), so they run as thirteen legs of
+        # `make verify-slow F=values`, each a list of harness filters. The first six hold the
+        # members that prove; their longest, `iv_mea::p_imea_06_range__ynoninv_xnoninv`, took 44
+        # minutes there. The `limits` legs hold the 24 members that time out at 60 minutes (tool
+        # limits, listed in verify/known-timeouts.txt), at most four to a leg, so each leg stays
+        # inside the job's 6 hours: the runner reports them as KNOWN-TIMEOUT and fails the leg
+        # only if one fails, runs out of memory or starts to prove (then record it and remove its
+        # line). A new weekly member must join one of these lists. One member is in none:
+        # `cp_crash::c_union` runs out of memory at 8 GB (and times out at 16 GB), which would
+        # fail its leg (spec 008's evaluation, "Exclusions and tool limits").
         include:
           - part: values-cell-a
             filters: 'cl_bnd::p_cbnd_'
@@ -247,16 +254,22 @@ jobs:
             filters: 'ur_exp:: ur_mea::p_qmea_01 ur_val::p_qval_03 pt_cls::p_ptcls_02 pt_crash::c_ortho pt_crash::c_rotate pt_ort::p_ptort_02 pt_val::p_ptval_02'
           - part: values-chord-angle
             filters: 'ag_cnv::p_agcnv_01 ag_eform::p_agef_01 ag_ari::p_agari_01__mul'
+          - part: values-cap
+            filters: 'cp_crash::c_cell_tests__edges_ cp_reg::p_cpreg_01__real cp_gro::p_cpgro_03__real cp_lem::l_cp_05 cp_mea::p_cpmea_01__area cl_cnt::p_ccap_01'
           - part: values-limits-a
             filters: 'iv_exp::p_iexp_02_symmetric'
           - part: values-limits-b
             filters: 'iv_exp::p_iexp_02_default iv_exp::p_iexp_03_ rl_exp::p_lexp_02_symmetric'
           - part: values-limits-c
-            filters: 'pt_cls::p_ptcls_03 pt_dst::p_ptdst_01__symmetric'
+            filters: 'pt_cls::p_ptcls_03'
           - part: values-limits-d
             filters: 'pt_crash::c_from_coords_normalize__band pt_ort::p_ptort_03'
           - part: values-limits-e
             filters: 'ca_ari::p_caari_03__sin ag_ari::p_agari_01__div ag_ari::p_agari_01__ratio'
+          - part: values-limits-f
+            filters: 'cp_con::p_cpcon_01__area cp_mea::p_cpmea_01__centroid cp_lem::l_cp_06a'
+          - part: values-limits-g
+            filters: 'cp_crash::c_cell_tests__real cp_crash::c_cell_union_bound'
     env:
       # One CBMC per physical core: these harnesses run close to their 30-minute limit,
       # and hyperthread contention slows them (EVALUATION.md, "Measurements"). The union and
@@ -323,17 +336,18 @@ jobs:
     runs-on: ubuntu-latest
     # The most a hosted job may run. The 226 mutants take about 9 hours on the workstation
     # (2026-10-14), more than one job's 6, so each spec's mutants are a leg: series N holds
-    # spec 00(N+1)'s (M-0NN spec 001, … M-5NN spec 006, M-6NN spec 007). Without the counterexample re-runs,
-    # which run-mutants.sh now skips, the workstation took 33, 50 and 54 minutes for specs
-    # 001–003, and about 3.8, 1.2 and 1.9 hours for specs 004–006, whose weekly-tier mutants
-    # have 60 minutes. Spec 004's leg is the longest: M-344 and M-345 give no verdict only when
+    # spec 00(N+1)'s (M-0NN spec 001, … M-6NN spec 007, M-7NN spec 008). Without the
+    # counterexample re-runs, which run-mutants.sh now skips, the workstation took 33, 50 and
+    # 54 minutes for specs 001–003, about 3.8, 1.2 and 1.9 hours for specs 004–006, whose
+    # weekly-tier mutants have 60 minutes, and 22 minutes for spec 008's first 40 (2026-10-25).
+    # Spec 004's leg is the longest: M-344 and M-345 give no verdict only when
     # their 60 minutes are up, and M-343's kill took 46 minutes. The xlarge-tier mutant (M-222) is
     # skipped here.
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        series: ['0', '1', '2', '3', '4', '5', '6']
+        series: ['0', '1', '2', '3', '4', '5', '6', '7']
     env:
       # The weekly tier's limit, as the slow job's values legs have it: run-mutants.sh's
       # default of 30 minutes is too short for the weekly-tier mutants of specs 004–006.

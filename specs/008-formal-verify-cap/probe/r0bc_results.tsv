@@ -1,0 +1,29 @@
+# R0b run, 2026-10-24 14:19-14:40, and R0c run, 14:47-15:00 (same runner settings as R0).
+# harness	result	seconds
+r0c::lemma_axis_unit	SUCCESSFUL	0.0
+r0c::lemma_chord_self	SUCCESSFUL	1.7
+r0c::r0c_add_cap_contains	SUCCESSFUL	17.0
+r0c::r0c_add_point_contains	SUCCESSFUL	6.8
+r0c::r0c_complement_draft_valid	SUCCESSFUL	4.7
+r0c::r0c_intersects_symmetric	SUCCESSFUL	27.0
+r0c::r0c_region_contains_implies_intersects_abstract	SUCCESSFUL	53.0
+r0c::r0c_region_contains_implies_intersects_real_edges	SUCCESSFUL	696.9
+r0c::r0c_region_no_intersect_no_vertex	SUCCESSFUL	51.1
+r0b::lemma_add_bounds	SUCCESSFUL	626.1
+r0b::lemma_chord_range	SUCCESSFUL	0.9
+r0b::lemma_neg_sub	SUCCESSFUL	54.6
+r0b::lemma_norm2_neg	TIMEOUT	-
+r0b::lemma_sq_neg	SUCCESSFUL	94.1
+r0b::r0b_add_cap_contains	FAILED	15.1
+r0b::r0b_add_point_contains	FAILED	11.5
+r0b::r0b_codec_round_trip_eq	SUCCESSFUL	8.8
+r0b::r0b_complement_draft_valid	FAILED	2.4
+r0b::r0b_contains_implies_intersects	SUCCESSFUL	20.3
+r0b::r0b_edge_test_crash	SUCCESSFUL	385.0
+r0b::r0b_from_center_angle_crash	SUCCESSFUL	1.7
+r0b::r0b_private_stub_union	TIMEOUT	-
+r0b::r0b_rect_bound_draft_valid	SUCCESSFUL	84.6
+r0b::r0b_rect_bound_library_valid	FAILED	259.8
+r0b::r0b_region_contains_implies_intersects	OOM	-
+r0b::r0b_region_contains_implies_intersects_abstract	OOM	-
+r0b::r0b_region_no_intersect_no_vertex	OOM	-
