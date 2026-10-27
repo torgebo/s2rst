@@ -16,14 +16,14 @@
     reason = "`__` marks a split-family member (harness-conventions)"
 )]
 
-use s2rst::s2::{Cell, CellId};
+use s2rst::s2::{Cell, CellId, Face};
 
 use crate::laws;
 use crate::stubs;
 use crate::value_domain::{any_box_cap, any_box_point};
 
 fn face0() -> Cell {
-    Cell::from_cell_id(CellId::from_face(0))
+    Cell::from_cell_id(CellId::from_face(Face::F0))
 }
 
 /// P-CPREG-01 (law): containing a cell implies intersecting it

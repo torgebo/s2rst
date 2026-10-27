@@ -4,7 +4,7 @@
 
 //! `Cell` containment and the region interface (P-CCNT, spec 004 data-model §4.1, §4.3).
 
-use s2rst::s2::{Cell, Region};
+use s2rst::s2::{Cell, CellVertex, Region};
 
 use crate::cell_spec;
 use crate::laws;
@@ -99,7 +99,7 @@ fn p_ccap_01() {
     let (cell, _) = any_cell();
     let cap = cell.cap_bound();
     assert!(cap.contains_point(cap.center()));
-    for k in 0..4 {
+    for k in CellVertex::ALL {
         assert!(cap.contains_point(cell.vertex(k)));
     }
 }

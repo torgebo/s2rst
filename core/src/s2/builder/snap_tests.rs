@@ -53,21 +53,21 @@ fn s2cellid_with_snap_radius_clamps_up_to_the_minimum() {
     // A requested radius below the per-level minimum is raised to the min,
     // and the level is preserved.
     let level = 10u8;
-    let min = S2CellIdSnapFunction::min_snap_radius_for_level(level);
-    let f = S2CellIdSnapFunction::with_snap_radius(level, Angle::from_radians(0.0));
+    let min = S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level));
+    let f = S2CellIdSnapFunction::with_snap_radius(Level::new(level), Angle::from_radians(0.0));
     assert_eq!(f.snap_radius().radians(), min.radians());
-    assert_eq!(f.level(), Level::from(level));
+    assert_eq!(f.level(), Level::from(Level::new(level)));
 }
 
 #[test]
 fn s2cellid_with_snap_radius_keeps_a_radius_above_the_minimum() {
     // A requested radius above the minimum is kept verbatim.
     let level = 10u8;
-    let min = S2CellIdSnapFunction::min_snap_radius_for_level(level);
+    let min = S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level));
     let big = Angle::from_radians(5.0 * min.radians());
-    let f = S2CellIdSnapFunction::with_snap_radius(level, big);
+    let f = S2CellIdSnapFunction::with_snap_radius(Level::new(level), big);
     assert_eq!(f.snap_radius().radians(), big.radians());
-    assert_eq!(f.level(), Level::from(level));
+    assert_eq!(f.level(), Level::from(Level::new(level)));
 }
 
 #[test]
@@ -77,12 +77,12 @@ fn s2cellid_min_edge_vertex_separation_uses_general_branch_above_min_radius() {
     // general three-bound formula. This is the branch the in-file `new(level)`
     // tests never reach, because `new` always uses exactly the minimum radius.
     let level = 12u8;
-    let min = S2CellIdSnapFunction::min_snap_radius_for_level(level);
+    let min = S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level));
     let snap_radius = Angle::from_radians(8.0 * min.radians());
-    let f = S2CellIdSnapFunction::with_snap_radius(level, snap_radius);
+    let f = S2CellIdSnapFunction::with_snap_radius(Level::new(level), snap_radius);
     assert_eq!(f.snap_radius().radians(), snap_radius.radians());
 
-    let min_diag = metric::MIN_DIAG.value(level);
+    let min_diag = metric::MIN_DIAG.value(Level::new(level));
     let sr = f.snap_radius().radians();
     let vs = f.min_vertex_separation().radians();
     // Mirror of the general branch: max(constant, proportional, asymptotic).

@@ -346,9 +346,9 @@ fn decode_point_compressed(
 pub fn encode_points_compressed(
     w: &mut dyn Write,
     vertices: &[S2XYZFaceSiTi],
-    level: impl Into<crate::s2::coords::Level>,
+    level: crate::s2::coords::Level,
 ) -> io::Result<()> {
-    let level = level.into().as_i32();
+    let level = level.as_i32();
     // Convert to (pi, qi) and collect face runs + off-center indices.
     let mut pi_qi: Vec<(u32, u32)> = Vec::with_capacity(vertices.len());
     let mut off_center: Vec<usize> = Vec::new();
@@ -414,10 +414,10 @@ pub fn encode_points_compressed(
 /// Returns `io::Error` if reading from `r` fails or the data is malformed.
 pub fn decode_points_compressed(
     r: &mut dyn Read,
-    level: impl Into<crate::s2::coords::Level>,
+    level: crate::s2::coords::Level,
     num_points: usize,
 ) -> io::Result<Vec<Point>> {
-    let level = level.into().as_i32();
+    let level = level.as_i32();
     // Decode faces.
     let face_runs = decode_faces(r, num_points)?;
     let mut faces_iter = FacesIterator::new(face_runs);
@@ -649,7 +649,7 @@ mod tests {
     #[test]
     fn test_encode_decode_points_all_on_level() {
         let level = Level::MAX;
-        let base = CellId::from_face(0);
+        let base = CellId::from_face(Face::F0);
         let mut vertices = Vec::new();
         let mut id = base.child_begin_at_level(level);
         for _ in 0..20 {
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn test_encode_decode_points_mixed() {
         let level = Level::new(10);
-        let cell = CellId::from_face(2).child_begin_at_level(level);
+        let cell = CellId::from_face(Face::F2).child_begin_at_level(level);
         let on_center = cell.to_point();
         let off_center = LatLng::from_degrees(37.7749, -122.4194).to_point();
 
@@ -860,6 +860,7 @@ mod tests {
 mod quickcheck_tests {
     use super::*;
     use crate::s2::CellId;
+    use crate::s2::Face;
     use crate::s2::coords::Level;
     use quickcheck_macros::quickcheck;
 
@@ -960,7 +961,7 @@ mod quickcheck_tests {
         let face = (raw % 6) as u8;
         let level = Level::new(((raw >> 3) % 31) as u8);
         let pos = raw >> 6;
-        let cell = CellId::from_face_pos_level(face, pos, level);
+        let cell = CellId::from_face_pos_level(Face::from_u8(face), pos, level);
         let point = cell.to_point();
 
         let vertices = vec![point];
@@ -1018,10 +1019,10 @@ mod quickcheck_tests {
             return true;
         }
         // Limit and clamp to valid face range.
-        let faces: Vec<crate::s2::coords::Face> = faces
+        let faces: Vec<Face> = faces
             .into_iter()
             .take(100)
-            .map(|f| crate::s2::coords::Face::from_u8(f % 6))
+            .map(|f| Face::from_u8(f % 6))
             .collect();
         let num = faces.len();
 
@@ -1065,7 +1066,7 @@ mod quickcheck_tests {
         let face = (raw % 6) as u8;
         let level = Level::new(((raw >> 3) % 25 + 5) as u8); // levels 5..29
         let pos = raw >> 8;
-        let base = CellId::from_face_pos_level(face, pos, level);
+        let base = CellId::from_face_pos_level(Face::from_u8(face), pos, level);
 
         let mut vertices = Vec::new();
         let mut id = base;

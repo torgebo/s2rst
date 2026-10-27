@@ -767,6 +767,7 @@ fn get_block_code(values: &[u64], base: u64, have_exceptions: bool) -> BlockCode
 mod tests {
     use super::*;
     use crate::s2::CellId;
+    use crate::s2::Level;
 
     fn roundtrip(points: &[Point], hint: CodingHint, expected_bytes: Option<usize>) -> usize {
         let mut buf = Vec::new();
@@ -848,7 +849,7 @@ mod tests {
     #[test]
     fn test_first_at_all_levels() {
         for level in 0..=MAX_CELL_LEVEL {
-            let p = CellId::begin(level).to_point();
+            let p = CellId::begin(Level::new(level)).to_point();
             roundtrip(&[p], CodingHint::Compact, Some(6));
         }
     }
@@ -856,7 +857,7 @@ mod tests {
     #[test]
     fn test_last_at_all_levels() {
         for level in 0..=MAX_CELL_LEVEL {
-            let p = CellId::end(level).prev().to_point();
+            let p = CellId::end(Level::new(level)).prev().to_point();
             let expected_size = 6 + (level as usize) / 4;
             roundtrip(&[p], CodingHint::Compact, Some(expected_size));
         }
@@ -865,7 +866,7 @@ mod tests {
     #[test]
     fn test_last_two_points_at_all_levels() {
         for level in 0..=MAX_CELL_LEVEL {
-            let id = CellId::end(level).prev();
+            let id = CellId::end(Level::new(level)).prev();
             let expected_size = 6 + (level as usize + 2) / 4;
             roundtrip(
                 &[id.to_point(), id.prev().to_point()],
@@ -878,7 +879,7 @@ mod tests {
     #[test]
     fn test_many_duplicate_points_at_all_levels() {
         for level in 0..=MAX_CELL_LEVEL {
-            let id = CellId::end(level).prev();
+            let id = CellId::end(Level::new(level)).prev();
             let mut expected_size = 23 + (level as usize + 2) / 4;
             if level == 30 {
                 expected_size += 1;
@@ -935,9 +936,9 @@ mod tests {
     #[test]
     fn test_sixty_four_bit_offset() {
         let level = MAX_CELL_LEVEL;
-        let mut points: Vec<Point> = vec![CellId::begin(level).to_point(); BLOCK_SIZE];
-        points.push(CellId::end(level).prev().to_point());
-        points.push(CellId::end(level).prev().prev().to_point());
+        let mut points: Vec<Point> = vec![CellId::begin(Level::new(level)).to_point(); BLOCK_SIZE];
+        points.push(CellId::end(Level::new(level)).prev().to_point());
+        points.push(CellId::end(Level::new(level)).prev().prev().to_point());
         roundtrip(&points, CodingHint::Compact, Some(16 + BLOCK_SIZE / 2));
     }
 

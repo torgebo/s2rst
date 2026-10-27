@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 
+use s2rst::s2::Level;
 use wasm_bindgen::prelude::*;
 
 use crate::angle::Angle;
+use crate::bounded::level_arg;
 
 /// A vertex snap function for builder-based operations (`simplified`, buffering).
 ///
@@ -19,8 +21,8 @@ pub struct SnapFunction(Kind);
 enum Kind {
     /// Snap radius in radians.
     Identity(f64),
-    /// S2 cell level (0–30).
-    CellId(u8),
+    /// S2 cell level, checked when the function is created.
+    CellId(Level),
     /// Lat/lng grid exponent.
     IntLatLng(i32),
 }
@@ -35,9 +37,11 @@ impl SnapFunction {
 
     /// Snap vertices to S2 cell centers at the given level (0–30). Higher levels
     /// snap more finely.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "cellId")]
-    pub fn cell_id(level: u8) -> SnapFunction {
-        SnapFunction(Kind::CellId(level))
+    pub fn cell_id(level: f64) -> Result<SnapFunction, JsValue> {
+        Ok(SnapFunction(Kind::CellId(level_arg(level)?)))
     }
 
     /// Snap vertices to a lat/lng grid with `10^(-exponent)` degree spacing

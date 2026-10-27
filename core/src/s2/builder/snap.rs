@@ -101,15 +101,13 @@ pub struct S2CellIdSnapFunction {
 impl S2CellIdSnapFunction {
     /// Creates a snap function that snaps to cell centers at the given level.
     /// Uses the minimum snap radius required for that level.
-    pub fn new(level: impl Into<Level>) -> Self {
-        let level = level.into();
+    pub fn new(level: Level) -> Self {
         let snap_radius = Self::min_snap_radius_for_level(level);
         S2CellIdSnapFunction { level, snap_radius }
     }
 
     /// Creates a snap function with a custom snap radius (must be >= minimum).
-    pub fn with_snap_radius(level: impl Into<Level>, snap_radius: Angle) -> Self {
-        let level = level.into();
+    pub fn with_snap_radius(level: Level, snap_radius: Angle) -> Self {
         let min = Self::min_snap_radius_for_level(level);
         let snap_radius = if snap_radius.radians() > min.radians() {
             snap_radius
@@ -129,8 +127,7 @@ impl S2CellIdSnapFunction {
     /// Returns the minimum snap radius for a given level.
     /// This is half the maximum cell diagonal at that level, plus a small
     /// error term.
-    pub fn min_snap_radius_for_level(level: impl Into<Level>) -> Angle {
-        let level = level.into();
+    pub fn min_snap_radius_for_level(level: Level) -> Angle {
         // 0.5 * MaxDiag.value(level) + 4 * DBL_EPSILON
         let max_diag_value = metric::MAX_DIAG.value(level);
         Angle::from_radians(0.5 * max_diag_value + 4.0 * DBL_EPSILON)
@@ -343,6 +340,8 @@ impl SnapFunction for IntLatLngSnapFunction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::CellVertex;
+    use crate::s2::Face;
     use crate::s2::coords::MAX_CELL_LEVEL;
     use quickcheck_macros::quickcheck;
 
@@ -367,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_cell_id_snap_level_30() {
-        let snap = S2CellIdSnapFunction::new(MAX_CELL_LEVEL);
+        let snap = S2CellIdSnapFunction::new(Level::MAX);
         let p = Point::from_coords(1.0, 2.0, 3.0);
         let snapped = snap.snap_point(p);
 
@@ -378,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_cell_id_snap_level_10() {
-        let snap = S2CellIdSnapFunction::new(10);
+        let snap = S2CellIdSnapFunction::new(Level::new(10));
         let p = Point::from_coords(1.0, 0.0, 0.0);
         let snapped = snap.snap_point(p);
 
@@ -387,21 +386,22 @@ mod tests {
         assert!(cell_id.level() >= 10);
 
         // The parent at level 10 should give the same point.
-        let parent = CellId::from_point(&p).parent_at_level(10);
+        let parent = CellId::from_point(&p).parent_at_level(Level::new(10));
         assert_eq!(snapped, parent.to_point());
     }
 
     #[test]
     fn test_cell_id_snap_radius_properties() {
         for level in [0u8, 5, 10, 15, 20, 25, 30] {
-            let snap = S2CellIdSnapFunction::new(level);
+            let snap = S2CellIdSnapFunction::new(Level::new(level));
             let sr = snap.snap_radius();
             let vs = snap.min_vertex_separation();
             let evs = snap.min_edge_vertex_separation();
 
             // snap_radius >= min_snap_radius_for_level
             assert!(
-                sr.radians() >= S2CellIdSnapFunction::min_snap_radius_for_level(level).radians()
+                sr.radians()
+                    >= S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level)).radians()
             );
 
             // min_vertex_separation > 0
@@ -426,7 +426,7 @@ mod tests {
 
         // Verify roundtrip for all levels.
         for level in 0..=MAX_CELL_LEVEL {
-            let radius = S2CellIdSnapFunction::min_snap_radius_for_level(level);
+            let radius = S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level));
             assert_eq!(
                 S2CellIdSnapFunction::level_for_max_snap_radius(radius),
                 level,
@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     fn test_clone_snap() {
-        let snap = S2CellIdSnapFunction::new(15);
+        let snap = S2CellIdSnapFunction::new(Level::new(15));
         let cloned = snap.clone_snap();
         assert!((cloned.snap_radius().radians() - snap.snap_radius().radians()).abs() < 1e-15);
 
@@ -562,8 +562,8 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(42);
         for _iter in 0..1000 {
             for level in 0..=MAX_CELL_LEVEL {
-                let f = S2CellIdSnapFunction::new(level);
-                let p = random_cell_id_at_level(&mut rng, level).to_point();
+                let f = S2CellIdSnapFunction::new(Level::new(level));
+                let p = random_cell_id_at_level(&mut rng, Level::new(level)).to_point();
                 assert_eq!(
                     p,
                     f.snap_point(p),
@@ -638,7 +638,7 @@ mod tests {
     fn get_max_vertex_distance_cell(p: Point, id: CellId) -> Angle {
         let cell = Cell::from(id);
         (0..4)
-            .map(|i| p.distance(cell.vertex(i)))
+            .map(|i| p.distance(cell.vertex(CellVertex::ALL[i])))
             .fold(Angle::default(), |a, b| {
                 if a.radians() > b.radians() { a } else { b }
             })
@@ -711,11 +711,11 @@ mod tests {
     }
 
     fn get_cell_id_min_vertex_sep(level: u8, best_cells: &mut BTreeSet<CellId>) -> f64 {
-        let search_focus = CellId::from_face(0).children()[3];
+        let search_focus = CellId::from_face(Face::F0).children()[3];
         let mut scores: Vec<(f64, CellId)> = Vec::new();
 
         if level == 0 {
-            update_cell_id_min_vertex_sep(CellId::from_face(0), &mut scores);
+            update_cell_id_min_vertex_sep(CellId::from_face(Face::F0), &mut scores);
         } else {
             let parents: Vec<CellId> = best_cells.iter().copied().collect();
             for parent in parents {
@@ -771,13 +771,13 @@ mod tests {
     where
         F: Fn(u8, Angle, Angle, Angle) -> f64,
     {
-        let search_focus = CellId::from_face(0).children()[3];
+        let search_focus = CellId::from_face(Face::F0).children()[3];
         let mut best_scores: BTreeMap<CellId, f64> = BTreeMap::new();
 
         let parents: Vec<CellId> = best_cells.iter().copied().collect();
         for parent in parents {
-            let mut id0 = parent.child_begin_at_level(level);
-            let end = parent.child_end_at_level(level);
+            let mut id0 = parent.child_begin_at_level(Level::new(level));
+            let end = parent.child_end_at_level(Level::new(level));
             while id0 != end {
                 let site0 = id0.to_point();
                 let nbrs = get_neighbors(id0);
@@ -852,7 +852,7 @@ mod tests {
     {
         let mut best_score = 1e10_f64;
         let mut best_cells = BTreeSet::new();
-        best_cells.insert(CellId::from_face(0));
+        best_cells.insert(CellId::from_face(Face::F0));
         for level in 0..=max_level {
             let score = get_cell_id_min_edge_sep(label, &objective, level, &mut best_cells);
             best_score = best_score.min(score);
@@ -874,7 +874,7 @@ mod tests {
         let score = get_cell_id_min_edge_sep_all_levels(
             "min_sep_for_level",
             |level, edge_sep, _min_sr, _max_sr| {
-                let min_diag = metric::MIN_DIAG.value(level);
+                let min_diag = metric::MIN_DIAG.value(Level::new(level));
                 edge_sep.radians() / min_diag
             },
         );
@@ -891,9 +891,9 @@ mod tests {
         let score = get_cell_id_min_edge_sep_all_levels(
             "min_sep_at_min_radius",
             |level, edge_sep, min_sr, _max_sr| {
-                let min_radius_at_level = metric::MAX_DIAG.value(level) / 2.0;
+                let min_radius_at_level = metric::MAX_DIAG.value(Level::new(level)) / 2.0;
                 if min_sr.radians() <= (1.0 + 1e-10) * min_radius_at_level {
-                    edge_sep.radians() / metric::MIN_DIAG.value(level)
+                    edge_sep.radians() / metric::MIN_DIAG.value(Level::new(level))
                 } else {
                     100.0
                 }
@@ -933,7 +933,9 @@ mod tests {
 
         let for_level = get_cell_id_min_edge_sep_to_level(
             "min_sep_for_level",
-            |level, edge_sep, _min_sr, _max_sr| edge_sep.radians() / metric::MIN_DIAG.value(level),
+            |level, edge_sep, _min_sr, _max_sr| {
+                edge_sep.radians() / metric::MIN_DIAG.value(Level::new(level))
+            },
             SHALLOW_LEVEL,
         );
         // Global worst case is ~0.397360; a shallow search stays at or above it.
@@ -1342,7 +1344,7 @@ mod tests {
             return true;
         };
         let level = level % (MAX_CELL_LEVEL + 1);
-        let snap = S2CellIdSnapFunction::new(level);
+        let snap = S2CellIdSnapFunction::new(Level::new(level));
         let snapped = snap.snap_point(p);
         snap.snap_point(snapped) == snapped
     }
@@ -1354,9 +1356,11 @@ mod tests {
             return true;
         };
         let level = level % (MAX_CELL_LEVEL + 1);
-        let snap = S2CellIdSnapFunction::new(level);
+        let snap = S2CellIdSnapFunction::new(Level::new(level));
         let snapped = snap.snap_point(p);
-        let expected = CellId::from_point(&p).parent_at_level(level).to_point();
+        let expected = CellId::from_point(&p)
+            .parent_at_level(Level::new(level))
+            .to_point();
         snapped == expected
     }
 
@@ -1368,7 +1372,7 @@ mod tests {
             return true;
         };
         let level = level % (MAX_CELL_LEVEL + 1);
-        let snap = S2CellIdSnapFunction::new(level);
+        let snap = S2CellIdSnapFunction::new(Level::new(level));
         let snapped = snap.snap_point(p);
         let dist = p.distance(snapped);
         dist.radians() <= snap.snap_radius().radians() + 1e-15
@@ -1379,7 +1383,7 @@ mod tests {
     #[quickcheck]
     fn prop_cell_id_separation_ordering(level: u8) -> bool {
         let level = level % (MAX_CELL_LEVEL + 1);
-        let snap = S2CellIdSnapFunction::new(level);
+        let snap = S2CellIdSnapFunction::new(Level::new(level));
         let sr = snap.snap_radius().radians();
         let vs = snap.min_vertex_separation().radians();
         let evs = snap.min_edge_vertex_separation().radians();
@@ -1390,8 +1394,8 @@ mod tests {
     #[quickcheck]
     fn prop_cell_id_min_snap_radius_monotone(level: u8) -> bool {
         let level = level % MAX_CELL_LEVEL; // 0..29
-        let r_low = S2CellIdSnapFunction::min_snap_radius_for_level(level);
-        let r_high = S2CellIdSnapFunction::min_snap_radius_for_level(level + 1);
+        let r_low = S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level));
+        let r_high = S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(level + 1));
         r_low.radians() >= r_high.radians()
     }
 
@@ -1412,7 +1416,7 @@ mod tests {
             return true;
         };
         let level = level % (MAX_CELL_LEVEL + 1);
-        let snap = S2CellIdSnapFunction::new(level);
+        let snap = S2CellIdSnapFunction::new(Level::new(level));
         let s1 = snap.snap_point(p1);
         let s2 = snap.snap_point(p2);
         if s1 == s2 {
@@ -1538,7 +1542,7 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn test_serde_cell_id_snap_roundtrip() {
-        let sf = S2CellIdSnapFunction::new(10);
+        let sf = S2CellIdSnapFunction::new(Level::new(10));
         let json = serde_json::to_string(&sf).unwrap();
         let back: S2CellIdSnapFunction = serde_json::from_str(&json).unwrap();
         assert_eq!(sf.snap_radius(), back.snap_radius());

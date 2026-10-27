@@ -8,6 +8,8 @@ use pyo3::prelude::*;
 
 use s2rst::s2::metric;
 
+use crate::bounded::LevelArg;
+
 /// A measure for cells that scales exponentially with subdivision level.
 ///
 /// `dim` is 1 for length metrics and 2 for area metrics. `value(level)`
@@ -160,8 +162,10 @@ impl PyMetric {
     // --- Methods ---
 
     /// The value of the metric at the given cell level (0-30).
-    fn value(&self, level: u8) -> f64 {
-        self.0.value(level)
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn value(&self, level: LevelArg) -> f64 {
+        self.0.value(level.0)
     }
 
     /// The minimum level such that the metric is at most `value`

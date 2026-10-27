@@ -371,6 +371,7 @@ mod prop {
         Angle, Cap, Cell, CellId, ChordAngle, Dimension, LatLng, Level, Point, Projection, Region,
         S2Decode, S2Encode, Shape, SnapFunction, approx_eq, point_is_unit,
     };
+    use s2rst::s2::CellVertex;
 
     // ---- Region invariants -----------------------------------------------
 
@@ -416,7 +417,7 @@ mod prop {
     /// A cell the region does not intersect has no vertex the region contains. The Kani twin is
     /// `verify/src/laws.rs` (`laws::region::no_intersect_no_vertex`, spec 008 P-CPREG-02).
     pub fn region_no_intersect_no_vertex<R: Region>(r: &R, c: &Cell) -> bool {
-        r.intersects_cell(c) || (0..4).all(|k| !r.contains_point(&c.vertex(k)))
+        r.intersects_cell(c) || (0..4).all(|k| !r.contains_point(&c.vertex(CellVertex::ALL[k])))
     }
 
     /// `cell_union_bound()` covers the region's bounding cap center if non-empty.

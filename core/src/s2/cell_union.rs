@@ -15,10 +15,11 @@
 //! all four children of any parent cell.
 
 use crate::s1::Angle;
+use crate::s2::Face;
 use crate::s2::cell_id::lsb_for_level;
 use crate::s2::coords::Level;
 use crate::s2::metric::MIN_WIDTH;
-use crate::s2::{Cap, Cell, CellId, Point, Rect, Region};
+use crate::s2::{Cap, Cell, CellId, LevelMod, Point, Rect, Region};
 use std::ops::Deref;
 
 /// A sorted, normalized collection of `CellId`s representing a region.
@@ -36,7 +37,7 @@ use std::ops::Deref;
 /// # Examples
 ///
 /// ```
-/// use s2rst::s2::{CellId, CellUnion, LatLng, Point};
+/// use s2rst::s2::{CellId, CellUnion, LatLng, Level, Point};
 ///
 /// // Create cell IDs for two nearby locations.
 /// let nyc = CellId::from_lat_lng(&LatLng::from_degrees(40.7128, -74.0060));
@@ -44,8 +45,8 @@ use std::ops::Deref;
 ///
 /// // Build a union from parent cells; normalization is automatic.
 /// let cu = CellUnion::from_cell_ids(vec![
-///     nyc.parent_at_level(12),
-///     jfk.parent_at_level(12),
+///     nyc.parent_at_level(Level::new(12)),
+///     jfk.parent_at_level(Level::new(12)),
 /// ]);
 /// assert!(cu.is_normalized());
 /// assert_eq!(cu.num_cells(), 2);
@@ -55,7 +56,7 @@ use std::ops::Deref;
 /// assert!(cu.contains_point(LatLng::from_degrees(40.7128, -74.0060).to_point()));
 ///
 /// // A child cell is contained by its parent in the union.
-/// let child = nyc.parent_at_level(15);
+/// let child = nyc.parent_at_level(Level::new(15));
 /// assert!(cu.contains_cell_id(child));
 /// ```
 #[must_use]
@@ -101,11 +102,12 @@ impl CellUnion {
     /// Deprecated: the same as [`CellUnion::from_begin_end`], which it calls, under a second
     /// name. The result is the normalised union of the largest cells that tile the range, as
     /// C++ `S2CellUnion::FromBeginEnd` returns. `begin` and `end` are leaf cells (or
-    /// `CellId::end(30)`), with `begin <= end`.
+    /// `CellId::end(Level::MAX)`), with `begin <= end`.
     ///
     /// # Panics
     ///
-    /// If `begin` or `end` is neither a leaf cell nor `CellId::end(30)`, or if `begin > end`.
+    /// If `begin` or `end` is neither a leaf cell nor `CellId::end(Level::MAX)`, or if
+    /// `begin > end`.
     #[deprecated(
         note = "use `from_begin_end`, the same constructor under its C++ name (`FromBeginEnd`)"
     )]
@@ -294,7 +296,7 @@ impl CellUnion {
 
     /// Creates a cell union covering the entire sphere (all 6 face cells).
     pub fn whole_sphere() -> Self {
-        CellUnion::from_cell_ids((0..6).map(CellId::from_face).collect())
+        CellUnion::from_cell_ids(Face::ALL.into_iter().map(CellId::from_face).collect())
     }
 
     /// Creates a cell union from a closed range of leaf cells `[min_id, max_id]`.
@@ -303,7 +305,7 @@ impl CellUnion {
     ///
     /// If `max_id` is not a valid leaf cell, if `min_id` is not one either and is not
     /// `max_id.next()`, or if `min_id > max_id.next()`. So `min_id == max_id.next()` (the next
-    /// leaf, or `CellId::end(30)` after the last one) gives the empty union, as C++
+    /// leaf, or `CellId::end(Level::MAX)` after the last one) gives the empty union, as C++
     /// `FromMinMax` does through `FromBeginEnd`.
     pub fn from_min_max(min_id: CellId, max_id: CellId) -> Self {
         assert!(
@@ -318,12 +320,13 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// If `begin` or `end` is neither a leaf cell nor `CellId::end(30)`, or if `begin > end`.
+    /// If `begin` or `end` is neither a leaf cell nor `CellId::end(Level::MAX)`, or if
+    /// `begin > end`.
     /// C++ `FromBeginEnd` requires them with `DCHECK`s only; here they are checked in every
     /// build, because the tiling loop never ends for some invalid ids (`CellId(0)`, for
     /// example) where a debug build would have panicked.
     pub fn from_begin_end(begin: CellId, end: CellId) -> Self {
-        let leaf_end = CellId::end(crate::s2::coords::MAX_CELL_LEVEL);
+        let leaf_end = CellId::end(Level::MAX);
         let in_range = |id: CellId| (id.is_valid() && id.is_leaf()) || id == leaf_end;
         assert!(
             in_range(begin),
@@ -458,7 +461,7 @@ impl CellUnion {
         // Find the maximum level such that all cells are at least "min_radius" wide.
         // C++: kMinWidth.GetLevelForMinValue(min_radius.radians())
         let radius_level = MIN_WIDTH.max_level(min_radius.radians());
-        if radius_level == Level::MIN && min_radius.radians() > MIN_WIDTH.value(0u8) {
+        if radius_level == Level::MIN && min_radius.radians() > MIN_WIDTH.value(Level::MIN) {
             // The requested expansion is greater than the width of a face cell.
             self.expand_at_level(Level::MIN);
         }
@@ -476,8 +479,7 @@ impl CellUnion {
     ///
     /// As [`CellUnion::leaf_cells_covered`].
     pub fn average_based_area(&self) -> f64 {
-        Cell::average_area_for_level(crate::s2::coords::MAX_CELL_LEVEL)
-            * self.leaf_cells_covered() as f64
+        Cell::average_area_for_level(Level::MAX) * self.leaf_cells_covered() as f64
     }
 
     /// Returns the approximate area of this cell union, using `Cell::approx_area()`
@@ -516,21 +518,17 @@ impl CellUnion {
     /// Each cell is replaced, in order, by all of its descendants at the new level: at least
     /// `min_level`, rounded up to a multiple of `level_mod` above `min_level`, but never past
     /// 30, as C++ `S2CellUnion::Denormalize` does. A cell already at a suitable level is kept.
-    /// `level_mod` must be 1, 2 or 3. Upstream checks it with a `DCHECK` only; here it is
-    /// checked in every build, because a larger one rounds levels up to 30, and a large cell
-    /// then expands into billions of leaf cells.
+    /// `level_mod` is a [`LevelMod`], 1, 2 or 3: upstream checks it with a `DCHECK` only, and a
+    /// larger one would round levels up to 30, so a large cell would expand into billions of leaf
+    /// cells (before spec 009 the `u8` it took was checked in every build).
     ///
     /// # Panics
     ///
-    /// If `level_mod` is not 1, 2 or 3, or if an id has no level marker (through
-    /// [`CellId::level`]). Another invalid id gives an unspecified result, and in debug builds
+    /// If an id has no level marker (through [`CellId::level`]). Another invalid id gives an unspecified result, and in debug builds
     /// may panic (an arithmetic overflow while it is expanded); a face-6 leaf, for one, is kept
     /// as it is.
-    pub fn denormalize(&self, min_level: Level, level_mod: u8) -> CellUnion {
-        assert!(
-            (1..=3).contains(&level_mod),
-            "denormalize: level_mod must be 1, 2 or 3"
-        );
+    pub fn denormalize(&self, min_level: Level, level_mod: LevelMod) -> CellUnion {
+        let level_mod = level_mod.get();
         let mut result = Vec::new();
         for &id in &self.0 {
             let level = id.level();
@@ -539,8 +537,7 @@ impl CellUnion {
             } else if level_mod > 1 {
                 let offset = (level - min_level) % level_mod;
                 if offset > 0 {
-                    // C++ rounds up in `int` and then clamps to kMaxLevel; a saturating
-                    // add cannot overflow even for a `level_mod` outside 1–3.
+                    // C++ rounds up in `int` and then clamps to kMaxLevel.
                     let rounded = level.as_u8().saturating_add(level_mod - offset);
                     Level::new(rounded.min(crate::s2::coords::MAX_CELL_LEVEL))
                 } else {
@@ -775,7 +772,6 @@ impl Region for CellUnion {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::s2::coords::MAX_CELL_LEVEL;
 
     /// Creates a cell union from cell IDs without normalization (test only).
     fn from_verbatim(ids: Vec<CellId>) -> CellUnion {
@@ -799,7 +795,7 @@ mod tests {
 
     #[test]
     fn test_from_cell_ids() {
-        let ids = vec![CellId::from_face(0), CellId::from_face(1)];
+        let ids = vec![CellId::from_face(Face::F0), CellId::from_face(Face::F1)];
         let cu = CellUnion::from_cell_ids(ids);
         assert_eq!(cu.num_cells(), 2);
         assert!(cu.is_valid());
@@ -808,7 +804,7 @@ mod tests {
 
     #[test]
     fn test_contains_cell_id() {
-        let parent = CellId::from_face(0);
+        let parent = CellId::from_face(Face::F0);
         let cu = CellUnion::from_cell_ids(vec![parent]);
         assert!(cu.contains_cell_id(parent));
         // Child should be contained.
@@ -817,13 +813,13 @@ mod tests {
 
     #[test]
     fn test_not_contains() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        assert!(!cu.contains_cell_id(CellId::from_face(1)));
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        assert!(!cu.contains_cell_id(CellId::from_face(Face::F1)));
     }
 
     #[test]
     fn test_normalize_removes_contained() {
-        let parent = CellId::from_face(0);
+        let parent = CellId::from_face(Face::F0);
         let child = parent.children()[0];
         let cu = CellUnion::from_cell_ids(vec![parent, child]);
         assert_eq!(cu.num_cells(), 1);
@@ -832,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_normalize_merges_siblings() {
-        let parent = CellId::from_face(0);
+        let parent = CellId::from_face(Face::F0);
         let children = parent.children();
         let cu = CellUnion::from_cell_ids(children.to_vec());
         assert_eq!(cu.num_cells(), 1);
@@ -841,35 +837,35 @@ mod tests {
 
     #[test]
     fn test_contains_point() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
         assert!(cu.contains_point(Point::from_coords(1.0, 0.0, 0.0)));
         assert!(!cu.contains_point(Point::from_coords(-1.0, 0.0, 0.0)));
     }
 
     #[test]
     fn test_intersects() {
-        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(0).children()[0]]);
+        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0).children()[0]]);
         assert!(cu1.intersects_union(&cu2));
     }
 
     #[test]
     fn test_not_intersects() {
-        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(3)]);
+        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F3)]);
         assert!(!cu1.intersects_union(&cu2));
     }
 
     #[test]
     fn test_leaf_cells_covered() {
         // A face cell covers 4^30 leaf cells.
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
         assert!(cu.leaf_cells_covered() > 0);
     }
 
     #[test]
     fn test_region_trait() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
         let r: &dyn Region = &cu;
         assert!(!r.cap_bound().is_empty());
         assert!(!r.rect_bound().is_empty());
@@ -878,14 +874,17 @@ mod tests {
 
     #[test]
     fn test_deref() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0), CellId::from_face(1)]);
+        let cu = CellUnion::from_cell_ids(vec![
+            CellId::from_face(Face::F0),
+            CellId::from_face(Face::F1),
+        ]);
         assert_eq!(cu.len(), 2);
         let _: &[CellId] = &cu;
     }
 
     #[test]
     fn test_from_iterator() {
-        let cu: CellUnion = [CellId::from_face(0), CellId::from_face(1)]
+        let cu: CellUnion = [CellId::from_face(Face::F0), CellId::from_face(Face::F1)]
             .into_iter()
             .collect();
         assert_eq!(cu.num_cells(), 2);
@@ -894,7 +893,7 @@ mod tests {
     #[test]
     fn test_whole_sphere() {
         // All 6 face cells should cover the whole sphere.
-        let cu = CellUnion::from_cell_ids((0..6).map(CellId::from_face).collect());
+        let cu = CellUnion::from_cell_ids(Face::ALL.into_iter().map(CellId::from_face).collect());
         assert_eq!(cu.num_cells(), 6);
         assert!(cu.contains_point(Point::from_coords(1.0, 0.0, 0.0)));
         assert!(cu.contains_point(Point::from_coords(-1.0, 0.0, 0.0)));
@@ -905,11 +904,11 @@ mod tests {
     #[test]
     fn test_is_normalized() {
         // A single face cell is normalized.
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
         assert!(cu.is_normalized());
 
         // Non-normalized: parent + child.
-        let parent = CellId::from_face(0);
+        let parent = CellId::from_face(Face::F0);
         let mut cu2 = CellUnion(vec![parent, parent.children()[0]]);
         assert!(!cu2.is_normalized());
         cu2.normalize();
@@ -920,7 +919,7 @@ mod tests {
     #[test]
     fn test_contains_all_children() {
         // A face cell should contain all its children at any level.
-        let face0 = CellId::from_face(0);
+        let face0 = CellId::from_face(Face::F0);
         let cu = CellUnion::from_cell_ids(vec![face0]);
 
         // Level 1 children.
@@ -938,8 +937,8 @@ mod tests {
     #[test]
     fn test_intersects_with_children() {
         // A cell union of face 0 should intersect any child of face 0.
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let child_cu = CellUnion::from_cell_ids(vec![CellId::from_face(0).children()[2]]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let child_cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0).children()[2]]);
         assert!(cu.intersects_union(&child_cu));
         assert!(child_cu.intersects_union(&cu));
     }
@@ -947,8 +946,8 @@ mod tests {
     #[test]
     fn test_denormalize_levels() {
         // Denormalize at level 2 should produce 16 cells (4^2).
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let den = cu.denormalize(Level::new(2), 1);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let den = cu.denormalize(Level::new(2), LevelMod::new(1));
         assert_eq!(den.num_cells(), 16);
         for id in den.cell_ids() {
             assert_eq!(id.level(), 2);
@@ -958,15 +957,15 @@ mod tests {
     #[test]
     fn test_leaf_cells_covered_exact() {
         // A single level-30 (leaf) cell covers exactly 1 leaf cell.
-        let leaf = CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL);
+        let leaf = CellId::from_face(Face::F0).child_begin_at_level(Level::MAX);
         let cu = CellUnion::from_cell_ids(vec![leaf]);
         assert_eq!(cu.leaf_cells_covered(), 1);
     }
 
     #[test]
     fn test_denormalize() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let den = cu.denormalize(Level::new(1), 1);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let den = cu.denormalize(Level::new(1), LevelMod::new(1));
         assert_eq!(den.num_cells(), 4);
         for id in den.cell_ids() {
             assert_eq!(id.level(), 1);
@@ -979,7 +978,7 @@ mod tests {
         assert_eq!(cu.num_cells(), 6);
         // Should contain every face.
         for f in 0..6 {
-            assert!(cu.contains_cell_id(CellId::from_face(f)));
+            assert!(cu.contains_cell_id(CellId::from_face(Face::from_u8(f))));
         }
         // Should contain any arbitrary point.
         assert!(cu.contains_point(Point::from_coords(0.3, 0.7, -0.5)));
@@ -988,15 +987,15 @@ mod tests {
     #[test]
     fn test_is_empty() {
         assert!(CellUnion::new().is_empty());
-        assert!(!CellUnion::from_cell_ids(vec![CellId::from_face(0)]).is_empty());
+        assert!(!CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]).is_empty());
     }
 
     #[test]
     fn test_from_min_max() {
         // from_min_max should create a range covering both endpoints.
-        let min_id = CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL);
-        let max_id = CellId::from_face(0).children()[0]
-            .child_end_at_level(MAX_CELL_LEVEL)
+        let min_id = CellId::from_face(Face::F0).child_begin_at_level(Level::MAX);
+        let max_id = CellId::from_face(Face::F0).children()[0]
+            .child_end_at_level(Level::MAX)
             .prev();
         let cu = CellUnion::from_min_max(min_id, max_id);
         assert!(cu.contains_cell_id(min_id));
@@ -1006,10 +1005,10 @@ mod tests {
     #[test]
     fn test_from_begin_end() {
         // A face's begin..end should reconstruct the face cell.
-        let face = CellId::from_face(0);
+        let face = CellId::from_face(Face::F0);
         let cu = CellUnion::from_begin_end(
-            face.child_begin_at_level(MAX_CELL_LEVEL),
-            face.child_end_at_level(MAX_CELL_LEVEL),
+            face.child_begin_at_level(Level::MAX),
+            face.child_end_at_level(Level::MAX),
         );
         assert_eq!(cu.num_cells(), 1);
         assert_eq!(cu[0], face);
@@ -1017,19 +1016,19 @@ mod tests {
 
     #[test]
     fn test_union() {
-        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(1)]);
+        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F1)]);
         let result = cu1.union(&cu2);
         assert_eq!(result.num_cells(), 2);
-        assert!(result.contains_cell_id(CellId::from_face(0)));
-        assert!(result.contains_cell_id(CellId::from_face(1)));
+        assert!(result.contains_cell_id(CellId::from_face(Face::F0)));
+        assert!(result.contains_cell_id(CellId::from_face(Face::F1)));
     }
 
     #[test]
     fn test_intersection() {
         // Intersection of face 0 with its first child should be the child.
-        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let child = CellId::from_face(0).children()[0];
+        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let child = CellId::from_face(Face::F0).children()[0];
         let cu2 = CellUnion::from_cell_ids(vec![child]);
         let result = cu1.intersection(&cu2);
         assert_eq!(result.num_cells(), 1);
@@ -1038,16 +1037,16 @@ mod tests {
 
     #[test]
     fn test_intersection_disjoint() {
-        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(3)]);
+        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let cu2 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F3)]);
         let result = cu1.intersection(&cu2);
         assert!(result.is_empty());
     }
 
     #[test]
     fn test_intersection_with_cell_id() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let child = CellId::from_face(0).children()[0];
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let child = CellId::from_face(Face::F0).children()[0];
         let result = cu.intersection_with_cell_id(child);
         assert_eq!(result.num_cells(), 1);
         assert_eq!(result[0], child);
@@ -1056,15 +1055,15 @@ mod tests {
     #[test]
     fn test_difference() {
         // Difference of face 0 minus its first child should leave 3 children.
-        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let child = CellId::from_face(0).children()[0];
+        let cu1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let child = CellId::from_face(Face::F0).children()[0];
         let cu2 = CellUnion::from_cell_ids(vec![child]);
         let result = cu1.difference(&cu2);
         // Face minus one quarter = three children.
         assert_eq!(result.num_cells(), 3);
         assert!(!result.contains_cell_id(child));
         // But should still contain the other three children.
-        for (i, c) in CellId::from_face(0).children().iter().enumerate() {
+        for (i, c) in CellId::from_face(Face::F0).children().iter().enumerate() {
             if i > 0 {
                 assert!(result.contains_cell_id(*c));
             }
@@ -1074,7 +1073,7 @@ mod tests {
     #[test]
     fn test_expand_at_level() {
         // Start with a small cell and expand.
-        let id = CellId::from_face(0).children()[0].children()[0];
+        let id = CellId::from_face(Face::F0).children()[0].children()[0];
         let mut cu = CellUnion::from_cell_ids(vec![id]);
         let orig_num = cu.num_cells();
         cu.expand_at_level(id.level());
@@ -1086,7 +1085,7 @@ mod tests {
 
     #[test]
     fn test_area_methods() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
         let avg = cu.average_based_area();
         let approx = cu.approx_area();
         let exact = cu.exact_area();
@@ -1129,7 +1128,8 @@ mod tests {
     #[test]
     fn test_unsorted_cells_not_valid() {
         // C++: UnsortedCellsNotValid
-        let id = CellId::from_point(&Point::from_coords(1.0, 0.0, 0.0)).parent_at_level(10);
+        let id =
+            CellId::from_point(&Point::from_coords(1.0, 0.0, 0.0)).parent_at_level(Level::new(10));
         let cu = from_verbatim(vec![id, id.prev()]);
         assert!(!cu.is_valid());
     }
@@ -1146,7 +1146,7 @@ mod tests {
         assert!(cu.is_empty());
 
         // Denormalize empty.
-        let output = cu.denormalize(Level::MIN, 2);
+        let output = cu.denormalize(Level::MIN, LevelMod::new(2));
         assert!(output.is_empty());
 
         // Expand by radius on empty.
@@ -1162,7 +1162,7 @@ mod tests {
     fn test_empty_and_non_empty_boolean_ops() {
         // C++: EmptyAndNonEmptyBooleanOps
         let empty = CellUnion::new();
-        let face1_id = CellId::from_face(1);
+        let face1_id = CellId::from_face(Face::F1);
         let non_empty = CellUnion::from_cell_ids(vec![face1_id]);
 
         // Contains cell_id.
@@ -1214,7 +1214,7 @@ mod tests {
     #[test]
     fn test_intersection_one_input_normalized() {
         // C++: IntersectionOneInputNormalized
-        let id = CellId::from_face(3);
+        let id = CellId::from_face(Face::F3);
         let parent = CellUnion::from_cell_ids(vec![id]);
         let ch = id.children();
         let children = from_verbatim(vec![ch[0], ch[1], ch[2], ch[3]]);
@@ -1235,14 +1235,17 @@ mod tests {
     #[test]
     fn test_to_string_one_cell() {
         // C++: ToStringOneCell
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(1)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F1)]);
         assert_eq!(cu.to_string(), "Size:1 S2CellIds:3");
     }
 
     #[test]
     fn test_to_string_two_cells() {
         // C++: ToStringTwoCells
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(1), CellId::from_face(2)]);
+        let cu = CellUnion::from_cell_ids(vec![
+            CellId::from_face(Face::F1),
+            CellId::from_face(Face::F2),
+        ]);
         assert_eq!(cu.to_string(), "Size:2 S2CellIds:3,5");
     }
 
@@ -1250,8 +1253,8 @@ mod tests {
     fn test_to_string_truncated() {
         // C++: ToStringOver500Cells
         // Denormalize face 1 to level 6 → 4^6 = 4096 cells.
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(1)]);
-        let denorm = cu.denormalize(Level::new(6), 1);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F1)]);
+        let denorm = cu.denormalize(Level::new(6), LevelMod::new(1));
         let s = denorm.to_string();
         // Should have exactly 500 commas (501 tokens truncated to 500).
         assert_eq!(s.matches(',').count(), 500);
@@ -1263,7 +1266,7 @@ mod tests {
     #[test]
     fn test_expand_by_radius() {
         // Verify that expand_by_radius on a single face cell expands it.
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let mut cu = CellUnion::from_cell_ids(vec![id]);
         let original_size = cu.num_cells();
         cu.expand_by_radius(Angle::from_degrees(1.0), 3);
@@ -1297,7 +1300,7 @@ mod quickcheck_tests {
     #[quickcheck]
     fn prop_normalized_contains_original(face: u8) -> bool {
         let face = face % 6;
-        let id = CellId::from_face(face);
+        let id = CellId::from_face(Face::from_u8(face));
         let children = id.children();
         let cu = CellUnion::from_cell_ids(children.to_vec());
         // After normalization (siblings merge to parent), contains all children.
@@ -1307,7 +1310,7 @@ mod quickcheck_tests {
     #[quickcheck]
     fn prop_from_cell_ids_is_normalized(face: u8) -> bool {
         let face = face % 6;
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(face)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::from_u8(face))]);
         cu.is_normalized()
     }
 
@@ -1315,7 +1318,7 @@ mod quickcheck_tests {
     #[quickcheck]
     fn prop_serde_roundtrip(face: u8) -> bool {
         let face = face % 6;
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(face)]);
+        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::from_u8(face))]);
         let json = serde_json::to_string(&cu).unwrap();
         let back: CellUnion = serde_json::from_str(&json).unwrap();
         serde_json::to_string(&back).unwrap() == json
@@ -1328,8 +1331,8 @@ mod quickcheck_tests {
     fn serde_rejects_invalid_unions() {
         let parse =
             |ids: &[u64]| serde_json::from_str::<CellUnion>(&serde_json::to_string(ids).unwrap());
-        let f0 = CellId::from_face(0);
-        let f1 = CellId::from_face(1);
+        let f0 = CellId::from_face(Face::F0);
+        let f1 = CellId::from_face(Face::F1);
         assert!(parse(&[f1.0, f0.0]).is_err(), "unsorted");
         assert!(parse(&[f0.0, f0.0]).is_err(), "duplicate");
         assert!(parse(&[f0.0, f0.child_begin().0]).is_err(), "overlapping");

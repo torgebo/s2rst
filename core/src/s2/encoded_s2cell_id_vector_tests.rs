@@ -8,6 +8,8 @@
 use quickcheck_macros::quickcheck;
 
 use super::*;
+use crate::s2::Face;
+use crate::s2::Level;
 
 fn round_trip(ids: &[CellId]) -> bool {
     let mut buf = Vec::new();
@@ -29,7 +31,7 @@ fn prop_cell_id_vector_round_trips_same_level(raw: Vec<u64>, level: u8) -> bool 
     let level = level % 31;
     let ids: Vec<CellId> = raw
         .into_iter()
-        .map(|x| CellId::from_face_pos_level(x as u8 % 6, x >> 3, level))
+        .map(|x| CellId::from_face_pos_level(Face::from_u8(x as u8 % 6), x >> 3, Level::new(level)))
         .collect();
     round_trip(&ids)
 }

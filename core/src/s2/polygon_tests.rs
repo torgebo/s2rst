@@ -10,6 +10,8 @@
 //! this crate, not ported from upstream S2.
 
 use super::*;
+use crate::s2::CellVertex;
+use crate::s2::Face;
 use crate::s2::LatLng;
 
 fn p(lat: f64, lng: f64) -> Point {
@@ -27,7 +29,7 @@ fn rect_polygon(lat_lo: f64, lng_lo: f64, lat_hi: f64, lng_hi: f64) -> Polygon {
 }
 
 fn cell_at(lat: f64, lng: f64, level: u8) -> Cell {
-    Cell::from_cell_id(CellId::from_point(&p(lat, lng)).parent_at_level(level))
+    Cell::from_cell_id(CellId::from_point(&p(lat, lng)).parent_at_level(Level::new(level)))
 }
 
 // ─── Region: intersects_cell ─────────────────────────────────────────────
@@ -55,7 +57,7 @@ fn intersects_cell_true_when_polygon_vertex_inside_cell() {
     // the polygon, but the polygon's vertices are inside the cell, so the
     // second detection strategy fires.
     let poly = rect_polygon(-0.5, -0.5, 0.5, 0.5);
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     assert!(poly.intersects_cell(&cell));
 }
 
@@ -67,14 +69,20 @@ fn intersects_cell_true_on_edge_crossing_only() {
     // (no corner inside the bar) while spanning far past it in latitude (no bar
     // vertex inside the cell). The asserts below confirm those preconditions,
     // so the only way `intersects_cell` can return true is the edge crossing.
-    let cell_id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(6);
+    let cell_id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(Level::new(6));
     let cell = Cell::from_cell_id(cell_id);
     let center = LatLng::from_point(cell_id.to_point());
     let (clat, clng) = (center.lat.degrees(), center.lng.degrees());
     // Quarter of the distance from the center to the nearest corner longitude:
     // narrow enough to keep every corner outside the bar.
     let half_width = (0..4)
-        .map(|i| (LatLng::from_point(cell.vertex(i)).lng.degrees() - clng).abs())
+        .map(|i| {
+            (LatLng::from_point(cell.vertex(CellVertex::ALL[i]))
+                .lng
+                .degrees()
+                - clng)
+                .abs()
+        })
         .fold(f64::INFINITY, f64::min)
         * 0.25;
 
@@ -88,7 +96,7 @@ fn intersects_cell_true_on_edge_crossing_only() {
 
     for i in 0..4 {
         assert!(
-            !bar.contains_point(&cell.vertex(i)),
+            !bar.contains_point(&cell.vertex(CellVertex::ALL[i])),
             "precondition: cell vertex {i} must be outside the bar"
         );
     }

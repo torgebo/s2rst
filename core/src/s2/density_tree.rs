@@ -34,6 +34,7 @@ use std::hash::Hash;
 use std::ops::ControlFlow;
 
 use crate::s1::Angle;
+use crate::s2::Face;
 use crate::s2::builder::{S2Error, S2ErrorCode};
 use crate::s2::cell_union::CellUnion;
 use crate::s2::coords::Level;
@@ -204,7 +205,7 @@ impl<'a> DecodedPath<'a> {
         let different_face = self.last == CellId::sentinel()
             || u8::from(self.last.face()) != u8::from(cell_id.face());
         if different_face {
-            self.last = cell_id.parent_at_level(0);
+            self.last = cell_id.parent_at_level(Level::MIN);
             self.load_face(u8::from(cell_id.face()), error);
             if !error.is_ok() {
                 return &self.stack[0];
@@ -240,10 +241,13 @@ impl<'a> DecodedPath<'a> {
             .map_or(0, Level::as_usize);
         let cell_level = cell_id.level().as_usize();
 
+        // The stack is indexed by level, so the loop counts in `usize` and converts each
+        // level, none of which exceeds `cell_level`.
+        let at = |l: usize| Level::new(l as u8);
         let mut result_level = start_level;
         let mut level = start_level + 1;
         while level <= cell_level {
-            let child_pos = cell_id.child_position(level as u8) as usize;
+            let child_pos = cell_id.child_position(at(level)) as usize;
             let offset = self.stack[level - 1].child_offset(child_pos);
             if offset < 0 {
                 if self.stack[level - 1].has_children() {
@@ -265,7 +269,7 @@ impl<'a> DecodedPath<'a> {
                 );
                 self.stack[level].clear();
                 self.offsets[level] = -1;
-                self.last = cell_id.parent_at_level(level as u8 - 1);
+                self.last = cell_id.parent_at_level(at(level - 1));
                 return &self.stack[level];
             }
             match DensityCell::decode(&self.tree.encoded, offset as usize) {
@@ -277,14 +281,14 @@ impl<'a> DecodedPath<'a> {
                     *error = e;
                     self.stack[level].clear();
                     self.offsets[level] = -1;
-                    self.last = cell_id.parent_at_level(level as u8 - 1);
+                    self.last = cell_id.parent_at_level(at(level - 1));
                     return &self.stack[level];
                 }
             }
             result_level = level;
             level += 1;
         }
-        self.last = cell_id.parent_at_level(result_level as u8);
+        self.last = cell_id.parent_at_level(at(result_level));
         &self.stack[result_level]
     }
 }
@@ -399,7 +403,7 @@ impl TreeEncoder {
         let mut enc = ReversedCellEncoder::new(output);
         let mut mask: u64 = 0;
         for face in (0..NUM_FACES).rev() {
-            let fc = CellId::from_face(face as u8);
+            let fc = CellId::from_face(Face::ALL[face]);
             if let Some(&w) = self.weights.get(&fc) {
                 self.encode_subtree_reversed(fc, w, output);
                 enc.next(output);
@@ -458,11 +462,12 @@ impl BreadthFirstTreeBuilder {
     where
         F: FnMut(CellId) -> Result<i64, S2Error>,
     {
-        let mut ranges = vec![(CellId::begin(MAX_CELL_LEVEL), CellId::end(MAX_CELL_LEVEL))];
+        let mut ranges = vec![(CellId::begin(Level::MAX), CellId::end(Level::MAX))];
         let mut next_ranges: Vec<(CellId, CellId)> = Vec::new();
         let mut size_est: i64 = 0;
 
-        for level in 0..=self.max_level {
+        // `new` clamps `max_level` to 30.
+        for level in (0..=self.max_level).map(Level::new) {
             if ranges.is_empty() || size_est >= self.approximate_size_bytes {
                 break;
             }
@@ -880,7 +885,7 @@ impl S2DensityTree {
             }
             if !self.visit_recursive(
                 &mut visitor,
-                CellId::from_face(face as u8),
+                CellId::from_face(Face::ALL[face]),
                 off,
                 &mut visited,
                 error,
@@ -1493,12 +1498,12 @@ mod tests {
     #[test]
     fn test_encode_one_face() {
         let mut e = TreeEncoder::new();
-        e.put(CellId::from_face(3), 17);
+        e.put(CellId::from_face(Face::F3), 17);
         let mut t = S2DensityTree::new();
         e.build(&mut t);
         let d = t.decode().unwrap();
         assert_eq!(d.len(), 1);
-        assert_eq!(*d.get(&CellId::from_face(3)).unwrap(), 17);
+        assert_eq!(*d.get(&CellId::from_face(Face::F3)).unwrap(), 17);
     }
 
     #[test]
@@ -1518,7 +1523,7 @@ mod tests {
     fn test_encode_each_face() {
         let mut expected = BTreeMap::new();
         for i in 0..6u8 {
-            expected.insert(CellId::from_face(i), 10 + i64::from(i));
+            expected.insert(CellId::from_face(Face::from_u8(i)), 10 + i64::from(i));
         }
         let mut e = TreeEncoder::new();
         for (&c, &w) in &expected {
@@ -1531,10 +1536,11 @@ mod tests {
 
     #[test]
     fn test_encode_one_branch() {
-        let split = cell_id::from_face_ij(Face::F1, 1 << 10, 2 << 10).parent_at_level(10);
+        let split =
+            cell_id::from_face_ij(Face::F1, 1 << 10, 2 << 10).parent_at_level(Level::new(10));
         let expected = sum_to_root(&BTreeMap::from([
-            (split.child_begin_at_level(20), 1),
-            (split.child_end_at_level(20), 17),
+            (split.child_begin_at_level(Level::new(20)), 1),
+            (split.child_end_at_level(Level::new(20)), 17),
         ]));
         let mut e = TreeEncoder::new();
         for (&c, &w) in &expected {
@@ -1634,7 +1640,7 @@ mod tests {
 
     #[test]
     fn test_normalize_balances() {
-        let f0 = CellId::from_face(0);
+        let f0 = CellId::from_face(Face::F0);
         let leaves = BTreeMap::from([(f0, 3i64), (f0.children()[0], 2), (f0.children()[1], 4)]);
         let mut e = TreeEncoder::new();
         for (&c, &w) in &sum_to_root(&leaves) {
@@ -1656,7 +1662,7 @@ mod tests {
 
     #[test]
     fn test_normalize_disjoint() {
-        let f0 = CellId::from_face(0);
+        let f0 = CellId::from_face(Face::F0);
         let leaves = BTreeMap::from([
             (f0.children()[0], 1i64),
             (f0.children()[1].children()[2], 1),
@@ -1684,7 +1690,7 @@ mod tests {
     #[test]
     fn test_decoded_path_scales() {
         let mut err = S2Error::ok();
-        let parent = CellId::from_face_pos_level(0, 0, 5);
+        let parent = CellId::from_face_pos_level(Face::F0, 0, Level::new(5));
         let base = BTreeMap::from([(parent, 100i64)]);
         let mut e = TreeEncoder::new();
         for (&c, &w) in &sum_to_root(&base) {
@@ -1706,7 +1712,7 @@ mod tests {
     #[test]
     fn test_decoded_path_correctness() {
         let mut err = S2Error::ok();
-        let f2 = CellId::from_face(2);
+        let f2 = CellId::from_face(Face::F2);
         let c22 = f2.children()[2];
         let base = BTreeMap::from([(c22.children()[2], 100i64), (c22.children()[3], 120)]);
         let mut e = TreeEncoder::new();
@@ -1720,7 +1726,11 @@ mod tests {
             if f == 2 {
                 continue;
             }
-            assert_eq!(p.get_cell(CellId::from_face(f), &mut err).weight(), 0);
+            assert_eq!(
+                p.get_cell(CellId::from_face(Face::from_u8(f)), &mut err)
+                    .weight(),
+                0
+            );
         }
         assert_eq!(p.get_cell(f2, &mut err).weight(), 220);
         assert_eq!(p.get_cell(f2.children()[2], &mut err).weight(), 220);
@@ -1738,7 +1748,7 @@ mod tests {
 
     #[test]
     fn test_sum_one() {
-        let f1 = CellId::from_face(1);
+        let f1 = CellId::from_face(Face::F1);
         let mut e = TreeEncoder::new();
         e.put(f1, 3);
         e.put(f1.children()[1], 1);
@@ -1753,8 +1763,8 @@ mod tests {
 
     #[test]
     fn test_sum_disjoint() {
-        let f2 = CellId::from_face(2);
-        let f3 = CellId::from_face(3);
+        let f2 = CellId::from_face(Face::F2);
+        let f3 = CellId::from_face(Face::F3);
         let mut e1 = TreeEncoder::new();
         e1.put(f2, 4);
         let mut t1 = S2DensityTree::new();
@@ -1775,7 +1785,7 @@ mod tests {
         let mut e = TreeEncoder::new();
         for i in 0..6u8 {
             for (&c, &w) in &sum_to_root(&BTreeMap::from([(
-                CellId::from_face_pos_level(i, 0, 10),
+                CellId::from_face_pos_level(Face::from_u8(i), 0, Level::new(10)),
                 1000i64,
             )])) {
                 e.put(c, w);
@@ -1861,7 +1871,7 @@ mod tests {
 
     #[test]
     fn test_normalize_does_not_overflow() {
-        let f0 = CellId::from_face(0);
+        let f0 = CellId::from_face(Face::F0);
         let max32 = i64::from(i32::MAX);
         let max64 = i64::MAX;
         let leaves = BTreeMap::from([
@@ -1884,7 +1894,7 @@ mod tests {
         let mut err = S2Error::ok();
         use rand::{Rng, SeedableRng};
 
-        let f2 = CellId::from_face(2);
+        let f2 = CellId::from_face(Face::F2);
         let c22 = f2.children()[2];
         let base = BTreeMap::from([(c22.children()[2], 100i64), (c22.children()[3], 120)]);
         let mut e = TreeEncoder::new();
@@ -1923,7 +1933,7 @@ mod tests {
 
     #[test]
     fn test_partitioning_removes_pointless_splits() {
-        let parent = CellId::from_face_pos_level(0, 0, 4);
+        let parent = CellId::from_face_pos_level(Face::F0, 0, Level::new(4));
         let base = BTreeMap::from([(parent, 20i64)]);
         let mut e = TreeEncoder::new();
         for (&c, &w) in &sum_to_root(&base) {
@@ -1944,8 +1954,8 @@ mod tests {
 
     #[test]
     fn test_partitioning_replaces_children_with_parent() {
-        let f0cell = CellId::from_face_pos_level(0, 0, 4);
-        let f1cell = CellId::from_face_pos_level(1, 0, 4);
+        let f0cell = CellId::from_face_pos_level(Face::F0, 0, Level::new(4));
+        let f1cell = CellId::from_face_pos_level(Face::F1, 0, Level::new(4));
 
         let base = BTreeMap::from([(f0cell, 20i64), (f1cell, 40)]);
         let mut e = TreeEncoder::new();
@@ -2012,18 +2022,18 @@ mod tests {
     }
 
     fn sum_fixture_weights() -> BTreeMap<CellId, i64> {
-        let f1 = CellId::from_face(1);
-        let f2 = CellId::from_face(2);
-        let f3 = CellId::from_face(3);
+        let f1 = CellId::from_face(Face::F1);
+        let f2 = CellId::from_face(Face::F2);
+        let f3 = CellId::from_face(Face::F3);
         BTreeMap::from([
             (f1, 3),
             (f1.children()[1], 1),
             (f1.children()[2], 2),
-            (CellId::from_face_pos_level(1, 0, 30), 4),
+            (CellId::from_face_pos_level(Face::F1, 0, Level::new(30)), 4),
             (f2, 4),
             (f3, 2),
             (f3.children()[0], 2),
-            (CellId::from_face_pos_level(3, 0, 30), 2),
+            (CellId::from_face_pos_level(Face::F3, 0, Level::new(30)), 2),
         ])
     }
 
@@ -2053,7 +2063,7 @@ mod tests {
 
     #[test]
     fn test_sum_nested() {
-        let f1 = CellId::from_face(1);
+        let f1 = CellId::from_face(Face::F1);
         let expected = BTreeMap::from([(f1, 4i64), (f1.children()[1], 2), (f1.children()[2], 2)]);
         for with_size in [false, true] {
             check_sum(&expected, &[f1, f1.children()[1]], 30, with_size);
@@ -2062,8 +2072,8 @@ mod tests {
 
     #[test]
     fn test_sum_leaves() {
-        let l1 = CellId::from_face_pos_level(1, 0, 30);
-        let l3 = CellId::from_face_pos_level(3, 0, 30);
+        let l1 = CellId::from_face_pos_level(Face::F1, 0, Level::new(30));
+        let l3 = CellId::from_face_pos_level(Face::F3, 0, Level::new(30));
         let expected = sum_to_root(&BTreeMap::from([(l1, 4i64), (l3, 2)]));
         for with_size in [false, true] {
             check_sum(&expected, &[l1, l3], 30, with_size);
@@ -2072,11 +2082,14 @@ mod tests {
 
     #[test]
     fn test_sum_leaves_level_limited() {
-        let l1 = CellId::from_face_pos_level(1, 0, 30);
-        let l3 = CellId::from_face_pos_level(3, 0, 30);
+        let l1 = CellId::from_face_pos_level(Face::F1, 0, Level::new(30));
+        let l3 = CellId::from_face_pos_level(Face::F3, 0, Level::new(30));
         let expected = sum_to_root(&BTreeMap::from([
-            (CellId::from_face_pos_level(1, 0, 20), 4i64),
-            (CellId::from_face_pos_level(3, 0, 20), 2),
+            (
+                CellId::from_face_pos_level(Face::F1, 0, Level::new(20)),
+                4i64,
+            ),
+            (CellId::from_face_pos_level(Face::F3, 0, Level::new(20)), 2),
         ]));
         for with_size in [false, true] {
             check_sum(&expected, &[l1, l3], 20, with_size);
@@ -2085,7 +2098,7 @@ mod tests {
 
     #[test]
     fn test_sum_max_level() {
-        let cell = CellId::from_face(5).children()[2].children()[1].children()[0];
+        let cell = CellId::from_face(Face::F5).children()[2].children()[1].children()[0];
         for max_level in 0..=cell.level().as_u8() {
             let mut b = BreadthFirstTreeBuilder::new(10000, max_level);
             let mut tree = S2DensityTree::new();
@@ -2093,7 +2106,10 @@ mod tests {
             b.build(|cid| Ok(i64::from(cid.intersects(cell_copy))), &mut tree)
                 .unwrap();
             let actual = tree.decode().unwrap();
-            let expected = sum_to_root(&BTreeMap::from([(cell.parent_at_level(max_level), 1i64)]));
+            let expected = sum_to_root(&BTreeMap::from([(
+                cell.parent_at_level(Level::new(max_level)),
+                1i64,
+            )]));
             assert!(
                 expect_trees_equal(&actual, &expected),
                 "failed at max_level={max_level}"
@@ -2514,9 +2530,9 @@ mod tests {
 
         // TwoShapes is NOT double counted: both shapes at p map to the same
         // feature, so its weight of 1 is counted only once.
-        let cell_p = CellId::from(&p).parent_at_level(1);
-        let cell_q = CellId::from(&q).parent_at_level(1);
-        let face = CellId::from(&p).parent_at_level(0);
+        let cell_p = CellId::from(&p).parent_at_level(Level::new(1));
+        let cell_q = CellId::from(&q).parent_at_level(Level::new(1));
+        let face = CellId::from(&p).parent_at_level(Level::new(0));
 
         assert_eq!(parsed[&face], 6, "face: TwoShapes(1) + OneShapes(5)");
         assert_eq!(

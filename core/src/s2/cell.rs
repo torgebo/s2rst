@@ -24,7 +24,9 @@ use crate::s2::coords::{
     Face, Level, POS_TO_IJ, POS_TO_ORIENTATION, face_uv_to_xyz, face_xyz_to_uv, face_xyz_to_uvw,
     get_u_axis, get_u_norm, get_v_axis, get_v_norm, uv_to_st,
 };
-use crate::s2::{Cap, CellId, LatLng, Point, Rect, ij_level_to_bound_uv, size_ij};
+use crate::s2::{
+    BoundedKind, Cap, CellId, LatLng, OutOfRange, Point, Rect, ij_level_to_bound_uv, size_ij,
+};
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 /// Latitude at pole (arcsin(sqrt(1/3)) - 0.5*epsilon).
@@ -59,6 +61,103 @@ impl CellEdge {
     ];
 }
 
+impl TryFrom<i64> for CellEdge {
+    type Error = OutOfRange;
+
+    /// The edge numbered `k`, or [`OutOfRange`] outside `0..=3`.
+    fn try_from(k: i64) -> Result<Self, OutOfRange> {
+        match usize::try_from(k) {
+            Ok(i) if i < CellEdge::ALL.len() => Ok(CellEdge::ALL[i]),
+            _ => Err(OutOfRange::new(BoundedKind::CellEdge, k)),
+        }
+    }
+}
+
+/// Identifies one of the four vertices of a [`Cell`]: the corners of its (u, v) rectangle, in
+/// counter-clockwise order.
+///
+/// A bounded type, like [`CellEdge`]: [`Cell::vertex`] and [`Cell::vertex_raw`] take one, so an
+/// index of 4 cannot reach them. Upstream's `GetVertex(int k)` uses `k`'s low two bits instead,
+/// so its `GetVertex(4)` is vertex 0; [`CellVertex::next`] and [`CellVertex::prev`] carry that
+/// wrap for the `k + 1` and `k - 1` of upstream's loops (spec 009). Vertex `k` is where edge
+/// `k - 1` ends and edge `k` begins.
+///
+/// ```
+/// use s2rst::s2::{Cell, CellId, CellVertex, Face};
+///
+/// let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
+/// for v in CellVertex::ALL {
+///     assert!(cell.vertex(v).is_unit());
+///     assert_eq!(v.next().prev(), v);
+/// }
+/// assert_eq!(CellVertex::UpperLeft.next(), CellVertex::LowerLeft);
+/// ```
+#[must_use]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CellVertex {
+    /// Vertex 0: lower left, (`u_lo`, `v_lo`).
+    #[default]
+    LowerLeft = 0,
+    /// Vertex 1: lower right, (`u_hi`, `v_lo`).
+    LowerRight = 1,
+    /// Vertex 2: upper right, (`u_hi`, `v_hi`).
+    UpperRight = 2,
+    /// Vertex 3: upper left, (`u_lo`, `v_hi`).
+    UpperLeft = 3,
+}
+
+impl CellVertex {
+    /// All four vertices in counter-clockwise order.
+    pub const ALL: [CellVertex; 4] = [
+        CellVertex::LowerLeft,
+        CellVertex::LowerRight,
+        CellVertex::UpperRight,
+        CellVertex::UpperLeft,
+    ];
+
+    /// The next vertex in counter-clockwise order (after `UpperLeft`, `LowerLeft`).
+    #[inline]
+    pub fn next(self) -> CellVertex {
+        CellVertex::ALL[(self.index() + 1) & 3]
+    }
+
+    /// The previous vertex in counter-clockwise order (before `LowerLeft`, `UpperLeft`).
+    #[inline]
+    pub fn prev(self) -> CellVertex {
+        CellVertex::ALL[(self.index() + 3) & 3]
+    }
+
+    /// The vertex's number, 0..=3.
+    #[inline]
+    #[must_use]
+    pub fn index(self) -> usize {
+        self as usize
+    }
+}
+
+impl TryFrom<i64> for CellVertex {
+    type Error = OutOfRange;
+
+    /// The vertex numbered `k`, or [`OutOfRange`] outside `0..=3`.
+    fn try_from(k: i64) -> Result<Self, OutOfRange> {
+        match usize::try_from(k) {
+            Ok(i) if i < CellVertex::ALL.len() => Ok(CellVertex::ALL[i]),
+            _ => Err(OutOfRange::new(BoundedKind::CellVertex, k)),
+        }
+    }
+}
+
+impl TryFrom<usize> for CellVertex {
+    type Error = OutOfRange;
+
+    /// The vertex numbered `k`, or [`OutOfRange`] above 3. A value beyond `i64` is reported as
+    /// `i64::MAX`.
+    fn try_from(k: usize) -> Result<Self, OutOfRange> {
+        CellVertex::try_from(i64::try_from(k).unwrap_or(i64::MAX))
+    }
+}
+
 /// A concrete S2 cell with precomputed bounds.
 ///
 /// This type is `Copy` and intended to be passed by value.
@@ -66,7 +165,7 @@ impl CellEdge {
 /// # Examples
 ///
 /// ```
-/// use s2rst::s2::{Cell, CellId, LatLng, Point};
+/// use s2rst::s2::{Cell, CellId, CellVertex, LatLng, Level, Point};
 ///
 /// // Create a cell from a lat/lng (Paris).
 /// let ll = LatLng::from_degrees(48.8566, 2.3522);
@@ -74,12 +173,12 @@ impl CellEdge {
 /// assert_eq!(cell.level(), 30); // leaf cell
 ///
 /// // Get the four vertices.
-/// let v0 = cell.vertex(0);
-/// let v1 = cell.vertex(1);
+/// let v0 = cell.vertex(CellVertex::LowerLeft);
+/// let v1 = cell.vertex(CellVertex::LowerRight);
 /// assert!(v0 != v1);
 ///
 /// // Navigate to a parent cell and check area.
-/// let parent_id = cell.id().parent_at_level(10);
+/// let parent_id = cell.id().parent_at_level(Level::new(10));
 /// let parent = Cell::from_cell_id(parent_id);
 /// assert!(parent.approx_area() > cell.approx_area());
 ///
@@ -107,7 +206,7 @@ impl PartialEq for Cell {
 
 impl Default for Cell {
     fn default() -> Self {
-        Self::from_cell_id(CellId::from_face(0))
+        Self::from_cell_id(CellId::from_face(Face::F0))
     }
 }
 
@@ -121,7 +220,7 @@ impl Cell {
     /// The identifier must be a valid cell ([`CellId::is_valid`]); upstream's `S2Cell(S2CellId)`
     /// states no precondition, and reaches undefined behaviour on such ids. Panics on an
     /// identifier with no level marker, 62 or more trailing zero bits (`0`, `1 << 62`, `1 << 63`
-    /// and `3 << 62`: an arithmetic overflow in debug builds, "level must be 0..=30" in release
+    /// and `3 << 62`: an arithmetic overflow in debug builds, "level must be in 0..=30" in release
     /// builds), and on an identifier with face 6 or 7 (an index out of bounds). Any other
     /// invalid identifier, one whose lowest set bit is at an odd position up to 61, gives a cell
     /// whose fields are unspecified.
@@ -159,14 +258,8 @@ impl Cell {
     }
 
     /// Constructs a cell for the given face (level-0 cell).
-    ///
-    /// # Panics
-    ///
-    /// The face must be 0–5, as for [`CellId::from_face`]. Faces 6 and 7 give an invalid
-    /// identifier, on which [`Cell::from_cell_id`] panics; larger values are outside the domain
-    /// and give an unspecified cell.
     #[inline]
-    pub fn from_face(face: impl Into<u8>) -> Self {
+    pub fn from_face(face: Face) -> Self {
         Self::from_cell_id(CellId::from_face(face))
     }
 
@@ -174,11 +267,9 @@ impl Cell {
     ///
     /// # Panics
     ///
-    /// Panics where [`CellId::from_face_pos_level`] does (a level above 30, or an overflow in
-    /// debug builds). The face must be 0–5: faces 6 and 7 give an invalid identifier, on which
-    /// [`Cell::from_cell_id`] panics.
+    /// Panics where [`CellId::from_face_pos_level`] does (an overflow in debug builds).
     #[inline]
-    pub fn from_face_pos_level(face: impl Into<u8>, pos: u64, level: impl Into<Level>) -> Self {
+    pub fn from_face_pos_level(face: Face, pos: u64, level: Level) -> Self {
         Self::from_cell_id(CellId::from_face_pos_level(face, pos, level))
     }
 
@@ -234,25 +325,35 @@ impl Cell {
 
     // --- Vertices and edges ---
 
-    /// Returns the normalized k-th vertex (k = 0,1,2,3) in CCW order.
+    /// Returns the normalized vertex `k`, in CCW order.
     ///
-    /// # Panics
+    /// `k` is a [`CellVertex`], so an index of 4, which upstream's `GetVertex(int)` wraps to
+    /// vertex 0 and which panicked here before spec 009, cannot be passed:
     ///
-    /// Panics if `k > 3`, in every build (an index out of bounds).
+    /// ```
+    /// use s2rst::s2::{Cell, CellId, CellVertex, Face};
+    ///
+    /// let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
+    /// let _ = cell.vertex(CellVertex::UpperLeft);
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use s2rst::s2::{Cell, CellId, Face};
+    ///
+    /// let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
+    /// let _ = cell.vertex(4usize);
+    /// ```
     #[inline]
-    pub fn vertex(self, k: usize) -> Point {
+    pub fn vertex(self, k: CellVertex) -> Point {
         Point(self.vertex_raw(k).vector().normalize())
     }
 
-    /// Returns the unnormalized k-th vertex.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `k > 3`, in every build (an index out of bounds).
+    /// Returns the unnormalized vertex `k`.
     #[inline]
-    pub fn vertex_raw(self, k: usize) -> Point {
+    pub fn vertex_raw(self, k: CellVertex) -> Point {
         let verts = self.uv.vertices();
-        Point(face_uv_to_xyz(self.face, verts[k].x, verts[k].y))
+        let v = verts[k.index()];
+        Point(face_uv_to_xyz(self.face, v.x, v.y))
     }
 
     /// Returns the normalized inward-facing normal of the given edge.
@@ -302,7 +403,7 @@ impl Cell {
     #[inline]
     pub fn ij_coord_of_edge(self, k: CellEdge) -> i32 {
         // MAX_SIZE = 2^30 = kLimitIJ in C++
-        let limit_ij = f64::from(size_ij(0));
+        let limit_ij = f64::from(size_ij(Level::MIN));
         (limit_ij * uv_to_st(self.uv_coord_of_edge(k))).round() as i32
     }
 
@@ -352,8 +453,8 @@ impl Cell {
     // --- Area ---
 
     /// Returns the average area of cells at the given level.
-    pub fn average_area_for_level(level: impl Into<Level>) -> f64 {
-        4.0 * PI / (6.0 * (4.0_f64).powi(level.into().as_i32()))
+    pub fn average_area_for_level(level: Level) -> f64 {
+        4.0 * PI / (6.0 * (4.0_f64).powi(level.as_i32()))
     }
 
     /// Returns the average area of cells at the level of this cell.
@@ -368,9 +469,13 @@ impl Cell {
         }
 
         let flat_area = 0.5
-            * (self.vertex(2).vector() - self.vertex(0).vector())
-                .cross(self.vertex(3).vector() - self.vertex(1).vector())
-                .norm();
+            * (self.vertex(CellVertex::UpperRight).vector()
+                - self.vertex(CellVertex::LowerLeft).vector())
+            .cross(
+                self.vertex(CellVertex::UpperLeft).vector()
+                    - self.vertex(CellVertex::LowerRight).vector(),
+            )
+            .norm();
 
         flat_area * 2.0 / (1.0 + (1.0 - (flat_area / PI).min(1.0)).sqrt())
     }
@@ -380,10 +485,10 @@ impl Cell {
     /// Computed as the sum of two spherical triangles, which is accurate
     /// at all cell levels.
     pub fn exact_area(self) -> f64 {
-        let v0 = self.vertex(0);
-        let v1 = self.vertex(1);
-        let v2 = self.vertex(2);
-        let v3 = self.vertex(3);
+        let v0 = self.vertex(CellVertex::LowerLeft);
+        let v1 = self.vertex(CellVertex::LowerRight);
+        let v2 = self.vertex(CellVertex::UpperRight);
+        let v3 = self.vertex(CellVertex::UpperLeft);
         crate::s2::point_measures::point_area(v0, v1, v2)
             + crate::s2::point_measures::point_area(v0, v2, v3)
     }
@@ -425,8 +530,8 @@ impl Cell {
         let uv_center = self.uv.center();
         let cap_center = Point(face_uv_to_xyz(self.face, uv_center.x, uv_center.y).normalize());
         let mut cap = Cap::from_point(cap_center);
-        for k in 0..4 {
-            cap = cap.add_point(self.vertex(k));
+        for &v in &CellVertex::ALL {
+            cap = cap.add_point(self.vertex(v));
         }
         cap
     }
@@ -515,9 +620,9 @@ impl Cell {
             return ChordAngle::ZERO;
         }
         let mut min_dist = ChordAngle::INFINITY;
-        for k in 0..4 {
+        for &k in &CellVertex::ALL {
             let v0 = self.vertex(k);
-            let v1 = self.vertex((k + 1) % 4);
+            let v1 = self.vertex(k.next());
             let (cp_a, cp_b) = edge_distances::edge_pair_closest_points(a, b, v0, v1);
             let d = cp_a.chord_angle(cp_b);
             if d < min_dist {
@@ -533,18 +638,18 @@ impl Cell {
         use crate::s1::ChordAngle;
         use crate::s2::edge_distances;
         // Check if any vertex of either cell is contained in the other.
-        for k in 0..4 {
+        for &k in &CellVertex::ALL {
             if self.contains_point(other.vertex(k)) || other.contains_point(self.vertex(k)) {
                 return ChordAngle::ZERO;
             }
         }
         let mut min_dist = ChordAngle::INFINITY;
-        for i in 0..4 {
+        for &i in &CellVertex::ALL {
             let a0 = self.vertex(i);
-            let a1 = self.vertex((i + 1) % 4);
-            for j in 0..4 {
+            let a1 = self.vertex(i.next());
+            for &j in &CellVertex::ALL {
                 let b0 = other.vertex(j);
-                let b1 = other.vertex((j + 1) % 4);
+                let b1 = other.vertex(j.next());
                 let (cp_a, cp_b) = edge_distances::edge_pair_closest_points(a0, a1, b0, b1);
                 let d = cp_a.chord_angle(cp_b);
                 if d < min_dist {
@@ -611,8 +716,8 @@ impl Cell {
         // Otherwise, the maximum distance always occurs between a vertex of one
         // cell and an edge of the other cell (including the edge endpoints).
         // This represents a total of 32 possible (vertex, edge) pairs.
-        let va: [Point; 4] = std::array::from_fn(|i| self.vertex(i));
-        let vb: [Point; 4] = std::array::from_fn(|i| other.vertex(i));
+        let va: [Point; 4] = CellVertex::ALL.map(|v| self.vertex(v));
+        let vb: [Point; 4] = CellVertex::ALL.map(|v| other.vertex(v));
         let mut max_dist = ChordAngle::NEGATIVE;
         for i in 0..4 {
             for j in 0..4 {
@@ -918,10 +1023,10 @@ mod tests {
 
     #[test]
     fn test_vertex_count() {
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         // Vertices should be unit-length.
         for k in 0..4 {
-            let v = c.vertex(k);
+            let v = c.vertex(CellVertex::ALL[k]);
             assert!(
                 (v.vector().norm() - 1.0).abs() < 1e-14,
                 "vertex {k} not unit length: {}",
@@ -933,7 +1038,7 @@ mod tests {
     #[test]
     fn test_edge_raw_inward() {
         // For face 0 (positive x), edge normals should point inward.
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         let center = c.center();
         for k in CellEdge::ALL {
             let e = c.edge_raw(k);
@@ -947,7 +1052,7 @@ mod tests {
 
     #[test]
     fn test_children() {
-        let parent = Cell::from_cell_id(CellId::from_face(0));
+        let parent = Cell::from_cell_id(CellId::from_face(Face::F0));
         let children = parent.children().expect("should have children");
         for child in &children {
             assert_eq!(child.level(), 1);
@@ -975,16 +1080,16 @@ mod tests {
 
     #[test]
     fn test_contains_cell() {
-        let parent = Cell::from_cell_id(CellId::from_face(0));
-        let child = Cell::from_cell_id(CellId::from_face(0).children()[0]);
+        let parent = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let child = Cell::from_cell_id(CellId::from_face(Face::F0).children()[0]);
         assert!(parent.contains_cell(child));
         assert!(!child.contains_cell(parent));
     }
 
     #[test]
     fn test_intersects_cell() {
-        let c0 = Cell::from_cell_id(CellId::from_face(0));
-        let c1 = Cell::from_cell_id(CellId::from_face(1));
+        let c0 = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let c1 = Cell::from_cell_id(CellId::from_face(Face::F1));
         // Different face cells don't intersect in the CellId sense.
         assert!(!c0.intersects_cell(c1));
         // A cell intersects itself.
@@ -997,7 +1102,7 @@ mod tests {
             let c = Cell::from_cell_id(CellId::from_face(face));
             let cap = c.cap_bound();
             for k in 0..4 {
-                assert!(cap.contains_point(c.vertex(k)));
+                assert!(cap.contains_point(c.vertex(CellVertex::ALL[k])));
             }
         }
     }
@@ -1010,7 +1115,7 @@ mod tests {
             assert!(r.is_valid());
             for k in 0..4 {
                 assert!(
-                    r.contains_point(c.vertex(k)),
+                    r.contains_point(c.vertex(CellVertex::ALL[k])),
                     "face {face}: rect_bound does not contain vertex {k}",
                 );
             }
@@ -1020,9 +1125,9 @@ mod tests {
     #[test]
     fn test_rect_bound_subcells() {
         // Test that rect_bound works for several levels.
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         for level in 1..=5u8 {
-            let child_id = id.child_begin_at_level(level);
+            let child_id = id.child_begin_at_level(Level::new(level));
             let child = Cell::from_cell_id(child_id);
             let r = child.rect_bound();
             assert!(r.is_valid());
@@ -1033,14 +1138,14 @@ mod tests {
     #[test]
     fn test_average_area() {
         // Level 0 face cell has area = 4*PI/6.
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         let expected = 4.0 * PI / 6.0;
         assert!((c.average_area() - expected).abs() < 1e-14);
     }
 
     #[test]
     fn test_approx_area() {
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         // Level 0 area ≈ average area.
         let avg = c.average_area();
         let approx = c.approx_area();
@@ -1049,7 +1154,7 @@ mod tests {
 
     #[test]
     fn test_cell_union_bound() {
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         let bound = c.cell_union_bound();
         assert_eq!(bound.len(), 1);
         assert_eq!(bound[0], c.id());
@@ -1059,7 +1164,7 @@ mod tests {
 
     #[test]
     fn test_distance_to_point_inside() {
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(5)));
         let center = c.center();
         assert_eq!(c.distance_to_point(center), ChordAngle::ZERO);
     }
@@ -1067,7 +1172,8 @@ mod tests {
     #[test]
     fn test_distance_to_point_outside() {
         // Face 0 cell at level 10, center is near a corner of face 0.
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(10));
+        let c =
+            Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(10)));
         // Point far away on opposite face.
         let far = Point::from_coords(-1.0, 0.0, 0.0);
         let dist = c.distance_to_point(far);
@@ -1082,15 +1188,15 @@ mod tests {
     #[test]
     fn test_distance_to_point_vertex() {
         // Distance from cell to one of its own vertices should be 0.
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5));
-        let v = c.vertex(0);
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(5)));
+        let v = c.vertex(CellVertex::LowerLeft);
         assert!(c.distance_to_point(v) <= ChordAngle::from_length2(1e-20));
     }
 
     #[test]
     fn test_distance_to_edge_crossing() {
         // An edge that passes through the cell should have distance 0.
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         let a = Point::from_coords(1.0, -0.5, -0.5);
         let b = Point::from_coords(1.0, 0.5, 0.5);
         assert_eq!(c.distance_to_edge(a, b), ChordAngle::ZERO);
@@ -1098,7 +1204,8 @@ mod tests {
 
     #[test]
     fn test_distance_to_edge_far() {
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(10));
+        let c =
+            Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(10)));
         // Edge on opposite side of the sphere.
         let a = Point::from_coords(-1.0, 0.0, -0.1);
         let b = Point::from_coords(-1.0, 0.0, 0.1);
@@ -1108,14 +1215,14 @@ mod tests {
 
     #[test]
     fn test_distance_to_cell_same() {
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(5)));
         assert_eq!(c.distance_to_cell(c), ChordAngle::ZERO);
     }
 
     #[test]
     fn test_distance_to_cell_adjacent() {
         // Two adjacent cells at the same level should have distance ~0.
-        let id = CellId::from_face(0).child_begin_at_level(5);
+        let id = CellId::from_face(Face::F0).child_begin_at_level(Level::new(5));
         let c1 = Cell::from_cell_id(id);
         let c2 = Cell::from_cell_id(id.next());
         let dist = c1.distance_to_cell(c2);
@@ -1129,7 +1236,7 @@ mod tests {
 
     #[test]
     fn test_max_distance_to_point() {
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         let p = c.center();
         let max_dist = c.max_distance_to_point(p);
         // Max distance from center to any face-0 vertex.
@@ -1139,8 +1246,8 @@ mod tests {
     #[test]
     fn test_max_distance_to_cell() {
         // Two cells on opposite faces.
-        let c1 = Cell::from_cell_id(CellId::from_face(0));
-        let c2 = Cell::from_cell_id(CellId::from_face(3));
+        let c1 = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let c2 = Cell::from_cell_id(CellId::from_face(Face::F3));
         let max_dist = c1.max_distance_to_cell(c2);
         // Some vertex pair should be > 90 degrees apart.
         assert!(max_dist.to_angle().degrees() > 90.0);
@@ -1151,7 +1258,8 @@ mod tests {
     #[test]
     fn test_center_raw() {
         // center_raw should be proportional to center but unnormalized.
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(10));
+        let c =
+            Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(10)));
         let raw = c.center_raw();
         let norm = c.center();
         let normalized = Point(raw.vector().normalize());
@@ -1164,7 +1272,8 @@ mod tests {
     #[test]
     fn test_boundary_distance_outside() {
         // Point outside the cell — boundary_distance == distance_to_point.
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(10));
+        let c =
+            Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(10)));
         let far = Point::from_coords(-1.0, 0.0, 0.0);
         let bd = c.boundary_distance(far);
         let dp = c.distance_to_point(far);
@@ -1179,7 +1288,7 @@ mod tests {
     #[test]
     fn test_boundary_distance_inside() {
         // Point inside the cell — distance_to_point is 0 but boundary_distance > 0.
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(5)));
         let center = c.center();
         assert_eq!(c.distance_to_point(center), ChordAngle::ZERO);
         let bd = c.boundary_distance(center);
@@ -1192,8 +1301,10 @@ mod tests {
 
     #[test]
     fn test_is_distance_less() {
-        let c1 = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5));
-        let c2 = Cell::from_cell_id(CellId::from_face(3).child_begin_at_level(5));
+        let c1 =
+            Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(5)));
+        let c2 =
+            Cell::from_cell_id(CellId::from_face(Face::F3).child_begin_at_level(Level::new(5)));
         // Opposite-face cells: distance is large.
         assert!(!c1.is_distance_less(c2, ChordAngle::from_degrees(10.0)));
         assert!(c1.is_distance_less(c2, ChordAngle::STRAIGHT));
@@ -1201,7 +1312,7 @@ mod tests {
 
     #[test]
     fn test_is_distance_less_or_equal() {
-        let c = Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0).child_begin_at_level(Level::new(5)));
         // A cell's distance to itself is 0.
         assert!(c.is_distance_less_or_equal(c, ChordAngle::ZERO));
         assert!(!c.is_distance_less(c, ChordAngle::ZERO));
@@ -1209,16 +1320,16 @@ mod tests {
 
     #[test]
     fn test_is_max_distance_less() {
-        let c1 = Cell::from_cell_id(CellId::from_face(0));
-        let c2 = Cell::from_cell_id(CellId::from_face(3));
+        let c1 = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let c2 = Cell::from_cell_id(CellId::from_face(Face::F3));
         // Max distance between opposite-face cells is large.
         assert!(!c1.is_max_distance_less(c2, ChordAngle::STRAIGHT));
     }
 
     #[test]
     fn test_is_max_distance_less_or_equal() {
-        let c1 = Cell::from_cell_id(CellId::from_face(0));
-        let c2 = Cell::from_cell_id(CellId::from_face(0));
+        let c1 = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let c2 = Cell::from_cell_id(CellId::from_face(Face::F0));
         // Max distance within same face cell is bounded.
         let max = c1.max_distance_to_cell(c2);
         assert!(c1.is_max_distance_less_or_equal(c2, max));
@@ -1226,7 +1337,7 @@ mod tests {
 
     #[test]
     fn test_uv_coord_of_edge() {
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         // Edge 0 is bottom (v=lo), edge 1 is right (u=hi),
         // edge 2 is top (v=hi), edge 3 is left (u=lo).
         let uv = c.bound_uv();
@@ -1239,12 +1350,16 @@ mod tests {
     #[test]
     fn test_ij_coord_of_edge() {
         // Face-0 cell at level 0 covers the full IJ range [0, MAX_SIZE].
-        let c = Cell::from_cell_id(CellId::from_face(0));
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
         // Bottom edge (j=0), Top edge (j=MAX_SIZE).
         let ij0 = c.ij_coord_of_edge(CellEdge::Bottom);
         let ij2 = c.ij_coord_of_edge(CellEdge::Top);
         assert_eq!(ij0, 0, "bottom edge IJ should be 0");
-        assert_eq!(ij2, size_ij(0), "top edge IJ should be MAX_SIZE");
+        assert_eq!(
+            ij2,
+            size_ij(Level::new(0)),
+            "top edge IJ should be MAX_SIZE"
+        );
     }
 
     #[test]
@@ -1258,7 +1373,7 @@ mod tests {
 
     #[test]
     fn test_from_face_pos_level() {
-        let c1 = Cell::from_face_pos_level(0, 0, 1);
+        let c1 = Cell::from_face_pos_level(Face::F0, 0, Level::new(1));
         assert_eq!(c1.face(), Face::F0);
         assert_eq!(c1.level(), 1);
     }
@@ -1280,7 +1395,7 @@ mod tests {
     #[test]
     fn test_size_ij_and_st() {
         // Level 0: size_ij = 2^30, size_st = 1.0.
-        let c0 = Cell::from_face(0);
+        let c0 = Cell::from_face(Face::F0);
         assert_eq!(c0.size_ij(), 1 << 30);
         assert!((c0.size_st() - 1.0).abs() < 1e-14);
 
@@ -1331,7 +1446,7 @@ mod quickcheck_tests {
             assert!(!cell.is_leaf());
 
             for k in 0..4 {
-                let vk = cell.vertex_raw(k);
+                let vk = cell.vertex_raw(CellVertex::ALL[k]);
                 *vertex_counts.entry(key(vk)).or_insert(0) += 1;
             }
         }
@@ -1382,7 +1497,7 @@ mod quickcheck_tests {
     #[test]
     fn test_distance_to_cell_self_is_zero() {
         // Distance from a cell to itself should be zero.
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         assert_eq!(cell.distance_to_cell(cell), ChordAngle::ZERO);
     }
 
@@ -1390,8 +1505,8 @@ mod quickcheck_tests {
     fn test_max_distance_to_point_vertex() {
         use crate::s1::ChordAngle;
         // Max distance from face cell to its vertex should be positive.
-        let cell = Cell::from_cell_id(CellId::from_face(0));
-        let max_dist = cell.max_distance_to_point(cell.vertex(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let max_dist = cell.max_distance_to_point(cell.vertex(CellVertex::LowerLeft));
         assert!(
             max_dist > ChordAngle::ZERO,
             "max distance to vertex should be > 0"
@@ -1431,7 +1546,7 @@ mod quickcheck_tests {
             let cap = cell.cap_bound();
             for k in 0..4 {
                 assert!(
-                    cap.contains_point(cell.vertex(k)),
+                    cap.contains_point(cell.vertex(CellVertex::ALL[k])),
                     "cap bound of face {face} should contain vertex {k}",
                 );
             }
@@ -1455,7 +1570,7 @@ mod quickcheck_tests {
     #[quickcheck]
     fn prop_contains_center(face: u8) -> bool {
         let face = face % 6;
-        let c = Cell::from_cell_id(CellId::from_face(face));
+        let c = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         c.contains_point(c.center())
     }
 
@@ -1463,15 +1578,15 @@ mod quickcheck_tests {
     fn prop_vertex_unit_length(face: u8, k: u8) -> bool {
         let face = face % 6;
         let k = (k % 4) as usize;
-        let c = Cell::from_cell_id(CellId::from_face(face));
-        (c.vertex(k).vector().norm() - 1.0).abs() < 1e-14
+        let c = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
+        (c.vertex(CellVertex::ALL[k]).vector().norm() - 1.0).abs() < 1e-14
     }
 
     #[cfg(feature = "serde")]
     #[quickcheck]
     fn prop_serde_roundtrip(face: u8) -> bool {
         let face = face % 6;
-        let c = Cell::from_cell_id(CellId::from_face(face));
+        let c = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         let json1 = serde_json::to_string(&c).unwrap();
         let back: Cell = serde_json::from_str(&json1).unwrap();
         let json2 = serde_json::to_string(&back).unwrap();

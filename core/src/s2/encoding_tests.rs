@@ -6,6 +6,7 @@
 //! from upstream S2.
 
 use super::*;
+use crate::s2::Face;
 
 /// R6 (FR-013): the `Rect` decoder's version error is formatted lazily, with today's text.
 #[test]
@@ -141,7 +142,7 @@ fn compressed_polyline_off_center_count_above_u32_max_is_rejected() {
     let vertices: Vec<Point> = [0u8, 1, 2]
         .iter()
         .map(|&f| {
-            CellId::from_face(f)
+            CellId::from_face(Face::from_u8(f))
                 .child_begin_at_level(Level::new(10))
                 .to_point()
         })

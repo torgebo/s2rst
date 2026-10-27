@@ -862,8 +862,8 @@ fn prop_cellid_parent_level(lat_i: i32, lng_i: i32, level: u8) -> bool {
     if level == 0 {
         return true;
     }
-    let parent = id.parent_at_level(level);
-    let grandparent = parent.parent_at_level(level - 1);
+    let parent = id.parent_at_level(Level::new(level));
+    let grandparent = parent.parent_at_level(Level::new(level - 1));
     parent.level() == level && grandparent.level() == level - 1
 }
 
@@ -871,7 +871,7 @@ fn prop_cellid_parent_level(lat_i: i32, lng_i: i32, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_contains_self(lat_i: i32, lng_i: i32, level: u8) -> bool {
     let ll = make_latlng(lat_i, lng_i);
-    let id = CellId::from_lat_lng(&ll).parent_at_level(level % 31);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new(level % 31));
     id.contains(id)
 }
 
@@ -881,8 +881,8 @@ fn prop_cellid_parent_contains_child(lat_i: i32, lng_i: i32, level: u8) -> bool 
     let ll = make_latlng(lat_i, lng_i);
     let id = CellId::from_lat_lng(&ll);
     let level = (level % 30) + 1; // 1..30
-    let parent = id.parent_at_level(level - 1);
-    let child = id.parent_at_level(level);
+    let parent = id.parent_at_level(Level::new(level - 1));
+    let child = id.parent_at_level(Level::new(level));
     parent.contains(child)
 }
 
@@ -1433,8 +1433,8 @@ fn prop_cell_union_normalize_idempotent(face0: i32, face1: i32, level0: i32, lev
     let l0 = (level0.rem_euclid(20)) as u8 + 1; // [1, 20]
     let l1 = (level1.rem_euclid(20)) as u8 + 1;
 
-    let id0 = CellId::from_face(f0).child_begin_at_level(l0);
-    let id1 = CellId::from_face(f1).child_begin_at_level(l1);
+    let id0 = CellId::from_face(Face::from_u8(f0)).child_begin_at_level(Level::new(l0));
+    let id1 = CellId::from_face(Face::from_u8(f1)).child_begin_at_level(Level::new(l1));
 
     let cu = CellUnion::from_cell_ids(vec![id0, id1, id0]); // duplicate on purpose
     // Normalized union should contain all original cells.
@@ -1448,7 +1448,7 @@ fn prop_cell_union_contains_center(face: i32, level: i32) -> bool {
 
     let f = (face.rem_euclid(6)) as u8;
     let l = (level.rem_euclid(25)) as u8 + 1; // [1, 25]
-    let id = CellId::from_face(f).child_begin_at_level(l);
+    let id = CellId::from_face(Face::from_u8(f)).child_begin_at_level(Level::new(l));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.contains_cell_id(id)
 }
@@ -1506,10 +1506,10 @@ fn prop_point_distance_symmetric_bits(
 /// A cell's `child_begin` at level L is contained by the face cell.
 #[quickcheck]
 fn prop_cellid_face_contains_descendants(face: i32, level: i32) -> bool {
-    let f = s2rst::s2::Face::from_u8((face.rem_euclid(6)) as u8);
+    let f = Face::from_u8((face.rem_euclid(6)) as u8);
     let l = (level.rem_euclid(29)) as u8 + 1; // [1, 29]
     let face_id = CellId::from_face(f);
-    let descendant = face_id.child_begin_at_level(l);
+    let descendant = face_id.child_begin_at_level(Level::new(l));
     // The face cell must contain all its descendants.
     face_id.contains(descendant) && descendant.level() == l && descendant.face() == f
 }
@@ -1541,10 +1541,10 @@ use s2rst::s2::Cell;
 #[quickcheck]
 fn prop_cell_vertices_normalized(lat: i32, lng: i32, level: u8) -> bool {
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level((level % 30) + 1);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new((level % 30) + 1));
     let cell = Cell::from_cell_id(id);
     (0..4).all(|k| {
-        let v = cell.vertex(k);
+        let v = cell.vertex(CellVertex::ALL[k]);
         (v.0.norm2() - 1.0).abs() < 1e-14
     })
 }
@@ -1553,7 +1553,7 @@ fn prop_cell_vertices_normalized(lat: i32, lng: i32, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_area_bounded(lat: i32, lng: i32, level: u8) -> bool {
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level((level % 30) + 1);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new((level % 30) + 1));
     let cell = Cell::from_cell_id(id);
     let a = cell.approx_area();
     a > 0.0 && a <= 4.0 * PI + 1e-10
@@ -1564,8 +1564,8 @@ fn prop_cell_area_bounded(lat: i32, lng: i32, level: u8) -> bool {
 fn prop_cell_area_decreases_with_level(lat: i32, lng: i32, level: u8) -> bool {
     let ll = make_latlng(lat, lng);
     let lv = (level % 29) + 1; // [1, 29] so parent exists
-    let child_id = CellId::from_lat_lng(&ll).parent_at_level(lv);
-    let parent_id = child_id.parent_at_level(lv - 1);
+    let child_id = CellId::from_lat_lng(&ll).parent_at_level(Level::new(lv));
+    let parent_id = child_id.parent_at_level(Level::new(lv - 1));
     let child = Cell::from_cell_id(child_id);
     let parent = Cell::from_cell_id(parent_id);
     parent.approx_area() > child.approx_area()
@@ -1575,17 +1575,17 @@ fn prop_cell_area_decreases_with_level(lat: i32, lng: i32, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_bound_contains_vertices(lat: i32, lng: i32, level: u8) -> bool {
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level((level % 30) + 1);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new((level % 30) + 1));
     let cell = Cell::from_cell_id(id);
     let bound = cell.rect_bound();
-    (0..4).all(|k| bound.contains_lat_lng(LatLng::from_point(cell.vertex(k))))
+    (0..4).all(|k| bound.contains_lat_lng(LatLng::from_point(cell.vertex(CellVertex::ALL[k]))))
 }
 
 /// Cell contains its own center point.
 #[quickcheck]
 fn prop_cell_contains_center(lat: i32, lng: i32, level: u8) -> bool {
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level((level % 30) + 1);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new((level % 30) + 1));
     let cell = Cell::from_cell_id(id);
     cell.contains_point(id.to_point())
 }
@@ -1594,7 +1594,7 @@ fn prop_cell_contains_center(lat: i32, lng: i32, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_distance_to_center_zero(lat: i32, lng: i32, level: u8) -> bool {
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level((level % 30) + 1);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new((level % 30) + 1));
     let cell = Cell::from_cell_id(id);
     cell.distance_to_point(id.to_point()).to_angle().radians() < 1e-10
 }
@@ -1603,7 +1603,7 @@ fn prop_cell_distance_to_center_zero(lat: i32, lng: i32, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_distance_le_max_distance(lat: i32, lng: i32, level: u8, px: i32, py: i32) -> bool {
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level((level % 25) + 1);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new((level % 25) + 1));
     let cell = Cell::from_cell_id(id);
     let p = make_latlng(px, py).to_point();
     cell.distance_to_point(p) <= cell.max_distance_to_point(p)
@@ -1621,8 +1621,8 @@ fn prop_cell_union_sorted_and_disjoint(face0: i32, face1: i32, level0: i32, leve
     let f1 = (face1.rem_euclid(6)) as u8;
     let l0 = (level0.rem_euclid(20)) as u8 + 1;
     let l1 = (level1.rem_euclid(20)) as u8 + 1;
-    let id0 = CellId::from_face(f0).child_begin_at_level(l0);
-    let id1 = CellId::from_face(f1).child_begin_at_level(l1);
+    let id0 = CellId::from_face(Face::from_u8(f0)).child_begin_at_level(Level::new(l0));
+    let id1 = CellId::from_face(Face::from_u8(f1)).child_begin_at_level(Level::new(l1));
     let cu = CellUnion::from_cell_ids(vec![id0, id1, id0]);
     cu.is_valid() && cu.is_normalized()
 }
@@ -1633,7 +1633,7 @@ fn prop_cell_union_contains_cell_centers(face: i32, level: i32) -> bool {
     use s2rst::s2::CellUnion;
     let f = (face.rem_euclid(6)) as u8;
     let l = (level.rem_euclid(25)) as u8 + 1;
-    let id = CellId::from_face(f).child_begin_at_level(l);
+    let id = CellId::from_face(Face::from_u8(f)).child_begin_at_level(Level::new(l));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.contains_point(id.to_point())
 }
@@ -1644,7 +1644,7 @@ fn prop_cell_union_from_range_covers_endpoints(face: i32, level: i32) -> bool {
     use s2rst::s2::CellUnion;
     let f = (face.rem_euclid(6)) as u8;
     let l = (level.rem_euclid(20)) as u8 + 5; // [5, 24]
-    let id = CellId::from_face(f).child_begin_at_level(l);
+    let id = CellId::from_face(Face::from_u8(f)).child_begin_at_level(Level::new(l));
     let begin = id.range_min();
     let end = id.range_max().next();
     let cu = CellUnion::from_begin_end(begin, end);
@@ -1657,11 +1657,11 @@ fn prop_cell_union_denormalize_valid(face: i32, level: i32, min_lev: u8, lev_mod
     use s2rst::s2::CellUnion;
     let f = (face.rem_euclid(6)) as u8;
     let l = (level.rem_euclid(20)) as u8 + 5;
-    let id = CellId::from_face(f).child_begin_at_level(l);
+    let id = CellId::from_face(Face::from_u8(f)).child_begin_at_level(Level::new(l));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let min_l = min_lev % 10;
     let mod_v = (lev_mod % 3) + 1; // [1, 3]
-    let denorm = cu.denormalize(Level::new(min_l), mod_v);
+    let denorm = cu.denormalize(Level::new(min_l), LevelMod::new(mod_v));
     denorm.is_valid()
 }
 
@@ -1671,7 +1671,7 @@ fn prop_cell_union_leaf_cells_positive(face: i32, level: i32) -> bool {
     use s2rst::s2::CellUnion;
     let f = (face.rem_euclid(6)) as u8;
     let l = (level.rem_euclid(25)) as u8 + 1;
-    let id = CellId::from_face(f).child_begin_at_level(l);
+    let id = CellId::from_face(Face::from_u8(f)).child_begin_at_level(Level::new(l));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.leaf_cells_covered() > 0
 }
@@ -1680,10 +1680,10 @@ fn prop_cell_union_leaf_cells_positive(face: i32, level: i32) -> bool {
 #[quickcheck]
 fn prop_cell_union_intersects_commutative(f0: i32, f1: i32, l0: i32, l1: i32) -> bool {
     use s2rst::s2::CellUnion;
-    let id0 = CellId::from_face((f0.rem_euclid(6)) as u8)
-        .child_begin_at_level(((l0.rem_euclid(20)) as u8) + 1);
-    let id1 = CellId::from_face((f1.rem_euclid(6)) as u8)
-        .child_begin_at_level(((l1.rem_euclid(20)) as u8) + 1);
+    let id0 = CellId::from_face(Face::from_u8((f0.rem_euclid(6)) as u8))
+        .child_begin_at_level(Level::new(((l0.rem_euclid(20)) as u8) + 1));
+    let id1 = CellId::from_face(Face::from_u8((f1.rem_euclid(6)) as u8))
+        .child_begin_at_level(Level::new(((l1.rem_euclid(20)) as u8) + 1));
     let cu0 = CellUnion::from_cell_ids(vec![id0]);
     let cu1 = CellUnion::from_cell_ids(vec![id1]);
     cu0.intersects_union(&cu1) == cu1.intersects_union(&cu0)
@@ -1754,6 +1754,9 @@ fn prop_intersection_merge_ge_error(_dummy: u8) -> bool {
 // 20. ENCODING ROUNDTRIP PROPERTIES
 // ════════════════════════════════════════════════════════════════════
 
+use s2rst::s2::CellVertex;
+use s2rst::s2::Face;
+use s2rst::s2::LevelMod;
 use s2rst::s2::encoding::{S2Decode, S2Encode};
 
 /// `CellId` encode/decode roundtrip.
@@ -1854,7 +1857,7 @@ fn prop_cell_union_encode_decode_roundtrip(face: i32, level: i32) -> bool {
     use s2rst::s2::CellUnion;
     let f = (face.rem_euclid(6)) as u8;
     let l = (level.rem_euclid(25)) as u8 + 1;
-    let id = CellId::from_face(f).child_begin_at_level(l);
+    let id = CellId::from_face(Face::from_u8(f)).child_begin_at_level(Level::new(l));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let mut buf = Vec::new();
     cu.encode(&mut buf).unwrap();
@@ -1893,7 +1896,7 @@ fn prop_cell_encode_decode_roundtrip(lat: i32, lng: i32, level_raw: u8) -> bool 
     use s2rst::s2::Cell;
     let level = level_raw % 31; // 0..30
     let ll = make_latlng(lat, lng);
-    let id = CellId::from_lat_lng(&ll).parent_at_level(level);
+    let id = CellId::from_lat_lng(&ll).parent_at_level(Level::new(level));
     let cell = Cell::from(id);
     let mut buf = Vec::new();
     cell.encode(&mut buf).unwrap();
@@ -1905,8 +1908,8 @@ fn prop_cell_encode_decode_roundtrip(lat: i32, lng: i32, level_raw: u8) -> bool 
 #[quickcheck]
 fn prop_cell_union_multi_encode_decode(lat0: i32, lng0: i32, lat1: i32, lng1: i32) -> bool {
     use s2rst::s2::CellUnion;
-    let id0 = CellId::from_lat_lng(&make_latlng(lat0, lng0)).parent_at_level(10);
-    let id1 = CellId::from_lat_lng(&make_latlng(lat1, lng1)).parent_at_level(10);
+    let id0 = CellId::from_lat_lng(&make_latlng(lat0, lng0)).parent_at_level(Level::new(10));
+    let id1 = CellId::from_lat_lng(&make_latlng(lat1, lng1)).parent_at_level(Level::new(10));
     let cu = CellUnion::from_cell_ids(vec![id0, id1]);
     let mut buf = Vec::new();
     cu.encode(&mut buf).unwrap();
@@ -2012,7 +2015,7 @@ fn prop_polygon_compressed_cell_center_roundtrip(face_raw: u8, level_raw: u8, po
     no_panic(|| {
         let face = face_raw % 6;
         let level = (level_raw % 20) + 5; // levels 5..24
-        let base = CellId::from_face_pos_level(face, pos, level);
+        let base = CellId::from_face_pos_level(Face::from_u8(face), pos, Level::new(level));
         let mut vertices = Vec::new();
         let mut id = base;
         for _ in 0..3 {
@@ -2156,7 +2159,7 @@ fn prop_cellid_decode_truncated(len: u8) -> bool {
     // all-zero buffer (`CellId(0)`, not a valid cell) would `Err` even at full
     // length. A valid id round-trips at full length and `Err`s when truncated.
     let mut full_buf = Vec::new();
-    CellId::from_face(0u8).encode(&mut full_buf).unwrap();
+    CellId::from_face(Face::F0).encode(&mut full_buf).unwrap();
     let truncated_len = (len as usize) % (full_buf.len() + 1);
     match CellId::decode(&mut &full_buf[..truncated_len]) {
         Ok(_) => truncated_len == full_buf.len(),
@@ -2353,9 +2356,9 @@ fn prop_cell_union_varying_size(raw: u64) -> bool {
     let count = ((raw % 10) + 1) as usize;
     let level = ((raw >> 4) % 20 + 1) as u8;
     let mut ids = Vec::new();
-    let face_id = CellId::from_face(((raw >> 8) % 6) as u8);
-    let mut id = face_id.child_begin_at_level(level);
-    let end = face_id.child_end_at_level(level);
+    let face_id = CellId::from_face(Face::from_u8(((raw >> 8) % 6) as u8));
+    let mut id = face_id.child_begin_at_level(Level::new(level));
+    let end = face_id.child_end_at_level(Level::new(level));
     for _ in 0..count {
         if id >= end {
             break;
@@ -2410,8 +2413,8 @@ fn prop_covering_respects_level_constraints(lat: i32, lng: i32, radius_i: u8) ->
     let min_lev: u8 = 3;
     let max_lev: u8 = 12;
     let coverer = RegionCoverer::new()
-        .min_level(min_lev)
-        .max_level(max_lev)
+        .min_level(Level::new(min_lev))
+        .max_level(Level::new(max_lev))
         .max_cells(20);
     let covering = coverer.covering(&cap);
     covering.cell_ids().iter().all(|id| {
@@ -2838,7 +2841,7 @@ fn make_cell_points(lat_i: i32, lng_i: i32, count: u8) -> Vec<Point> {
     (0..n)
         .map(|i| {
             let level = (i % 31) as u8;
-            center.parent_at_level(level).to_point()
+            center.parent_at_level(Level::new(level)).to_point()
         })
         .collect()
 }
@@ -2881,7 +2884,7 @@ fn prop_s2point_vector_compact_not_larger_for_same_level(lat: i32, lng: i32, cou
             let la = (lat.wrapping_add(i as i32 * 7)) % 90;
             let lo = (lng.wrapping_add(i as i32 * 13)) % 180;
             CellId::from_point(&make_latlng(la, lo).to_point())
-                .parent_at_level(level)
+                .parent_at_level(Level::new(level))
                 .to_point()
         })
         .collect();
@@ -2961,7 +2964,7 @@ fn prop_cell_id_vector_same_level_compact(face: u8, level_raw: u8) -> bool {
     use s2rst::s2::encoded_s2cell_id_vector::encode_s2cell_id_vector;
     let face = face % 6;
     let level = level_raw % 31;
-    let parent = CellId::from_face(face).child_begin_at_level(level);
+    let parent = CellId::from_face(Face::from_u8(face)).child_begin_at_level(Level::new(level));
     let ids: Vec<CellId> = (0..4).map(|i| parent.advance(i)).collect();
     let mut buf = Vec::new();
     encode_s2cell_id_vector(&ids, &mut buf).unwrap();
@@ -3009,7 +3012,7 @@ fn prop_lax_polyline_compact_roundtrip(lat: i32, lng: i32) -> bool {
     // Use cell-center points for compact encoding.
     let center = CellId::from_point(&make_latlng(lat, lng).to_point());
     let points: Vec<Point> = (0..5)
-        .map(|i| center.parent_at_level(i * 6).to_point())
+        .map(|i| center.parent_at_level(Level::new(i * 6)).to_point())
         .collect();
     let lp = LaxPolyline::new(points.clone());
     let mut buf = Vec::new();
@@ -3100,10 +3103,10 @@ fn prop_lax_polygon_compact_roundtrip(lat: i32, lng: i32) -> bool {
     use s2rst::s2::lax_polygon::LaxPolygon;
     let center = CellId::from_point(&make_latlng(lat, lng).to_point());
     let loop0: Vec<Point> = (0..3)
-        .map(|i| center.parent_at_level(i * 10).to_point())
+        .map(|i| center.parent_at_level(Level::new(i * 10)).to_point())
         .collect();
     let loop1: Vec<Point> = (0..4)
-        .map(|i| center.parent_at_level(i * 7 + 1).to_point())
+        .map(|i| center.parent_at_level(Level::new(i * 7 + 1)).to_point())
         .collect();
     let lp = LaxPolygon::from_loops(&[&loop0, &loop1]);
     let mut buf = Vec::new();
@@ -3148,7 +3151,7 @@ fn prop_point_vector_compact_roundtrip(lat: i32, lng: i32) -> bool {
     use s2rst::s2::point_vector::PointVector;
     let center = CellId::from_point(&make_latlng(lat, lng).to_point());
     let points: Vec<Point> = (0..6)
-        .map(|i| center.parent_at_level(i * 5).to_point())
+        .map(|i| center.parent_at_level(Level::new(i * 5)).to_point())
         .collect();
     let pv = PointVector::new(points);
     let mut buf = Vec::new();
@@ -3216,7 +3219,7 @@ fn prop_shape_index_compact_roundtrip(lat: i32, lng: i32) -> bool {
     use s2rst::s2::shape_index::ShapeIndex;
     let center = CellId::from_point(&make_latlng(lat, lng).to_point());
     let points: Vec<Point> = (0..4)
-        .map(|i| center.parent_at_level(i * 7 + 1).to_point())
+        .map(|i| center.parent_at_level(Level::new(i * 7 + 1)).to_point())
         .collect();
     let lp = LaxPolyline::new(points);
     let mut index = ShapeIndex::new();
@@ -3745,7 +3748,7 @@ fn prop_set_max_error_false_for_simple_targets(_dummy: u8) -> bool {
         Point::from_coords(1.0, 0.0, 0.0),
         Point::from_coords(0.0, 1.0, 0.0),
     );
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let mut ct = CellTarget::new(cell);
     !pt.set_max_error(ChordAngle::from_degrees(1.0))
         && !et.set_max_error(ChordAngle::from_degrees(1.0))
@@ -3767,7 +3770,8 @@ fn prop_shape_index_target_set_max_error_true(lat0: i32, lng0: i32, lat1: i32, l
 fn prop_interleave_deinterleave_inverse(a: u32, b: u32) -> bool {
     // Test through the S2PointVector roundtrip: encode a cell and decode it.
     // If interleave/deinterleave are correct, cell centers roundtrip exactly.
-    let cell = CellId::from_face((a % 6) as u8).child_begin_at_level(((b % 31) as u8).min(30));
+    let cell = CellId::from_face(Face::from_u8((a % 6) as u8))
+        .child_begin_at_level(Level::new(((b % 31) as u8).min(30)));
     let point = cell.to_point();
     use s2rst::s2::encoded_s2point_vector::{
         CodingHint, decode_s2point_vector, encode_s2point_vector,
@@ -3848,7 +3852,8 @@ fn prop_loop_contains_cell_implies_intersects(
     match make_triangle_loop(lat0, lng0, lat1, lng1, lat2, lng2) {
         Some(lp) => {
             let cell = Cell::from_cell_id(
-                CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20)),
+                CellId::from_face(Face::from_u8(face % 6))
+                    .child_begin_at_level(Level::new((level % 20).min(20))),
             );
             !lp.contains_cell(&cell) || lp.intersects_cell(&cell)
         }
@@ -3947,7 +3952,8 @@ fn prop_polygon_contains_cell_implies_intersects(
     match make_triangle_polygon(lat0, lng0, lat1, lng1, lat2, lng2) {
         Some(poly) => {
             let cell = Cell::from_cell_id(
-                CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20)),
+                CellId::from_face(Face::from_u8(face % 6))
+                    .child_begin_at_level(Level::new((level % 20).min(20))),
             );
             !poly.contains_cell(&cell) || poly.intersects_cell(&cell)
         }
@@ -3988,8 +3994,10 @@ fn prop_cap_contains_cell_implies_intersects(
     let center = make_latlng(lat, lng).to_point();
     let radius = Angle::from_degrees((deg % 90) as f64);
     let cap = Cap::from_center_angle(center, radius);
-    let cell =
-        Cell::from_cell_id(CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20)));
+    let cell = Cell::from_cell_id(
+        CellId::from_face(Face::from_u8(face % 6))
+            .child_begin_at_level(Level::new((level % 20).min(20))),
+    );
     !cap.contains_cell(&cell) || cap.intersects_cell(&cell)
 }
 
@@ -4024,8 +4032,10 @@ fn prop_rect_contains_cell_implies_intersects(
     let ll0 = make_latlng(lat0, lng0);
     let ll1 = make_latlng(lat1, lng1);
     let rect = Rect::from_point_pair(ll0, ll1);
-    let cell =
-        Cell::from_cell_id(CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20)));
+    let cell = Cell::from_cell_id(
+        CellId::from_face(Face::from_u8(face % 6))
+            .child_begin_at_level(Level::new((level % 20).min(20))),
+    );
     !rect.contains_cell(&cell) || rect.intersects_cell(&cell)
 }
 
@@ -4043,26 +4053,32 @@ fn prop_rect_rect_bound_is_self(lat0: i32, lng0: i32, lat1: i32, lng1: i32) -> b
 /// Cell::cap_bound covers all four cell vertices.
 #[quickcheck]
 fn prop_cell_cap_bound_covers_vertices(face: u8, level: u8) -> bool {
-    let cell =
-        Cell::from_cell_id(CellId::from_face(face % 6).child_begin_at_level((level % 25).min(25)));
+    let cell = Cell::from_cell_id(
+        CellId::from_face(Face::from_u8(face % 6))
+            .child_begin_at_level(Level::new((level % 25).min(25))),
+    );
     let cb = cell.cap_bound();
-    (0..4).all(|i| cb.contains_point(cell.vertex(i)))
+    (0..4).all(|i| cb.contains_point(cell.vertex(CellVertex::ALL[i])))
 }
 
 /// Cell::rect_bound covers all four cell vertices.
 #[quickcheck]
 fn prop_cell_rect_bound_covers_vertices(face: u8, level: u8) -> bool {
-    let cell =
-        Cell::from_cell_id(CellId::from_face(face % 6).child_begin_at_level((level % 25).min(25)));
+    let cell = Cell::from_cell_id(
+        CellId::from_face(Face::from_u8(face % 6))
+            .child_begin_at_level(Level::new((level % 25).min(25))),
+    );
     let rb = cell.rect_bound();
-    (0..4).all(|i| rb.contains_lat_lng(LatLng::from_point(cell.vertex(i))))
+    (0..4).all(|i| rb.contains_lat_lng(LatLng::from_point(cell.vertex(CellVertex::ALL[i]))))
 }
 
 /// Cell::contains_cell(self) is always true.
 #[quickcheck]
 fn prop_cell_contains_self(face: u8, level: u8) -> bool {
-    let cell =
-        Cell::from_cell_id(CellId::from_face(face % 6).child_begin_at_level((level % 25).min(25)));
+    let cell = Cell::from_cell_id(
+        CellId::from_face(Face::from_u8(face % 6))
+            .child_begin_at_level(Level::new((level % 25).min(25))),
+    );
     cell.contains_cell(cell)
 }
 
@@ -4070,9 +4086,10 @@ fn prop_cell_contains_self(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_contains_cell_implies_intersects(face_a: u8, level_a: u8, face_b: u8) -> bool {
     let a = Cell::from_cell_id(
-        CellId::from_face(face_a % 6).child_begin_at_level((level_a % 20).min(20)),
+        CellId::from_face(Face::from_u8(face_a % 6))
+            .child_begin_at_level(Level::new((level_a % 20).min(20))),
     );
-    let b = Cell::from_cell_id(CellId::from_face(face_b % 6));
+    let b = Cell::from_cell_id(CellId::from_face(Face::from_u8(face_b % 6)));
     !a.contains_cell(b) || a.intersects_cell(b)
 }
 
@@ -4082,7 +4099,8 @@ fn prop_cell_contains_cell_implies_intersects(face_a: u8, level_a: u8, face_b: u
 #[quickcheck]
 fn prop_cellunion_cap_bound_valid(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let cb = cu.cap_bound();
     !cb.is_empty()
@@ -4092,7 +4110,8 @@ fn prop_cellunion_cap_bound_valid(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_rect_bound_valid(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.rect_bound().is_valid()
 }
@@ -4101,7 +4120,8 @@ fn prop_cellunion_rect_bound_valid(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_contains_implies_intersects(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let cell = Cell::from_cell_id(id);
     // The union contains the cell, so it must also intersect it.
@@ -4123,7 +4143,8 @@ fn prop_loop_cap_bound_covers_contained_cell_center(
     match make_triangle_loop(lat0, lng0, lat1, lng1, lat2, lng2) {
         Some(lp) => {
             let cell = Cell::from_cell_id(
-                CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20)),
+                CellId::from_face(Face::from_u8(face % 6))
+                    .child_begin_at_level(Level::new((level % 20).min(20))),
             );
             let center = cell.id().to_point();
             if !lp.contains_point(&center) {
@@ -4735,7 +4756,8 @@ fn prop_u64_cellid_u64_roundtrip(v: u64) -> bool {
 #[quickcheck]
 fn prop_cellid_u64_cellid_roundtrip(face: u8, level: u8) -> bool {
     use s2rst::s2::CellId;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 30).min(30));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 30).min(30)));
     CellId::from(u64::from(id)) == id
 }
 
@@ -4854,7 +4876,8 @@ fn prop_face_u8_roundtrip(v: u8) -> bool {
 /// CellId → Cell → CellId roundtrip.
 #[quickcheck]
 fn prop_cellid_to_cell_roundtrip(face: u8, level: u8) -> bool {
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 30).min(30));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 30).min(30)));
     let cell = Cell::from_cell_id(id);
     cell.id() == id
 }
@@ -4947,7 +4970,8 @@ fn prop_r1interval_lo_le_hi(a: i32, b: i32) -> bool {
 /// CellId range_min <= range_max.
 #[quickcheck]
 fn prop_cellid_range_min_le_max(face: u8, level: u8) -> bool {
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 30).min(30));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 30).min(30)));
     id.range_min() <= id.range_max()
 }
 
@@ -4955,8 +4979,8 @@ fn prop_cellid_range_min_le_max(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_parent_range_contains_child(face: u8, level: u8) -> bool {
     let level = ((level % 29) + 1).min(29); // level >= 1 so we can take parent
-    let id = CellId::from_face(face % 6).child_begin_at_level(level);
-    let parent = id.parent_at_level(level - 1);
+    let id = CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level));
+    let parent = id.parent_at_level(Level::new(level - 1));
     parent.range_min() <= id.range_min() && id.range_max() <= parent.range_max()
 }
 
@@ -5023,7 +5047,8 @@ fn prop_chord_angle_default_is_zero(_dummy: u8) -> bool {
 
 #[quickcheck]
 fn prop_cellid_display_nonempty(face: u8, level: u8) -> bool {
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 30).min(30));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 30).min(30)));
     !id.to_string().is_empty()
 }
 
@@ -5059,7 +5084,7 @@ fn prop_face_display_nonempty(v: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_display_nonempty(face: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let cu = CellUnion::from_cell_ids(vec![CellId::from_face(face % 6)]);
+    let cu = CellUnion::from_cell_ids(vec![CellId::from_face(Face::from_u8(face % 6))]);
     !cu.to_string().is_empty()
 }
 
@@ -5139,7 +5164,7 @@ fn prop_identity_snap_edge_vertex_le_vertex_sep(deg: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_snap_radius_nonneg(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let snap = S2CellIdSnapFunction::new(level % 30);
+    let snap = S2CellIdSnapFunction::new(Level::new(level % 30));
     snap.snap_radius().radians() >= 0.0
 }
 
@@ -5147,7 +5172,7 @@ fn prop_cellid_snap_radius_nonneg(level: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_snap_min_vertex_sep_le_radius(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let snap = S2CellIdSnapFunction::new(level % 30);
+    let snap = S2CellIdSnapFunction::new(Level::new(level % 30));
     snap.min_vertex_separation() <= snap.snap_radius()
 }
 
@@ -5155,7 +5180,7 @@ fn prop_cellid_snap_min_vertex_sep_le_radius(level: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_snap_edge_vertex_le_vertex_sep(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let snap = S2CellIdSnapFunction::new(level % 30);
+    let snap = S2CellIdSnapFunction::new(Level::new(level % 30));
     snap.min_edge_vertex_separation() <= snap.min_vertex_separation()
 }
 
@@ -5190,7 +5215,7 @@ fn prop_snap_separations_all_nonneg(level: u8, exp: u8, id_deg: u8) -> bool {
         IdentitySnapFunction, IntLatLngSnapFunction, S2CellIdSnapFunction, SnapFunction,
     };
     let id_snap = IdentitySnapFunction::new(Angle::from_degrees((id_deg % 71) as f64));
-    let cell_snap = S2CellIdSnapFunction::new(level % 30);
+    let cell_snap = S2CellIdSnapFunction::new(Level::new(level % 30));
     let ll_snap = IntLatLngSnapFunction::new((exp % 11) as i32);
     id_snap.min_vertex_separation().radians() >= 0.0
         && cell_snap.min_vertex_separation().radians() >= 0.0
@@ -5211,7 +5236,7 @@ fn prop_identity_snap_clone_same_radius(deg: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_snap_clone_same_radius(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let snap = S2CellIdSnapFunction::new(level % 30);
+    let snap = S2CellIdSnapFunction::new(Level::new(level % 30));
     let cloned = snap.clone_snap();
     (cloned.snap_radius().radians() - snap.snap_radius().radians()).abs() < 1e-15
 }
@@ -5224,7 +5249,8 @@ fn prop_cellid_snap_clone_same_radius(level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_intoiter_count(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let expected = cu.cell_ids().len();
     cu.into_iter().count() == expected
@@ -5234,7 +5260,8 @@ fn prop_cellunion_intoiter_count(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_iter_all_valid(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.cell_ids().iter().all(|c| c.is_valid())
 }
@@ -5243,7 +5270,10 @@ fn prop_cellunion_iter_all_valid(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_normalized_ids_sorted(face0: u8, face1: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let mut ids = vec![CellId::from_face(face0 % 6), CellId::from_face(face1 % 6)];
+    let mut ids = vec![
+        CellId::from_face(Face::from_u8(face0 % 6)),
+        CellId::from_face(Face::from_u8(face1 % 6)),
+    ];
     ids.dedup();
     let cu = CellUnion::from_cell_ids(ids);
     cu.cell_ids().windows(2).all(|w| w[0] <= w[1])
@@ -5253,7 +5283,8 @@ fn prop_cellunion_normalized_ids_sorted(face0: u8, face1: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_from_cell_ids_roundtrip(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.cell_ids().contains(&id)
 }
@@ -5262,7 +5293,7 @@ fn prop_cellunion_from_cell_ids_roundtrip(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_fromiter_consistent(face: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6);
+    let id = CellId::from_face(Face::from_u8(face % 6));
     let ids = [id];
     let cu: CellUnion = ids.iter().copied().collect();
     cu.cell_ids().iter().all(|c| c.is_valid())
@@ -5272,7 +5303,8 @@ fn prop_cellunion_fromiter_consistent(face: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_ref_intoiter_count(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20).min(20));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20).min(20)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     (&cu).into_iter().count() == cu.cell_ids().len()
 }
@@ -5344,7 +5376,8 @@ fn prop_point_vector_encode_decode_count(lat0: i32, lng0: i32, lat1: i32, lng1: 
 #[quickcheck]
 fn prop_cell_encode_decode_level(face: u8, level: u8) -> bool {
     use s2rst::s2::encoding::{S2Decode, S2Encode};
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 30).min(30));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 30).min(30)));
     let cell = Cell::from_cell_id(id);
     let mut buf = Vec::new();
     cell.encode(&mut buf).unwrap();
@@ -5380,7 +5413,8 @@ fn prop_rect_encode_decode_bounds(lat0: i32, lng0: i32, lat1: i32, lng1: i32) ->
 #[quickcheck]
 fn prop_cellid_encode_decode_level(face: u8, level: u8) -> bool {
     use s2rst::s2::encoding::{S2Decode, S2Encode};
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 30).min(30));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 30).min(30)));
     let mut buf = Vec::new();
     id.encode(&mut buf).unwrap();
     let back = CellId::decode(&mut buf.as_slice()).unwrap();
@@ -5442,7 +5476,8 @@ fn prop_polyline_rect_bound_covers_endpoints(lat0: i32, lng0: i32, lat1: i32, ln
 #[quickcheck]
 fn prop_cellunion_cap_bound_covers_cell_centers(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 15).min(15));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 15).min(15)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let cb = cu.cap_bound();
     cu.cell_ids()
@@ -5454,7 +5489,8 @@ fn prop_cellunion_cap_bound_covers_cell_centers(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cellunion_rect_bound_covers_cell_centers(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 15).min(15));
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 15).min(15)));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let rb = cu.rect_bound();
     cu.cell_ids()
@@ -5629,7 +5665,7 @@ fn prop_r2_norm_nonneg(x: i32, y: i32) -> bool {
 /// CellId from face is a valid face cell.
 #[quickcheck]
 fn prop_cellid_from_face_valid(face: u8) -> bool {
-    let id = CellId::from_face(face % 6);
+    let id = CellId::from_face(Face::from_u8(face % 6));
     use s2rst::s2::Face;
     id.is_valid() && id.face() == Face::try_from(face % 6).unwrap()
 }
@@ -5646,7 +5682,7 @@ fn prop_cellid_from_latlng_leaf(lat: i32, lng: i32) -> bool {
 #[quickcheck]
 fn prop_cellid_level_matches_requested(face: u8, level: u8) -> bool {
     let level = (level % 31).min(30);
-    let id = CellId::from_face(face % 6).child_begin_at_level(level);
+    let id = CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level));
     id.level() == level
 }
 
@@ -5792,7 +5828,7 @@ fn prop_r2rect_empty_is_empty(_dummy: u8) -> bool {
 #[quickcheck]
 fn prop_cell_level_matches_cellid(face: u8) -> bool {
     use s2rst::s2::Cell;
-    let cellid = CellId::from_face(face % 6).child_begin_at_level(5u8);
+    let cellid = CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(5));
     let cell = Cell::from(cellid);
     cell.level() == 5u8
 }
@@ -5801,7 +5837,7 @@ fn prop_cell_level_matches_cellid(face: u8) -> bool {
 #[quickcheck]
 fn prop_cell_child_level_parent_plus_one(face: u8, level: u8) -> bool {
     let level = level % 29; // levels 0..=28 so child is at most 29
-    let cellid = CellId::from_face(face % 6).child_begin_at_level(level);
+    let cellid = CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level));
     let child_level = cellid.child_begin().level();
     child_level == level + 1
 }
@@ -5810,7 +5846,7 @@ fn prop_cell_child_level_parent_plus_one(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_parent_level(face: u8, level: u8) -> bool {
     let level = 1 + level % 29; // levels 1..=29
-    let cellid = CellId::from_face(face % 6).child_begin_at_level(level);
+    let cellid = CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level));
     cellid.parent().level() == level - 1
 }
 
@@ -5820,14 +5856,14 @@ fn prop_cellid_face_roundtrip(face: u8) -> bool {
     use s2rst::s2::Face;
     let f = face % 6;
     let expected = Face::try_from(f).unwrap();
-    CellId::from_face(f).face() == expected
+    CellId::from_face(Face::from_u8(f)).face() == expected
 }
 
 /// CellId: is_valid() is true for freshly constructed cells.
 #[quickcheck]
 fn prop_cellid_constructed_valid(face: u8, level: u8) -> bool {
-    CellId::from_face(face % 6)
-        .child_begin_at_level(level % 30)
+    CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new(level % 30))
         .is_valid()
 }
 
@@ -5971,14 +6007,16 @@ fn prop_chord_angle_negative_from_length2(_dummy: u8) -> bool {
 /// CellId: range_min <= range_max for any valid cell.
 #[quickcheck]
 fn prop_cellid_range_min_le_max_level(face: u8, level: u8) -> bool {
-    let cid = CellId::from_face(face % 6).child_begin_at_level(level % 30);
+    let cid =
+        CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level % 30));
     cid.range_min().id() <= cid.range_max().id()
 }
 
 /// CellId: child_begin() < child_end() for non-leaf cells.
 #[quickcheck]
 fn prop_cellid_child_begin_lt_end(face: u8, level: u8) -> bool {
-    let cid = CellId::from_face(face % 6).child_begin_at_level(level % 29);
+    let cid =
+        CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level % 29));
     cid.child_begin().id() < cid.child_end().id()
 }
 
@@ -6512,21 +6550,21 @@ fn prop_cellid_none_not_valid(_dummy: u8) -> bool {
 /// CellId: prev() and next() are inverses (next(prev(x)) == x for non-boundary cells).
 #[quickcheck]
 fn prop_cellid_prev_next_inverse(lat: i32, lng: i32) -> bool {
-    let id = CellId::from_lat_lng(&make_latlng(lat, lng)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&make_latlng(lat, lng)).parent_at_level(Level::new(10));
     id.prev().next() == id
 }
 
 /// CellId: advance(0) is identity.
 #[quickcheck]
 fn prop_cellid_advance_zero(lat: i32, lng: i32) -> bool {
-    let id = CellId::from_lat_lng(&make_latlng(lat, lng)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&make_latlng(lat, lng)).parent_at_level(Level::new(10));
     id.advance(0) == id
 }
 
 /// CellId: advance(1) == next().
 #[quickcheck]
 fn prop_cellid_advance_one_eq_next(lat: i32, lng: i32) -> bool {
-    let id = CellId::from_lat_lng(&make_latlng(lat, lng)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&make_latlng(lat, lng)).parent_at_level(Level::new(10));
     id.advance(1) == id.next()
 }
 
@@ -6656,7 +6694,7 @@ fn prop_rect_expanded_contains_original(lat0: i32, lng0: i32, lat1: i32, lng1: i
 fn prop_cell_union_from_min_max(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
     let level = (level % 20) + 5;
-    let id = CellId::from_face(face % 6).child_begin_at_level(level);
+    let id = CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level));
     let min = id.range_min();
     let max = id.range_max();
     let cu = CellUnion::from_min_max(min, max);
@@ -6668,7 +6706,8 @@ fn prop_cell_union_from_min_max(face: u8, level: u8) -> bool {
 fn prop_cell_union_whole_sphere_contains_all(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
     let ws = CellUnion::whole_sphere();
-    let id = CellId::from_face(face % 6).child_begin_at_level(level % 20);
+    let id =
+        CellId::from_face(Face::from_u8(face % 6)).child_begin_at_level(Level::new(level % 20));
     ws.contains_cell_id(id)
 }
 
@@ -6676,7 +6715,8 @@ fn prop_cell_union_whole_sphere_contains_all(face: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_union_contains_self(face: u8, level: u8) -> bool {
     use s2rst::s2::CellUnion;
-    let id = CellId::from_face(face % 6).child_begin_at_level((level % 20) + 1);
+    let id = CellId::from_face(Face::from_u8(face % 6))
+        .child_begin_at_level(Level::new((level % 20) + 1));
     let cu = CellUnion::from_cell_ids(vec![id]);
     cu.contains_union(&cu)
 }
@@ -6760,7 +6800,7 @@ fn prop_u64_cellid_roundtrip(v: u64) -> bool {
 #[quickcheck]
 fn prop_cellid_u64_roundtrip(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let raw: u64 = id.into();
     CellId::from(raw) == id
 }
@@ -6853,7 +6893,7 @@ fn prop_bool_endpoint_true_hi() {
 #[quickcheck]
 fn prop_face_u8_roundtrip2(f: u8) -> bool {
     let f = f % 6;
-    let face = s2rst::s2::coords::Face::from_u8(f);
+    let face = Face::from_u8(f);
     face as u8 == f
 }
 
@@ -6902,7 +6942,7 @@ fn prop_exactfloat_cmp_matches_f64(a: i32, b: i32) -> bool {
 fn prop_cellunion_iter_sorted(face: u8) -> bool {
     use s2rst::s2::CellUnion;
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let ids: Vec<CellId> = cu.into_iter().collect();
     ids.windows(2).all(|w| w[0] <= w[1])
@@ -6913,7 +6953,7 @@ fn prop_cellunion_iter_sorted(face: u8) -> bool {
 fn prop_cellunion_fromiter_preserves_ids(face: u8) -> bool {
     use s2rst::s2::CellUnion;
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let ids: Vec<CellId> = cu.iter().copied().collect();
     let cu2 = CellUnion::from_cell_ids(ids);
@@ -6925,7 +6965,7 @@ fn prop_cellunion_fromiter_preserves_ids(face: u8) -> bool {
 fn prop_cellunion_fromiter_then_normalize(face: u8) -> bool {
     use s2rst::s2::CellUnion;
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let mut cu = CellUnion::from_cell_ids(vec![id, id]); // duplicate
     cu.normalize();
     let mut cu2 = cu.clone();
@@ -7036,7 +7076,7 @@ fn prop_chord_angle_predecessor_le(a: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_level_in_range(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     id.level() <= 30
 }
 
@@ -7044,7 +7084,7 @@ fn prop_cellid_level_in_range(face: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_child_parent_roundtrip(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let child = id.children()[0];
     child.parent() == id
 }
@@ -7053,7 +7093,7 @@ fn prop_cellid_child_parent_roundtrip(face: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_children_count(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     id.children().len() == 4
 }
 
@@ -7061,7 +7101,7 @@ fn prop_cellid_children_count(face: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_contains_child2(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let child = id.children()[2];
     id.contains(child)
 }
@@ -7070,7 +7110,7 @@ fn prop_cellid_contains_child2(face: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_intersects_child(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     let child = id.children()[1];
     id.intersects(child)
 }
@@ -7079,7 +7119,7 @@ fn prop_cellid_intersects_child(face: u8) -> bool {
 #[quickcheck]
 fn prop_cellid_range_min_le_max2(face: u8) -> bool {
     let face = face % 6;
-    let id = CellId::from_face(face);
+    let id = CellId::from_face(Face::from_u8(face));
     id.range_min() <= id.range_max()
 }
 
@@ -7520,9 +7560,7 @@ fn prop_angle_display_nonempty2(a: i32) -> bool {
 /// Face Display is non-empty
 #[quickcheck]
 fn prop_face_display_nonempty2(f: u8) -> bool {
-    !s2rst::s2::coords::Face::from_u8(f % 6)
-        .to_string()
-        .is_empty()
+    !Face::from_u8(f % 6).to_string().is_empty()
 }
 
 /// Rect Display is non-empty
@@ -7576,7 +7614,7 @@ fn prop_identity_min_edge_vertex_sep_le_vertex_sep(deg: u8) -> bool {
 #[quickcheck]
 fn prop_cell_snap_radius_nonneg(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let sf = S2CellIdSnapFunction::new((level % 31).min(30));
+    let sf = S2CellIdSnapFunction::new(Level::new((level % 31).min(30)));
     sf.snap_radius().radians() >= 0.0
 }
 
@@ -7584,7 +7622,7 @@ fn prop_cell_snap_radius_nonneg(level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_snap_min_vertex_sep_le_radius(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let sf = S2CellIdSnapFunction::new((level % 31).min(30));
+    let sf = S2CellIdSnapFunction::new(Level::new((level % 31).min(30)));
     sf.min_vertex_separation().radians() <= sf.snap_radius().radians() + 1e-15
 }
 
@@ -7592,7 +7630,7 @@ fn prop_cell_snap_min_vertex_sep_le_radius(level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_snap_min_edge_vertex_sep_le_vertex_sep(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let sf = S2CellIdSnapFunction::new((level % 31).min(30));
+    let sf = S2CellIdSnapFunction::new(Level::new((level % 31).min(30)));
     sf.min_edge_vertex_separation().radians() <= sf.min_vertex_separation().radians() + 1e-15
 }
 
@@ -7618,7 +7656,7 @@ fn prop_snap_separations_ordered(deg: u8, level: u8) -> bool {
     use s2rst::s2::builder::snap::{IdentitySnapFunction, S2CellIdSnapFunction, SnapFunction};
     let d = (deg % 71) as f64;
     let sf_id = IdentitySnapFunction::new(Angle::from_degrees(d));
-    let sf_cell = S2CellIdSnapFunction::new((level % 31).min(30));
+    let sf_cell = S2CellIdSnapFunction::new(Level::new((level % 31).min(30)));
     // For each: edge_vertex_sep <= vertex_sep <= snap_radius
     let id_ok = sf_id.min_edge_vertex_separation().radians()
         <= sf_id.min_vertex_separation().radians() + 1e-15
@@ -7633,7 +7671,7 @@ fn prop_snap_separations_ordered(deg: u8, level: u8) -> bool {
 #[quickcheck]
 fn prop_cell_snap_clone_same_radius(level: u8) -> bool {
     use s2rst::s2::builder::snap::{S2CellIdSnapFunction, SnapFunction};
-    let sf = S2CellIdSnapFunction::new((level % 31).min(30));
+    let sf = S2CellIdSnapFunction::new(Level::new((level % 31).min(30)));
     let sf2 = sf.clone();
     (sf.snap_radius().radians() - sf2.snap_radius().radians()).abs() < 1e-15
 }
@@ -7964,7 +8002,7 @@ fn prop_cell_vertices_are_unit(lat: i32, lng: i32) -> bool {
     use s2rst::s2::Cell;
     let id = CellId::from_lat_lng(&make_latlng(lat, lng));
     let cell = Cell::from_cell_id(id);
-    (0..4).all(|k| (cell.vertex(k).0.norm() - 1.0).abs() < 1e-14)
+    (0..4).all(|k| (cell.vertex(CellVertex::ALL[k]).0.norm() - 1.0).abs() < 1e-14)
 }
 
 /// Cell level matches id level
@@ -8158,7 +8196,7 @@ fn prop_robust_degenerate_edge_hits(face: u8) -> bool {
     use s2rst::s2::robust_cell_clipper::{RobustCellClipper, RobustClipResult};
 
     let face = face % 6;
-    let cell = Cell::from_cell_id(CellId::from_face(face));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
     let center = cell.center();
     let mut c = RobustCellClipper::new();
     c.start_cell(cell);
@@ -8172,10 +8210,10 @@ fn prop_robust_opposite_face_miss(face: u8, lat: i16, lng: i16) -> bool {
 
     let face = face % 6;
     let opp = (face + 3) % 6;
-    let cell = Cell::from_cell_id(CellId::from_face(face));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
 
     // Generate points on the opposite face using the opposite face center region.
-    let opp_cell = Cell::from_cell_id(CellId::from_face(opp));
+    let opp_cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(opp)));
     let c = opp_cell.center();
     let tiny_lat = f64::from(lat) / 1_000_000.0;
     let tiny_lng = f64::from(lng) / 1_000_000.0;
@@ -8198,7 +8236,7 @@ fn prop_robust_opposite_face_miss(face: u8, lat: i16, lng: i16) -> bool {
 fn prop_robust_hit_both_implies_inside(x: i16, y: i16) -> bool {
     use s2rst::s2::robust_cell_clipper::{RobustCellClipper, RobustClipResult};
 
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     // Generate small points near the center of face 0.
     let center = cell.center();
     let dx = f64::from(x) / 10_000_000.0;
@@ -8222,7 +8260,7 @@ fn prop_robust_no_crossings_option(face: u8) -> bool {
     use s2rst::s2::robust_cell_clipper::{Options, RobustCellClipper};
 
     let face = face % 6;
-    let cell = Cell::from_cell_id(CellId::from_face(face));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
     let mut c = RobustCellClipper::with_options(Options {
         enable_crossings: false,
     });
@@ -8327,7 +8365,7 @@ fn prop_reclipped_negative_id_always_processes(face: u8) -> bool {
     use s2rst::s2::robust_cell_clipper::RobustCellClipper;
 
     let face = face % 6;
-    let cell = Cell::from_cell_id(CellId::from_face(face));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
     let mut clipper = RobustCellClipper::new();
     clipper.start_cell(cell);
 
@@ -8354,7 +8392,7 @@ fn prop_reclipped_dimension_matches(dim: u8) -> bool {
         1 => Dimension::Polyline,
         _ => Dimension::Polygon,
     };
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let mut clipper = RobustCellClipper::new();
     clipper.start_cell(cell);
 
@@ -8375,6 +8413,8 @@ fn prop_reclipped_dimension_matches(dim: u8) -> bool {
 mod cell_union_beyond_the_proofs {
     use super::*;
     use s2rst::s2::CellUnion;
+    use s2rst::s2::Face;
+    use s2rst::s2::LevelMod;
     use s2rst::s2::encoding::{S2Decode, S2Encode};
 
     /// SplitMix64, so that one quickcheck `u64` seeds a whole union.
@@ -8396,7 +8436,7 @@ mod cell_union_beyond_the_proofs {
         /// A random cell at a level in `min_level..=max_level`.
         fn cell(&mut self, min_level: u8, max_level: u8) -> CellId {
             let level = min_level + self.below(u64::from(max_level - min_level) + 1) as u8;
-            let mut c = CellId::from_face(self.below(6) as u8);
+            let mut c = CellId::from_face(Face::from_u8(self.below(6) as u8));
             for _ in 0..level {
                 c = c.children()[self.below(4) as usize];
             }
@@ -8463,7 +8503,7 @@ mod cell_union_beyond_the_proofs {
             for c in *set {
                 let (lo, hi) = (c.range_min(), c.range_max());
                 out.extend([lo, hi]);
-                if lo > CellId::begin(30u8) {
+                if lo > CellId::begin(Level::new(30)) {
                     out.push(lo.prev());
                 }
                 if hi.next().is_valid() {
@@ -8533,7 +8573,7 @@ mod cell_union_beyond_the_proofs {
         let u = CellUnion::from_cell_ids(r.cells_around(anchor, 20, true));
         let b = CellUnion::from_cell_ids(r.cells_around(anchor, 6, false));
         let c = if r.below(3) == 0 {
-            anchor.parent_at_level(anchor.level().as_u8() / 2)
+            anchor.parent_at_level(Level::new(anchor.level().as_u8() / 2))
         } else {
             r.descendant(anchor)
         };
@@ -8589,7 +8629,7 @@ mod cell_union_beyond_the_proofs {
         let level_mod = 1 + r.below(3) as u8;
         let anchor = r.cell(min_level.saturating_sub(2), 30);
         let u = CellUnion::from_cell_ids(r.cells_around(anchor, 8, true));
-        let d = u.denormalize(Level::new(min_level), level_mod);
+        let d = u.denormalize(Level::new(min_level), LevelMod::new(level_mod));
         let total = |v: &[CellId]| v.iter().map(|&c| leaves(c)).sum::<u64>();
         d.is_valid()
             && total(&d) == total(&u)

@@ -1119,7 +1119,9 @@ fn get_face_mask(index: &ShapeIndex) -> u8 {
     while !it.done() {
         let face = it.cell_id().face();
         mask |= 1 << face.as_u8();
-        it.seek(crate::s2::CellId::from_face(face.as_u8() + 1).range_min());
+        // The first leaf after this face (for face 5, past the last face): upstream builds it
+        // as face + 1's range minimum, which for face 5 is the invalid face 6.
+        it.seek(crate::s2::CellId::from_face(face).range_max().next());
     }
     // A full polygon (0 edges, reference_point contained) covers all faces
     // but has no indexed cells. Detect this case explicitly.

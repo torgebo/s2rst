@@ -26,6 +26,7 @@
 use rand::Rng;
 
 use crate::r3::Vector;
+use crate::s2::Face;
 use crate::s2::coords::{Level, MAX_CELL_LEVEL};
 use crate::s2::point::{from_frame, get_frame};
 use crate::s2::{Cap, CellId, Loop, Point, Polygon};
@@ -86,16 +87,16 @@ pub fn sample_point_from_cap(rng: &mut impl Rng, cap: &Cap) -> Point {
 
 /// Returns a random cell id at the given level. The distribution is uniform
 /// over the space of cell ids, but only approximately uniform over the sphere.
-pub fn random_cell_id_at_level(rng: &mut impl Rng, level: impl Into<Level>) -> CellId {
+pub fn random_cell_id_at_level(rng: &mut impl Rng, level: Level) -> CellId {
     let face: u8 = rng.gen_range(0..6);
     let pos: u64 = rng.gen_range(0..(1u64 << (2 * u32::from(MAX_CELL_LEVEL) + 1)));
-    CellId::from_face_pos_level(face, pos, level)
+    CellId::from_face_pos_level(Face::from_u8(face), pos, level)
 }
 
 /// Returns a random cell id at a randomly chosen level.
 pub fn random_cell_id(rng: &mut impl Rng) -> CellId {
     let level: u8 = rng.gen_range(0..=MAX_CELL_LEVEL);
-    random_cell_id_at_level(rng, level)
+    random_cell_id_at_level(rng, Level::new(level))
 }
 
 /// Returns a random number skewed towards smaller values. First a `base` is
@@ -152,7 +153,12 @@ pub fn check_covering(
 ) {
     let Some(id) = id else {
         for face in 0..6u8 {
-            check_covering(region, covering, check_tight, Some(CellId::from_face(face)));
+            check_covering(
+                region,
+                covering,
+                check_tight,
+                Some(CellId::from_face(Face::from_u8(face))),
+            );
         }
         return;
     };
@@ -363,7 +369,7 @@ mod tests {
     fn test_random_cell_id_at_level() {
         let mut rng = make_rng();
         for level in 0..=MAX_CELL_LEVEL {
-            let id = random_cell_id_at_level(&mut rng, level);
+            let id = random_cell_id_at_level(&mut rng, Level::new(level));
             assert!(id.is_valid());
             assert_eq!(id.level(), level);
         }

@@ -5,7 +5,7 @@
 //! P-URANGE: range construction (FR-005). `from_begin_end`, `from_min_max` and `from_range`
 //! are tool-limit exclusions (P-URANGE-01/02/03, research R0); only `whole_sphere` is proven.
 
-use s2rst::s2::{CellId, CellUnion};
+use s2rst::s2::{CellId, CellUnion, Face};
 
 use crate::union_domain::{any_leaf, out_covers};
 
@@ -18,7 +18,7 @@ use crate::union_domain::{any_leaf, out_covers};
 #[kani::unwind(8)]
 fn p_urange_04() {
     let u = CellUnion::whole_sphere();
-    let faces: Vec<CellId> = (0u8..6).map(CellId::from_face).collect();
+    let faces: Vec<CellId> = Face::ALL.into_iter().map(CellId::from_face).collect();
     assert_eq!(u.cell_ids(), &faces[..]);
     let (leaf, _) = any_leaf();
     assert!(out_covers::<6>(u.cell_ids(), leaf));

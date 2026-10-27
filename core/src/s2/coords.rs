@@ -37,6 +37,7 @@
 )]
 use std::fmt;
 
+use super::bounded::{BoundedKind, OutOfRange};
 use crate::r3::{Axis, Vector};
 
 // ---------------------------------------------------------------------------
@@ -48,13 +49,61 @@ pub const MAX_CELL_LEVEL: u8 = 30;
 
 /// A cell subdivision level in the range `0..=30`.
 ///
-/// This newtype ensures that cell levels are always in the valid range,
-/// preventing out-of-range values from propagating through the codebase.
-/// Use [`Level::new`] for a panicking constructor or [`Level::try_new`]
-/// for a fallible one.
+/// A bounded type ([`bounded`](super::bounded)): a `Level` is always in range, so the
+/// functions that take one need no check of their own. Build one from an integer explicitly:
+///
+/// - [`Level::new`] for a literal. It panics outside the range, and in a constant context an
+///   out-of-range literal is rejected when the code is compiled.
+/// - [`Level::try_from`](TryFrom::try_from) for a value computed at run time. It returns
+///   [`OutOfRange`] outside the range.
+///
+/// ```
+/// use s2rst::s2::{CellId, Face, Level};
+///
+/// const FINEST: Level = Level::new(30);
+/// let leaf = CellId::from_face(Face::F0).child_begin_at_level(FINEST);
+/// assert_eq!(leaf.parent_at_level(Level::new(5)).level(), Level::new(5));
+/// ```
+///
+/// A raw integer does not convert implicitly, so a level out of range cannot reach a function
+/// that takes one:
+///
+/// ```compile_fail
+/// let level: s2rst::s2::Level = 31u8.into();
+/// ```
+///
+/// ```compile_fail
+/// use s2rst::s2::{CellId, Face};
+///
+/// CellId::from_face(Face::F0).parent_at_level(5u8);
+/// ```
+///
+/// ```compile_fail
+/// const TOO_FINE: s2rst::s2::Level = s2rst::s2::Level::new(31);
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Level(u8);
+
+/// Deserialises the form that `Serialize` writes, unchanged (a bare number in JSON), and
+/// accepts only a level in `0..=30`.
+///
+/// Anything else is an error carrying the [`OutOfRange`] text, for example
+/// "level must be in 0..=30, got 31". A derived impl would accept any `u8`: a way to build a
+/// `Level` outside its range, which every function taking one assumes it is not (spec 009, B2).
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Level {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "Level")]
+        struct Raw(u8);
+
+        let Raw(v) = Raw::deserialize(deserializer)?;
+        Level::try_from(v).map_err(D::Error::custom)
+    }
+}
 
 impl Level {
     /// The minimum cell level (face cells).
@@ -65,21 +114,46 @@ impl Level {
 
     /// Creates a new level, panicking if `v > 30`.
     ///
+    /// This is the constructor for literals. In a constant context (a `const` item, or
+    /// `const { Level::new(n) }`), an out-of-range `v` is rejected when the code is compiled.
+    /// For a value computed at run time, use [`Level::try_from`](TryFrom::try_from).
+    ///
     /// # Panics
     ///
     /// Panics if `v > 30`.
     #[track_caller]
     pub const fn new(v: u8) -> Self {
-        assert!(v <= MAX_CELL_LEVEL, "level must be 0..=30");
+        assert!(v <= MAX_CELL_LEVEL, "level must be in 0..=30");
         Level(v)
     }
 
-    /// Tries to create a level from a `u8`.
+    /// Tries to create a level from a `u8`: `None` above 30. [`Level::try_from`] gives the
+    /// same, with an [`OutOfRange`] error.
+    ///
+    /// [`Level::try_from`]: TryFrom::try_from
     pub const fn try_new(v: u8) -> Option<Self> {
         if v <= MAX_CELL_LEVEL {
             Some(Level(v))
         } else {
             None
+        }
+    }
+
+    /// The level `rhs` levels finer, or `None` past 30.
+    #[must_use]
+    pub const fn checked_add(self, rhs: u8) -> Option<Self> {
+        match self.0.checked_add(rhs) {
+            Some(v) => Level::try_new(v),
+            None => None,
+        }
+    }
+
+    /// The level `rhs` levels coarser, or `None` below 0.
+    #[must_use]
+    pub const fn checked_sub(self, rhs: u8) -> Option<Self> {
+        match self.0.checked_sub(rhs) {
+            Some(v) => Some(Level(v)),
+            None => None,
         }
     }
 
@@ -104,7 +178,7 @@ impl Level {
     }
 }
 
-/// Checked addition: panics if result > 30.
+/// Checked addition: panics if the result is above 30 (see [`Level::checked_add`]).
 impl std::ops::Add<u8> for Level {
     type Output = Level;
     #[track_caller]
@@ -113,7 +187,7 @@ impl std::ops::Add<u8> for Level {
     }
 }
 
-/// Checked subtraction: panics if result would underflow.
+/// Checked subtraction: panics if the result would be below 0 (see [`Level::checked_sub`]).
 impl std::ops::Sub<u8> for Level {
     type Output = Level;
     #[track_caller]
@@ -172,54 +246,47 @@ impl From<Level> for i32 {
     }
 }
 
-/// Converts a `u8` to a `Level`.
-///
-/// # Panics
-///
-/// Panics if `v > 30`.
-impl From<u8> for Level {
-    #[track_caller]
-    fn from(v: u8) -> Self {
-        Level::new(v)
-    }
-}
-
-impl TryFrom<u16> for Level {
-    type Error = &'static str;
-    fn try_from(v: u16) -> Result<Self, Self::Error> {
-        if v <= u16::from(MAX_CELL_LEVEL) {
-            Ok(Level(v as u8))
-        } else {
-            Err("level must be 0..=30")
-        }
-    }
-}
-
 impl From<Level> for f64 {
     fn from(l: Level) -> f64 {
         f64::from(l.0)
     }
 }
 
-impl TryFrom<i32> for Level {
-    type Error = &'static str;
-    fn try_from(v: i32) -> Result<Self, Self::Error> {
-        if v >= 0 && v <= i32::from(MAX_CELL_LEVEL) {
-            Ok(Level(v as u8))
-        } else {
-            Err("level must be 0..=30")
+impl TryFrom<i64> for Level {
+    type Error = OutOfRange;
+
+    /// The level `v`, or [`OutOfRange`] outside `0..=30`.
+    fn try_from(v: i64) -> Result<Self, OutOfRange> {
+        match u8::try_from(v) {
+            Ok(l) if l <= MAX_CELL_LEVEL => Ok(Level(l)),
+            _ => Err(OutOfRange::new(BoundedKind::Level, v)),
         }
     }
 }
 
-impl TryFrom<usize> for Level {
-    type Error = &'static str;
-    fn try_from(v: usize) -> Result<Self, Self::Error> {
-        if v <= MAX_CELL_LEVEL as usize {
-            Ok(Level(v as u8))
-        } else {
-            Err("level must be 0..=30")
+/// `TryFrom` for the narrower integer types, through `i64`, which holds all of their values.
+macro_rules! level_try_from_via_i64 {
+    ($($t:ty),*) => {$(
+        impl TryFrom<$t> for Level {
+            type Error = OutOfRange;
+
+            /// The level `v`, or [`OutOfRange`] outside `0..=30`.
+            fn try_from(v: $t) -> Result<Self, OutOfRange> {
+                Level::try_from(i64::from(v))
+            }
         }
+    )*};
+}
+
+level_try_from_via_i64!(u8, u16, i32);
+
+impl TryFrom<usize> for Level {
+    type Error = OutOfRange;
+
+    /// The level `v`, or [`OutOfRange`] outside `0..=30`. A value beyond `i64` is reported as
+    /// `i64::MAX`.
+    fn try_from(v: usize) -> Result<Self, OutOfRange> {
+        Level::try_from(i64::try_from(v).unwrap_or(i64::MAX))
     }
 }
 
@@ -320,16 +387,26 @@ impl From<Face> for u8 {
     }
 }
 
-impl TryFrom<u8> for Face {
-    type Error = u8;
-    /// Converts a `u8` to `Face`. Returns `Err(v)` if `v >= 6`.
+impl TryFrom<i64> for Face {
+    type Error = OutOfRange;
+
+    /// The face numbered `v`, or [`OutOfRange`] outside `0..=5`.
     #[inline]
-    fn try_from(v: u8) -> Result<Face, u8> {
-        if v < 6 {
-            Ok(Face::ALL[v as usize])
-        } else {
-            Err(v)
+    fn try_from(v: i64) -> Result<Face, OutOfRange> {
+        match usize::try_from(v) {
+            Ok(i) if i < Face::ALL.len() => Ok(Face::ALL[i]),
+            _ => Err(OutOfRange::new(BoundedKind::Face, v)),
         }
+    }
+}
+
+impl TryFrom<u8> for Face {
+    type Error = OutOfRange;
+
+    /// The face numbered `v`, or [`OutOfRange`] above 5.
+    #[inline]
+    fn try_from(v: u8) -> Result<Face, OutOfRange> {
+        Face::try_from(i64::from(v))
     }
 }
 
@@ -1564,3 +1641,7 @@ mod quickcheck_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "coords_tests.rs"]
+mod coords_tests;

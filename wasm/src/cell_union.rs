@@ -4,6 +4,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::angle::Angle;
+use crate::bounded::level_arg;
 use crate::cell_id::CellId;
 use crate::point::Point;
 
@@ -199,9 +200,12 @@ impl CellUnion {
     }
 
     /// Expand to include all cells at the given level adjacent to the union.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "expandAtLevel")]
-    pub fn expand_at_level(&mut self, level: u8) {
-        self.0.expand_at_level(level.into());
+    pub fn expand_at_level(&mut self, level: f64) -> Result<(), JsValue> {
+        self.0.expand_at_level(level_arg(level)?);
+        Ok(())
     }
 
     /// Expand by a minimum radius.

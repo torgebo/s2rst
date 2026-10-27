@@ -35,5 +35,5 @@ fn invalid_debug_string_is_zero_padded() {
         "Invalid: ffffffffffffffff"
     );
     assert_eq!(CellId(2).to_string(), CellId(2).to_debug_string());
-    assert_eq!(CellId::from_face(3u8).to_debug_string(), "3/");
+    assert_eq!(CellId::from_face(Face::F3).to_debug_string(), "3/");
 }

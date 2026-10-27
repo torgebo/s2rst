@@ -12,10 +12,10 @@
 //! names are reachable. Operations that only read a field are grouped with the constructor, as
 //! 001 grouped its accessors.
 
-use s2rst::s2::{Cell, CellEdge, CellId, Region};
+use s2rst::s2::{BoundedKind, Cell, CellEdge, CellId, CellVertex, Face, Region};
 
 use crate::domain::{any_face, any_level};
-use crate::value_domain::{any_cell, any_edge};
+use crate::value_domain::{any_cell, any_cell_vertex, any_edge};
 
 /// C-Cell::from_cell_id, with the accessors `id`, `face`, `level`, `orientation`, `is_leaf`,
 /// `size_ij` and `bound_uv`: they complete without panic, arithmetic overflow or undefined
@@ -45,7 +45,7 @@ fn c_from_cell_id() {
 #[kani::unwind(9)]
 fn c_from_face() {
     let f = any_face();
-    let c = Cell::from_face(f);
+    let c = Cell::from_face(Face::from_u8(f));
     kani::cover!(f == 0 && c.orientation() == 0, "face 0");
     kani::cover!(f == 5, "face 5");
 }
@@ -60,7 +60,7 @@ fn c_from_face_pos_level() {
     let pos: u64 = kani::any();
     kani::assume(pos < (1u64 << 61));
     let l = any_level();
-    let c = Cell::from_face_pos_level(f, pos, l);
+    let c = Cell::from_face_pos_level(Face::from_u8(f), pos, l);
     kani::cover!(c.is_leaf(), "a leaf");
     kani::cover!(l.as_u8() == 0, "a face cell");
 }
@@ -149,30 +149,21 @@ fn c_from_cell_id_largest() {
 // Every panic here is in every build, so there is no `r_*` counterpart.
 // ---------------------------------------------------------------------------------------------
 
-/// N-Cell::from_cell_id, N-From<CellId>, N-from_face, N-from_face_pos_level: each panics, in
-/// every build, for every identifier with no level marker (62 or more trailing zero bits: `0`,
-/// `1 << 62`, `1 << 63`, `3 << 62`) and every identifier on face 6 or 7 (an index out of bounds);
-/// `from_face` for faces 6 and 7; `from_face_pos_level` for those faces and every raw level above
-/// 30.
+/// N-Cell::from_cell_id, N-From<CellId>: each panics, in every build, for every identifier with
+/// no level marker (62 or more trailing zero bits: `0`, `1 << 62`, `1 << 63`, `3 << 62`) and
+/// every identifier on face 6 or 7 (an index out of bounds). `from_face` and
+/// `from_face_pos_level` were here too, for faces 6 and 7 and levels above 30: since spec 009
+/// they take a `Face` and a `Level`, so neither can be handed one.
 #[kani::proof]
 #[kani::should_panic]
 #[kani::unwind(9)]
 fn n_from_cell_id() {
     let x: u64 = kani::any();
     kani::assume(x.trailing_zeros() >= 62 || x >> 61 >= 6);
-    let f: u8 = kani::any();
-    kani::assume(f == 6 || f == 7);
-    let pos: u64 = kani::any();
-    kani::assume(pos < 1 << 61);
-    let raw: u8 = kani::any();
-    kani::assume(raw > 30);
-    let op: u8 = kani::any();
-    let _ = match op {
-        0 => Cell::from_cell_id(CellId(x)),
-        1 => Cell::from(CellId(x)),
-        2 => Cell::from_face(f),
-        3 => Cell::from_face_pos_level(f, pos, any_level()),
-        _ => Cell::from_face_pos_level(any_face(), pos, raw),
+    let _ = if kani::any() {
+        Cell::from_cell_id(CellId(x))
+    } else {
+        Cell::from(CellId(x))
     };
     kani::cover!(true, "returns");
 }
@@ -237,7 +228,8 @@ fn c_fg_from_lat_lng() {
     kani::cover!(c.is_leaf() && id.is_leaf(), "a leaf");
 }
 
-/// C-Cell::vertex, vertex_raw: complete for every valid cell and every vertex index below 4.
+/// C-Cell::vertex, vertex_raw: complete for every valid cell and every vertex (a `CellVertex`
+/// since spec 009; before, every index below 4).
 ///
 /// Stubs: `any_uv_bound` (the abstract u-v bound: any rectangle in [−1, 1]², which holds every
 /// cell's).
@@ -246,10 +238,12 @@ fn c_fg_from_lat_lng() {
 #[kani::stub(s2rst::s2::ij_level_to_bound_uv, crate::stubs::any_uv_bound)]
 fn c_fg_vertex() {
     let (c, d) = any_cell();
-    let k: usize = kani::any();
-    kani::assume(k < 4);
+    let k = any_cell_vertex();
     let _ = (c.vertex_raw(k), c.vertex(k));
-    kani::cover!(d.level == 30 && k == 3, "a leaf's last vertex");
+    kani::cover!(
+        d.level == 30 && k == CellVertex::UpperLeft,
+        "a leaf's last vertex"
+    );
 }
 
 /// C-Cell::edge, edge_raw: complete for every valid cell and every edge.
@@ -541,23 +535,24 @@ fn r_from_point() {
     kani::cover!(true, "a leaf");
 }
 
-/// N-Cell::vertex, N-vertex_raw: each panics for every valid cell and every index above 3, in
-/// every build (an index out of bounds).
-///
-/// Stubs: `any_uv_bound` (the abstract u-v bound: any rectangle in [−1, 1]², which holds every
-/// cell's).
+/// C-CellVertex::try_from: the fallible conversion accepts exactly 0–3, gives the vertex
+/// numbered so back, and reports a rejected index with its kind (spec 009). Before spec 009,
+/// `Cell::vertex` and `vertex_raw` took a `usize` and panicked for every index above 3, in every
+/// build (`n_vertex`, retired): they take a `CellVertex` now, so no such index can reach them.
 #[kani::proof]
-#[kani::should_panic]
-#[kani::unwind(9)]
-#[kani::stub(s2rst::s2::ij_level_to_bound_uv, crate::stubs::any_uv_bound)]
-fn n_vertex() {
-    let (c, _) = any_cell();
-    let k: usize = kani::any();
-    kani::assume(k > 3);
-    if kani::any::<bool>() {
-        let _ = c.vertex(k);
-    } else {
-        let _ = c.vertex_raw(k);
+fn c_cell_vertex_try_from() {
+    let k: i64 = kani::any();
+    match CellVertex::try_from(k) {
+        Ok(v) => {
+            assert!((0..=3).contains(&k));
+            assert!(i64::try_from(v.index()).ok() == Some(k));
+        }
+        Err(e) => {
+            assert!(!(0..=3).contains(&k));
+            assert!(e.value() == k);
+            assert!(e.kind() == BoundedKind::CellVertex);
+        }
     }
-    kani::cover!(true, "returns");
+    kani::cover!(k == 3, "the last vertex");
+    kani::cover!(k == 4, "the first index rejected");
 }

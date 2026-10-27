@@ -1052,6 +1052,7 @@ impl S2Decode for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::LatLng;
 
     fn roundtrip_encode_decode<T: S2Encode + S2Decode + std::fmt::Debug>(val: &T) -> T {
@@ -1062,7 +1063,7 @@ mod tests {
 
     #[test]
     fn test_cell_id_roundtrip() {
-        let id = CellId::from_face(3);
+        let id = CellId::from_face(Face::F3);
         let back = roundtrip_encode_decode(&id);
         assert_eq!(id, back);
 
@@ -1115,7 +1116,10 @@ mod tests {
 
     #[test]
     fn test_cell_union_roundtrip() {
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0), CellId::from_face(3)]);
+        let cu = CellUnion::from_cell_ids(vec![
+            CellId::from_face(Face::F0),
+            CellId::from_face(Face::F3),
+        ]);
         let back = roundtrip_encode_decode(&cu);
         assert_eq!(cu.len(), back.len());
         for i in 0..cu.len() {
@@ -1337,7 +1341,7 @@ mod tests {
     fn test_polygon_compressed_roundtrip() {
         // Use cell-center vertices so the auto-selector picks compressed.
         let level = Level::new(10);
-        let base = CellId::from_face(0).child_begin_at_level(level);
+        let base = CellId::from_face(Face::F0).child_begin_at_level(level);
         let mut cells = Vec::new();
         let mut id = base;
         for _ in 0..20 {
@@ -1396,7 +1400,7 @@ mod tests {
     fn test_cell_encode_decode_multiple() {
         // Encode/decode cells at various levels.
         for face in 0..6u8 {
-            let cell = Cell::from(CellId::from_face(face));
+            let cell = Cell::from(CellId::from_face(Face::from_u8(face)));
             let back = roundtrip_encode_decode(&cell);
             assert_eq!(cell.id(), back.id());
         }
@@ -1475,7 +1479,7 @@ mod tests {
     #[test]
     fn test_cell_id_wire_format() {
         // C++ S2CellId: raw u64 (8 bytes).
-        let id = CellId::from_face(3);
+        let id = CellId::from_face(Face::F3);
         let mut buf = Vec::new();
         id.encode(&mut buf).unwrap();
         assert_eq!(buf.len(), 8, "S2CellId should be exactly 8 bytes");
@@ -1534,7 +1538,10 @@ mod tests {
     #[test]
     fn test_cell_union_wire_format() {
         // C++ S2CellUnion: version(1) + count(8) + cell_ids(8*N).
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0), CellId::from_face(3)]);
+        let cu = CellUnion::from_cell_ids(vec![
+            CellId::from_face(Face::F0),
+            CellId::from_face(Face::F3),
+        ]);
         let mut buf = Vec::new();
         cu.encode(&mut buf).unwrap();
         // 1 + 8 + 8*2 = 25
@@ -1575,6 +1582,7 @@ mod tests {
 #[cfg(test)]
 mod quickcheck_tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::LatLng;
     use quickcheck_macros::quickcheck;
 
@@ -1722,7 +1730,7 @@ mod quickcheck_tests {
         let face = (raw % 6) as u8;
         let level = ((raw >> 3) % 25 + 5) as u8;
         let pos = raw >> 8;
-        let base = CellId::from_face_pos_level(face, pos, level);
+        let base = CellId::from_face_pos_level(Face::from_u8(face), pos, Level::new(level));
 
         let mut points = Vec::new();
         let mut id = base;

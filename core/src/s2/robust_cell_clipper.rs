@@ -15,6 +15,7 @@
 //! - Crossing intercepts are identical on both sides of a shared boundary.
 //! - Crossings are ordered correctly around the cell boundary.
 
+use crate::s2::CellVertex;
 use crate::s2::Point;
 use crate::s2::cell::{Cell, CellEdge};
 use crate::s2::coords;
@@ -238,7 +239,8 @@ impl RobustCellClipper {
 
         for k in 0..4 {
             let edge = CellEdge::from_index(k);
-            self.boundaries[k] = (cell.vertex(k), cell.vertex((k + 1) % 4));
+            let v = CellVertex::ALL[k];
+            self.boundaries[k] = (cell.vertex(v), cell.vertex(v.next()));
             self.normals[k] = cell.edge_raw(edge);
         }
     }
@@ -711,6 +713,8 @@ impl CellEdge {
 mod tests {
     use super::*;
     use crate::r3::Vector;
+    use crate::s2::CellVertex;
+    use crate::s2::Face;
     use crate::s2::{CellId, LatLng};
 
     fn cell(token: &str) -> Cell {
@@ -718,7 +722,7 @@ mod tests {
     }
 
     fn face0_cell() -> Cell {
-        Cell::from_cell_id(CellId::from_face(0))
+        Cell::from_cell_id(CellId::from_face(Face::F0))
     }
 
     fn crossing(
@@ -773,10 +777,10 @@ mod tests {
         let cell = cell("05");
         let p0 = cell.center();
 
-        let c0 = cell.vertex(0);
-        let c1 = cell.vertex(1);
-        let c2 = cell.vertex(2);
-        let c3 = cell.vertex(3);
+        let c0 = cell.vertex(CellVertex::LowerLeft);
+        let c1 = cell.vertex(CellVertex::LowerRight);
+        let c2 = cell.vertex(CellVertex::UpperRight);
+        let c3 = cell.vertex(CellVertex::UpperLeft);
 
         // Points a tiny bit inside the cell from corners.
         let v: Vec<Point> = [c0, c1, c2, c3]
@@ -830,7 +834,10 @@ mod tests {
         let cell1 = cell("1b");
         let cell2 = cell("11");
         let cell3 = cell("0f");
-        let edge = (cell0.vertex(0), cell2.vertex(2));
+        let edge = (
+            cell0.vertex(CellVertex::LowerLeft),
+            cell2.vertex(CellVertex::UpperRight),
+        );
 
         // Cell 0: HIT_V0, 2 crossings on Right and Top.
         {
@@ -940,7 +947,7 @@ mod tests {
     #[test]
     fn test_corner_grazing_detected0() {
         let cell = cell("14");
-        let corner = cell.vertex(0);
+        let corner = cell.vertex(CellVertex::LowerLeft);
         assert_eq!(corner, Point(Vector::new(1.0, 0.0, 0.0)));
 
         let k_tiny = 2e-15;
@@ -987,8 +994,8 @@ mod tests {
         let center = cell.center();
 
         // Reflect the center across the bottom edge (boundary 0).
-        let v0 = cell.vertex(0);
-        let v1 = cell.vertex(1);
+        let v0 = cell.vertex(CellVertex::LowerLeft);
+        let v1 = cell.vertex(CellVertex::LowerRight);
         let reflected = reflect_across(center, v0, v1);
 
         let mut clipper = RobustCellClipper::new();
@@ -1043,10 +1050,10 @@ mod tests {
     fn test_no_crossings_works() {
         let cell = cell("05");
         let center = cell.center();
-        let v0 = cell.vertex(0);
-        let v1 = cell.vertex(1);
-        let v2 = cell.vertex(2);
-        let v3 = cell.vertex(3);
+        let v0 = cell.vertex(CellVertex::LowerLeft);
+        let v1 = cell.vertex(CellVertex::LowerRight);
+        let v2 = cell.vertex(CellVertex::UpperRight);
+        let v3 = cell.vertex(CellVertex::UpperLeft);
 
         let mut clipper = RobustCellClipper::with_options(Options {
             enable_crossings: false,
@@ -1073,8 +1080,8 @@ mod tests {
             for b in 0..4 {
                 clipper.start_cell(cell);
 
-                let mut v0 = cell.vertex(b % 4);
-                let mut v1 = cell.vertex((b + 1) % 4);
+                let mut v0 = cell.vertex(CellVertex::ALL[b % 4]);
+                let mut v1 = cell.vertex(CellVertex::ALL[(b + 1) % 4]);
                 if flip {
                     std::mem::swap(&mut v0, &mut v1);
                 }
@@ -1108,7 +1115,7 @@ mod tests {
     #[test]
     fn test_corner_grazing_boundary_containment() {
         let cell = cell("14");
-        let corner = cell.vertex(0);
+        let corner = cell.vertex(CellVertex::LowerLeft);
         assert_eq!(corner, Point(Vector::new(1.0, 0.0, 0.0)));
 
         let k_tiny = 2e-15;
@@ -1159,10 +1166,10 @@ mod tests {
         for boundary_edge in 0..4 {
             let cell = cell("114");
             let center = cell.center();
-            let v0 = cell.vertex(boundary_edge % 4);
-            let v1 = cell.vertex((boundary_edge + 1) % 4);
-            let v2 = cell.vertex((boundary_edge + 2) % 4);
-            let v3 = cell.vertex((boundary_edge + 3) % 4);
+            let v0 = cell.vertex(CellVertex::ALL[boundary_edge % 4]);
+            let v1 = cell.vertex(CellVertex::ALL[(boundary_edge + 1) % 4]);
+            let v2 = cell.vertex(CellVertex::ALL[(boundary_edge + 2) % 4]);
+            let v3 = cell.vertex(CellVertex::ALL[(boundary_edge + 3) % 4]);
 
             let mut clipper = RobustCellClipper::new();
             clipper.start_cell(cell);
@@ -1209,14 +1216,22 @@ mod tests {
 
             let v0 = cell.center();
             for k in 0..4 {
-                let v1 = reflect_across(v0, cell.vertex(k % 4), cell.vertex((k + 1) % 4));
+                let v1 = reflect_across(
+                    v0,
+                    cell.vertex(CellVertex::ALL[k % 4]),
+                    cell.vertex(CellVertex::ALL[(k + 1) % 4]),
+                );
                 clipper.clip_edge(v0, v1, false);
                 assert_eq!(k + 1, clipper.get_crossings().len());
             }
 
             // Cross again at the same points — duplicates should cancel.
             for k in 0..4 {
-                let v1 = reflect_across(v0, cell.vertex(k % 4), cell.vertex((k + 1) % 4));
+                let v1 = reflect_across(
+                    v0,
+                    cell.vertex(CellVertex::ALL[k % 4]),
+                    cell.vertex(CellVertex::ALL[(k + 1) % 4]),
+                );
                 if swap {
                     clipper.clip_edge(v1, v0, false);
                 } else {
@@ -1264,8 +1279,8 @@ mod tests {
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell0);
 
-        let v0 = cell1.vertex(0);
-        let v1 = cell1.vertex(1);
+        let v0 = cell1.vertex(CellVertex::LowerLeft);
+        let v1 = cell1.vertex(CellVertex::LowerRight);
         assert_eq!(RobustClipResult::Miss, clipper.clip_edge(v0, v1, false));
     }
 
@@ -1273,10 +1288,10 @@ mod tests {
     fn test_crossings_ordered_by_intercept() {
         let cell = cell("05");
         let center = cell.center();
-        let v0 = cell.vertex(0);
-        let v1 = cell.vertex(1);
-        let v2 = cell.vertex(2);
-        let v3 = cell.vertex(3);
+        let v0 = cell.vertex(CellVertex::LowerLeft);
+        let v1 = cell.vertex(CellVertex::LowerRight);
+        let v2 = cell.vertex(CellVertex::UpperRight);
+        let v3 = cell.vertex(CellVertex::UpperLeft);
 
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell);
@@ -1319,8 +1334,8 @@ mod tests {
                 }
 
                 clipper.start_cell(cell0);
-                let mut v0 = cell1.vertex(i % 4);
-                let mut v1 = cell1.vertex((i + 1) % 4);
+                let mut v0 = cell1.vertex(CellVertex::ALL[i % 4]);
+                let mut v1 = cell1.vertex(CellVertex::ALL[(i + 1) % 4]);
                 if flip {
                     std::mem::swap(&mut v0, &mut v1);
                 }
@@ -1386,8 +1401,8 @@ mod tests {
         let mut clipper = RobustCellClipper::new();
         for i in 0..2 {
             clipper.start_cell(cell0);
-            let v0 = k_cells[i][0].vertex(0);
-            let v1 = k_cells[i][1].vertex(1);
+            let v0 = k_cells[i][0].vertex(CellVertex::LowerLeft);
+            let v1 = k_cells[i][1].vertex(CellVertex::LowerRight);
             assert!(clipper.clip_edge(v0, v1, false).is_hit());
 
             let crossings = clipper.get_crossings();
@@ -1415,9 +1430,13 @@ mod tests {
 
         let v0 = k_cell.center();
         for k in 0..4usize {
-            clipper.clip_edge(v0, k_cell_neighbor[k].vertex(k % 4), false);
+            clipper.clip_edge(v0, k_cell_neighbor[k].vertex(CellVertex::ALL[k % 4]), false);
             clipper.clip_edge(v0, k_cell_neighbor[k].center(), false);
-            clipper.clip_edge(v0, k_cell_neighbor[k].vertex((k + 1) % 4), false);
+            clipper.clip_edge(
+                v0,
+                k_cell_neighbor[k].vertex(CellVertex::ALL[(k + 1) % 4]),
+                false,
+            );
         }
         assert_eq!(12, clipper.get_crossings().len());
 
@@ -1469,7 +1488,11 @@ mod tests {
 
         let v0 = k_cell.center();
         for k in 0..4usize {
-            let v1 = reflect_across(v0, k_cell.vertex(k % 4), k_cell.vertex((k + 1) % 4));
+            let v1 = reflect_across(
+                v0,
+                k_cell.vertex(CellVertex::ALL[k % 4]),
+                k_cell.vertex(CellVertex::ALL[(k + 1) % 4]),
+            );
             clipper.clip_edge(v0, v1, false);
         }
         assert_eq!(4, clipper.get_crossings().len());
@@ -1478,28 +1501,44 @@ mod tests {
         let yinc = Vector::new(0.0, eps, 0.0);
         let zinc = Vector::new(0.0, 0.0, eps);
 
-        let mut v1 = reflect_across(v0, k_cell.vertex(0), k_cell.vertex(1));
+        let mut v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::LowerLeft),
+            k_cell.vertex(CellVertex::LowerRight),
+        );
         clipper.clip_edge(
             Point((v0.0 + yinc).normalize()),
             Point((v1.0 + yinc).normalize()),
             false,
         );
 
-        v1 = reflect_across(v0, k_cell.vertex(1), k_cell.vertex(2));
+        v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::LowerRight),
+            k_cell.vertex(CellVertex::UpperRight),
+        );
         clipper.clip_edge(
             Point((v0.0 + zinc).normalize()),
             Point((v1.0 + zinc).normalize()),
             false,
         );
 
-        v1 = reflect_across(v0, k_cell.vertex(2), k_cell.vertex(3));
+        v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::UpperRight),
+            k_cell.vertex(CellVertex::UpperLeft),
+        );
         clipper.clip_edge(
             Point((v0.0 - yinc).normalize()),
             Point((v1.0 - yinc).normalize()),
             false,
         );
 
-        v1 = reflect_across(v0, k_cell.vertex(3), k_cell.vertex(0));
+        v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::UpperLeft),
+            k_cell.vertex(CellVertex::LowerLeft),
+        );
         clipper.clip_edge(
             Point((v0.0 - zinc).normalize()),
             Point((v1.0 - zinc).normalize()),
@@ -1528,7 +1567,11 @@ mod tests {
 
         let v0 = k_cell.center();
         for k in 0..4usize {
-            let v1 = reflect_across(v0, k_cell.vertex(k % 4), k_cell.vertex((k + 1) % 4));
+            let v1 = reflect_across(
+                v0,
+                k_cell.vertex(CellVertex::ALL[k % 4]),
+                k_cell.vertex(CellVertex::ALL[(k + 1) % 4]),
+            );
             clipper.clip_edge(v0, v1, false);
         }
         assert_eq!(4, clipper.get_crossings().len());
@@ -1538,28 +1581,44 @@ mod tests {
         let yinc = Vector::new(0.0, eps, 0.0);
         let zinc = Vector::new(0.0, 0.0, eps);
 
-        let mut v1 = reflect_across(v0, k_cell.vertex(0), k_cell.vertex(1));
+        let mut v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::LowerLeft),
+            k_cell.vertex(CellVertex::LowerRight),
+        );
         clipper.clip_edge(
             Point((v0.0 - yinc).normalize()),
             Point((v1.0 - yinc).normalize()),
             false,
         );
 
-        v1 = reflect_across(v0, k_cell.vertex(1), k_cell.vertex(2));
+        v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::LowerRight),
+            k_cell.vertex(CellVertex::UpperRight),
+        );
         clipper.clip_edge(
             Point((v0.0 - zinc).normalize()),
             Point((v1.0 - zinc).normalize()),
             false,
         );
 
-        v1 = reflect_across(v0, k_cell.vertex(2), k_cell.vertex(3));
+        v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::UpperRight),
+            k_cell.vertex(CellVertex::UpperLeft),
+        );
         clipper.clip_edge(
             Point((v0.0 + yinc).normalize()),
             Point((v1.0 + yinc).normalize()),
             false,
         );
 
-        v1 = reflect_across(v0, k_cell.vertex(3), k_cell.vertex(0));
+        v1 = reflect_across(
+            v0,
+            k_cell.vertex(CellVertex::UpperLeft),
+            k_cell.vertex(CellVertex::LowerLeft),
+        );
         clipper.clip_edge(
             Point((v0.0 + zinc).normalize()),
             Point((v1.0 + zinc).normalize()),
@@ -1587,10 +1646,26 @@ mod tests {
         clipper.start_cell(cell_r);
 
         // Move corners toward centers to avoid crossing far boundaries.
-        let v0 = crate::s2::edge_distances::interpolate(1e-15, cell_l.vertex(0), cell_l.center());
-        let v1 = crate::s2::edge_distances::interpolate(1e-16, cell_r.vertex(1), cell_r.center());
-        let v2 = crate::s2::edge_distances::interpolate(1e-16, cell_r.vertex(2), cell_r.center());
-        let v3 = crate::s2::edge_distances::interpolate(1e-15, cell_l.vertex(3), cell_l.center());
+        let v0 = crate::s2::edge_distances::interpolate(
+            1e-15,
+            cell_l.vertex(CellVertex::LowerLeft),
+            cell_l.center(),
+        );
+        let v1 = crate::s2::edge_distances::interpolate(
+            1e-16,
+            cell_r.vertex(CellVertex::LowerRight),
+            cell_r.center(),
+        );
+        let v2 = crate::s2::edge_distances::interpolate(
+            1e-16,
+            cell_r.vertex(CellVertex::UpperRight),
+            cell_r.center(),
+        );
+        let v3 = crate::s2::edge_distances::interpolate(
+            1e-15,
+            cell_l.vertex(CellVertex::UpperLeft),
+            cell_l.center(),
+        );
 
         // Clip two crossing edges: v0→v1 (lower) and v3→v2 (upper).
         clipper.clip_edge(v0, v1, false);

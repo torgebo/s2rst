@@ -11,11 +11,18 @@ use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
 use s2rst::s1::ChordAngle;
+use s2rst::s2::CellVertex;
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::{Cap, Cell, CellId, LatLng, Point, Rect};
 
 #[library_benchmark]
 fn bench_cell_from_cell_id() -> Cell {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     black_box(Cell::from_cell_id(id))
 }
 
@@ -27,38 +34,58 @@ fn bench_cell_from_point() -> Cell {
 
 #[library_benchmark]
 fn bench_cell_vertex() -> Point {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let cell = black_box(cell);
-    let _ = black_box(cell.vertex(0));
-    let _ = black_box(cell.vertex(1));
-    let _ = black_box(cell.vertex(2));
-    black_box(cell.vertex(3))
+    let _ = black_box(cell.vertex(CellVertex::LowerLeft));
+    let _ = black_box(cell.vertex(CellVertex::LowerRight));
+    let _ = black_box(cell.vertex(CellVertex::UpperRight));
+    black_box(cell.vertex(CellVertex::UpperLeft))
 }
 
 #[library_benchmark]
 fn bench_cell_children() -> Option<[Cell; 4]> {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let cell = black_box(cell);
     black_box(cell.children())
 }
 
 #[library_benchmark]
 fn bench_cell_contains_point() -> bool {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let p = cell.center();
     black_box(black_box(cell).contains_point(black_box(p)))
 }
 
 #[library_benchmark]
 fn bench_cell_cap_bound() -> Cap {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let cell = black_box(cell);
     black_box(cell.cap_bound())
 }
 
 #[library_benchmark]
 fn bench_cell_rect_bound() -> Rect {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let cell = black_box(cell);
     black_box(cell.rect_bound())
 }
@@ -66,7 +93,11 @@ fn bench_cell_rect_bound() -> Rect {
 // C++: BM_GetDistanceToPoint
 #[library_benchmark]
 fn bench_cell_distance_to_point() -> ChordAngle {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let p = LatLng::from_degrees(48.0, -121.0).to_point();
     black_box(black_box(cell).distance_to_point(black_box(p)))
 }
@@ -74,7 +105,11 @@ fn bench_cell_distance_to_point() -> ChordAngle {
 // C++: BM_GetDistanceToEdge
 #[library_benchmark]
 fn bench_cell_distance_to_edge() -> ChordAngle {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     let a = LatLng::from_degrees(47.5, -122.5).to_point();
     let b = LatLng::from_degrees(48.5, -121.5).to_point();
     black_box(black_box(cell).distance_to_edge(black_box(a), black_box(b)))
@@ -83,8 +118,16 @@ fn bench_cell_distance_to_edge() -> ChordAngle {
 // C++: BM_GetDistanceToCell
 #[library_benchmark]
 fn bench_cell_distance_to_cell() -> ChordAngle {
-    let c1 = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 15));
-    let c2 = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345679, 15));
+    let c1 = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
+    let c2 = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345679,
+        Level::new(15),
+    ));
     black_box(black_box(c1).distance_to_cell(black_box(c2)))
 }
 
@@ -100,17 +143,27 @@ fn bench_cell_subdivide() {
             }
         }
     }
-    let root = black_box(Cell::from_cell_id(CellId::from_face(0)));
+    let root = black_box(Cell::from_cell_id(CellId::from_face(Face::F0)));
     expand(root, 3);
 }
 
 // C++: BM_DistanceCompare — is_distance_less with 50th percentile limit
 #[library_benchmark]
 fn bench_cell_is_distance_less() -> usize {
-    let origin = Cell::from_cell_id(CellId::from_face_pos_level(4, 0xB181D000000000, 30));
+    let origin = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F4,
+        0xB181D000000000,
+        Level::new(30),
+    ));
     // Build 100 nearby cells and compute a median distance as limit.
     let cells: Vec<Cell> = (0..100_u64)
-        .map(|i| Cell::from_cell_id(CellId::from_face_pos_level(4, 0xB181D000000000 + i, 30)))
+        .map(|i| {
+            Cell::from_cell_id(CellId::from_face_pos_level(
+                Face::F4,
+                0xB181D000000000 + i,
+                Level::new(30),
+            ))
+        })
         .collect();
     let mut distances: Vec<ChordAngle> =
         cells.iter().map(|c| origin.distance_to_cell(*c)).collect();
@@ -128,8 +181,16 @@ fn bench_cell_is_distance_less() -> usize {
 // C++: BM_GetDistanceToCellSameFace — distance between cells on same face
 #[library_benchmark]
 fn bench_cell_distance_same_face() -> ChordAngle {
-    let c1 = Cell::from_cell_id(CellId::from_face_pos_level(4, 0xB181D000000000, 20));
-    let c2 = Cell::from_cell_id(CellId::from_face_pos_level(4, 0xB181D000100000, 20));
+    let c1 = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F4,
+        0xB181D000000000,
+        Level::new(20),
+    ));
+    let c2 = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F4,
+        0xB181D000100000,
+        Level::new(20),
+    ));
     black_box(c1.distance_to_cell(c2))
 }
 

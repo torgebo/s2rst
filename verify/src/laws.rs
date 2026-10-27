@@ -73,7 +73,7 @@ pub mod region {
     /// `core/tests/trait_property_tests.rs`.
     pub fn no_intersect_no_vertex<R: Region>(r: &R, c: &Cell) {
         if !r.intersects_cell(c) {
-            for k in 0..4 {
+            for k in s2rst::s2::CellVertex::ALL {
                 assert!(
                     !r.contains_point(&c.vertex(k)),
                     "a vertex of a cell the region does not intersect is contained"

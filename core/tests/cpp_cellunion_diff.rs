@@ -16,6 +16,7 @@
 
 use s2rst::s2::CellId;
 use s2rst::s2::CellUnion;
+use s2rst::s2::LevelMod;
 use s2rst::s2::coords::Level;
 use s2rst::s2::encoding::{S2Decode, S2Encode};
 
@@ -95,7 +96,8 @@ fn denormalize_matches_cpp() {
     for line in section_lines("CELLUNION_DENORMALIZE") {
         let f = fields(line);
         let (min_level, level_mod): (u8, u8) = (f[1].parse().unwrap(), f[2].parse().unwrap());
-        let got = CellUnion::from_verbatim(ids(f[0])).denormalize(Level::new(min_level), level_mod);
+        let got = CellUnion::from_verbatim(ids(f[0]))
+            .denormalize(Level::new(min_level), LevelMod::new(level_mod));
         assert_eq!(
             got.cell_ids(),
             &ids(f[3])[..],

@@ -1,0 +1,270 @@
+   Compiling s2rst v0.5.0 (/home/t/sources/s2rst_multi/3/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 27.82s
+     Running benches/cell.rs (target/release/deps/cell-d55053d3df46f5d6)
+cell::cell_benchmarks::bench_cell_from_cell_id
+  Instructions:                                        232|232                  (No change)
+  L1 Hits:                                             257|257                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             28|28                   (No change)
+  Total read+write:                                    285|285                  (No change)
+  Estimated Cycles:                                   1237|1237                 (No change)
+cell::cell_benchmarks::bench_cell_from_point
+  Instructions:                                        412|412                  (No change)
+  L1 Hits:                                             435|435                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             60|60                   (No change)
+  Total read+write:                                    495|495                  (No change)
+  Estimated Cycles:                                   2535|2535                 (No change)
+cell::cell_benchmarks::bench_cell_vertex
+  Instructions:                                        172|172                  (No change)
+  L1 Hits:                                             194|194                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             25|25                   (No change)
+  Total read+write:                                    219|219                  (No change)
+  Estimated Cycles:                                   1069|1069                 (No change)
+cell::cell_benchmarks::bench_cell_children
+  Instructions:                                        279|279                  (No change)
+  L1 Hits:                                             329|329                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             29|29                   (No change)
+  Total read+write:                                    358|358                  (No change)
+  Estimated Cycles:                                   1344|1344                 (No change)
+cell::cell_benchmarks::bench_cell_contains_point
+  Instructions:                                         89|89                   (No change)
+  L1 Hits:                                              96|96                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             14|14                   (No change)
+  Total read+write:                                    110|110                  (No change)
+  Estimated Cycles:                                    586|586                  (No change)
+cell::cell_benchmarks::bench_cell_cap_bound
+  Instructions:                                        276|276                  (No change)
+  L1 Hits:                                             291|291                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             36|36                   (No change)
+  Total read+write:                                    327|327                  (No change)
+  Estimated Cycles:                                   1551|1551                 (No change)
+cell::cell_benchmarks::bench_cell_rect_bound
+  Instructions:                                        941|941                  (No change)
+  L1 Hits:                                            1108|1108                 (No change)
+  LL Hits:                                               2|2                    (No change)
+  RAM Hits:                                             77|77                   (No change)
+  Total read+write:                                   1187|1187                 (No change)
+  Estimated Cycles:                                   3813|3813                 (No change)
+cell::cell_benchmarks::bench_cell_distance_to_point
+  Instructions:                                        157|157                  (No change)
+  L1 Hits:                                             165|165                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             23|23                   (No change)
+  Total read+write:                                    188|188                  (No change)
+  Estimated Cycles:                                    970|970                  (No change)
+cell::cell_benchmarks::bench_cell_distance_to_edge
+  Instructions:                                       3982|3982                 (No change)
+  L1 Hits:                                            4909|4909                 (No change)
+  LL Hits:                                               7|7                    (No change)
+  RAM Hits:                                            106|106                  (No change)
+  Total read+write:                                   5022|5022                 (No change)
+  Estimated Cycles:                                   8654|8654                 (No change)
+cell::cell_benchmarks::bench_cell_distance_to_cell
+  Instructions:                                        192|192                  (No change)
+  L1 Hits:                                             224|224                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             31|31                   (No change)
+  Total read+write:                                    255|255                  (No change)
+  Estimated Cycles:                                   1309|1309                 (No change)
+cell::cell_benchmarks::bench_cell_subdivide
+  Instructions:                                         12|12                   (No change)
+  L1 Hits:                                              18|18                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              2|2                    (No change)
+  Total read+write:                                     20|20                   (No change)
+  Estimated Cycles:                                     88|88                   (No change)
+cell::cell_benchmarks::bench_cell_is_distance_less
+  Instructions:                                    5641697|5641697              (No change)
+  L1 Hits:                                         7609289|7609289              (No change)
+  LL Hits:                                            1250|1250                 (No change)
+  RAM Hits:                                            542|542                  (No change)
+  Total read+write:                                7611081|7611081              (No change)
+  Estimated Cycles:                                7634509|7634509              (No change)
+cell::cell_benchmarks::bench_cell_distance_same_face
+  Instructions:                                        196|196                  (No change)
+  L1 Hits:                                             227|227                  (No change)
+  LL Hits:                                               1|1                    (No change)
+  RAM Hits:                                             33|33                   (No change)
+  Total read+write:                                    261|261                  (No change)
+  Estimated Cycles:                                   1387|1387                 (No change)
+
+Gungraun result: Ok. 13 without regressions; 0 regressed; 0 filtered; 13 benchmarks finished in 4.82770s
+     Running benches/cell_id.rs (target/release/deps/cell_id-edecb06830497683)
+cell_id::cellid_benchmarks::bench_cellid_from_point
+  Instructions:                                        213|213                  (No change)
+  L1 Hits:                                             216|216                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             35|35                   (No change)
+  Total read+write:                                    251|251                  (No change)
+  Estimated Cycles:                                   1441|1441                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_to_point
+  Instructions:                                        225|225                  (No change)
+  L1 Hits:                                             241|241                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             26|26                   (No change)
+  Total read+write:                                    267|267                  (No change)
+  Estimated Cycles:                                   1151|1151                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_to_point_raw
+  Instructions:                                        202|202                  (No change)
+  L1 Hits:                                             219|219                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             24|24                   (No change)
+  Total read+write:                                    243|243                  (No change)
+  Estimated Cycles:                                   1059|1059                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_from_lat_lng
+  Instructions:                                        466|466                  (No change)
+  L1 Hits:                                             531|531                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             62|62                   (No change)
+  Total read+write:                                    593|593                  (No change)
+  Estimated Cycles:                                   2701|2701                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_from_face_ij
+  Instructions:                                        126|126                  (No change)
+  L1 Hits:                                             133|133                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             12|12                   (No change)
+  Total read+write:                                    145|145                  (No change)
+  Estimated Cycles:                                    553|553                  (No change)
+cell_id::cellid_benchmarks::bench_cellid_level
+  Instructions:                                         16|16                   (No change)
+  L1 Hits:                                              19|19                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              2|2                    (No change)
+  Total read+write:                                     21|21                   (No change)
+  Estimated Cycles:                                     89|89                   (No change)
+cell_id::cellid_benchmarks::bench_cellid_parent
+  Instructions:                                         16|16                   (No change)
+  L1 Hits:                                              20|20                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              1|1                    (No change)
+  Total read+write:                                     21|21                   (No change)
+  Estimated Cycles:                                     55|55                   (No change)
+cell_id::cellid_benchmarks::bench_cellid_parent_at_level
+  Instructions:                                         11|11                   (No change)
+  L1 Hits:                                              15|15                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              1|1                    (No change)
+  Total read+write:                                     16|16                   (No change)
+  Estimated Cycles:                                     50|50                   (No change)
+cell_id::cellid_benchmarks::bench_cellid_child_position
+  Instructions:                                         10|10                   (No change)
+  L1 Hits:                                              14|14                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              1|1                    (No change)
+  Total read+write:                                     15|15                   (No change)
+  Estimated Cycles:                                     49|49                   (No change)
+cell_id::cellid_benchmarks::bench_cellid_children
+  Instructions:                                         21|21                   (No change)
+  L1 Hits:                                              27|27                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              1|1                    (No change)
+  Total read+write:                                     28|28                   (No change)
+  Estimated Cycles:                                     62|62                   (No change)
+cell_id::cellid_benchmarks::bench_cellid_all_neighbors
+  Instructions:                                       2355|2355                 (No change)
+  L1 Hits:                                            2775|2775                 (No change)
+  LL Hits:                                               7|7                    (No change)
+  RAM Hits:                                             65|65                   (No change)
+  Total read+write:                                   2847|2847                 (No change)
+  Estimated Cycles:                                   5085|5085                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_advance
+  Instructions:                                         30|30                   (No change)
+  L1 Hits:                                              33|33                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              2|2                    (No change)
+  Total read+write:                                     35|35                   (No change)
+  Estimated Cycles:                                    103|103                  (No change)
+cell_id::cellid_benchmarks::bench_cellid_contains
+  Instructions:                                         23|23                   (No change)
+  L1 Hits:                                              28|28                   (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              2|2                    (No change)
+  Total read+write:                                     30|30                   (No change)
+  Estimated Cycles:                                     98|98                   (No change)
+cell_id::cellid_benchmarks::bench_cellid_edge_neighbors
+  Instructions:                                        902|902                  (No change)
+  L1 Hits:                                             984|984                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                             53|53                   (No change)
+  Total read+write:                                   1037|1037                 (No change)
+  Estimated Cycles:                                   2839|2839                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_to_token
+  Instructions:                                        840|840                  (No change)
+  L1 Hits:                                            1093|1093                 (No change)
+  LL Hits:                                               3|3                    (No change)
+  RAM Hits:                                             38|38                   (No change)
+  Total read+write:                                   1134|1134                 (No change)
+  Estimated Cycles:                                   2438|2438                 (No change)
+cell_id::cellid_benchmarks::bench_cellid_from_token
+  Instructions:                                        133|133                  (No change)
+  L1 Hits:                                             144|144                  (No change)
+  LL Hits:                                               0|0                    (No change)
+  RAM Hits:                                              3|3                    (No change)
+  Total read+write:                                    147|147                  (No change)
+  Estimated Cycles:                                    249|249                  (No change)
+
+Gungraun result: Ok. 16 without regressions; 0 regressed; 0 filtered; 16 benchmarks finished in 5.63169s
+     Running benches/region_coverer.rs (target/release/deps/region_coverer-161cfaecd274f00b)
+region_coverer::region_coverer_benchmarks::bench_covering_cap
+  Instructions:                                      80857|80857                (No change)
+  L1 Hits:                                          105981|105981               (No change)
+  LL Hits:                                              20|20                   (No change)
+  RAM Hits:                                            407|407                  (No change)
+  Total read+write:                                 106408|106408               (No change)
+  Estimated Cycles:                                 120326|120326               (No change)
+region_coverer::region_coverer_benchmarks::bench_covering_cell
+  Instructions:                                       1847|1847                 (No change)
+  L1 Hits:                                            2687|2688                 (-0.03720%) [-1.00037x]
+  LL Hits:                                               6|6                    (No change)
+  RAM Hits:                                             76|75                   (+1.33333%) [+1.01333x]
+  Total read+write:                                   2769|2769                 (No change)
+  Estimated Cycles:                                   5377|5343                 (+0.63635%) [+1.00636x]
+region_coverer::region_coverer_benchmarks::bench_covering_loop
+  Instructions:                                    2716579|2716369              (+0.00773%) [+1.00008x]
+  L1 Hits:                                         3768680|3769073              (-0.01043%) [-1.00010x]
+  LL Hits:                                            6950|6419                 (+8.27232%) [+1.08272x]
+  RAM Hits:                                            967|965                  (+0.20725%) [+1.00207x]
+  Total read+write:                                3776597|3776457              (+0.00371%) [+1.00004x]
+  Estimated Cycles:                                3837275|3834943              (+0.06081%) [+1.00061x]
+region_coverer::region_coverer_benchmarks::bench_covering_cap_fine
+  Instructions:                                      67450|67450                (No change)
+  L1 Hits:                                           88543|88543                (No change)
+  LL Hits:                                              20|20                   (No change)
+  RAM Hits:                                            403|403                  (No change)
+  Total read+write:                                  88966|88966                (No change)
+  Estimated Cycles:                                 102748|102748               (No change)
+region_coverer::covering_cell_union::bench_covering_cell_union_4
+  Instructions:                                     129077|129097               (-0.01549%) [-1.00015x]
+  L1 Hits:                                          173199|173220               (-0.01212%) [-1.00012x]
+  LL Hits:                                              17|16                   (+6.25000%) [+1.06250x]
+  RAM Hits:                                            317|317                  (No change)
+  Total read+write:                                 173533|173553               (-0.01152%) [-1.00012x]
+  Estimated Cycles:                                 184379|184395               (-0.00868%) [-1.00009x]
+region_coverer::covering_cell_union::bench_covering_cell_union_64
+  Instructions:                                     131882|132208               (-0.24658%) [-1.00247x]
+  L1 Hits:                                          164584|164912               (-0.19889%) [-1.00199x]
+  LL Hits:                                              29|28                   (+3.57143%) [+1.03571x]
+  RAM Hits:                                            499|498                  (+0.20080%) [+1.00201x]
+  Total read+write:                                 165112|165438               (-0.19705%) [-1.00197x]
+  Estimated Cycles:                                 182194|182482               (-0.15782%) [-1.00158x]
+region_coverer::covering_loop_scaling::bench_covering_loop_32_vertices
+  Instructions:                                     193094|193094               (No change)
+  L1 Hits:                                          264940|264943               (-0.00113%) [-1.00001x]
+  LL Hits:                                              95|94                   (+1.06383%) [+1.01064x]
+  RAM Hits:                                            861|859                  (+0.23283%) [+1.00233x]
+  Total read+write:                                 265896|265896               (No change)
+  Estimated Cycles:                                 295550|295478               (+0.02437%) [+1.00024x]
+region_coverer::covering_loop_scaling::bench_covering_loop_256_vertices
+  Instructions:                                     913324|913324               (No change)
+  L1 Hits:                                         1253370|1253379              (-0.00072%) [-1.00001x]
+  LL Hits:                                            1754|1747                 (+0.40069%) [+1.00401x]
+  RAM Hits:                                           2315|2313                 (+0.08647%) [+1.00086x]
+  Total read+write:                                1257439|1257439              (No change)
+  Estimated Cycles:                                1343165|1343069              (+0.00715%) [+1.00007x]
+
+Gungraun result: Ok. 8 without regressions; 0 regressed; 0 filtered; 8 benchmarks finished in 3.22175s

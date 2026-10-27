@@ -498,7 +498,7 @@ fn test_cell_id_none_sentinel() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_from_face() {
-    let id = CellId::from_face(3);
+    let id = CellId::from_face(3.0).unwrap();
     assert!(id.is_valid());
     assert!(id.is_face());
     assert_eq!(id.face(), 3);
@@ -533,7 +533,7 @@ fn test_cell_id_token_roundtrip() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_id_string() {
-    let id = CellId::from_face(0);
+    let id = CellId::from_face(0.0).unwrap();
     let s = id.id_string();
     assert!(!s.is_empty());
     // Should be a decimal number string
@@ -542,7 +542,7 @@ fn test_cell_id_id_string() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_id_parts() {
-    let id = CellId::from_face(0);
+    let id = CellId::from_face(0.0).unwrap();
     let parts = id.id_parts();
     assert_eq!(parts.len(), 2);
 }
@@ -567,14 +567,16 @@ fn test_cell_id_parent() {
 #[wasm_bindgen_test]
 fn test_cell_id_parent_at_level() {
     let id = CellId::from_lat_lng(&LatLng::from_degrees(40.0, -74.0));
-    let parent = id.parent_at_level(10);
+    let parent = id.parent_at_level(10.0).unwrap();
     assert_eq!(parent.level(), 10);
     assert!(parent.contains(&id));
 }
 
 #[wasm_bindgen_test]
 fn test_cell_id_children() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(5);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(5.0)
+        .unwrap();
     let children = id.children();
     assert_eq!(children.len(), 4);
     for c in &children {
@@ -585,7 +587,9 @@ fn test_cell_id_children() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_range_min_max() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(10.0)
+        .unwrap();
     let rmin = id.range_min();
     let rmax = id.range_max();
     assert!(id.contains(&rmin));
@@ -594,7 +598,9 @@ fn test_cell_id_range_min_max() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_contains_intersects() {
-    let parent = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(5);
+    let parent = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(5.0)
+        .unwrap();
     let child = parent.children()[0];
     assert!(parent.contains(&child));
     assert!(parent.intersects(&child));
@@ -631,7 +637,9 @@ fn test_cell_id_to_point_to_lat_lng() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_edge_neighbors() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(10.0)
+        .unwrap();
     let neighbors = id.edge_neighbors();
     assert_eq!(neighbors.len(), 4);
     for n in &neighbors {
@@ -641,15 +649,19 @@ fn test_cell_id_edge_neighbors() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_vertex_neighbors() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
-    let neighbors = id.vertex_neighbors(10);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(10.0)
+        .unwrap();
+    let neighbors = id.vertex_neighbors(10.0).unwrap();
     assert!(neighbors.len() >= 3);
 }
 
 #[wasm_bindgen_test]
 fn test_cell_id_all_neighbors() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
-    let neighbors = id.all_neighbors(10);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(10.0)
+        .unwrap();
+    let neighbors = id.all_neighbors(10.0).unwrap();
     assert!(neighbors.is_some());
     assert!(neighbors.unwrap().len() >= 4);
 }
@@ -664,7 +676,7 @@ fn test_cell_id_common_ancestor_level() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_debug_string_roundtrip() {
-    let id = CellId::from_face(3).children()[1];
+    let id = CellId::from_face(3.0).unwrap().children()[1];
     let dbg = id.to_debug_string();
     assert!(!dbg.is_empty());
     let parsed = CellId::from_debug_string(&dbg);
@@ -674,7 +686,7 @@ fn test_cell_id_debug_string_roundtrip() {
 
 #[wasm_bindgen_test]
 fn test_cell_id_to_string() {
-    let id = CellId::from_face(0);
+    let id = CellId::from_face(0.0).unwrap();
     let s = id.to_string_js();
     assert!(!s.is_empty());
 }
@@ -708,7 +720,7 @@ fn test_cell_from_lat_lng() {
 
 #[wasm_bindgen_test]
 fn test_cell_from_face() {
-    let cell = Cell::from_face(2);
+    let cell = Cell::from_face(2.0).unwrap();
     assert_eq!(cell.face(), 2);
     assert_eq!(cell.level(), 0);
     assert!(!cell.is_leaf());
@@ -716,29 +728,29 @@ fn test_cell_from_face() {
 
 #[wasm_bindgen_test]
 fn test_cell_vertex_edge() {
-    let cell = Cell::from_face(0);
+    let cell = Cell::from_face(0.0).unwrap();
     for k in 0..4 {
-        let v = cell.vertex(k).unwrap();
+        let v = cell.vertex(f64::from(k)).unwrap();
         assert!(v.is_unit());
-        let e = cell.edge(k as u8).unwrap();
+        let e = cell.edge(f64::from(k)).unwrap();
         let _ = e; // Just check it doesn't panic
     }
 }
 
 #[wasm_bindgen_test]
 fn test_cell_center() {
-    let cell = Cell::from_face(0);
+    let cell = Cell::from_face(0.0).unwrap();
     let c = cell.center();
     assert!(c.is_unit());
 }
 
 #[wasm_bindgen_test]
 fn test_cell_area() {
-    let cell = Cell::from_face(0);
+    let cell = Cell::from_face(0.0).unwrap();
     assert!(cell.exact_area() > 0.0);
     assert!(cell.approx_area() > 0.0);
     assert!(cell.average_area() > 0.0);
-    let level_area = Cell::average_area_for_level(15);
+    let level_area = Cell::average_area_for_level(15.0).unwrap();
     assert!(level_area > 0.0);
     assert!(level_area < cell.average_area());
 }
@@ -753,7 +765,7 @@ fn test_cell_contains_point() {
 
 #[wasm_bindgen_test]
 fn test_cell_cap_bound_rect_bound() {
-    let cell = Cell::from_face(0);
+    let cell = Cell::from_face(0.0).unwrap();
     let cap = cell.cap_bound();
     assert!(cap.is_valid());
     assert!(!cap.is_empty());
@@ -813,7 +825,10 @@ fn test_cell_union_from_tokens() {
 #[wasm_bindgen_test]
 fn test_cell_union_from_range_covers_exactly_the_range() {
     // D-002: five leaves are a level-29 cell plus one leaf (C++ FromBeginEnd).
-    let begin = CellId::from_face(1).child_begin_at_level(30);
+    let begin = CellId::from_face(1.0)
+        .unwrap()
+        .child_begin_at_level(30.0)
+        .unwrap();
     let end = begin.advance(5);
     assert_eq!(CellUnion::from_range(&begin, &end).unwrap().num_cells(), 2);
 }
@@ -822,15 +837,21 @@ fn test_cell_union_from_range_covers_exactly_the_range() {
 fn test_cell_union_range_constructors_reject_bad_arguments() {
     // C++ FromBeginEnd requires leaf cells with begin <= end (DCHECKs only). In a release
     // build, CellId(0) as begin looped forever; the bindings throw instead.
-    let leaf = |face: u8, k: i64| CellId::from_face(face).child_begin_at_level(30).advance(k);
+    let leaf = |face: u8, k: i64| {
+        CellId::from_face(f64::from(face))
+            .unwrap()
+            .child_begin_at_level(30.0)
+            .unwrap()
+            .advance(k)
+    };
     let zero = CellId::none();
-    let face4 = CellId::from_face(4);
+    let face4 = CellId::from_face(4.0).unwrap();
     assert!(CellUnion::from_range(&zero, &leaf(0, 3)).is_err());
     assert!(CellUnion::from_range(&leaf(1, 0), &face4).is_err());
     assert!(CellUnion::from_range(&leaf(3, 0), &leaf(1, 0)).is_err());
     assert!(CellUnion::from_begin_end(&zero, &leaf(0, 3)).is_err());
     assert!(CellUnion::from_min_max(&leaf(3, 0), &leaf(1, 0)).is_err());
-    let leaf_end = CellId::from_face(5).range_max().next();
+    let leaf_end = CellId::from_face(5.0).unwrap().range_max().next();
     assert!(CellUnion::from_min_max(&leaf(5, 0), &leaf_end).is_err());
     assert_eq!(
         CellUnion::from_range(&leaf(5, 0), &leaf_end)
@@ -907,16 +928,20 @@ fn test_cell_union_normalize() {
 
 #[wasm_bindgen_test]
 fn test_cell_union_expand() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(10.0)
+        .unwrap();
     let mut cu = CellUnion::from_cell_ids(vec![id]);
     let n_before = cu.num_cells();
-    cu.expand_at_level(10);
+    cu.expand_at_level(10.0).unwrap();
     assert!(cu.num_cells() > n_before);
 }
 
 #[wasm_bindgen_test]
 fn test_cell_union_expand_by_radius() {
-    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
+    let id = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0))
+        .parent_at_level(10.0)
+        .unwrap();
     let mut cu = CellUnion::from_cell_ids(vec![id]);
     let n_before = cu.num_cells();
     cu.expand_by_radius(&Angle::from_degrees(1.0), 5);
@@ -1332,7 +1357,7 @@ fn test_loop_empty_full() {
 
 #[wasm_bindgen_test]
 fn test_loop_from_cell() {
-    let cell = Cell::from_face(0);
+    let cell = Cell::from_face(0.0).unwrap();
     let loop_ = Loop::from_cell(&cell);
     assert_eq!(loop_.num_vertices(), 4);
 }
@@ -1495,7 +1520,7 @@ fn test_polygon_empty_full() {
 
 #[wasm_bindgen_test]
 fn test_polygon_from_cell() {
-    let cell = Cell::from_face(0);
+    let cell = Cell::from_face(0.0).unwrap();
     let poly = Polygon::from_cell(&cell);
     assert_eq!(poly.num_loops(), 1);
     assert!(poly.area() > 0.0);
@@ -1799,9 +1824,12 @@ fn test_region_coverer_new() {
 #[wasm_bindgen_test]
 fn test_region_coverer_settings() {
     let rc = RegionCoverer::new()
-        .set_min_level(5)
-        .set_max_level(15)
-        .set_level_mod(2)
+        .set_min_level(5.0)
+        .unwrap()
+        .set_max_level(15.0)
+        .unwrap()
+        .set_level_mod(2.0)
+        .unwrap()
         .set_max_cells(10);
     // Just verify chaining works and doesn't panic
     let _ = rc;
@@ -1811,8 +1839,11 @@ fn test_region_coverer_settings() {
 fn test_region_coverer_covering_cap() {
     let center = LatLng::from_degrees(48.8566, 2.3522).to_point();
     let cap = Cap::from_center_angle(&center, &Angle::from_degrees(0.5));
-    let coverer = RegionCoverer::new().set_max_level(14).set_max_cells(8);
-    let covering = coverer.covering_cap(&cap);
+    let coverer = RegionCoverer::new()
+        .set_max_level(14.0)
+        .unwrap()
+        .set_max_cells(8);
+    let covering = coverer.covering_cap(&cap).unwrap();
     assert!(covering.num_cells() > 0);
     assert!(covering.num_cells() <= 8);
 }
@@ -1824,7 +1855,7 @@ fn test_region_coverer_covering_rect() {
         &LatLng::from_degrees(1.0, 1.0),
     );
     let coverer = RegionCoverer::new().set_max_cells(20);
-    let covering = coverer.covering_rect(&rect);
+    let covering = coverer.covering_rect(&rect).unwrap();
     assert!(covering.num_cells() > 0);
 }
 
@@ -1832,7 +1863,7 @@ fn test_region_coverer_covering_rect() {
 fn test_region_coverer_covering_loop() {
     let loop_ = make_loop("0:0, 0:10, 10:10, 10:0").unwrap();
     let coverer = RegionCoverer::new().set_max_cells(20);
-    let covering = coverer.covering_loop(&loop_);
+    let covering = coverer.covering_loop(&loop_).unwrap();
     assert!(covering.num_cells() > 0);
 }
 
@@ -1840,7 +1871,7 @@ fn test_region_coverer_covering_loop() {
 fn test_region_coverer_covering_polygon() {
     let poly = make_polygon("0:0, 0:10, 10:10, 10:0").unwrap();
     let coverer = RegionCoverer::new().set_max_cells(20);
-    let covering = coverer.covering_polygon(&poly);
+    let covering = coverer.covering_polygon(&poly).unwrap();
     assert!(covering.num_cells() > 0);
 }
 
@@ -1849,7 +1880,7 @@ fn test_region_coverer_interior_covering_cap() {
     let center = LatLng::from_degrees(0.0, 0.0).to_point();
     let cap = Cap::from_center_angle(&center, &Angle::from_degrees(5.0));
     let coverer = RegionCoverer::new().set_max_cells(50);
-    let covering = coverer.interior_covering_cap(&cap);
+    let covering = coverer.interior_covering_cap(&cap).unwrap();
     assert!(covering.num_cells() > 0);
 }
 
@@ -1860,7 +1891,7 @@ fn test_region_coverer_interior_covering_rect() {
         &LatLng::from_degrees(10.0, 10.0),
     );
     let coverer = RegionCoverer::new().set_max_cells(50);
-    let covering = coverer.interior_covering_rect(&rect);
+    let covering = coverer.interior_covering_rect(&rect).unwrap();
     assert!(covering.num_cells() > 0);
 }
 
@@ -1868,7 +1899,7 @@ fn test_region_coverer_interior_covering_rect() {
 fn test_region_coverer_interior_covering_polygon() {
     let poly = make_polygon("0:0, 0:10, 10:10, 10:0").unwrap();
     let coverer = RegionCoverer::new().set_max_cells(50);
-    let covering = coverer.interior_covering_polygon(&poly);
+    let covering = coverer.interior_covering_polygon(&poly).unwrap();
     assert!(covering.num_cells() > 0);
 }
 
@@ -1995,7 +2026,9 @@ fn test_shape_index_locate_cell() {
     index.add_polygon(poly);
     index.build();
 
-    let cell_id = CellId::from_lat_lng(&LatLng::from_degrees(5.0, 5.0)).parent_at_level(5);
+    let cell_id = CellId::from_lat_lng(&LatLng::from_degrees(5.0, 5.0))
+        .parent_at_level(5.0)
+        .unwrap();
     let rel = index.locate_cell(&cell_id);
     assert!(rel == "DISJOINT" || rel == "SUBDIVIDED" || rel == "INDEXED");
 }
@@ -2357,11 +2390,11 @@ fn test_polygon_loop_at_out_of_range_throws() {
 
 #[wasm_bindgen_test]
 fn test_cell_vertex_edge_out_of_range_throws() {
-    let cell = Cell::from_face(0);
-    assert!(cell.vertex(3).is_ok());
-    assert!(cell.vertex(4).is_err());
-    assert!(cell.edge(3).is_ok());
-    assert!(cell.edge(9).is_err());
+    let cell = Cell::from_face(0.0).unwrap();
+    assert!(cell.vertex(3.0).is_ok());
+    assert!(cell.vertex(4.0).is_err());
+    assert!(cell.edge(3.0).is_ok());
+    assert!(cell.edge(9.0).is_err());
 }
 
 // ===========================================================================
@@ -2417,18 +2450,18 @@ fn test_polygon_loop_contains_point() {
 
 #[wasm_bindgen_test]
 fn test_cell_contains_and_intersects_cell() {
-    let parent = Cell::from_face(0);
-    let pid = CellId::from_face(0);
+    let parent = Cell::from_face(0.0).unwrap();
+    let pid = CellId::from_face(0.0).unwrap();
     let child = Cell::from_cell_id(&pid.children()[0]);
     assert!(parent.contains_cell(&child));
     assert!(parent.intersects_cell(&child));
-    let other_face = Cell::from_face(3);
+    let other_face = Cell::from_face(3.0).unwrap();
     assert!(!parent.contains_cell(&other_face));
 }
 
 #[wasm_bindgen_test]
 fn test_cell_id_hierarchy_iteration() {
-    let face = CellId::from_face(0);
+    let face = CellId::from_face(0.0).unwrap();
     let cb = face.child_begin();
     let ce = face.child_end();
     assert_eq!(cb.level(), 1);
@@ -2442,17 +2475,17 @@ fn test_cell_id_hierarchy_iteration() {
     assert_eq!(count, 4);
 
     // from_face_pos_level round-trips the face.
-    let rebuilt = CellId::from_face_pos_level(0, face.pos(), 0);
+    let rebuilt = CellId::from_face_pos_level(0.0, face.pos(), 0.0).unwrap();
     assert_eq!(rebuilt.face(), 0);
     assert!(rebuilt.is_face());
 
     // begin/end at a level, advance, child_position.
-    let b = CellId::begin(1);
-    let _e = CellId::end(1); // past-the-end sentinel; do not deref its face.
+    let b = CellId::begin(1.0).unwrap();
+    let _e = CellId::end(1.0).unwrap(); // past-the-end sentinel; do not deref its face.
     assert_eq!(b.level(), 1);
     assert!(b.is_valid());
     assert!(b.advance(1).is_valid());
-    let _ = face.children()[1].child_position(1);
+    let _ = face.children()[1].child_position(1.0).unwrap();
     assert!(face.lsb() > 0);
 }
 
@@ -2515,7 +2548,7 @@ fn test_cap_interior_and_add() {
 
 #[wasm_bindgen_test]
 fn test_cell_union_range_constructors() {
-    let f = CellId::from_face(0);
+    let f = CellId::from_face(0.0).unwrap();
     let u = CellUnion::from_range(&f.range_min(), &f.range_max()).unwrap();
     assert!(u.is_valid());
     assert!(u.num_cells() >= 1);
@@ -2528,7 +2561,7 @@ fn test_cell_union_range_constructors() {
 #[wasm_bindgen_test]
 fn test_polygon_snapped() {
     let poly = make_polygon("0:0, 0:10, 10:10, 10:0").unwrap();
-    let snapped = poly.snapped(20);
+    let snapped = poly.snapped(20.0).unwrap();
     assert!(snapped.num_loops() >= 1);
 }
 
@@ -2539,7 +2572,9 @@ fn test_polygon_snapped() {
 #[wasm_bindgen_test]
 fn test_snap_function_and_simplified() {
     let poly = make_polygon("0:0, 0:5, 0:10, 5:10, 10:10, 10:0").unwrap();
-    let _ = poly.simplified(&SnapFunction::cell_id(20)).area();
+    let _ = poly
+        .simplified(&SnapFunction::cell_id(20.0).unwrap())
+        .area();
     let _ = poly
         .simplified(&SnapFunction::identity(&Angle::from_degrees(0.5)))
         .area();
@@ -2572,11 +2607,14 @@ fn test_encode_decode_roundtrips() {
     let pld = Polyline::decode(&pl.encode()).unwrap();
     assert_eq!(pld.num_vertices(), pl.num_vertices());
 
-    let u = CellUnion::from_cell_ids(vec![CellId::from_face(0), CellId::from_face(3)]);
+    let u = CellUnion::from_cell_ids(vec![
+        CellId::from_face(0.0).unwrap(),
+        CellId::from_face(3.0).unwrap(),
+    ]);
     let ud = CellUnion::decode(&u.encode()).unwrap();
     assert_eq!(ud.num_cells(), u.num_cells());
 
-    let id = CellId::from_face(0).children()[0];
+    let id = CellId::from_face(0.0).unwrap().children()[0];
     let idd = CellId::decode(&id.encode()).unwrap();
     assert_eq!(idd.id_string(), id.id_string());
 }
@@ -2603,9 +2641,14 @@ fn test_polyline_uninterpolate() {
 
 #[wasm_bindgen_test]
 fn test_cell_children_and_orientation() {
-    let c = Cell::from_face(0);
+    let c = Cell::from_face(0.0).unwrap();
     assert_eq!(c.children().len(), 4);
-    let leaf = Cell::from_cell_id(&CellId::from_face(0).child_begin_at_level(30));
+    let leaf = Cell::from_cell_id(
+        &CellId::from_face(0.0)
+            .unwrap()
+            .child_begin_at_level(30.0)
+            .unwrap(),
+    );
     assert_eq!(leaf.children().len(), 0);
     assert!(c.orientation() <= 3);
 }
@@ -2630,19 +2673,25 @@ fn test_earth_conversions() {
 #[wasm_bindgen_test]
 fn test_region_coverer_extras() {
     let cap = Cap::from_center_angle(&Point::new(1.0, 0.0, 0.0), &Angle::from_degrees(5.0));
-    let cov = RegionCoverer::new().set_max_cells(8).covering_cap(&cap);
+    let cov = RegionCoverer::new()
+        .set_max_cells(8)
+        .covering_cap(&cap)
+        .unwrap();
     assert!(cov.num_cells() >= 1);
     let fast = RegionCoverer::new()
         .set_max_cells(8)
-        .fast_covering_cap(&cap);
+        .fast_covering_cap(&cap)
+        .unwrap();
     assert!(fast.num_cells() >= 1);
-    let u = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
+    let u = CellUnion::from_cell_ids(vec![CellId::from_face(0.0).unwrap()]);
     let _ = RegionCoverer::new()
         .set_max_cells(8)
-        .covering_cell_union(&u);
+        .covering_cell_union(&u)
+        .unwrap();
     let _ = RegionCoverer::new()
         .set_max_cells(8)
-        .is_canonical(cov.cell_ids());
+        .is_canonical(cov.cell_ids())
+        .unwrap();
 }
 
 // ===========================================================================
@@ -2767,7 +2816,7 @@ fn test_shape_index_queries() {
 #[wasm_bindgen_test]
 fn test_s2builder_driver() {
     // Assemble a polygon from a loop, snapping to cell level 20.
-    let mut b = Builder::new(&SnapFunction::cell_id(20));
+    let mut b = Builder::new(&SnapFunction::cell_id(20.0).unwrap());
     b.add_loop(&make_loop("0:0, 0:10, 10:10, 10:0").unwrap());
     let poly = b.build_polygon().unwrap();
     assert!(poly.num_loops() >= 1);
@@ -2783,7 +2832,7 @@ fn test_s2builder_driver() {
     assert!(pl.num_vertices() >= 2);
 
     // Reusable: build a polyline from a polyline input.
-    let mut pb2 = Builder::new(&SnapFunction::cell_id(20));
+    let mut pb2 = Builder::new(&SnapFunction::cell_id(20.0).unwrap());
     pb2.add_polyline(&make_polyline("0:0, 0:5, 0:10").unwrap());
     assert!(pb2.build_polyline().unwrap().num_vertices() >= 2);
 }
@@ -2915,8 +2964,8 @@ fn test_point_and_cell_indexes() {
     assert!(near[0].distance_radians() >= 0.0 && near[0].point().is_unit());
 
     let mut cidx = CellIndex::new();
-    cidx.add(&CellId::from_face(0), 1);
-    cidx.add(&CellId::from_face(3), 2);
+    cidx.add(&CellId::from_face(0.0).unwrap(), 1);
+    cidx.add(&CellId::from_face(3.0).unwrap(), 2);
     cidx.build();
     let cc = cidx.closest_cells(&parse_point("0:0").unwrap(), 1, f64::INFINITY);
     assert!(!cc.is_empty());
@@ -2932,23 +2981,31 @@ fn test_point_and_cell_indexes() {
 fn test_region_term_indexer() {
     let rti = RegionTermIndexer::new().set_max_cells(8);
     let poly = make_polygon("0:0, 0:10, 10:10, 10:0").unwrap();
-    let index_terms = rti.index_terms_for_polygon(&poly);
+    let index_terms = rti.index_terms_for_polygon(&poly).unwrap();
     assert!(!index_terms.is_empty());
 
     // A point inside the region shares a term with the indexed region.
-    let inside = rti.query_terms_for_point(&parse_point("5:5").unwrap());
+    let inside = rti
+        .query_terms_for_point(&parse_point("5:5").unwrap())
+        .unwrap();
     assert!(inside.iter().any(|t| index_terms.contains(t)));
 
     // A far-away point shares no term.
-    let outside = rti.query_terms_for_point(&parse_point("80:80").unwrap());
+    let outside = rti
+        .query_terms_for_point(&parse_point("80:80").unwrap())
+        .unwrap();
     assert!(!outside.iter().any(|t| index_terms.contains(t)));
 
     // Covering- and other region-based variants are callable.
-    let _ = rti.index_terms_for_cap(&Cap::from_center_angle(
-        &parse_point("5:5").unwrap(),
-        &Angle::from_degrees(1.0),
-    ));
-    let _ = rti.query_terms_for_rect(&make_rect("0:0, 10:10").unwrap());
+    let _ = rti
+        .index_terms_for_cap(&Cap::from_center_angle(
+            &parse_point("5:5").unwrap(),
+            &Angle::from_degrees(1.0),
+        ))
+        .unwrap();
+    let _ = rti
+        .query_terms_for_rect(&make_rect("0:0, 10:10").unwrap())
+        .unwrap();
 }
 
 // ===========================================================================

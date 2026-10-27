@@ -4,6 +4,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::angle::Angle;
+use crate::bounded::level_arg;
 use crate::cap::Cap;
 use crate::cell::Cell;
 use crate::point::Point;
@@ -43,8 +44,13 @@ impl Polygon {
 
     /// A copy of this polygon with vertices snapped to the given S2 cell level
     /// (0–30). Builds the snapping pipeline internally.
-    pub fn snapped(&self, snap_level: u8) -> Polygon {
-        Polygon(s2rst::s2::Polygon::snapped(&self.0, snap_level))
+    ///
+    /// Throws unless `snapLevel` is an integer in 0..=30.
+    pub fn snapped(&self, snap_level: f64) -> Result<Polygon, JsValue> {
+        Ok(Polygon(s2rst::s2::Polygon::snapped(
+            &self.0,
+            level_arg(snap_level)?,
+        )))
     }
 
     /// A simplified copy of this polygon, merging vertices and edges according

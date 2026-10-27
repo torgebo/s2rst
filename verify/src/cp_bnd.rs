@@ -5,8 +5,8 @@
 //! `Cap`'s bounds: cap, covering, rectangle, and the longitude reduction (P-CPBND, spec 008
 //! data-model §4).
 
-use s2rst::s2::Region;
 use s2rst::s2::metric::MIN_WIDTH;
+use s2rst::s2::{Level, Region};
 
 use crate::cap_spec;
 use crate::stubs;
@@ -53,7 +53,7 @@ fn p_cpbnd_02() {
     let level = i32::from(MIN_WIDTH.max_level(r).as_u8()) - 1;
     assert!(level == cap_spec::upstream_level(r));
     if level >= 0 {
-        assert!(MIN_WIDTH.value(level as u8) >= 2.0 * r);
+        assert!(MIN_WIDTH.value(Level::new(level as u8)) >= 2.0 * r);
     }
     kani::cover!(level == -1, "the six faces");
     kani::cover!(level == 29, "the finest level");

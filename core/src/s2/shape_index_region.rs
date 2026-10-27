@@ -320,6 +320,7 @@ impl Region for ShapeIndexRegion<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::LatLng;
     use crate::s2::shape::{Chain, ChainPosition, Edge, ReferencePoint, Shape};
 
@@ -415,7 +416,7 @@ mod tests {
 
         let region = ShapeIndexRegion::new(&index);
         // The face cell should intersect.
-        let face_cell = Cell::from_cell_id(CellId::from_face(0));
+        let face_cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         assert!(region.intersects_cell(&face_cell));
 
         // A cell on the opposite side of the sphere should not.
@@ -441,7 +442,7 @@ mod tests {
 
         // A very small cell near the center of the polygon.
         let center_id = CellId::from_point(&p(0.0, 0.0));
-        let small_cell = Cell::from_cell_id(center_id.parent_at_level(20));
+        let small_cell = Cell::from_cell_id(center_id.parent_at_level(Level::new(20)));
         assert!(
             region.contains_cell(&small_cell),
             "A small cell inside a large polygon should be contained"
@@ -461,7 +462,7 @@ mod tests {
 
         // A cell far from the polygon.
         let far_id = CellId::from_point(&p(45.0, 90.0));
-        let far_cell = Cell::from_cell_id(far_id.parent_at_level(10));
+        let far_cell = Cell::from_cell_id(far_id.parent_at_level(Level::new(10)));
         assert!(!region.contains_cell(&far_cell));
     }
 
@@ -475,7 +476,7 @@ mod tests {
         // A cell that overlaps the boundary of the polygon.
         // Use a cell near one of the polygon edges.
         let edge_id = CellId::from_point(&p(1.0, 0.0));
-        let edge_cell = Cell::from_cell_id(edge_id.parent_at_level(15));
+        let edge_cell = Cell::from_cell_id(edge_id.parent_at_level(Level::new(15)));
         assert!(
             region.intersects_cell(&edge_cell),
             "A cell overlapping a polygon boundary should intersect"
@@ -495,7 +496,7 @@ mod tests {
         let region = ShapeIndexRegion::new(&index);
 
         let interior_id = CellId::from_point(&p(0.0, 0.0));
-        let interior_cell = Cell::from_cell_id(interior_id.parent_at_level(20));
+        let interior_cell = Cell::from_cell_id(interior_id.parent_at_level(Level::new(20)));
         assert!(region.intersects_cell(&interior_cell));
     }
 
@@ -510,7 +511,7 @@ mod tests {
         let region = ShapeIndexRegion::new(&index);
 
         let far_id = CellId::from_point(&p(45.0, 90.0));
-        let far_cell = Cell::from_cell_id(far_id.parent_at_level(10));
+        let far_cell = Cell::from_cell_id(far_id.parent_at_level(Level::new(10)));
         assert!(!region.intersects_cell(&far_cell));
     }
 

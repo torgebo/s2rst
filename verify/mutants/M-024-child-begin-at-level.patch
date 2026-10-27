@@ -4,15 +4,14 @@ Expect-Fail: hier::p_hier_07
 Defect: child_begin_at_level() doubles the new marker
 
 diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
-index 9a961e1..5e0dd4e 100644
 --- a/core/src/s2/cell_id.rs
 +++ b/core/src/s2/cell_id.rs
-@@ -413,7 +413,7 @@ impl CellId {
-     /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
+@@ -428,7 +428,7 @@
+     /// Returns the first child at the given level (must be >= this cell's level).
      #[inline]
-     pub fn child_begin_at_level(self, level: impl Into<Level>) -> CellId {
--        CellId(self.0 - self.lsb() + lsb_for_level(level.into()))
-+        CellId(self.0 - self.lsb() + 2 * lsb_for_level(level.into()))
+     pub fn child_begin_at_level(self, level: Level) -> CellId {
+-        CellId(self.0 - self.lsb() + lsb_for_level(level))
++        CellId(self.0 - self.lsb() + 2 * lsb_for_level(level))
      }
  
      /// Returns the first cell after the last child at the given level.

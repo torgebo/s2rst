@@ -137,6 +137,7 @@ impl Region for RegionUnion {
 mod tests {
     use super::*;
     use crate::s1;
+    use crate::s2::Face;
     use crate::s2::LatLng;
 
     fn p(lat: f64, lng: f64) -> Point {
@@ -190,7 +191,7 @@ mod tests {
         let ru = RegionUnion::from_regions(vec![Box::new(cap)]);
 
         // Face 0 cell should intersect (it contains the equator at lng=0)
-        let face0 = Cell::from(CellId::from_face(0));
+        let face0 = Cell::from(CellId::from_face(Face::F0));
         assert!(ru.intersects_cell(&face0));
     }
 
@@ -200,7 +201,7 @@ mod tests {
         let cap = Cap::full();
         let ru = RegionUnion::from_regions(vec![Box::new(cap)]);
 
-        let face0 = Cell::from(CellId::from_face(0));
+        let face0 = Cell::from(CellId::from_face(Face::F0));
         assert!(ru.contains_cell(&face0));
     }
 

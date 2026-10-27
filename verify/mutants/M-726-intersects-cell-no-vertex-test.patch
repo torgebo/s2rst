@@ -6,9 +6,9 @@ Defect: `Region::intersects_cell` without the vertex test
 diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
 --- a/core/src/s2/cap.rs
 +++ b/core/src/s2/cap.rs
-@@ -506,9 +506,6 @@
-             cell.vertex(2),
-             cell.vertex(3),
+@@ -508,9 +508,6 @@
+             cell.vertex(CellVertex::UpperRight),
+             cell.vertex(CellVertex::UpperLeft),
          ];
 -        if vertices.iter().any(|&v| self.contains_point(v)) {
 -            return true;

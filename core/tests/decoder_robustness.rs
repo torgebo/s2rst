@@ -18,6 +18,8 @@
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::contains_point_query::{ContainsPointQuery, VertexModel};
 use s2rst::s2::density_tree::{S2DensityTree, TreeEncoder};
 use s2rst::s2::encoded_s2cell_id_vector::{decode_s2cell_id_vector, encode_s2cell_id_vector};
@@ -60,7 +62,7 @@ fn rand_cell_ids(r: &mut ChaCha8Rng, n: usize) -> Vec<CellId> {
             let leaf = CellId::from_point(&rand_point(r));
             // Vary the level so the delta encoding sees a range of cells.
             let level: u8 = r.gen_range(0..=30);
-            leaf.parent_at_level(level)
+            leaf.parent_at_level(Level::new(level))
         })
         .collect()
 }
@@ -132,7 +134,7 @@ where
 /// descendants, so the ancestors-present invariant holds) and return its bytes.
 fn valid_density_tree_bytes() -> Vec<u8> {
     let mut enc = TreeEncoder::new();
-    let face = CellId::from_face(0u8);
+    let face = CellId::from_face(Face::F0);
     enc.put(face, 100);
     enc.put(face.children()[0], 60);
     enc.put(face.children()[0].children()[2], 25);
@@ -576,15 +578,16 @@ fn compressed_points_robustness() {
         let points = rand_points(&mut r, n);
         let xyz = points_to_xyz_face_si_ti(&points);
         let mut buf = Vec::new();
-        encode_points_compressed(&mut buf, &xyz, level).unwrap();
-        let decoded = decode_points_compressed(&mut buf.as_slice(), level, points.len()).unwrap();
+        encode_points_compressed(&mut buf, &xyz, Level::new(level)).unwrap();
+        let decoded =
+            decode_points_compressed(&mut buf.as_slice(), Level::new(level), points.len()).unwrap();
         assert_eq!(decoded.len(), points.len());
 
         // Every truncation of that valid encoding must not panic.
         for cut in 0..=buf.len() {
             no_panic(
                 "compressed_points",
-                |rr| decode_points_compressed(rr, level, points.len()),
+                |rr| decode_points_compressed(rr, Level::new(level), points.len()),
                 &buf[..cut],
             );
         }
@@ -602,7 +605,7 @@ fn compressed_points_robustness() {
         let num_points = (u16::from_le_bytes([bytes[1], bytes[2]]) % 4096) as usize;
         no_panic(
             "compressed_points",
-            |rr| decode_points_compressed(rr, lvl, num_points),
+            |rr| decode_points_compressed(rr, Level::new(lvl), num_points),
             &bytes[3..],
         );
     }
@@ -831,16 +834,16 @@ fn no_decoder_panics_on_any_input() {
         // A valid union that is not normalised (four siblings), which decodes verbatim, and
         // an unsorted encoding, which is rejected (spec 002, FR-017).
         enc(&CellUnion::from_verbatim(
-            CellId::from_face(2u8)
-                .child_begin_at_level(9)
+            CellId::from_face(Face::F2)
+                .child_begin_at_level(Level::new(9))
                 .children()
                 .to_vec(),
         )),
         [
             &[1u8][..],
             &2u64.to_le_bytes(),
-            &CellId::from_face(1u8).id().to_le_bytes(),
-            &CellId::from_face(0u8).id().to_le_bytes(),
+            &CellId::from_face(Face::F1).id().to_le_bytes(),
+            &CellId::from_face(Face::F0).id().to_le_bytes(),
         ]
         .concat(),
         enc(&Cell::from(CellId::from_point(&rand_point(&mut r)))),
@@ -864,7 +867,7 @@ fn no_decoder_panics_on_any_input() {
         let xyz = points_to_xyz_face_si_ti(&pts);
         let count = (pts.len() as u16).to_le_bytes();
         let mut b = vec![20u8, count[0], count[1]];
-        encode_points_compressed(&mut b, &xyz, 20u8).unwrap();
+        encode_points_compressed(&mut b, &xyz, Level::new(20)).unwrap();
         seeds.push(b);
     }
 
@@ -1001,7 +1004,7 @@ fn no_decoder_panics_on_any_input() {
                 if b.len() >= 3 {
                     let lvl = b[0] % 31;
                     let n = (u16::from_le_bytes([b[1], b[2]]) % 4096) as usize;
-                    drop(decode_points_compressed(&mut &b[3..], lvl, n));
+                    drop(decode_points_compressed(&mut &b[3..], Level::new(lvl), n));
                 }
             }),
         ),
@@ -1121,7 +1124,7 @@ fn text_parsers_deterministic_cases() {
     }
     assert_eq!(
         CellId::from_debug_string("0/"),
-        Some(CellId::from_face(0u8))
+        Some(CellId::from_face(Face::F0))
     );
     assert!(CellId::from_token("89c25").is_valid());
 }

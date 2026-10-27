@@ -13,6 +13,7 @@ use pyo3::prelude::*;
 
 mod angle;
 mod boolean;
+mod bounded;
 mod buffer;
 mod builder;
 mod cell_query;

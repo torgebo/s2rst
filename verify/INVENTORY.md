@@ -67,7 +67,7 @@ under the R15 budget (research R12).
 | 39 | `CellId::to_lat_lng` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 40 | `CellId::center_st` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 41 | `CellId::center_uv` | encoding | excluded | float-geometry |  |  |  |  |  |
-| 42 | `CellId::size_st` | free-fn | in-scope (gap 2, 2026-10-27, shared) |  | Level | — | `cl_crash::c_fg_size_and_ij` (shared, through `Cell::size_st`); a raw level above 30 panics (`crash::n_raw_level`) | proven | 1/1 |
+| 42 | `CellId::size_st` | free-fn | in-scope (gap 2, 2026-10-27, shared) |  | Level | — | `cl_crash::c_fg_size_and_ij` (shared, through `Cell::size_st`); a `Level` argument cannot be out of range (spec 009; `crash::n_level_new`) | proven | 1/1 |
 | 43 | `CellId::bound_st` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 44 | `CellId::bound_uv` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 45 | `CellId::to_face_ij_orientation` | encoding | in-scope |  | Valid | — | `crash::c_to_face_ij_orientation` | proven | 3/3 |
@@ -172,7 +172,8 @@ pass.
 
 | Operations | Outside the domain | Build | Harness | Result |
 |------------|--------------------|-------|---------|--------|
-| `impl From<u8> for Level`, and every operation taking `impl Into<Level>`: `from_face_pos_level`, `child_position`, `parent_at_level`, `child_begin_at_level`, `child_end_at_level`, `begin`, `end`, `lsb_for_level`, `size_ij`, `size_st`, `vertex_neighbors`, `all_neighbors` | a raw level above 30 | every | `crash::n_raw_level` | panics (both builds) |
+| `Level::new`; since spec 009 the only way a raw level can fail, because the 12 operations that took `impl Into<Level>` (`from_face_pos_level`, `child_position`, `parent_at_level`, `child_begin_at_level`, `child_end_at_level`, `begin`, `end`, `lsb_for_level`, `size_ij`, `size_st`, `vertex_neighbors`, `all_neighbors`) take a `Level`, and `impl From<u8> for Level` is gone | a raw level above 30 | every | `crash::n_level_new`; `Level::try_from` is exact: `crash::c_level_try_from` | panics (both builds); `try_from` returns `OutOfRange` exactly outside `0..=30`. Before spec 009 the 13 entry points panicked in the conversion (`crash::n_raw_level`, retired) |
+| `Face::from_u8`; since spec 009 the only way a raw face number can fail, because `CellId::from_face`, `Cell::from_face` and both `from_face_pos_level` take a `Face` (before, `from_face(7)` silently built an invalid id) | a face number above 5 | every | `crash::n_face_from_u8`; `Face::try_from` is exact: `crash::c_face_try_from` | panics (both builds: an index); `try_from` returns `OutOfRange` exactly outside `0..=5` |
 | `level` | 62 or more trailing zero bits (`0`, `1 << 62`, `1 << 63`, `3 << 62`) | every | `crash::n_level` | panics (both builds) |
 | `child_position` | an invalid id with any level, or a valid cell with a level outside `1..=level` | debug | `crash::n_child_position`; release `crash::r_child_position` | panics in debug builds; returns in release builds |
 | `parent` | a face cell | debug | `crash::n_parent`; release `crash::r_parent` | panics in debug builds; returns in release builds |
@@ -183,7 +184,7 @@ pass.
 | `from_face_ij` | `i` or `j` outside `[0, 2^30)` | debug | none: not every such input panics | the `# Panics` said it panics; the first `n_from_face_ij` returned (36 of 48 sampled inputs return, many as valid cells: `i = 2^30` on face 0 gives face 1's first leaf). The section now says that some such inputs panic and the others give an unspecified id |
 
 Two harness lessons: a symbolic panic condition (`raw > 30`) is not simplified to false, so
-CBMC explores the code after the panic on paths no input takes, and `n_raw_level` needs a small
+CBMC explores the code after the panic on paths no input takes, and `n_raw_level` (retired by spec 009) needed a small
 unwind bound for the neighbour operations' loops (10 minutes without it, 1.4 s with it); and
 the domain of the invalid ids is `spec::valid_by_marker`, the model's validity without its
 level search, which `tests/spec_vs_cpp.rs` checks against `spec::valid`.

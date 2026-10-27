@@ -129,6 +129,13 @@ and `PROPERTIES.md`, `verify/PROPERTIES_BY_KIND.md` and the rendered `.html` cop
   [constitution](.specify/memory/constitution.md), Technical Constraints).
 - **Docs:** public items are documented (`missing_docs` is a warning and
   `make doc` denies warnings).
+- **Bounded parameters:** a parameter restricted to a range or a small set takes
+  a bounded type (`Level`, `Face`, `LevelMod`, `CellVertex`, or a new one beside
+  them in `s2::bounded`), never a raw integer. Conversions from raw integers are
+  `TryFrom` returning `OutOfRange`, never `From`, and a parameter of a bounded
+  type is plain `T`, not `impl Into<T>`. The bindings convert each kind in one
+  place (`python/src/bounded.rs`, `wasm/src/bounded.rs`). See
+  [`BOUNDED_TYPES.md`](BOUNDED_TYPES.md) for the reasons and the measurements.
 - **Python:** [`ruff`](https://docs.astral.sh/ruff/) for lint and format
   (`ruff check` / `ruff format --check`).
 - **Python stub:** the package ships type stubs

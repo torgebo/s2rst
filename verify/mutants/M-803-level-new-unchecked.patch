@@ -1,16 +1,16 @@
 Mutant: M-803
 Targets: N-Level
-Expect-Fail: crash::n_raw_level
+Expect-Fail: crash::n_level_new
 Defect: Level::new loses its range check, so a raw level above 30 converts instead of panicking
 
 diff --git a/core/src/s2/coords.rs b/core/src/s2/coords.rs
 --- a/core/src/s2/coords.rs
 +++ b/core/src/s2/coords.rs
-@@ -70,7 +70,6 @@
+@@ -123,7 +123,6 @@
      /// Panics if `v > 30`.
      #[track_caller]
      pub const fn new(v: u8) -> Self {
--        assert!(v <= MAX_CELL_LEVEL, "level must be 0..=30");
+-        assert!(v <= MAX_CELL_LEVEL, "level must be in 0..=30");
          Level(v)
      }
  

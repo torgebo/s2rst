@@ -10,6 +10,7 @@
 use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
+use s2rst::s2::Level;
 use s2rst::s2::{CellId, Face, LatLng, Point, from_face_ij};
 
 #[library_benchmark]
@@ -20,14 +21,22 @@ fn bench_cellid_from_point() -> CellId {
 
 #[library_benchmark]
 fn bench_cellid_to_point() -> Point {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 20));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(20),
+    ));
     black_box(id.to_point())
 }
 
 // C++: BM_ToPointRaw
 #[library_benchmark]
 fn bench_cellid_to_point_raw() -> Point {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 20));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(20),
+    ));
     black_box(id.to_point_raw())
 }
 
@@ -49,64 +58,100 @@ fn bench_cellid_from_face_ij() -> CellId {
 
 #[library_benchmark]
 fn bench_cellid_level() -> u8 {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     black_box(id.level().as_u8())
 }
 
 #[library_benchmark]
 fn bench_cellid_parent() -> CellId {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 20));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(20),
+    ));
     black_box(id.parent())
 }
 
 #[library_benchmark]
 fn bench_cellid_parent_at_level() -> CellId {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 20));
-    black_box(id.parent_at_level(10))
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(20),
+    ));
+    black_box(id.parent_at_level(Level::new(10)))
 }
 
 // C++: BM_child_position (level 10)
 #[library_benchmark]
 fn bench_cellid_child_position() -> u8 {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
-    black_box(id.child_position(10))
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
+    black_box(id.child_position(Level::new(10)))
 }
 
 #[library_benchmark]
 fn bench_cellid_children() -> [CellId; 4] {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     black_box(id.children())
 }
 
 #[library_benchmark]
 fn bench_cellid_all_neighbors() -> Option<Vec<CellId>> {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
-    black_box(id.all_neighbors(15))
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
+    black_box(id.all_neighbors(Level::new(15)))
 }
 
 #[library_benchmark]
 fn bench_cellid_advance() -> CellId {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 20));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(20),
+    ));
     black_box(id.advance(123))
 }
 
 #[library_benchmark]
 fn bench_cellid_contains() -> bool {
-    let parent = CellId::from_face_pos_level(3, 0x12345678, 10);
+    let parent = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(10));
     let child = parent.children()[0].children()[1];
     black_box(black_box(parent).contains(black_box(child)))
 }
 
 #[library_benchmark]
 fn bench_cellid_edge_neighbors() -> [CellId; 4] {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     black_box(id.edge_neighbors())
 }
 
 // C++: BM_ToToken (level 15)
 #[library_benchmark]
 fn bench_cellid_to_token() -> String {
-    let id = black_box(CellId::from_face_pos_level(3, 0x12345678, 15));
+    let id = black_box(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(15),
+    ));
     black_box(id.to_token())
 }
 

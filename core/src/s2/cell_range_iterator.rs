@@ -176,6 +176,7 @@ impl<'a> Iterator for CellRangeIterator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::lax_polyline::LaxPolyline;
     use crate::s2::point_vector::PointVector;
     use crate::s2::text_format;
@@ -220,7 +221,7 @@ mod tests {
 
         let mut it = CellRangeIterator::new(&index);
         let mut count = 0;
-        let mut prev_max = CellId::from_face(0).range_min(); // sentinel-ish
+        let mut prev_max = CellId::from_face(Face::F0).range_min(); // sentinel-ish
         while !it.done() {
             // Each cell's range should be non-empty.
             assert!(it.range_min() <= it.range_max());
@@ -257,7 +258,7 @@ mod tests {
 
         let mut it = CellRangeIterator::new(&index);
         // Seek to face 3 — should position at or after face 3.
-        let target = CellId::from_face(3);
+        let target = CellId::from_face(Face::F3);
         it.seek(target);
         if !it.done() {
             assert!(it.id() >= target);

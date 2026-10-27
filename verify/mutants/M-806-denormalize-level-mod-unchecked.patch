@@ -1,19 +1,16 @@
 Mutant: M-806
-Targets: N-CellUnion::denormalize
-Expect-Fail: cu_crash::n_denormalize__n2
-Defect: denormalize loses its level_mod check, so a level_mod of 0 or above 3 returns
+Targets: N-LevelMod
+Expect-Fail: cu_crash::n_level_mod_new
+Defect: LevelMod::new loses its range check, so a level_mod of 0 or above 3 reaches denormalize (re-pointed by spec 009: the check moved from denormalize's assert to the type)
 
-diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
---- a/core/src/s2/cell_union.rs
-+++ b/core/src/s2/cell_union.rs
-@@ -527,10 +527,6 @@
-     /// may panic (an arithmetic overflow while it is expanded); a face-6 leaf, for one, is kept
-     /// as it is.
-     pub fn denormalize(&self, min_level: Level, level_mod: u8) -> CellUnion {
--        assert!(
--            (1..=3).contains(&level_mod),
--            "denormalize: level_mod must be 1, 2 or 3"
--        );
-         let mut result = Vec::new();
-         for &id in &self.0 {
-             let level = id.level();
+diff --git a/core/src/s2/bounded.rs b/core/src/s2/bounded.rs
+--- a/core/src/s2/bounded.rs
++++ b/core/src/s2/bounded.rs
+@@ -137,7 +137,6 @@
+     #[track_caller]
+     #[must_use]
+     pub const fn new(v: u8) -> Self {
+-        assert!(v >= 1 && v <= 3, "level_mod must be in 1..=3");
+         LevelMod(v)
+     }
+ 

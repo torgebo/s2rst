@@ -5,7 +5,7 @@
 //! `Cell` identity and construction (P-CID, spec 004 data-model §4.1), against the reference
 //! description of a cell (`cell_spec`, on 001's model).
 
-use s2rst::s2::{Cell, CellId};
+use s2rst::s2::{Cell, CellId, Face};
 
 use crate::cell_spec;
 use crate::domain::{any_face, any_level};
@@ -60,7 +60,7 @@ fn p_cid_02() {
 #[kani::unwind(9)]
 fn p_cid_03() {
     let f = any_face();
-    let face = Cell::from_face(f);
+    let face = Cell::from_face(Face::from_u8(f));
     assert_eq!(
         face.id().0,
         spec::compose(Decomposed {
@@ -72,7 +72,7 @@ fn p_cid_03() {
     let pos: u64 = kani::any();
     kani::assume(pos < (1u64 << 61));
     let l = any_level();
-    let c = Cell::from_face_pos_level(f, pos, l);
+    let c = Cell::from_face_pos_level(Face::from_u8(f), pos, l);
     let leaf = Decomposed {
         face: f,
         level: 30,
@@ -91,7 +91,7 @@ fn p_cid_03() {
         (c.face(), c.level(), c.orientation())
     );
     let default = Cell::default();
-    assert_eq!(default.id(), CellId::from_face(0));
+    assert_eq!(default.id(), CellId::from_face(Face::F0));
     assert_eq!((default.face().as_u8(), default.level().as_u8()), (0, 0));
     kani::cover!(l.as_u8() == 30, "a leaf");
     kani::cover!(f == 5 && l.as_u8() == 15, "a level-15 cell on face 5");

@@ -88,6 +88,7 @@
 //!   containment queries in inverted indexes.
 
 pub mod boolean_operation;
+pub mod bounded;
 pub mod buffer_operation;
 pub mod builder;
 mod cap;
@@ -188,8 +189,9 @@ pub mod wedge_relations;
 pub mod winding_operation;
 pub mod wrapped_shape;
 
+pub use bounded::{BoundedKind, LevelMod, OutOfRange};
 pub use cap::Cap;
-pub use cell::{Cell, CellEdge};
+pub use cell::{Cell, CellEdge, CellVertex};
 pub use cell_id::{
     CellId, expanded_by_distance_uv, from_face_ij, ij_level_to_bound_uv, lsb_for_level, size_ij,
 };

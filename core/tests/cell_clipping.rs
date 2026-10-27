@@ -15,6 +15,8 @@
 
 use s2rst::r2;
 use s2rst::r3::Vector;
+use s2rst::s2::CellVertex;
+use s2rst::s2::Face;
 use s2rst::s2::r2_edge_clipper::{R2Edge, R2EdgeClipper};
 use s2rst::s2::reclipped_shape::ReclippedShape;
 use s2rst::s2::robust_cell_clipper::{CrossingType, RobustCellClipper, RobustClipResult};
@@ -60,7 +62,7 @@ fn r2_clipper_clips_all_boundaries() {
 #[test]
 fn uv_clipper_face_detection() {
     for face in 0..6u8 {
-        let cell = Cell::from_cell_id(CellId::from_face(face));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         let mut c = UVEdgeClipper::from_cell(cell);
         let center = cell.center();
         // Center should be inside.
@@ -81,7 +83,7 @@ fn uv_clipper_face_detection() {
 fn robust_clipper_all_face_cells() {
     // The center of each face cell should be "inside" when clipped.
     for face in 0..6u8 {
-        let cell = Cell::from_cell_id(CellId::from_face(face));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         let center = cell.center();
         let tiny = Point((center.0 + Vector::new(1e-12, 1e-12, 0.0)).normalize());
 
@@ -98,7 +100,7 @@ fn robust_clipper_all_face_cells() {
 #[test]
 fn robust_clipper_opposite_faces_miss() {
     // An edge on face 3 should miss a face 0 cell.
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let v0 = LatLng::from_degrees(10.0, -170.0).to_point();
     let v1 = LatLng::from_degrees(20.0, -170.0).to_point();
 
@@ -117,8 +119,8 @@ fn robust_clipper_crossing_produces_correct_types() {
     c.start_cell(cell);
 
     // Reflect center across boundary 0 (bottom).
-    let v0 = cell.vertex(0);
-    let v1_cell = cell.vertex(1);
+    let v0 = cell.vertex(CellVertex::LowerLeft);
+    let v1_cell = cell.vertex(CellVertex::LowerRight);
     let normal = Point(
         s2rst::s2::edge_crossings::robust_cross_prod(v0, v1_cell)
             .0
@@ -153,7 +155,7 @@ fn shape_tracker_full_sphere_closure() {
     assert!(t.finished());
 
     for face in 0..6u8 {
-        let cell = Cell::from_cell_id(CellId::from_face(face));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         t.add_cell_boundary(cell);
     }
     assert!(t.finished(), "all 6 face boundaries should close");
@@ -166,7 +168,7 @@ fn shape_tracker_level1_children_close() {
     t.mark_chain(0);
 
     for face in 0..6u8 {
-        let face_id = CellId::from_face(face);
+        let face_id = CellId::from_face(Face::from_u8(face));
         for &child in &face_id.children() {
             t.add_cell_boundary(Cell::from_cell_id(child));
         }
@@ -195,7 +197,7 @@ fn shape_tracker_reset_works() {
 
 #[test]
 fn reclipped_shape_filters_by_cell() {
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let mut clipper = RobustCellClipper::new();
     clipper.start_cell(cell);
 
@@ -226,7 +228,7 @@ fn reclipped_shape_filters_by_cell() {
 
 #[test]
 fn reclipped_shape_id_caching() {
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let edges = vec![(
         LatLng::from_degrees(10.0, 10.0).to_point(),
         LatLng::from_degrees(20.0, 20.0).to_point(),
@@ -280,7 +282,7 @@ fn reclipped_shape_id_caching() {
 #[test]
 fn pipeline_clip_and_track_polygon_ring() {
     // Create a small polygon ring inside face 0 and clip it.
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let ring = [
         LatLng::from_degrees(-10.0, 0.0).to_point(),
         LatLng::from_degrees(0.0, 10.0).to_point(),
@@ -315,7 +317,7 @@ fn pipeline_clip_and_track_polygon_ring() {
 
 #[test]
 fn pipeline_reclip_preserves_crossing_info() {
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let v0 = LatLng::from_degrees(10.0, 10.0).to_point();
     let v1 = LatLng::from_degrees(10.0, 80.0).to_point();
 

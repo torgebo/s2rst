@@ -184,6 +184,8 @@ fn decode_base_shift(r: &mut dyn Read) -> io::Result<(u64, u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
+    use crate::s2::Level;
 
     /// Encodes `cell_ids`, verifies encoded size equals `expected_bytes`,
     /// then decodes and verifies the result matches the input.
@@ -235,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_same_level() {
-        let ids: Vec<CellId> = (0..6).map(CellId::from_face).collect();
+        let ids: Vec<CellId> = Face::ALL.into_iter().map(CellId::from_face).collect();
         roundtrip(&ids);
     }
 
@@ -251,18 +253,18 @@ mod tests {
 
     #[test]
     fn test_leaf_cells() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let ids = vec![
-            id.child_begin_at_level(30),
-            id.child_begin_at_level(30).next(),
-            id.child_end_at_level(30).prev(),
+            id.child_begin_at_level(Level::new(30)),
+            id.child_begin_at_level(Level::new(30)).next(),
+            id.child_end_at_level(Level::new(30)).prev(),
         ];
         roundtrip(&ids);
     }
 
     #[test]
     fn test_all_faces() {
-        let ids: Vec<CellId> = (0..6).map(CellId::from_face).collect();
+        let ids: Vec<CellId> = Face::ALL.into_iter().map(CellId::from_face).collect();
         let mut buf = Vec::new();
         encode_s2cell_id_vector(&ids, &mut buf).unwrap();
         assert!(buf.len() <= 10, "encoded size {} too large", buf.len());
@@ -414,7 +416,7 @@ mod tests {
     /// C++ TEST(EncodedS2CellIdVector, `SixFaceCells`)
     #[test]
     fn test_six_face_cells() {
-        let ids: Vec<CellId> = (0..6).map(CellId::from_face).collect();
+        let ids: Vec<CellId> = Face::ALL.into_iter().map(CellId::from_face).collect();
         test_encoded(&ids, 8);
     }
 

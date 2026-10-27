@@ -16,6 +16,7 @@
 use std::collections::HashSet;
 
 use crate::s1::{self, Angle};
+use crate::s2::CellVertex;
 use crate::s2::builder::{S2Error, S2ErrorCode};
 use crate::s2::edge_crosser::EdgeCrosser;
 use crate::s2::edge_distances;
@@ -618,9 +619,9 @@ impl Region for Polyline {
             }
         }
         // Check if any polyline edge crosses any cell edge.
-        for j in 0..4 {
+        for &j in &CellVertex::ALL {
             let cell_a = cell.vertex(j);
-            let cell_b = cell.vertex((j + 1) & 3);
+            let cell_b = cell.vertex(j.next());
             let mut crosser = EdgeCrosser::new(cell_a, cell_b);
             for i in 1..self.vertices.len() {
                 if crosser.crossing_sign(self.vertices[i - 1], self.vertices[i])
@@ -656,6 +657,8 @@ impl PartialEq for Polyline {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
+    use crate::s2::Level;
 
     fn p(lat: f64, lng: f64) -> Point {
         LatLng::from_degrees(lat, lng).to_point()
@@ -842,7 +845,7 @@ mod tests {
         // A polyline crossing through a cell. Pick a cell at a moderate level
         // and route a polyline through it.
         let center = p(10.0, 20.0);
-        let cell_id = CellId::from_point(&center).parent_at_level(10);
+        let cell_id = CellId::from_point(&center).parent_at_level(Level::new(10));
         let cell = Cell::from(cell_id);
 
         // Build a polyline that starts well outside the cell, passes through
@@ -1149,7 +1152,7 @@ mod tests {
         let b = Point::from_coords(1.0, -0.8, 1.1).normalize();
         let line = Polyline::new(vec![a, b]);
         for face in 0u8..6 {
-            let cell = Cell::from_cell_id(CellId::from_face(face));
+            let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
             // The polyline should intersect faces 0, 2, 4 (even faces).
             assert_eq!((face & 1) == 0, line.intersects_cell(&cell), "face {face}");
         }

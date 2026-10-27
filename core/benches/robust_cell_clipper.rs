@@ -11,6 +11,8 @@ use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
 use s2rst::r3::Vector;
+use s2rst::s2::CellVertex;
+use s2rst::s2::Face;
 use s2rst::s2::robust_cell_clipper::{Options, RobustCellClipper, RobustClipResult};
 use s2rst::s2::{Cell, CellId, LatLng, Point};
 
@@ -55,7 +57,7 @@ fn clip_edge_crossing() -> RobustClipResult {
 #[library_benchmark]
 fn clip_edge_near_corner() -> RobustClipResult {
     let cell = Cell::from_cell_id(CellId::from_token("14"));
-    let corner = cell.vertex(0);
+    let corner = cell.vertex(CellVertex::LowerLeft);
     let k_tiny = 2e-15;
     let pnt0 = Point((corner.0 + Vector::new(-k_tiny, -k_tiny, k_tiny)).normalize());
     let pnt1 = Point((corner.0 + Vector::new(-k_tiny, k_tiny, -k_tiny)).normalize());
@@ -93,7 +95,7 @@ fn clip_multiple_and_sort() -> usize {
     c.start_cell(cell);
     let center = cell.center();
     for k in 0..4 {
-        let v = cell.vertex(k % 4);
+        let v = cell.vertex(CellVertex::ALL[k % 4]);
         let outer = Point((center.0 * 2.0 - v.0).normalize());
         c.clip_edge(center, outer, false);
     }
@@ -103,7 +105,7 @@ fn clip_multiple_and_sort() -> usize {
 // is_boundary_contained with contained edges
 #[library_benchmark]
 fn boundary_contained() -> bool {
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let mut c = RobustCellClipper::new();
     c.start_cell(cell);
     let v0 = LatLng::from_degrees(-10.0, 0.0).to_point();

@@ -7,7 +7,7 @@
 //! with the model for all inputs; these tests show, by sampling, that the model agrees with
 //! upstream C++. Together: C++ oracle ⇔ model (sampled) ⇔ implementation (proved).
 
-use s2rst::s2::CellId;
+use s2rst::s2::{CellId, Level};
 use s2rst_verify::spec::{self, Decomposed};
 
 const CSV: &str = include_str!("../../core/tests/data/cpp_cellid_vectors.csv");
@@ -151,7 +151,7 @@ fn hand_written_cases() {
     // 5 = 0b101 is the valid face-0 leaf whose last digit is 2.
     let (s, n) = spec::debug_string(5);
     assert_eq!(&s[..n], b"0/000000000000000000000000000002");
-    assert_eq!(spec::end(0), CellId::end(0u8).0);
+    assert_eq!(spec::end(0), CellId::end(Level::MIN).0);
 }
 
 /// The model's own round trips, on a sweep of decompositions.

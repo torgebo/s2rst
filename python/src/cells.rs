@@ -7,20 +7,9 @@ use pyo3::types::{PyDict, PyType};
 use s2rst::s2;
 
 use crate::angle::PyAngle;
+use crate::bounded::{CellEdgeArg, CellVertexArg, FaceArg, LevelArg, LevelModArg};
 use crate::regions::{PyCap, PyRect};
 use crate::s2point::{PyLatLng, PyS2Point};
-
-fn cell_edge_from_index(k: u8) -> PyResult<s2::CellEdge> {
-    match k {
-        0 => Ok(s2::CellEdge::Bottom),
-        1 => Ok(s2::CellEdge::Right),
-        2 => Ok(s2::CellEdge::Top),
-        3 => Ok(s2::CellEdge::Left),
-        _ => Err(pyo3::exceptions::PyIndexError::new_err(
-            "edge index must be 0, 1, 2, or 3",
-        )),
-    }
-}
 
 /// Checks a leaf-cell range against C++ `S2CellUnion::FromBeginEnd`'s `DCHECK`s: both ends
 /// are leaf cells (either may also be the end of the leaves, when `end_allowed`) and
@@ -94,15 +83,24 @@ impl PyCellId {
     }
 
     /// Cell for a given face (0-5).
+    ///
+    /// Raises `ValueError` unless `0 <= face <= 5`.
     #[classmethod]
-    fn from_face(_cls: &Bound<'_, PyType>, face: u8) -> Self {
-        PyCellId(s2::CellId::from_face(face))
+    fn from_face(_cls: &Bound<'_, PyType>, face: FaceArg) -> Self {
+        PyCellId(s2::CellId::from_face(face.0))
     }
 
     /// Cell from face, Hilbert curve position, and level.
+    ///
+    /// Raises `ValueError` unless `0 <= face <= 5` and `0 <= level <= 30`.
     #[classmethod]
-    fn from_face_pos_level(_cls: &Bound<'_, PyType>, face: u8, pos: u64, level: u8) -> Self {
-        PyCellId(s2::CellId::from_face_pos_level(face, pos, level))
+    fn from_face_pos_level(
+        _cls: &Bound<'_, PyType>,
+        face: FaceArg,
+        pos: u64,
+        level: LevelArg,
+    ) -> Self {
+        PyCellId(s2::CellId::from_face_pos_level(face.0, pos, level.0))
     }
 
     /// Leaf cell containing the given point.
@@ -165,15 +163,19 @@ impl PyCellId {
     }
 
     /// Position of this cell relative to its parent at the given level.
-    fn child_position(&self, level: u8) -> u8 {
-        self.0.child_position(level)
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn child_position(&self, level: LevelArg) -> u8 {
+        self.0.child_position(level.0)
     }
 
     // --- Hierarchy ---
 
     /// Parent cell at the given level.
-    fn parent_at_level(&self, level: u8) -> Self {
-        PyCellId(self.0.parent_at_level(level))
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn parent_at_level(&self, level: LevelArg) -> Self {
+        PyCellId(self.0.parent_at_level(level.0))
     }
 
     /// Immediate parent cell.
@@ -203,13 +205,17 @@ impl PyCellId {
     }
 
     /// First child at the given level.
-    fn child_begin_at_level(&self, level: u8) -> Self {
-        PyCellId(self.0.child_begin_at_level(level))
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn child_begin_at_level(&self, level: LevelArg) -> Self {
+        PyCellId(self.0.child_begin_at_level(level.0))
     }
 
     /// First cell past the last child at the given level.
-    fn child_end_at_level(&self, level: u8) -> Self {
-        PyCellId(self.0.child_end_at_level(level))
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn child_end_at_level(&self, level: LevelArg) -> Self {
+        PyCellId(self.0.child_end_at_level(level.0))
     }
 
     /// Minimum CellId in this cell's range.
@@ -309,18 +315,22 @@ impl PyCellId {
     }
 
     /// Cells at the given level sharing a vertex with this cell's closest vertex.
-    fn vertex_neighbors(&self, level: u8) -> Vec<PyCellId> {
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn vertex_neighbors(&self, level: LevelArg) -> Vec<PyCellId> {
         self.0
-            .vertex_neighbors(level)
+            .vertex_neighbors(level.0)
             .into_iter()
             .map(PyCellId)
             .collect()
     }
 
     /// All neighboring cells at the given level.
-    fn all_neighbors(&self, level: u8) -> Option<Vec<PyCellId>> {
+    ///
+    /// Raises `ValueError` unless `0 <= level <= 30`.
+    fn all_neighbors(&self, level: LevelArg) -> Option<Vec<PyCellId>> {
         self.0
-            .all_neighbors(level)
+            .all_neighbors(level.0)
             .map(|v| v.into_iter().map(PyCellId).collect())
     }
 
@@ -433,35 +443,33 @@ impl PyCell {
     }
 
     /// Normalized k-th vertex (k=0,1,2,3) in CCW order.
-    fn vertex(&self, k: usize) -> PyResult<PyS2Point> {
-        if k >= 4 {
-            return Err(pyo3::exceptions::PyIndexError::new_err(
-                "vertex index must be 0, 1, 2, or 3",
-            ));
-        }
-        Ok(PyS2Point(self.0.vertex(k)))
+    ///
+    /// Raises `IndexError` unless `0 <= k <= 3`.
+    fn vertex(&self, k: CellVertexArg) -> PyS2Point {
+        PyS2Point(self.0.vertex(k.0))
     }
 
     /// Unnormalized k-th vertex (k=0,1,2,3).
-    fn vertex_raw(&self, k: usize) -> PyResult<PyS2Point> {
-        if k >= 4 {
-            return Err(pyo3::exceptions::PyIndexError::new_err(
-                "vertex index must be 0, 1, 2, or 3",
-            ));
-        }
-        Ok(PyS2Point(self.0.vertex_raw(k)))
+    ///
+    /// Raises `IndexError` unless `0 <= k <= 3`.
+    fn vertex_raw(&self, k: CellVertexArg) -> PyS2Point {
+        PyS2Point(self.0.vertex_raw(k.0))
     }
 
     /// Normalized inward-facing normal of edge k (k=0,1,2,3 for
     /// Bottom, Right, Top, Left).
-    fn edge(&self, k: u8) -> PyResult<PyS2Point> {
-        Ok(PyS2Point(self.0.edge(cell_edge_from_index(k)?)))
+    ///
+    /// Raises `IndexError` unless `0 <= k <= 3`.
+    fn edge(&self, k: CellEdgeArg) -> PyS2Point {
+        PyS2Point(self.0.edge(k.0))
     }
 
     /// Unnormalized inward-facing normal of edge k (k=0,1,2,3 for
     /// Bottom, Right, Top, Left).
-    fn edge_raw(&self, k: u8) -> PyResult<PyS2Point> {
-        Ok(PyS2Point(self.0.edge_raw(cell_edge_from_index(k)?)))
+    ///
+    /// Raises `IndexError` unless `0 <= k <= 3`.
+    fn edge_raw(&self, k: CellEdgeArg) -> PyS2Point {
+        PyS2Point(self.0.edge_raw(k.0))
     }
 
     /// Center as a unit-length S2Point.
@@ -658,30 +666,12 @@ impl PyCellUnion {
 
     /// Replace large cells with smaller cells respecting min_level and level_mod.
     ///
-    /// Raises `ValueError` unless `min_level` is in 0..=30 and `level_mod` is 1, 2 or 3.
-    /// The core checks `level_mod` in every build and panics (upstream only with a `DCHECK`):
-    /// a larger one would expand every cell to leaf level, which never finishes for a large
-    /// cell.
-    /// The arguments are taken as `i64`, not `u8`, so that a value outside 0..=255 raises
-    /// `ValueError` as documented rather than pyo3's `OverflowError`.
-    fn denormalize(&self, min_level: i64, level_mod: i64) -> PyResult<Self> {
-        let min_level = u8::try_from(min_level)
-            .ok()
-            .and_then(s2::Level::try_new)
-            .ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "min_level must be in 0..=30, got {min_level}"
-                ))
-            })?;
-        let level_mod = u8::try_from(level_mod)
-            .ok()
-            .filter(|m| (1..=3).contains(m))
-            .ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "level_mod must be 1, 2 or 3, got {level_mod}"
-                ))
-            })?;
-        Ok(PyCellUnion(self.0.denormalize(min_level, level_mod)))
+    /// Raises `ValueError` unless `min_level` is in 0..=30 and `level_mod` is 1, 2 or 3 (a
+    /// larger modulus would expand every cell to leaf level, which never finishes for a large
+    /// cell). Any Python integer is accepted and checked, so a value outside 0..=255 raises
+    /// `ValueError` too, not `OverflowError`.
+    fn denormalize(&self, min_level: LevelArg, level_mod: LevelModArg) -> Self {
+        PyCellUnion(self.0.denormalize(min_level.0, level_mod.0))
     }
 
     /// Whether this union contains no cells.
@@ -710,8 +700,10 @@ impl PyCellUnion {
     }
 
     /// Expand the union to include all neighbors at `expand_level` (in place).
-    fn expand_at_level(&mut self, expand_level: u8) {
-        self.0.expand_at_level(expand_level.into());
+    ///
+    /// Raises `ValueError` unless `0 <= expand_level <= 30`.
+    fn expand_at_level(&mut self, expand_level: LevelArg) {
+        self.0.expand_at_level(expand_level.0);
     }
 
     /// Expand the union so every point within `min_radius` is covered (in place).

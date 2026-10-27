@@ -4,15 +4,14 @@ Expect-Fail: val::p_val_10
 Defect: from_face_pos_level() shifts the face one bit short
 
 diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
-index 9a961e1..07b0579 100644
 --- a/core/src/s2/cell_id.rs
 +++ b/core/src/s2/cell_id.rs
-@@ -238,7 +238,7 @@ impl CellId {
+@@ -252,7 +252,7 @@
+     /// (`face << 61` plus `pos` overflows).
      #[inline]
-     pub fn from_face_pos_level(face: impl Into<u8>, pos: u64, level: impl Into<Level>) -> Self {
-         let f: u8 = face.into();
--        CellId(((u64::from(f) << POS_BITS) + pos) | 1).parent_at_level(level)
-+        CellId(((u64::from(f) << (POS_BITS - 1)) + pos) | 1).parent_at_level(level)
+     pub fn from_face_pos_level(face: Face, pos: u64, level: Level) -> Self {
+-        CellId(((u64::from(face.as_u8()) << POS_BITS) + pos) | 1).parent_at_level(level)
++        CellId(((u64::from(face.as_u8()) << (POS_BITS - 1)) + pos) | 1).parent_at_level(level)
      }
  
      /// Returns the leaf cell containing the given point.

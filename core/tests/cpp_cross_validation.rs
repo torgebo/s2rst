@@ -13,6 +13,7 @@
 
 use s2rst::r1;
 use s2rst::s1;
+use s2rst::s2::CellVertex;
 use s2rst::s2::{Cell, CellId, LatLng, Loop, Point, Rect};
 
 const CSV: &str = include_str!("data/cpp_test_vectors.csv");
@@ -378,7 +379,7 @@ fn test_cpp_cell_vertices() {
             let ey = parse_f64(f[2 + k * 3]);
             let ez = parse_f64(f[3 + k * 3]);
 
-            let v = cell.vertex(k);
+            let v = cell.vertex(CellVertex::ALL[k]);
             assert_close(
                 v.x(),
                 ex,

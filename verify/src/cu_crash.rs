@@ -18,7 +18,7 @@
     reason = "`__` marks a split-family member (harness-conventions)"
 )]
 
-use s2rst::s2::{Cell, CellId, CellUnion, Region};
+use s2rst::s2::{BoundedKind, Cell, CellId, CellUnion, LevelMod, Region};
 
 use crate::domain::{any_invalid, any_level, any_u64, any_valid};
 use crate::spec::{self, Decomposed};
@@ -291,8 +291,8 @@ macro_rules! denormalize {
         #[doc = concat!(
             "C-CellUnion::denormalize: completes without panic, overflow or undefined ",
             "behaviour for every valid union of exactly ", stringify!($n), " cells ",
-            "(`ValidUnion`), every `min_level` and every `level_mod` in 1–3 (the ",
-            "`debug_assert!` and upstream `DCHECK`), within the loop bound: each cell's new ",
+            "(`ValidUnion`), every `min_level` and every `level_mod` (a `LevelMod`, 1–3; ",
+            "upstream's `DCHECK`), within the loop bound: each cell's new ",
             "level is at most 2 below its own, so it has at most 16 descendants."
         )]
         $(#[$attr])*
@@ -305,7 +305,7 @@ macro_rules! denormalize {
             for d in &$ds {
                 kani::assume(union_spec::denorm_level(d.level, $m.as_u8(), $k) - d.level <= 2);
             }
-            let $r = CellUnion::from_verbatim(v).denormalize($m, $k);
+            let $r = CellUnion::from_verbatim(v).denormalize($m, LevelMod::new($k));
             $covers
         }
     )* };
@@ -416,26 +416,62 @@ fn n_leaf_cells_covered__n2() {
     kani::cover!(true, "returns");
 }
 
-/// N-CellUnion::denormalize: panics for every `level_mod` outside 1–3, whatever the union and
-/// `min_level` (its `assert!`, first), and for every union of two ids whose first has no level
-/// marker, in every build. (A later id without one panics too, once the loop reaches it, after
-/// the earlier cells' descendants, which no bound covers.)
+/// N-CellUnion::denormalize: panics for every union of two ids whose first has no level marker,
+/// whatever `min_level` and `level_mod`, in every build. (A later id without one panics too, once
+/// the loop reaches it, after the earlier cells' descendants, which no bound covers.) Before spec
+/// 009 it also panicked for every `level_mod` outside 1–3 (its `assert!`); it takes a `LevelMod`
+/// now, so it cannot be handed one, and `n_level_mod_new` proves the check where the modulus is
+/// made.
 #[kani::proof]
 #[kani::should_panic]
 #[kani::unwind(3)]
 fn n_denormalize__n2() {
     let (v, raw) = any_seq::<2>();
     let m = any_level();
-    let k: u8 = kani::any();
-    kani::assume(!(1..=3).contains(&k) || raw[0].trailing_zeros() >= 62);
+    let k = LevelMod::new(any_level_mod());
+    kani::assume(raw[0].trailing_zeros() >= 62);
     let _ = CellUnion::from_verbatim(v).denormalize(m, k);
     kani::cover!(true, "returns");
+}
+
+/// N-LevelMod: `LevelMod::new` panics for every value outside 1–3, in every build (spec 009).
+/// The operations that take a modulus (`CellUnion::denormalize`, the coverer and the term
+/// indexer) take a `LevelMod`, so this is the only place a raw modulus can fail.
+#[kani::proof]
+#[kani::should_panic]
+fn n_level_mod_new() {
+    let raw: u8 = kani::any();
+    kani::assume(!(1..=3).contains(&raw));
+    let _ = LevelMod::new(raw);
+    kani::cover!(true, "returns");
+}
+
+/// C-LevelMod::try_from: the fallible conversion accepts exactly 1–3, gives the value back, and
+/// reports a rejected value with its kind (spec 009). The `u8` source agrees with the `i64` one.
+#[kani::proof]
+fn c_level_mod_try_from() {
+    let raw: i64 = kani::any();
+    match LevelMod::try_from(raw) {
+        Ok(k) => {
+            assert!((1..=3).contains(&raw));
+            assert!(i64::from(k.get()) == raw);
+        }
+        Err(e) => {
+            assert!(!(1..=3).contains(&raw));
+            assert!(e.value() == raw);
+            assert!(e.kind() == BoundedKind::LevelMod);
+        }
+    }
+    let small: u8 = kani::any();
+    assert!(LevelMod::try_from(small).ok() == LevelMod::try_from(i64::from(small)).ok());
+    kani::cover!(raw == 3, "the last modulus");
+    kani::cover!(raw == 4, "the first modulus rejected");
 }
 
 /// N-CellUnion::from_begin_end, from_range (tool-limit rows for crash freedom): panic for every
 /// pair outside their domain, a bound that is neither a leaf nor `end(30)` or `begin > end`, in
 /// every build (the `assert!`s, before the tiling loop). The unwind bound is for that loop after
-/// the panic, as in `crash::n_raw_level`.
+/// the panic, as in `crash::n_raw_level` before spec 009 retired it.
 #[kani::proof]
 #[kani::should_panic]
 #[kani::unwind(2)]

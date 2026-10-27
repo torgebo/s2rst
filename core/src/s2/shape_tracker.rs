@@ -377,6 +377,8 @@ fn adjacent_face(face: i32, axis: i32) -> i32 {
 mod tests {
     use super::*;
     use crate::s2::CellId;
+    use crate::s2::Face;
+    use crate::s2::Level;
 
     fn crossing(
         boundary: CellEdge,
@@ -473,8 +475,8 @@ mod tests {
         tracker.mark_chain(0);
         assert!(tracker.finished());
 
-        let cell0 = Cell::from_cell_id(CellId::from_face(0));
-        let cell1 = Cell::from_cell_id(CellId::from_face(1));
+        let cell0 = Cell::from_cell_id(CellId::from_face(Face::F0));
+        let cell1 = Cell::from_cell_id(CellId::from_face(Face::F1));
 
         // Get IJ coords for boundaries.
         let bound0 = cell0.bound_uv();
@@ -513,7 +515,7 @@ mod tests {
 
             let mut cnt = 0;
             for &face in &order {
-                let cell = Cell::from_cell_id(CellId::from_face(faces[face]));
+                let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(faces[face])));
                 tracker.add_cell_boundary(cell);
                 cnt += 1;
                 assert_eq!(cnt == 6, tracker.finished());
@@ -531,10 +533,10 @@ mod tests {
         let mut total_cells = 0;
         let total_expected = 6 * (4 + 16); // level 1 + level 2 children
         for face in 0..6 {
-            let face_id = CellId::from_face(face);
+            let face_id = CellId::from_face(Face::from_u8(face));
             for level in 1..=2u8 {
-                let beg = face_id.child_begin_at_level(level);
-                let end = face_id.child_end_at_level(level);
+                let beg = face_id.child_begin_at_level(Level::new(level));
+                let end = face_id.child_end_at_level(Level::new(level));
                 let mut id = beg;
                 while id != end {
                     let cell = Cell::from_cell_id(id);
@@ -570,7 +572,7 @@ mod tests {
         ];
 
         for face in 0..6 {
-            let cell = Cell::from_cell_id(CellId::from_face(face));
+            let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
             tracker.process_crossings(cell, &crossings);
             assert_eq!(face == 5, tracker.finished());
         }
@@ -626,7 +628,7 @@ mod tests {
             ];
 
             for face in 0..6 {
-                let cell = Cell::from_cell_id(CellId::from_face(face));
+                let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
                 tracker.process_crossings(cell, &crossings);
                 assert_eq!(face == 5, tracker.finished());
             }

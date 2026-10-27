@@ -21,11 +21,11 @@
 
 #![expect(
     clippy::cast_possible_truncation,
-    reason = "level_mod (usize->u8) — always <= MAX_CELL_LEVEL"
+    reason = "level offsets (usize->u8) — always <= MAX_CELL_LEVEL"
 )]
 use crate::s2::coords::Level;
 use crate::s2::region_coverer::RegionCoverer;
-use crate::s2::{CellId, CellUnion, Point, Region};
+use crate::s2::{CellId, CellUnion, LevelMod, Point, Region};
 
 /// Options for the [`RegionTermIndexer`].
 #[derive(Clone, Debug, PartialEq)]
@@ -36,8 +36,9 @@ pub struct Options {
     pub min_level: Level,
     /// Maximum cell level for coverings (default: 16, ~150m).
     pub max_level: Level,
-    /// Level modifier for cell levels (default: 1).
-    pub level_mod: usize,
+    /// Level modifier for cell levels (default: 1). A [`LevelMod`], 1..=3: before spec 009 it
+    /// was a `usize`, and 0 divided by zero when terms were computed.
+    pub level_mod: LevelMod,
     /// If true, optimize for point-only indexes (skips covering terms).
     pub index_contains_points_only: bool,
     /// If true, trade index size for query speed (~1.3x improvement).
@@ -52,7 +53,7 @@ impl Default for Options {
             max_cells: 8,
             min_level: Level::new(4),
             max_level: Level::new(16),
-            level_mod: 1,
+            level_mod: LevelMod::DEFAULT,
             index_contains_points_only: false,
             optimize_for_space: false,
             marker_character: '$',
@@ -100,15 +101,27 @@ impl RegionTermIndexer {
         &mut self.options
     }
 
+    /// Panics unless `min_level ≤ max_level`, the one relation between the options that their
+    /// types cannot carry (spec 009, B12: a release build's terms did not finish without it).
+    #[track_caller]
+    fn check_levels(&self) {
+        assert!(
+            self.options.min_level <= self.options.max_level,
+            "min_level ({}) must not exceed max_level ({})",
+            self.options.min_level,
+            self.options.max_level
+        );
+    }
+
     /// Returns the true maximum level, accounting for `level_mod`.
     fn true_max_level(&self) -> Level {
         let opts = &self.options;
-        if opts.level_mod == 1 {
+        if opts.level_mod.get() == 1 {
             opts.max_level
         } else {
             // Round down to nearest level_mod boundary.
             let range = (opts.max_level - opts.min_level) as usize;
-            let adjusted = range - (range % opts.level_mod);
+            let adjusted = range - (range % usize::from(opts.level_mod.get()));
             opts.min_level + adjusted as u8
         }
     }
@@ -116,13 +129,23 @@ impl RegionTermIndexer {
     /// Generates index terms for a region.
     ///
     /// These terms should be stored in the database for each document.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build.
     pub fn get_index_terms(&self, region: &dyn Region) -> Vec<String> {
+        self.check_levels();
         let covering = self.get_covering(region);
         self.get_index_terms_for_covering(&covering)
     }
 
     /// Generates index terms for a point.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build.
     pub fn get_index_terms_for_point(&self, point: Point) -> Vec<String> {
+        self.check_levels();
         let cell_id = CellId::from_point(&point);
         let level = self.true_max_level();
         let id = cell_id.parent_at_level(level);
@@ -149,13 +172,23 @@ impl RegionTermIndexer {
     /// Generates query terms for a region.
     ///
     /// Look up each term in the database and union the results.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build.
     pub fn get_query_terms(&self, region: &dyn Region) -> Vec<String> {
+        self.check_levels();
         let covering = self.get_covering(region);
         self.get_query_terms_for_covering(&covering)
     }
 
     /// Generates query terms for a point.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build.
     pub fn get_query_terms_for_point(&self, point: Point) -> Vec<String> {
+        self.check_levels();
         let cell_id = CellId::from_point(&point);
         let level = self.true_max_level();
         let id = cell_id.parent_at_level(level);
@@ -178,7 +211,12 @@ impl RegionTermIndexer {
     }
 
     /// Generates index terms from a pre-computed canonical cell covering.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build.
     pub fn get_index_terms_for_covering(&self, covering: &CellUnion) -> Vec<String> {
+        self.check_levels();
         let true_max = self.true_max_level();
         let mut terms = Vec::new();
 
@@ -188,7 +226,7 @@ impl RegionTermIndexer {
             debug_assert!(level <= self.options.max_level);
             debug_assert_eq!(
                 0,
-                (level - self.options.min_level) % self.options.level_mod as u8
+                (level - self.options.min_level) % self.options.level_mod.get()
             );
             // Ancestor terms: the cell and all ancestors.
             let mut current = id;
@@ -214,7 +252,12 @@ impl RegionTermIndexer {
     }
 
     /// Generates query terms from a pre-computed canonical cell covering.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build.
     pub fn get_query_terms_for_covering(&self, covering: &CellUnion) -> Vec<String> {
+        self.check_levels();
         let _true_max = self.true_max_level();
         let mut terms = Vec::new();
 
@@ -224,7 +267,7 @@ impl RegionTermIndexer {
             debug_assert!(level <= self.options.max_level);
             debug_assert_eq!(
                 0,
-                (level - self.options.min_level) % self.options.level_mod as u8
+                (level - self.options.min_level) % self.options.level_mod.get()
             );
             // Ancestor term at this cell's level.
             terms.push(self.ancestor_term(id));
@@ -261,7 +304,7 @@ impl RegionTermIndexer {
             .max_cells(self.options.max_cells)
             .min_level(self.options.min_level)
             .max_level(self.options.max_level)
-            .level_mod(self.options.level_mod as u8);
+            .level_mod(self.options.level_mod);
         coverer.covering(region)
     }
 
@@ -446,7 +489,7 @@ mod tests {
         // is not a multiple of level_mod.
         let opts1 = Options {
             min_level: Level::new(1),
-            level_mod: 2,
+            level_mod: LevelMod::new(2),
             max_level: Level::new(19),
             ..Options::default()
         };
@@ -454,7 +497,7 @@ mod tests {
 
         let opts2 = Options {
             min_level: Level::new(1),
-            level_mod: 2,
+            level_mod: LevelMod::new(2),
             max_level: Level::new(20),
             ..Options::default()
         };
@@ -472,3 +515,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "region_term_indexer_tests.rs"]
+mod region_term_indexer_tests;

@@ -61,7 +61,7 @@
 //!
 //! ```
 //! use s2rst::s1::Angle;
-//! use s2rst::s2::{Cap, LatLng, Point, Region};
+//! use s2rst::s2::{Cap, LatLng, Level, Point, Region};
 //! use s2rst::s2::region_coverer::RegionCoverer;
 //!
 //! // Define a spherical cap (disc) centered on Paris.
@@ -69,7 +69,7 @@
 //! let cap = Cap::from_center_angle(center, Angle::from_degrees(0.5));
 //!
 //! // Approximate the cap with a covering of S2 cells.
-//! let coverer = RegionCoverer::new().max_level(14).max_cells(8);
+//! let coverer = RegionCoverer::new().max_level(Level::new(14)).max_cells(8);
 //! let covering = coverer.covering(&cap);
 //! assert!(!covering.is_empty());
 //!

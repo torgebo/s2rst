@@ -10,11 +10,12 @@
 use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
+use s2rst::s2::Face;
 use s2rst::s2::uv_edge_clipper::UVEdgeClipper;
 use s2rst::s2::{Cell, CellId, LatLng};
 
 fn face0_cell() -> Cell {
-    Cell::from_cell_id(CellId::from_face(0))
+    Cell::from_cell_id(CellId::from_face(Face::F0))
 }
 
 // Clip an edge fully inside a face cell
@@ -50,7 +51,7 @@ fn clip_cross_face() -> bool {
 // Clip to a small cell
 #[library_benchmark]
 fn clip_small_cell() -> bool {
-    let id = CellId::from_face(0).children()[0].children()[0].children()[0];
+    let id = CellId::from_face(Face::F0).children()[0].children()[0].children()[0];
     let cell = Cell::from_cell_id(id);
     let mut c = UVEdgeClipper::from_cell(cell);
     let center = cell.center();

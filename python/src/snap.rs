@@ -11,11 +11,13 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 use s2rst::s1::Angle;
+use s2rst::s2::Level;
 use s2rst::s2::builder::snap::{
     IdentitySnapFunction, IntLatLngSnapFunction, S2CellIdSnapFunction, SnapFunction,
 };
 
 use crate::angle::PyAngle;
+use crate::bounded::LevelArg;
 
 /// A snap function that does not move vertices; `snap_radius` only controls the
 /// minimum vertex separation.
@@ -57,7 +59,7 @@ impl PyIdentitySnapFunction {
 #[pyclass(name = "S2CellIdSnapFunction", module = "s2rst")]
 #[derive(Clone, Copy)]
 pub struct PyS2CellIdSnapFunction {
-    level: u8,
+    level: Level,
 }
 
 impl PyS2CellIdSnapFunction {
@@ -68,14 +70,15 @@ impl PyS2CellIdSnapFunction {
 
 #[pymethods]
 impl PyS2CellIdSnapFunction {
+    /// Raises `ValueError` unless `0 <= level <= 30`.
     #[new]
-    fn new(level: u8) -> Self {
-        Self { level }
+    fn new(level: LevelArg) -> Self {
+        Self { level: level.0 }
     }
 
     #[getter]
     fn level(&self) -> u8 {
-        self.level
+        self.level.as_u8()
     }
 
     fn snap_radius(&self) -> PyAngle {

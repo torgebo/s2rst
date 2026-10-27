@@ -313,9 +313,12 @@ Each mutant injects one defect into `core/`; every listed harness must fail on i
 | M-741 | D-009 back: `0.0_f64.max(h)`, whose sign for a height of −0 Rust leaves open (−0 unoptimised) | P-CPMEA-01 | `cp_mea::p_cpmea_01__area` | killed |
 | M-801 | parent() loses its debug check, so a face cell returns (lsb << 2 sets bit 62) instead of panicking | N-parent | `crash::n_parent` | killed |
 | M-802 | parent()'s face check is promoted to every build, so a release build panics where its `# Panics` names debug builds only | R-parent | `crash::r_parent` | killed |
-| M-803 | Level::new loses its range check, so a raw level above 30 converts instead of panicking | N-Level | `crash::n_raw_level` | killed |
+| M-803 | Level::new loses its range check, so a raw level above 30 converts instead of panicking | N-Level | `crash::n_level_new` | killed |
 | M-804 | s1::Interval::contains loses its debug check, so a point outside [−π, π] returns | N-s1::Interval::contains | `iv_crash::n_point_operations` | killed |
 | M-805 | sin2's special-operand check is promoted to every build, so a release build panics on the sentinels | R-s1::ChordAngle::sin2 | `ca_crash::r_trigonometry` | killed |
-| M-806 | denormalize loses its level_mod check, so a level_mod of 0 or above 3 returns | N-CellUnion::denormalize | `cu_crash::n_denormalize__n2` | killed |
+| M-806 | LevelMod::new loses its range check, so a level_mod of 0 or above 3 reaches denormalize (re-pointed by spec 009: the check moved from denormalize's assert to the type) | N-LevelMod | `cu_crash::n_level_mod_new` | killed |
 | M-807 | encode_uint_with_length clamps the length to 8, so a length above 8 writes 8 bytes instead of panicking | N-encode_uint_with_length | `cd_crash::n_uint_with_length` | killed |
 | M-808 | s1::Interval::expanded's negative branch no longer returns the full interval first, so a NaN margin on it panics in debug builds | O-s1::Interval::expanded | `iv_crash::o_expanded_nan_full` | killed |
+| M-809 | Face::try_from accepts 6, one past the last face | C-Face::try_from | `crash::c_face_try_from` | killed |
+| M-810 | LevelMod::try_from accepts 0, one value outside 1..=3 | C-LevelMod::try_from | `cu_crash::c_level_mod_try_from` | killed |
+| M-811 | CellVertex::try_from accepts index 4, one past the last vertex | C-CellVertex::try_from | `cl_crash::c_cell_vertex_try_from` | killed |

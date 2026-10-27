@@ -174,7 +174,7 @@ const fn init_lookup_tables(
 /// # Examples
 ///
 /// ```
-/// use s2rst::s2::{CellId, LatLng, Point};
+/// use s2rst::s2::{CellId, LatLng, Level, Point};
 ///
 /// // Create a CellId from a lat/lng point (New York City).
 /// let ll = LatLng::from_degrees(40.7128, -74.0060);
@@ -183,7 +183,7 @@ const fn init_lookup_tables(
 /// assert_eq!(id.level(), 30); // leaf cell
 ///
 /// // Navigate the hierarchy: parent at level 10.
-/// let parent = id.parent_at_level(10);
+/// let parent = id.parent_at_level(Level::new(10));
 /// assert_eq!(parent.level(), 10);
 /// assert!(parent.contains(id));
 ///
@@ -220,10 +220,26 @@ impl CellId {
     }
 
     /// Returns the cell corresponding to a given S2 cube face (0–5).
+    ///
+    /// The face is a [`Face`], so faces 6 and 7, for which upstream's `FromFace(int)` builds an
+    /// undefined identifier without a check, cannot be passed (spec 009). From an integer, use
+    /// [`Face::try_from`](TryFrom::try_from).
+    ///
+    /// ```
+    /// use s2rst::s2::{CellId, Face};
+    ///
+    /// assert!(CellId::from_face(Face::F5).is_valid());
+    /// for face in Face::ALL {
+    ///     assert_eq!(CellId::from_face(face).face(), face);
+    /// }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// s2rst::s2::CellId::from_face(7u8);
+    /// ```
     #[inline]
-    pub fn from_face(face: impl Into<u8>) -> Self {
-        let f: u8 = face.into();
-        CellId((u64::from(f) << POS_BITS) + lsb_for_level(Level::MIN))
+    pub fn from_face(face: Face) -> Self {
+        CellId((u64::from(face.as_u8()) << POS_BITS) + lsb_for_level(Level::MIN))
     }
 
     /// Returns a cell given its face (0–5), the 61-bit Hilbert curve position
@@ -232,13 +248,11 @@ impl CellId {
     ///
     /// # Panics
     ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
-    /// In debug builds, also panics on overflow if `pos` is far outside the 61-bit range
+    /// In debug builds, panics on overflow if `pos` is far outside the 61-bit range
     /// (`face << 61` plus `pos` overflows).
     #[inline]
-    pub fn from_face_pos_level(face: impl Into<u8>, pos: u64, level: impl Into<Level>) -> Self {
-        let f: u8 = face.into();
-        CellId(((u64::from(f) << POS_BITS) + pos) | 1).parent_at_level(level)
+    pub fn from_face_pos_level(face: Face, pos: u64, level: Level) -> Self {
+        CellId(((u64::from(face.as_u8()) << POS_BITS) + pos) | 1).parent_at_level(level)
     }
 
     /// Returns the leaf cell containing the given point.
@@ -331,12 +345,10 @@ impl CellId {
     ///
     /// # Panics
     ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
-    /// In debug builds, also panics if this cell is not valid or `level` is not in
+    /// In debug builds, panics if this cell is not valid or `level` is not in
     /// `1..=self.level()`.
     #[inline]
-    pub fn child_position(self, level: impl Into<Level>) -> u8 {
-        let level = level.into();
+    pub fn child_position(self, level: Level) -> u8 {
         debug_assert!(self.is_valid());
         debug_assert!(level >= Level::new(1));
         debug_assert!(level <= self.level());
@@ -348,13 +360,9 @@ impl CellId {
     // =======================================================================
 
     /// Returns the cell at the given level (which must be <= this cell's level).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
-    pub fn parent_at_level(self, level: impl Into<Level>) -> CellId {
-        let new_lsb = lsb_for_level(level.into());
+    pub fn parent_at_level(self, level: Level) -> CellId {
+        let new_lsb = lsb_for_level(level);
         CellId((self.0 & new_lsb.wrapping_neg()) | new_lsb)
     }
 
@@ -418,43 +426,27 @@ impl CellId {
     }
 
     /// Returns the first child at the given level (must be >= this cell's level).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
-    pub fn child_begin_at_level(self, level: impl Into<Level>) -> CellId {
-        CellId(self.0 - self.lsb() + lsb_for_level(level.into()))
+    pub fn child_begin_at_level(self, level: Level) -> CellId {
+        CellId(self.0 - self.lsb() + lsb_for_level(level))
     }
 
     /// Returns the first cell after the last child at the given level.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
-    pub fn child_end_at_level(self, level: impl Into<Level>) -> CellId {
-        CellId(self.0 + self.lsb() + lsb_for_level(level.into()))
+    pub fn child_end_at_level(self, level: Level) -> CellId {
+        CellId(self.0 + self.lsb() + lsb_for_level(level))
     }
 
     /// Returns the first cell at the given level (the smallest cell ID).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
-    pub fn begin(level: impl Into<Level>) -> CellId {
-        CellId::from_face(0).child_begin_at_level(level)
+    pub fn begin(level: Level) -> CellId {
+        CellId::from_face(Face::F0).child_begin_at_level(level)
     }
 
     /// Returns the past-the-end cell at the given level.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
-    pub fn end(level: impl Into<Level>) -> CellId {
-        CellId::from_face(5).child_end_at_level(level)
+    pub fn end(level: Level) -> CellId {
+        CellId::from_face(Face::F5).child_end_at_level(level)
     }
 
     /// Returns the minimum `CellId` contained within this cell.
@@ -651,12 +643,8 @@ impl CellId {
     }
 
     /// Returns the edge length at the given level in (s,t)-space.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
     #[inline]
-    pub fn size_st(level: impl Into<Level>) -> f64 {
+    pub fn size_st(level: Level) -> f64 {
         ij_to_st_min(size_ij(level))
     }
 
@@ -763,10 +751,9 @@ impl CellId {
     ///
     /// # Panics
     ///
-    /// Panics if `level` is 30, or an integer greater than 30. `level` must be less than
+    /// Panics if `level` is 30. `level` must be less than
     /// `self.level()`, as upstream `AppendVertexNeighbors` requires.
-    pub fn vertex_neighbors(self, level: impl Into<Level>) -> Vec<CellId> {
-        let level = level.into();
+    pub fn vertex_neighbors(self, level: Level) -> Vec<CellId> {
         let half_size = size_ij(Level::new(level.as_u8() + 1));
         let size = half_size << 1;
         let (f, i, j, _) = self.to_face_ij_orientation();
@@ -800,12 +787,7 @@ impl CellId {
 
     /// Returns all neighbors of this cell at the given level. Two cells are
     /// neighbors if their boundaries intersect but their interiors do not.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
-    pub fn all_neighbors(self, level: impl Into<Level>) -> Option<Vec<CellId>> {
-        let level = level.into();
+    pub fn all_neighbors(self, level: Level) -> Option<Vec<CellId>> {
         if level < self.level() || level > Level::MAX {
             return None;
         }
@@ -933,8 +915,8 @@ impl CellId {
             return None;
         }
         let bytes = s.as_bytes();
-        let face = bytes[0].wrapping_sub(b'0');
-        if face > 5 || bytes[1] != b'/' {
+        let face = Face::try_from(bytes[0].wrapping_sub(b'0')).ok()?;
+        if bytes[1] != b'/' {
             return None;
         }
         let mut id = CellId::from_face(face);
@@ -954,24 +936,15 @@ impl CellId {
 // ---------------------------------------------------------------------------
 
 /// Returns the lowest-numbered bit that is on for cells at the given level.
-///
-/// # Panics
-///
-/// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
 #[inline]
-pub fn lsb_for_level(level: impl Into<Level>) -> u64 {
-    let level = level.into();
+pub fn lsb_for_level(level: Level) -> u64 {
     1u64 << (2 * (u32::from(MAX_CELL_LEVEL) - level.as_u32()))
 }
 
 /// Returns the edge length of cells at the given level in (i,j)-space.
-///
-/// # Panics
-///
-/// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
 #[inline]
-pub fn size_ij(level: impl Into<Level>) -> i32 {
-    1 << (MAX_CELL_LEVEL - level.into().as_u8())
+pub fn size_ij(level: Level) -> i32 {
+    1 << (MAX_CELL_LEVEL - level.as_u8())
 }
 
 /// Returns a leaf cell given its cube face and (i, j) coordinates.
@@ -1029,12 +1002,8 @@ fn from_face_ij_same(f: Face, i: i32, j: i32, same_face: bool) -> CellId {
 
 /// Returns the bounds in (u,v)-space for the cell at the given level
 /// containing the leaf cell with the given (i,j)-coordinates.
-///
-/// # Panics
-///
-/// Panics if `level` is an integer greater than 30: the conversion to `Level` panics.
 #[inline]
-pub fn ij_level_to_bound_uv(i: i32, j: i32, level: impl Into<Level>) -> r2::Rect {
+pub fn ij_level_to_bound_uv(i: i32, j: i32, level: Level) -> r2::Rect {
     let cell_size = size_ij(level);
     let x_lo = i & (-cell_size);
     let y_lo = j & (-cell_size);
@@ -1169,11 +1138,11 @@ mod tests {
     #[test]
     fn test_from_face() {
         for face in 0..6u8 {
-            let fpl = CellId::from_face_pos_level(face, 0, 0);
-            let f = CellId::from_face(face);
+            let fpl = CellId::from_face_pos_level(Face::from_u8(face), 0, Level::new(0));
+            let f = CellId::from_face(Face::from_u8(face));
             assert_eq!(
                 fpl, f,
-                "from_face_pos_level({face}, 0, 0) != from_face({face})"
+                "from_face_pos_level({face}, 0, Level::new(0)) != from_face({face})"
             );
         }
     }
@@ -1187,7 +1156,7 @@ mod tests {
 
     #[test]
     fn test_parent_child_relationships() {
-        let ci = CellId::from_face_pos_level(3, 0x12345678, MAX_CELL_LEVEL - 4);
+        let ci = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(MAX_CELL_LEVEL - 4));
 
         assert!(ci.is_valid());
         assert_eq!(ci.face(), Face::F3);
@@ -1204,8 +1173,8 @@ mod tests {
         assert!(ci.child_begin().0 < ci.0);
         assert!(ci.child_end().0 > ci.0);
         assert_eq!(ci.child_end(), ci.child_begin().next().next().next().next());
-        assert_eq!(ci.range_min(), ci.child_begin_at_level(MAX_CELL_LEVEL));
-        assert_eq!(ci.range_max().next(), ci.child_end_at_level(MAX_CELL_LEVEL));
+        assert_eq!(ci.range_min(), ci.child_begin_at_level(Level::MAX));
+        assert_eq!(ci.range_max().next(), ci.child_end_at_level(Level::MAX));
     }
 
     #[test]
@@ -1250,14 +1219,17 @@ mod tests {
 
     #[test]
     fn test_from_debug_string() {
-        assert_eq!(CellId::from_debug_string("3/"), Some(CellId::from_face(3)));
+        assert_eq!(
+            CellId::from_debug_string("3/"),
+            Some(CellId::from_face(Face::F3))
+        );
         assert_eq!(
             CellId::from_debug_string("0/21"),
-            Some(CellId::from_face(0).children()[2].children()[1])
+            Some(CellId::from_face(Face::F0).children()[2].children()[1])
         );
         assert_eq!(
             CellId::from_debug_string("4/000000000000000000000000000000"),
-            Some(CellId::from_face(4).range_min())
+            Some(CellId::from_face(Face::F4).range_min())
         );
         // Too many levels
         assert_eq!(
@@ -1390,7 +1362,7 @@ mod tests {
         // Face 1 edge neighbors should be faces 5, 3, 2, 0.
         let faces = [Face::F5, Face::F3, Face::F2, Face::F0];
         let nbrs = from_face_ij(Face::F1, 0, 0)
-            .parent_at_level(0)
+            .parent_at_level(Level::new(0))
             .edge_neighbors();
         for (i, nbr) in nbrs.iter().enumerate() {
             assert!(nbr.is_face(), "neighbor {i} should be a face");
@@ -1406,13 +1378,13 @@ mod tests {
         // Check corner cells at all levels.
         let max_ij = MAX_SIZE - 1;
         for level in 1..=MAX_CELL_LEVEL {
-            let id = from_face_ij(Face::F1, 0, 0).parent_at_level(level);
-            let level_size_ij = size_ij(level);
+            let id = from_face_ij(Face::F1, 0, 0).parent_at_level(Level::new(level));
+            let level_size_ij = size_ij(Level::new(level));
             let want = [
-                from_face_ij(Face::F5, max_ij, max_ij).parent_at_level(level),
-                from_face_ij(Face::F1, level_size_ij, 0).parent_at_level(level),
-                from_face_ij(Face::F1, 0, level_size_ij).parent_at_level(level),
-                from_face_ij(Face::F0, max_ij, 0).parent_at_level(level),
+                from_face_ij(Face::F5, max_ij, max_ij).parent_at_level(Level::new(level)),
+                from_face_ij(Face::F1, level_size_ij, 0).parent_at_level(Level::new(level)),
+                from_face_ij(Face::F1, 0, level_size_ij).parent_at_level(Level::new(level)),
+                from_face_ij(Face::F0, max_ij, 0).parent_at_level(Level::new(level)),
             ];
             let got = id.edge_neighbors();
             for i in 0..4 {
@@ -1431,7 +1403,7 @@ mod tests {
     fn test_vertex_neighbors() {
         // Center of face 2 at level 5.
         let id = CellId::from_point(&Point::from_coords(0.0, 0.0, 1.0));
-        let mut neighbors = id.vertex_neighbors(5);
+        let mut neighbors = id.vertex_neighbors(Level::new(5));
         neighbors.sort();
 
         for (n, neighbor) in neighbors.iter().enumerate() {
@@ -1441,17 +1413,17 @@ mod tests {
             } else {
                 1 << 29
             };
-            let want = from_face_ij(Face::F2, i, j).parent_at_level(5);
+            let want = from_face_ij(Face::F2, i, j).parent_at_level(Level::new(5));
             assert_eq!(*neighbor, want, "vertex neighbor {n}");
         }
 
         // Corner of faces 0, 4, 5.
-        let id = CellId::from_face_pos_level(0, 0, MAX_CELL_LEVEL);
-        let mut neighbors = id.vertex_neighbors(0);
+        let id = CellId::from_face_pos_level(Face::F0, 0, Level::MAX);
+        let mut neighbors = id.vertex_neighbors(Level::new(0));
         neighbors.sort();
         assert_eq!(neighbors.len(), 3);
-        assert_eq!(neighbors[0], CellId::from_face(0));
-        assert_eq!(neighbors[1], CellId::from_face(4));
+        assert_eq!(neighbors[0], CellId::from_face(Face::F0));
+        assert_eq!(neighbors[1], CellId::from_face(Face::F4));
     }
 
     // --- Common ancestor level ---
@@ -1460,63 +1432,70 @@ mod tests {
     fn test_common_ancestor_level() {
         // Identical cells.
         assert_eq!(
-            CellId::from_face(0).common_ancestor_level(CellId::from_face(0)),
+            CellId::from_face(Face::F0).common_ancestor_level(CellId::from_face(Face::F0)),
             Some(Level::MIN)
         );
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(30)
-                .common_ancestor_level(CellId::from_face(0).child_begin_at_level(30)),
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(30))
+                .common_ancestor_level(
+                    CellId::from_face(Face::F0).child_begin_at_level(Level::new(30))
+                ),
             Some(Level::MAX)
         );
 
         // One is descendant of the other.
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(30)
-                .common_ancestor_level(CellId::from_face(0)),
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(30))
+                .common_ancestor_level(CellId::from_face(Face::F0)),
             Some(Level::MIN)
         );
         assert_eq!(
-            CellId::from_face(5)
-                .common_ancestor_level(CellId::from_face(5).child_end_at_level(30).prev()),
+            CellId::from_face(Face::F5).common_ancestor_level(
+                CellId::from_face(Face::F5)
+                    .child_end_at_level(Level::new(30))
+                    .prev()
+            ),
             Some(Level::MIN)
         );
 
         // No common ancestors (different faces).
         assert_eq!(
-            CellId::from_face(0).common_ancestor_level(CellId::from_face(5)),
+            CellId::from_face(Face::F0).common_ancestor_level(CellId::from_face(Face::F5)),
             None
         );
         assert_eq!(
-            CellId::from_face(2)
-                .child_begin_at_level(30)
-                .common_ancestor_level(CellId::from_face(3).child_begin_at_level(20)),
+            CellId::from_face(Face::F2)
+                .child_begin_at_level(Level::new(30))
+                .common_ancestor_level(
+                    CellId::from_face(Face::F3).child_begin_at_level(Level::new(20))
+                ),
             None
         );
 
         // Common ancestor distinct from both.
         assert_eq!(
-            CellId::from_face(5)
-                .child_begin_at_level(9)
+            CellId::from_face(Face::F5)
+                .child_begin_at_level(Level::new(9))
                 .next()
-                .child_begin_at_level(15)
+                .child_begin_at_level(Level::new(15))
                 .common_ancestor_level(
-                    CellId::from_face(5)
-                        .child_begin_at_level(9)
-                        .child_begin_at_level(20)
+                    CellId::from_face(Face::F5)
+                        .child_begin_at_level(Level::new(9))
+                        .child_begin_at_level(Level::new(20))
                 ),
             Some(Level::new(8))
         );
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(2)
-                .child_begin_at_level(30)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(2))
+                .child_begin_at_level(Level::new(30))
                 .common_ancestor_level(
-                    CellId::from_face(0)
-                        .child_begin_at_level(2)
+                    CellId::from_face(Face::F0)
+                        .child_begin_at_level(Level::new(2))
                         .next()
-                        .child_begin_at_level(5)
+                        .child_begin_at_level(Level::new(5))
                 ),
             Some(Level::new(1))
         );
@@ -1527,35 +1506,41 @@ mod tests {
     #[test]
     fn test_advance() {
         assert_eq!(
-            CellId::from_face(0).child_begin_at_level(0).advance(7),
-            CellId::from_face(5).child_end_at_level(0)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
+                .advance(7),
+            CellId::from_face(Face::F5).child_end_at_level(Level::new(0))
         );
         assert_eq!(
-            CellId::from_face(0).child_begin_at_level(0).advance(12),
-            CellId::from_face(5).child_end_at_level(0)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
+                .advance(12),
+            CellId::from_face(Face::F5).child_end_at_level(Level::new(0))
         );
         assert_eq!(
-            CellId::from_face(5).child_end_at_level(0).advance(-7),
-            CellId::from_face(0).child_begin_at_level(0)
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::new(0))
+                .advance(-7),
+            CellId::from_face(Face::F0).child_begin_at_level(Level::new(0))
         );
         assert_eq!(
-            CellId::from_face(5)
-                .child_end_at_level(0)
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::new(0))
                 .advance(-12000000),
-            CellId::from_face(0).child_begin_at_level(0)
+            CellId::from_face(Face::F0).child_begin_at_level(Level::new(0))
         );
 
         // Advance 256 leaf cells = one cell at level MAX_LEVEL - 4.
-        let id = CellId::from_face_pos_level(3, 0x12345678, MAX_CELL_LEVEL - 4);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(MAX_CELL_LEVEL - 4));
         assert_eq!(
-            id.child_begin_at_level(MAX_CELL_LEVEL).advance(256),
-            id.next().child_begin_at_level(MAX_CELL_LEVEL)
+            id.child_begin_at_level(Level::MAX).advance(256),
+            id.next().child_begin_at_level(Level::MAX)
         );
 
         assert_eq!(
-            CellId::from_face_pos_level(1, 0, MAX_CELL_LEVEL)
+            CellId::from_face_pos_level(Face::F1, 0, Level::MAX)
                 .advance(4 << (2 * i64::from(MAX_CELL_LEVEL))),
-            CellId::from_face_pos_level(5, 0, MAX_CELL_LEVEL)
+            CellId::from_face_pos_level(Face::F5, 0, Level::MAX)
         );
     }
 
@@ -1565,78 +1550,87 @@ mod tests {
     fn test_wrapping() {
         // Wrap from beginning to end.
         assert_eq!(
-            CellId::from_face(0).child_begin_at_level(0).prev_wrap(),
-            CellId::from_face(5).child_end_at_level(0).prev()
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
+                .prev_wrap(),
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::new(0))
+                .prev()
         );
 
         // Smallest end leaf wraps to smallest first leaf.
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(MAX_CELL_LEVEL)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::MAX)
                 .prev_wrap(),
-            CellId::from_face_pos_level(5, !0u64 >> FACE_BITS, MAX_CELL_LEVEL)
+            CellId::from_face_pos_level(Face::F5, !0u64 >> FACE_BITS, Level::MAX)
         );
 
         // PrevWrap == AdvanceWrap(-1)
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(MAX_CELL_LEVEL)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::MAX)
                 .prev_wrap(),
-            CellId::from_face(0)
-                .child_begin_at_level(MAX_CELL_LEVEL)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::MAX)
                 .advance_wrap(-1)
         );
 
         // Prev + NextWrap stays the same.
         assert_eq!(
-            CellId::from_face(5)
-                .child_end_at_level(4)
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::new(4))
                 .prev()
                 .next_wrap(),
-            CellId::from_face(0).child_begin_at_level(4)
+            CellId::from_face(Face::F0).child_begin_at_level(Level::new(4))
         );
 
         // AdvanceWrap forward and back.
         assert_eq!(
-            CellId::from_face(5)
-                .child_end_at_level(4)
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::new(4))
                 .advance(-1)
                 .advance_wrap(1),
-            CellId::from_face(0).child_begin_at_level(4)
+            CellId::from_face(Face::F0).child_begin_at_level(Level::new(4))
         );
 
         // Advancing 7 steps around cube.
         assert_eq!(
-            CellId::from_face(0).child_begin_at_level(0).advance_wrap(7),
-            CellId::from_face(1)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
+                .advance_wrap(7),
+            CellId::from_face(Face::F1)
         );
 
         // Twice around.
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(0)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
                 .advance_wrap(12),
-            CellId::from_face(0).child_begin_at_level(0)
+            CellId::from_face(Face::F0).child_begin_at_level(Level::new(0))
         );
 
         // Backwards once around plus one step.
-        assert_eq!(CellId::from_face(5).advance_wrap(-7), CellId::from_face(4));
+        assert_eq!(
+            CellId::from_face(Face::F5).advance_wrap(-7),
+            CellId::from_face(Face::F4)
+        );
 
         // Even multiple wrapping.
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(0)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
                 .advance_wrap(-12000000),
-            CellId::from_face(0).child_begin_at_level(0)
+            CellId::from_face(Face::F0).child_begin_at_level(Level::new(0))
         );
 
         // Combination of advances that should be equivalent.
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(5)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(5))
                 .advance_wrap(6644),
-            CellId::from_face(0)
-                .child_begin_at_level(5)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(5))
                 .advance_wrap(-11788)
         );
     }
@@ -1646,34 +1640,34 @@ mod tests {
     #[test]
     fn test_distance_from_begin() {
         assert_eq!(
-            CellId::from_face(5)
-                .child_end_at_level(0)
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::new(0))
                 .distance_from_begin(),
             6
         );
         assert_eq!(
-            CellId::from_face(5)
-                .child_end_at_level(MAX_CELL_LEVEL)
+            CellId::from_face(Face::F5)
+                .child_end_at_level(Level::MAX)
                 .distance_from_begin(),
             6 * (1i64 << (2 * u32::from(MAX_CELL_LEVEL)))
         );
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(0)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(0))
                 .distance_from_begin(),
             0
         );
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(MAX_CELL_LEVEL)
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::MAX)
                 .distance_from_begin(),
             0
         );
 
         // Advancing from begin by distance should return the same cell.
-        let id = CellId::from_face_pos_level(3, 0x12345678, MAX_CELL_LEVEL - 4);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(MAX_CELL_LEVEL - 4));
         assert_eq!(
-            CellId::from_face(0)
+            CellId::from_face(Face::F0)
                 .child_begin_at_level(id.level())
                 .advance(id.distance_from_begin()),
             id
@@ -1684,13 +1678,13 @@ mod tests {
 
     #[test]
     fn test_face_si_ti() {
-        let id = CellId::from_face_pos_level(3, 0x12345678, MAX_CELL_LEVEL);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::MAX);
         for level in 0..=MAX_CELL_LEVEL {
             let l = MAX_CELL_LEVEL - level;
             let want = 1u32 << level;
             let mask = (1u32 << (level + 1)) - 1;
 
-            let (_, si, ti) = id.parent_at_level(l).get_center_si_ti();
+            let (_, si, ti) = id.parent_at_level(Level::new(l)).get_center_si_ti();
             assert_eq!(
                 si & mask,
                 want,
@@ -1713,7 +1707,7 @@ mod tests {
     #[test]
     fn test_maximum_tile() {
         // Test a fixed cell at level 10.
-        let id = CellId::from_face_pos_level(3, 0x12345678, 10);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(10));
 
         // limit == id returns id.
         assert_eq!(id.maximum_tile(id), id);
@@ -1777,13 +1771,13 @@ mod tests {
         use crate::s2::metric::MAX_EDGE;
 
         const MAX_WALK_LEVEL: u8 = 8;
-        let max_dist = MAX_EDGE.value(MAX_WALK_LEVEL);
+        let max_dist = MAX_EDGE.value(Level::new(MAX_WALK_LEVEL));
 
         // Begin/End iterate over all cells at the given level across all faces.
         // Begin(level) = face 0 child_begin_at_level
         // End(level) = face 5 child_end_at_level
-        let begin = CellId::from_face(0).child_begin_at_level(MAX_WALK_LEVEL);
-        let end = CellId::from_face(5).child_end_at_level(MAX_WALK_LEVEL);
+        let begin = CellId::from_face(Face::F0).child_begin_at_level(Level::new(MAX_WALK_LEVEL));
+        let end = CellId::from_face(Face::F5).child_end_at_level(Level::new(MAX_WALK_LEVEL));
         let mut id = begin;
         let mut count = 0u64;
         while id != end {
@@ -1813,7 +1807,7 @@ mod tests {
         // Use deterministic set of cells across all faces and positions.
         for face in 0..6u8 {
             for pos_shift in [0u64, 0x12345678, 0xABCDEF01, 0x55555555, 0xFFFFFFFF] {
-                let id = CellId::from_face_pos_level(face, pos_shift, MAX_CELL_LEVEL);
+                let id = CellId::from_face_pos_level(Face::from_u8(face), pos_shift, Level::MAX);
                 assert!(id.is_leaf(), "Expected leaf cell");
                 assert_eq!(id.level(), MAX_CELL_LEVEL);
                 let center = id.to_lat_lng();
@@ -1830,12 +1824,12 @@ mod tests {
 
     #[test]
     fn test_display_fromstr() {
-        let id = CellId::from_face_pos_level(3, 0x12345678, MAX_CELL_LEVEL - 4);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(MAX_CELL_LEVEL - 4));
         let s = format!("{id}");
         let id2: CellId = s.parse().unwrap();
         assert_eq!(id, id2);
 
-        let face = CellId::from_face(2);
+        let face = CellId::from_face(Face::F2);
         assert_eq!(format!("{face}"), "2/");
         assert_eq!("2/".parse::<CellId>().unwrap(), face);
     }
@@ -1847,24 +1841,24 @@ mod tests {
         let max_ij = (1 << MAX_CELL_LEVEL) - 1;
 
         // Minimum i,j at level 0.
-        let uv = ij_level_to_bound_uv(0, 0, 0);
+        let uv = ij_level_to_bound_uv(0, 0, Level::new(0));
         assert!(float64_near(uv.x.lo, -1.0, 1e-15));
         assert!(float64_near(uv.x.hi, 1.0, 1e-15));
         assert!(float64_near(uv.y.lo, -1.0, 1e-15));
         assert!(float64_near(uv.y.hi, 1.0, 1e-15));
 
         // Maximum i,j at level 0.
-        let uv = ij_level_to_bound_uv(max_ij, max_ij, 0);
+        let uv = ij_level_to_bound_uv(max_ij, max_ij, Level::new(0));
         assert!(float64_near(uv.x.lo, -1.0, 1e-15));
         assert!(float64_near(uv.x.hi, 1.0, 1e-15));
 
         // Minimum i,j at MAX_LEVEL.
-        let uv = ij_level_to_bound_uv(0, 0, MAX_CELL_LEVEL);
+        let uv = ij_level_to_bound_uv(0, 0, Level::MAX);
         assert!(float64_near(uv.x.lo, -1.0, 1e-15));
         assert!(float64_near(uv.x.hi, -0.999999997516473060, 1e-15));
 
         // Maximum i,j at MAX_LEVEL.
-        let uv = ij_level_to_bound_uv(max_ij, max_ij, MAX_CELL_LEVEL);
+        let uv = ij_level_to_bound_uv(max_ij, max_ij, Level::MAX);
         assert!(float64_near(uv.x.lo, 0.999999997516473060, 1e-15));
         assert!(float64_near(uv.x.hi, 1.0, 1e-15));
     }
@@ -1876,7 +1870,7 @@ mod tests {
         // Test all_neighbors at the same level for a cell near a face boundary.
         // Face 0, high i value (near the edge shared with face 1).
         let max_ij = MAX_SIZE - 1;
-        let near_edge = from_face_ij(Face::F0, max_ij, MAX_SIZE / 2).parent_at_level(5);
+        let near_edge = from_face_ij(Face::F0, max_ij, MAX_SIZE / 2).parent_at_level(Level::new(5));
         let level = near_edge.level();
         let nbrs = near_edge.all_neighbors(level).unwrap();
 
@@ -1955,7 +1949,7 @@ mod tests {
     fn test_cell_id_advance_wrap() {
         // The total number of cells at level 0 is 6 (one per face).
         // advance_wrap(6) at level 0 should return to the same cell.
-        let start = CellId::from_face(0);
+        let start = CellId::from_face(Face::F0);
         assert_eq!(
             start.advance_wrap(6),
             start,
@@ -1970,7 +1964,7 @@ mod tests {
         );
 
         // advance_wrap(+N) followed by advance_wrap(-N) returns to start.
-        let id = CellId::from_face_pos_level(3, 0x12345678, 15);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(15));
         for &steps in &[1i64, 100, 100_000, 1_000_000_000] {
             let forwarded = id.advance_wrap(steps);
             let roundtrip = forwarded.advance_wrap(-steps);
@@ -1984,20 +1978,20 @@ mod tests {
         // Large positive wrap: more than the total number of cells at a given level. At level 0,
         // there are 6 cells. 13 steps = 2*6 + 1, so advance_wrap(13) == advance_wrap(1).
         assert_eq!(
-            CellId::from_face(0).advance_wrap(13),
-            CellId::from_face(0).advance_wrap(1),
+            CellId::from_face(Face::F0).advance_wrap(13),
+            CellId::from_face(Face::F0).advance_wrap(1),
             "advance_wrap(13) should equal advance_wrap(1) at level 0"
         );
 
         // Large negative wrap.
         assert_eq!(
-            CellId::from_face(2).advance_wrap(-14),
-            CellId::from_face(2).advance_wrap(-2),
+            CellId::from_face(Face::F2).advance_wrap(-14),
+            CellId::from_face(Face::F2).advance_wrap(-2),
             "advance_wrap(-14) should equal advance_wrap(-2) at level 0"
         );
 
         // Verify wrapping consistency at a deeper level.
-        let deep = CellId::from_face_pos_level(1, 0, 10);
+        let deep = CellId::from_face_pos_level(Face::F1, 0, Level::new(10));
         let total_at_level_10 = 6i64 * (1 << (2 * 10)); // 6 * 4^10
         assert_eq!(
             deep.advance_wrap(total_at_level_10),
@@ -2052,11 +2046,11 @@ mod tests {
         );
 
         // FromStr for CellId
-        let face_cell = CellId::from_face(3);
+        let face_cell = CellId::from_face(Face::F3);
         let parsed: CellId = "3/".parse().unwrap();
         assert_eq!(parsed, face_cell, "FromStr should parse face cell");
 
-        let child = CellId::from_face(0).children()[2].children()[1];
+        let child = CellId::from_face(Face::F0).children()[2].children()[1];
         let parsed2: CellId = "0/21".parse().unwrap();
         assert_eq!(parsed2, child, "FromStr should parse child path");
 
@@ -2065,7 +2059,7 @@ mod tests {
         assert!(err.is_err(), "FromStr should return Err for invalid input");
 
         // Display -> FromStr roundtrip
-        let id = CellId::from_face_pos_level(4, 0xABCDEF00, 20);
+        let id = CellId::from_face_pos_level(Face::F4, 0xABCDEF00, Level::new(20));
         let displayed = format!("{id}");
         let roundtrip: CellId = displayed.parse().unwrap();
         assert_eq!(
@@ -2080,7 +2074,7 @@ mod tests {
     fn test_cell_id_center_st_and_uv() {
         // Test center_st() returns values in [0, 1] for all faces at level 0.
         for face in 0..6u8 {
-            let id = CellId::from_face(face);
+            let id = CellId::from_face(Face::from_u8(face));
             let st = id.center_st();
             assert!(
                 st.x >= 0.0 && st.x <= 1.0,
@@ -2111,7 +2105,7 @@ mod tests {
 
         // Center UV at level 0 should be (0, 0) since st_to_uv(0.5) = 0.
         for face in 0..6u8 {
-            let id = CellId::from_face(face);
+            let id = CellId::from_face(Face::from_u8(face));
             let uv = id.center_uv();
             assert!(
                 float64_near(uv.x, 0.0, 1e-15),
@@ -2131,8 +2125,11 @@ mod tests {
         for level in [1u8, 5, 10, 15, 20, 25, MAX_CELL_LEVEL] {
             for face in 0..6u8 {
                 // Test child_begin (lowest cell) and child_end.prev (highest cell).
-                let lo = CellId::from_face(face).child_begin_at_level(level);
-                let hi = CellId::from_face(face).child_end_at_level(level).prev();
+                let lo =
+                    CellId::from_face(Face::from_u8(face)).child_begin_at_level(Level::new(level));
+                let hi = CellId::from_face(Face::from_u8(face))
+                    .child_end_at_level(Level::new(level))
+                    .prev();
 
                 for id in [lo, hi] {
                     let st = id.center_st();
@@ -2175,7 +2172,7 @@ mod tests {
         }
 
         // Verify consistency: center_uv should equal st_to_uv(center_st).
-        let id = CellId::from_face_pos_level(2, 0x12345678, 15);
+        let id = CellId::from_face_pos_level(Face::F2, 0x12345678, Level::new(15));
         let st = id.center_st();
         let uv = id.center_uv();
         assert!(
@@ -2195,24 +2192,24 @@ mod tests {
     #[test]
     fn test_begin_end() {
         // Begin(0) should be face 0 at level 0.
-        let b0 = CellId::begin(0);
-        assert_eq!(b0, CellId::from_face(0));
+        let b0 = CellId::begin(Level::new(0));
+        assert_eq!(b0, CellId::from_face(Face::F0));
         // End(0) should be past face 5 at level 0.
-        let e0 = CellId::end(0);
-        assert!(e0.0 > CellId::from_face(5).0);
+        let e0 = CellId::end(Level::new(0));
+        assert!(e0.0 > CellId::from_face(Face::F5).0);
         // Begin at leaf level.
-        let b30 = CellId::begin(MAX_CELL_LEVEL);
+        let b30 = CellId::begin(Level::MAX);
         assert!(b30.is_leaf());
         // Begin should be less than End at any level.
         for level in 0..=MAX_CELL_LEVEL {
-            assert!(CellId::begin(level).0 < CellId::end(level).0);
+            assert!(CellId::begin(Level::new(level)).0 < CellId::end(Level::new(level)).0);
         }
     }
 
     #[test]
     fn test_to_point_raw() {
         // to_point_raw should be proportional to to_point but unnormalized.
-        let id = CellId::from_face(0).child_begin_at_level(15);
+        let id = CellId::from_face(Face::F0).child_begin_at_level(Level::new(15));
         let raw = id.to_point_raw();
         let norm = id.to_point();
         let normalized = Point(raw.vector().normalize());
@@ -2223,7 +2220,7 @@ mod tests {
     #[test]
     fn test_expanded_by_distance_uv() {
         // Expanding by zero should not change the rect significantly.
-        let uv = ij_level_to_bound_uv(0, 0, 10);
+        let uv = ij_level_to_bound_uv(0, 0, Level::new(10));
         let expanded = expanded_by_distance_uv(&uv, crate::s1::Angle::from_radians(0.0));
         assert!((expanded.x.lo - uv.x.lo).abs() < 1e-10);
         assert!((expanded.x.hi - uv.x.hi).abs() < 1e-10);
@@ -2252,7 +2249,7 @@ mod quickcheck_tests {
         let face = (raw % 6) as u8;
         let level = ((raw >> 3) % 31) as u8;
         let pos = raw >> 6;
-        CellId::from_face_pos_level(face, pos, level)
+        CellId::from_face_pos_level(Face::from_u8(face), pos, Level::new(level))
     }
 
     #[quickcheck]
@@ -2334,13 +2331,13 @@ mod quickcheck_tests {
     #[test]
     fn test_token_roundtrip() {
         // A sample cell at various levels.
-        let id = CellId::from_face_pos_level(3, 0x12345678, 20);
+        let id = CellId::from_face_pos_level(Face::F3, 0x12345678, Level::new(20));
         let token = id.to_token();
         let back = CellId::from_token(&token);
         assert_eq!(id, back, "token round-trip failed for {id}");
 
         // Face cell.
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let token = id.to_token();
         let back = CellId::from_token(&token);
         assert_eq!(id, back, "token round-trip failed for face cell");
@@ -2455,13 +2452,15 @@ mod quickcheck_tests {
     fn test_common_ancestor_level_same_cell() {
         // Two identical cell ids.
         assert_eq!(
-            CellId::from_face(0).common_ancestor_level(CellId::from_face(0)),
+            CellId::from_face(Face::F0).common_ancestor_level(CellId::from_face(Face::F0)),
             Some(Level::MIN)
         );
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(MAX_CELL_LEVEL)
-                .common_ancestor_level(CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL)),
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::MAX)
+                .common_ancestor_level(
+                    CellId::from_face(Face::F0).child_begin_at_level(Level::MAX)
+                ),
             Some(Level::MAX),
         );
     }
@@ -2470,9 +2469,9 @@ mod quickcheck_tests {
     fn test_common_ancestor_level_descendant() {
         // One cell is a descendant of the other.
         assert_eq!(
-            CellId::from_face(0)
-                .child_begin_at_level(MAX_CELL_LEVEL)
-                .common_ancestor_level(CellId::from_face(0)),
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::MAX)
+                .common_ancestor_level(CellId::from_face(Face::F0)),
             Some(Level::MIN),
         );
     }
@@ -2481,7 +2480,7 @@ mod quickcheck_tests {
     fn test_common_ancestor_level_different_faces() {
         // Two cells on different faces have no common ancestor.
         assert_eq!(
-            CellId::from_face(0).common_ancestor_level(CellId::from_face(5)),
+            CellId::from_face(Face::F0).common_ancestor_level(CellId::from_face(Face::F5)),
             None,
         );
     }
@@ -2489,13 +2488,13 @@ mod quickcheck_tests {
     #[test]
     fn test_common_ancestor_level_shared_ancestor() {
         // Two cells that have a common ancestor distinct from both.
-        let a = CellId::from_face(5)
-            .child_begin_at_level(9)
+        let a = CellId::from_face(Face::F5)
+            .child_begin_at_level(Level::new(9))
             .next()
-            .child_begin_at_level(15);
-        let b = CellId::from_face(5)
-            .child_begin_at_level(9)
-            .child_begin_at_level(20);
+            .child_begin_at_level(Level::new(15));
+        let b = CellId::from_face(Face::F5)
+            .child_begin_at_level(Level::new(9))
+            .child_begin_at_level(Level::new(20));
         assert_eq!(a.common_ancestor_level(b), Some(Level::new(8)));
     }
 
@@ -2504,23 +2503,23 @@ mod quickcheck_tests {
     #[test]
     fn test_wrapping_begin_prev_wrap() {
         // Wrapping backward from the beginning should give the last cell.
-        let begin = CellId::from_face(0).child_begin_at_level(4);
-        let end = CellId::from_face(5).child_end_at_level(4);
+        let begin = CellId::from_face(Face::F0).child_begin_at_level(Level::new(4));
+        let end = CellId::from_face(Face::F5).child_end_at_level(Level::new(4));
         assert_eq!(begin.prev_wrap(), end.prev());
     }
 
     #[test]
     fn test_wrapping_end_next_wrap() {
         // Wrapping forward from the end should give the first cell.
-        let begin = CellId::from_face(0).child_begin_at_level(4);
-        let end = CellId::from_face(5).child_end_at_level(4);
+        let begin = CellId::from_face(Face::F0).child_begin_at_level(Level::new(4));
+        let end = CellId::from_face(Face::F5).child_end_at_level(Level::new(4));
         assert_eq!(end.prev().next_wrap(), begin);
     }
 
     #[test]
     fn test_wrapping_advance_wrap() {
         // advance_wrap(-1) from begin == prev_wrap from begin
-        let begin = CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL);
+        let begin = CellId::from_face(Face::F0).child_begin_at_level(Level::MAX);
         assert_eq!(begin.prev_wrap(), begin.advance_wrap(-1));
     }
 
@@ -2587,8 +2586,8 @@ mod quickcheck_tests {
         // Parent should contain child at every level.
         let leaf = CellId::from_point(&LatLng::from_degrees(48.8566, 2.3522).to_point());
         for level in 0..MAX_CELL_LEVEL {
-            let parent = leaf.parent_at_level(level);
-            let child = leaf.parent_at_level(level + 1);
+            let parent = leaf.parent_at_level(Level::new(level));
+            let child = leaf.parent_at_level(Level::new(level + 1));
             assert!(
                 parent.contains(child),
                 "level {level} parent should contain level {} child",
@@ -2606,10 +2605,12 @@ mod quickcheck_tests {
     fn test_to_face_ij_orientation_consistency() {
         // Verify that to_face_ij_orientation is consistent with from_face_ij.
         let test_ids = [
-            CellId::from_face(0),
-            CellId::from_face(3),
-            CellId::from_point(&LatLng::from_degrees(0.0, 0.0).to_point()).parent_at_level(10),
-            CellId::from_point(&LatLng::from_degrees(45.0, 90.0).to_point()).parent_at_level(15),
+            CellId::from_face(Face::F0),
+            CellId::from_face(Face::F3),
+            CellId::from_point(&LatLng::from_degrees(0.0, 0.0).to_point())
+                .parent_at_level(Level::new(10)),
+            CellId::from_point(&LatLng::from_degrees(45.0, 90.0).to_point())
+                .parent_at_level(Level::new(15)),
         ];
         for id in &test_ids {
             let (f, i, j, _) = id.to_face_ij_orientation();
@@ -2626,17 +2627,18 @@ mod quickcheck_tests {
     #[test]
     fn test_child_position() {
         // child_position returns 0..3 indicating which quadrant.
-        let parent = CellId::from_face(0);
+        let parent = CellId::from_face(Face::F0);
         let children = parent.children();
         for (i, child) in children.iter().enumerate() {
-            assert_eq!(child.child_position(1), i as u8);
+            assert_eq!(child.child_position(Level::new(1)), i as u8);
         }
     }
 
     #[test]
     fn test_edge_neighbors_valid() {
         // Each edge neighbor should be a valid cell at the same level.
-        let id = CellId::from_point(&LatLng::from_degrees(0.0, 0.0).to_point()).parent_at_level(10);
+        let id = CellId::from_point(&LatLng::from_degrees(0.0, 0.0).to_point())
+            .parent_at_level(Level::new(10));
         let neighbors = id.edge_neighbors();
         for (k, nbr) in neighbors.iter().enumerate() {
             assert!(nbr.is_valid(), "edge neighbor {k} is invalid");
@@ -2649,8 +2651,8 @@ mod quickcheck_tests {
     fn test_begin_end_iteration() {
         // begin(level)..end(level) should cover all cells at that level on each face.
         for level in [0u8, 1, 5] {
-            let begin = CellId::begin(level);
-            let end = CellId::end(level);
+            let begin = CellId::begin(Level::new(level));
+            let end = CellId::end(Level::new(level));
             assert!(begin < end, "begin >= end at level {level}");
             assert_eq!(begin.level(), level);
             assert!(begin.is_valid());

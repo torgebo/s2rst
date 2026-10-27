@@ -5,15 +5,13 @@ Tier: slow
 Defect: the FR-015 fix reversed: denormalize() adds with Level + u8, which panics when rounding up passes level 30
 
 diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
-index 4669eb0..8cbbeab 100644
 --- a/core/src/s2/cell_union.rs
 +++ b/core/src/s2/cell_union.rs
-@@ -500,10 +500,7 @@ impl CellUnion {
+@@ -537,9 +537,7 @@
              } else if level_mod > 1 {
                  let offset = (level - min_level) % level_mod;
                  if offset > 0 {
--                    // C++ rounds up in `int` and then clamps to kMaxLevel; a saturating
--                    // add cannot overflow even for a `level_mod` outside 1–3.
+-                    // C++ rounds up in `int` and then clamps to kMaxLevel.
 -                    let rounded = level.as_u8().saturating_add(level_mod - offset);
 -                    Level::new(rounded.min(crate::s2::coords::MAX_CELL_LEVEL))
 +                    level + (level_mod - offset)

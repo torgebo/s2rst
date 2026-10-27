@@ -11,6 +11,7 @@ use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
 use s2rst::s1::{Angle, ChordAngle};
+use s2rst::s2::Level;
 use s2rst::s2::cell_index::CellIndex;
 use s2rst::s2::closest_cell_query::{ClosestCellQuery, Options, PointTarget};
 use s2rst::s2::{CellId, LatLng};
@@ -21,7 +22,7 @@ fn make_cell_index(n: usize) -> CellIndex {
     let center_id = CellId::from_point(&center);
     let mut index = CellIndex::new();
     for i in 0..n {
-        let id = center_id.parent_at_level(15).advance(i as i64);
+        let id = center_id.parent_at_level(Level::new(15)).advance(i as i64);
         index.add(id, i as i32);
     }
     index.build();

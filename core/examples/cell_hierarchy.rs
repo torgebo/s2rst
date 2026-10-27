@@ -13,6 +13,9 @@
 //! Run with: `cargo run --example cell_hierarchy`
 #![allow(clippy::print_stdout, reason = "example binary")]
 
+use s2rst::s2::CellVertex;
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::earth;
 use s2rst::s2::{Cell, CellId, LatLng};
 
@@ -28,7 +31,7 @@ fn main() {
         "-----", "--------------", "--------------"
     );
     for level in (0..=30).step_by(5) {
-        let id = CellId::from_face_pos_level(0, 0, level);
+        let id = CellId::from_face_pos_level(Face::F0, 0, Level::new(level));
         let cell = Cell::from_cell_id(id);
         let edge_km = edge_length_km(&cell);
         let area_km2 = earth::steradians_to_square_km(cell.approx_area());
@@ -59,7 +62,7 @@ fn main() {
         "Level", "Token", "Edge", "Area"
     );
     for level in [30, 20, 15, 10, 5, 1, 0] {
-        let ancestor = leaf.parent_at_level(level);
+        let ancestor = leaf.parent_at_level(Level::new(level));
         let cell = Cell::from_cell_id(ancestor);
         let edge_km = edge_length_km(&cell);
         let area_km2 = earth::steradians_to_square_km(cell.approx_area());
@@ -73,7 +76,7 @@ fn main() {
     }
 
     // ── Children of a level-4 cell ──────────────────────────────────────
-    let parent = leaf.parent_at_level(4);
+    let parent = leaf.parent_at_level(Level::new(4));
     let children = parent.children();
     println!(
         "\n=== 4 children of level-4 cell {} ===\n",
@@ -95,7 +98,7 @@ fn main() {
     }
 
     // ── Edge neighbors ──────────────────────────────────────────────────
-    let level10 = leaf.parent_at_level(10);
+    let level10 = leaf.parent_at_level(Level::new(10));
     let neighbors = level10.edge_neighbors();
     println!(
         "\n=== 4 edge neighbors of level-10 cell {} ===\n",
@@ -114,8 +117,8 @@ fn main() {
 
     // ── Containment relationships ───────────────────────────────────────
     println!("\n=== Containment checks ===\n");
-    let level5 = leaf.parent_at_level(5);
-    let level15 = leaf.parent_at_level(15);
+    let level5 = leaf.parent_at_level(Level::new(5));
+    let level15 = leaf.parent_at_level(Level::new(15));
     println!("  level-5 contains level-15?  {}", level5.contains(level15));
     println!("  level-15 contains level-5?  {}", level15.contains(level5));
     println!("  level-5 contains leaf?      {}", level5.contains(leaf));
@@ -134,8 +137,8 @@ fn main() {
 fn edge_length_km(cell: &Cell) -> f64 {
     let mut total = 0.0;
     for i in 0..4 {
-        let v0 = cell.vertex(i);
-        let v1 = cell.vertex((i + 1) % 4);
+        let v0 = cell.vertex(CellVertex::ALL[i]);
+        let v1 = cell.vertex(CellVertex::ALL[(i + 1) % 4]);
         total += earth::get_distance_km_points(v0, v1);
     }
     total / 4.0

@@ -8,6 +8,7 @@
 //! Integration tests for `S2Builder`, ported from C++ `s2builder_test.cc`.
 
 use s2rst::s1::Angle;
+use s2rst::s2::Level;
 use s2rst::s2::builder::point_vector_layer::S2PointVectorLayer;
 use s2rst::s2::builder::polygon_layer::S2PolygonLayer;
 use s2rst::s2::builder::polyline_vector_layer::S2PolylineVectorLayer;
@@ -157,7 +158,9 @@ fn test_builder_identity_snap_preserves_vertices() {
 fn test_builder_cellid_snap() {
     let input = text_format::make_polygon("0:0, 5:10, 10:0");
 
-    let mut builder = S2Builder::new(Options::new(Box::new(S2CellIdSnapFunction::new(10))));
+    let mut builder = S2Builder::new(Options::new(Box::new(S2CellIdSnapFunction::new(
+        Level::new(10),
+    ))));
     builder.start_layer(Box::new(S2PolygonLayer::new()));
     builder.add_polygon(&input);
 

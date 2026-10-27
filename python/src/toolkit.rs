@@ -26,6 +26,7 @@ use s2rst::s2::crossing_edge_query::CrossingType;
 use s2rst::s2::shape_util;
 
 use crate::angle::PyAngle;
+use crate::bounded::FaceArg;
 use crate::index::PyShapeIndex;
 use crate::s2point::PyS2Point;
 use crate::shapes::PyShape;
@@ -283,20 +284,14 @@ pub fn wedge_contains(
 // Cube-face coordinates
 // ---------------------------------------------------------------------------
 
-/// Convert a face number `0..=5` to a `Face`, raising `ValueError` otherwise.
-fn face_from_int(face: u8) -> PyResult<coords::Face> {
-    coords::Face::try_from(face)
-        .map_err(|v| pyo3::exceptions::PyValueError::new_err(format!("invalid face: {v}")))
-}
-
 /// Convert `(face, u, v)` cube-face coordinates to a direction vector
 /// (not necessarily unit length).
+///
+/// Raises `ValueError` unless `0 <= face <= 5`.
 #[pyfunction]
-pub fn face_uv_to_xyz(face: u8, u: f64, v: f64) -> PyResult<PyS2Point> {
-    let face = face_from_int(face)?;
-    Ok(PyS2Point(s2::Point::new(coords::face_uv_to_xyz(
-        face, u, v,
-    ))))
+pub fn face_uv_to_xyz(face: FaceArg, u: f64, v: f64) -> PyS2Point {
+    let face = face.0;
+    PyS2Point(s2::Point::new(coords::face_uv_to_xyz(face, u, v)))
 }
 
 /// Convert a direction vector to `(face, u, v)` cube-face coordinates.
@@ -320,17 +315,21 @@ pub fn uv_to_st(u: f64) -> f64 {
 }
 
 /// The unit-length u-axis of the given face.
+///
+/// Raises `ValueError` unless `0 <= face <= 5`.
 #[pyfunction]
-pub fn get_u_axis(face: u8) -> PyResult<PyS2Point> {
-    let face = face_from_int(face)?;
-    Ok(PyS2Point(s2::Point::new(coords::get_u_axis(face))))
+pub fn get_u_axis(face: FaceArg) -> PyS2Point {
+    let face = face.0;
+    PyS2Point(s2::Point::new(coords::get_u_axis(face)))
 }
 
 /// The unit-length v-axis of the given face.
+///
+/// Raises `ValueError` unless `0 <= face <= 5`.
 #[pyfunction]
-pub fn get_v_axis(face: u8) -> PyResult<PyS2Point> {
-    let face = face_from_int(face)?;
-    Ok(PyS2Point(s2::Point::new(coords::get_v_axis(face))))
+pub fn get_v_axis(face: FaceArg) -> PyS2Point {
+    let face = face.0;
+    PyS2Point(s2::Point::new(coords::get_v_axis(face)))
 }
 
 // ----- shape_util -----

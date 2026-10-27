@@ -15,9 +15,10 @@ use s2rst::s2::builder::polyline_layer::S2PolylineLayer;
 use s2rst::s2::builder::snap::{IdentitySnapFunction, S2CellIdSnapFunction, SnapFunction};
 use s2rst::s2::builder::{Options, S2Builder};
 use s2rst::s2::polyline::Polyline;
-use s2rst::s2::{Loop, Point};
+use s2rst::s2::{Level, Loop, Point};
 
 use crate::angle::PyAngle;
+use crate::bounded::LevelArg;
 use crate::geometry::{PyLoop, PyPolygon, PyPolyline};
 use crate::s2point::PyS2Point;
 use crate::shapes::PyLaxPolygon;
@@ -37,11 +38,12 @@ enum Input {
 ///
 /// Snapping is controlled by `snap_function` (an `IdentitySnapFunction`,
 /// `S2CellIdSnapFunction`, or `IntLatLngSnapFunction`); the legacy `snap_level`
-/// keyword is still accepted and maps to an `S2CellIdSnapFunction`.
+/// keyword is still accepted and maps to an `S2CellIdSnapFunction`; it raises
+/// `ValueError` unless `0 <= snap_level <= 30`.
 #[pyclass(name = "S2Builder")]
 pub struct PyS2Builder {
     snap_function: Option<Py<PyAny>>,
-    snap_level: Option<u8>,
+    snap_level: Option<Level>,
     split_crossing_edges: bool,
     simplify_edge_chains: bool,
     intersection_tolerance: Angle,
@@ -63,7 +65,7 @@ impl PyS2Builder {
     ))]
     fn new(
         snap_function: Option<Py<PyAny>>,
-        snap_level: Option<u8>,
+        snap_level: Option<LevelArg>,
         split_crossing_edges: bool,
         simplify_edge_chains: bool,
         intersection_tolerance: Option<PyAngle>,
@@ -71,7 +73,7 @@ impl PyS2Builder {
     ) -> Self {
         PyS2Builder {
             snap_function,
-            snap_level,
+            snap_level: snap_level.map(|l| l.0),
             split_crossing_edges,
             simplify_edge_chains,
             intersection_tolerance: intersection_tolerance.map(|a| a.0).unwrap_or(Angle::ZERO),

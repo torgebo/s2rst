@@ -11,7 +11,12 @@ mod serde_tests {
     use serde_json::Value;
 
     fn level5() -> Cell {
-        Cell::from_cell_id(CellId::from_face(0).child_begin_at_level(5).next().next())
+        Cell::from_cell_id(
+            CellId::from_face(Face::F0)
+                .child_begin_at_level(Level::new(5))
+                .next()
+                .next(),
+        )
     }
 
     /// Every field of a cell, the bounds as bit patterns.
@@ -87,8 +92,10 @@ mod serde_tests {
         };
         for face in 0..6u8 {
             for level in 0..=max_level {
-                let mut id = CellId::from_face(face).child_begin_at_level(level);
-                let end = CellId::from_face(face).child_end_at_level(level);
+                let mut id =
+                    CellId::from_face(Face::from_u8(face)).child_begin_at_level(Level::new(level));
+                let end =
+                    CellId::from_face(Face::from_u8(face)).child_end_at_level(Level::new(level));
                 while id != end {
                     check(Cell::from_cell_id(id));
                     id = id.next();
@@ -101,7 +108,9 @@ mod serde_tests {
             s ^= s >> 7;
             s ^= s << 17;
             let leaf = CellId::from((s % (6 << 61)) | 1);
-            check(Cell::from_cell_id(leaf.parent_at_level((s % 31) as u8)));
+            check(Cell::from_cell_id(
+                leaf.parent_at_level(Level::new((s % 31) as u8)),
+            ));
         }
     }
 
@@ -117,5 +126,81 @@ mod serde_tests {
     #[ignore = "SC-009's full size: 34 s in a debug build, 2 s in release"]
     fn consistent_cells_round_trip_in_full() {
         round_trip(7, 2_000_000);
+    }
+
+    /// The serialised form of face cell 0, before spec 009 (CO-04).
+    const FACE0_JSON: &str = r#"{"face":"F0","level":0,"orientation":0,"id":1152921504606846976,"uv":{"x":{"lo":-1.0,"hi":1.0},"y":{"lo":-1.0,"hi":1.0}}}"#;
+
+    /// CO-04 (spec 009): a cell keeps its serialised form, its level and face included, and
+    /// reads back.
+    #[test]
+    fn face_cell_form_is_unchanged() {
+        let c = Cell::from_cell_id(CellId::from_face(Face::F0));
+        assert_eq!(serde_json::to_string(&c).unwrap(), FACE0_JSON);
+        assert_eq!(
+            fields(serde_json::from_str::<Cell>(FACE0_JSON).unwrap()),
+            fields(c)
+        );
+    }
+}
+
+/// `CellVertex` and `CellEdge` as bounded types (spec 009).
+mod bounded_index_tests {
+    use super::super::*;
+    use crate::s2::BoundedKind;
+
+    #[test]
+    fn cell_vertex_try_from_accepts_exactly_zero_to_three() {
+        for k in -2i64..=6 {
+            match CellVertex::try_from(k) {
+                Ok(v) => {
+                    assert!((0..=3).contains(&k));
+                    assert_eq!(v.index() as i64, k);
+                }
+                Err(e) => {
+                    assert!(!(0..=3).contains(&k));
+                    assert_eq!(e.kind(), BoundedKind::CellVertex);
+                    assert_eq!(e.value(), k);
+                }
+            }
+        }
+        assert!(CellVertex::try_from(usize::MAX).is_err());
+        assert_eq!(CellVertex::try_from(2usize), Ok(CellVertex::UpperRight));
+    }
+
+    #[test]
+    fn cell_vertex_next_and_prev_wrap() {
+        for (k, v) in CellVertex::ALL.into_iter().enumerate() {
+            assert_eq!(v.index(), k);
+            assert_eq!(v.next(), CellVertex::ALL[(k + 1) % 4]);
+            assert_eq!(v.prev(), CellVertex::ALL[(k + 3) % 4]);
+        }
+        assert_eq!(CellVertex::default(), CellVertex::LowerLeft);
+    }
+
+    /// The vertices are those `vertex_raw` gave for the indices 0..=3 before spec 009: the
+    /// corners of the u-v rectangle, counter-clockwise from (u_lo, v_lo).
+    #[test]
+    fn cell_vertices_are_the_uv_corners_in_order() {
+        let cell =
+            Cell::from_cell_id(CellId::from_face(Face::F2).child_begin_at_level(Level::new(3)));
+        let uv = cell.bound_uv().vertices();
+        for v in CellVertex::ALL {
+            let p = face_uv_to_xyz(cell.face(), uv[v.index()].x, uv[v.index()].y);
+            assert_eq!(cell.vertex_raw(v).vector(), p);
+        }
+    }
+
+    #[test]
+    fn cell_edge_try_from_accepts_exactly_zero_to_three() {
+        for k in -2i64..=6 {
+            match CellEdge::try_from(k) {
+                Ok(e) => assert_eq!(CellEdge::ALL[usize::try_from(k).unwrap()], e),
+                Err(e) => {
+                    assert!(!(0..=3).contains(&k));
+                    assert_eq!(e.kind(), BoundedKind::CellEdge);
+                }
+            }
+        }
     }
 }

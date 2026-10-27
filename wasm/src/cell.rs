@@ -4,6 +4,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::angle::ChordAngle;
+use crate::bounded::{cell_edge_arg, cell_vertex_arg, face_arg, level_arg};
 use crate::cap::Cap;
 use crate::cell_id::CellId;
 use crate::latlng::LatLng;
@@ -36,9 +37,11 @@ impl Cell {
     }
 
     /// Create from a face number (0–5).
+    ///
+    /// Throws unless `face` is an integer in 0..=5.
     #[wasm_bindgen(js_name = "fromFace")]
-    pub fn from_face(face: u8) -> Cell {
-        Cell(s2rst::s2::Cell::from_face(face))
+    pub fn from_face(face: f64) -> Result<Cell, JsValue> {
+        Ok(Cell(s2rst::s2::Cell::from_face(face_arg(face)?)))
     }
 
     /// The face (0–5).
@@ -65,26 +68,14 @@ impl Cell {
         self.0.is_leaf()
     }
 
-    /// Return the k-th vertex (0–3) as a `Point`. Throws if `k > 3`.
-    pub fn vertex(&self, k: usize) -> Result<Point, JsValue> {
-        if k >= 4 {
-            return Err(crate::error::js_err(format!(
-                "cell vertex index {k} out of range (0..4)"
-            )));
-        }
-        Ok(Point(self.0.vertex(k)))
+    /// Return the k-th vertex (0–3) as a `Point`. Throws unless `k` is an integer in 0..=3.
+    pub fn vertex(&self, k: f64) -> Result<Point, JsValue> {
+        Ok(Point(self.0.vertex(cell_vertex_arg(k)?)))
     }
 
-    /// Return the k-th edge normal (0–3) as a `Point`. Throws if `k` is out of range.
-    pub fn edge(&self, k: u8) -> Result<Point, JsValue> {
-        let edges = s2rst::s2::CellEdge::ALL;
-        let edge = *edges.get(k as usize).ok_or_else(|| {
-            crate::error::js_err(format!(
-                "cell edge index {k} out of range (0..{})",
-                edges.len()
-            ))
-        })?;
-        Ok(Point(self.0.edge(edge)))
+    /// Return the k-th edge normal (0–3) as a `Point`. Throws unless `k` is an integer in 0..=3.
+    pub fn edge(&self, k: f64) -> Result<Point, JsValue> {
+        Ok(Point(self.0.edge(cell_edge_arg(k)?)))
     }
 
     /// The center of this cell.
@@ -93,9 +84,11 @@ impl Cell {
     }
 
     /// Average area for the given level in steradians.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "averageAreaForLevel")]
-    pub fn average_area_for_level(level: u8) -> f64 {
-        s2rst::s2::Cell::average_area_for_level(level)
+    pub fn average_area_for_level(level: f64) -> Result<f64, JsValue> {
+        Ok(s2rst::s2::Cell::average_area_for_level(level_arg(level)?))
     }
 
     /// Average area for this cell's level.

@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use s2rst::s2::CellUnion;
 use s2rst::s2::region_coverer::RegionCoverer;
 
+use crate::bounded::{LevelArg, LevelModArg, check_level_order};
 use crate::cells::PyCellUnion;
 use crate::geometry::{PyLoop, PyPolygon};
 use crate::regions::{PyCap, PyRect};
@@ -22,28 +23,31 @@ pub struct PyRegionCoverer(RegionCoverer);
 impl PyRegionCoverer {
     /// Create a region coverer. The keyword-only settings default to the S2
     /// norms: `min_level=0`, `max_level=30`, `level_mod=1`, `max_cells=8`.
+    ///
+    /// Raises `ValueError` unless `0 <= min_level <= max_level <= 30` and `1 <= level_mod <= 3`.
     #[new]
     #[pyo3(signature = (*, min_level=None, max_level=None, level_mod=None, max_cells=None))]
     fn new(
-        min_level: Option<u8>,
-        max_level: Option<u8>,
-        level_mod: Option<u8>,
+        min_level: Option<LevelArg>,
+        max_level: Option<LevelArg>,
+        level_mod: Option<LevelModArg>,
         max_cells: Option<usize>,
-    ) -> Self {
+    ) -> PyResult<Self> {
         let mut c = RegionCoverer::new();
         if let Some(v) = min_level {
-            c = c.min_level(v);
+            c = c.min_level(v.0);
         }
         if let Some(v) = max_level {
-            c = c.max_level(v);
+            c = c.max_level(v.0);
         }
         if let Some(v) = level_mod {
-            c = c.level_mod(v);
+            c = c.level_mod(v.0);
         }
         if let Some(v) = max_cells {
             c = c.max_cells(v);
         }
-        PyRegionCoverer(c)
+        check_level_order(c.min_level, c.max_level)?;
+        Ok(PyRegionCoverer(c))
     }
 
     #[getter]
@@ -58,7 +62,7 @@ impl PyRegionCoverer {
 
     #[getter]
     fn level_mod(&self) -> u8 {
-        self.0.level_mod
+        self.0.level_mod.get()
     }
 
     #[getter]

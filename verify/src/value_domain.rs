@@ -15,7 +15,7 @@
 use s2rst::r1;
 use s2rst::r2;
 use s2rst::s1::{Angle, ChordAngle, Interval};
-use s2rst::s2::{Cap, Cell, CellEdge, LatLng, Point, Rect};
+use s2rst::s2::{Cap, Cell, CellEdge, CellVertex, LatLng, Point, Rect};
 
 use crate::arc_spec;
 use crate::chord_spec;
@@ -58,6 +58,13 @@ pub fn any_point() -> f64 {
 /// `AnyF64`: every `f64` bit pattern, NaN and the infinities included.
 pub fn any_f64() -> f64 {
     kani::any()
+}
+
+/// `CellVertex`: any of the four vertices (spec 009).
+pub fn any_cell_vertex() -> CellVertex {
+    let k: u8 = kani::any();
+    kani::assume(k < 4);
+    CellVertex::ALL[usize::from(k)]
 }
 
 /// `Edge`: the four edges of a cell.

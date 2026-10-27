@@ -331,7 +331,7 @@ Documented behaviour or cost, worked around in the same way:
   unreachable exactly when no input returns, and `run-verify.sh` requires it unsatisfied.
 - **A symbolic panic condition keeps the code after it alive.** After `assume(raw > 30)`, a
   failed `assert!(raw <= 30)` is not simplified to false, so CBMC explores what follows on paths
-  no input takes; loops there timed out (`crash::n_raw_level`, 10 minutes). A small unwind bound
+  no input takes; loops there timed out (`crash::n_raw_level`, retired by spec 009; 10 minutes). A small unwind bound
   fixes it, with unwinding checks still on. A constant condition is pruned.
 - **Terse output gives no counterexample values.** `run-verify.sh` re-runs failures with concrete
   playback.

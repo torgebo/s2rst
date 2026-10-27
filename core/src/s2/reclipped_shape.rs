@@ -199,6 +199,7 @@ impl ReclippedShape {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::{Cell, CellId, LatLng};
 
     #[test]
@@ -212,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_reclip_edges() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell);
 
@@ -245,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_skip_same_shape_id() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell);
 
@@ -278,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_reset_forces_reprocessing() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell);
 
@@ -312,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_reclip_with_crossings() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell);
 
@@ -340,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_contains_interior_point() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let center = cell.center();
 
         // Small polygon ring entirely inside face 0.
@@ -391,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_contains_vertex_for_polyline() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let center = cell.center();
 
         let a = LatLng::from_degrees(10.0, 10.0).to_point();
@@ -420,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_reclip_no_crossings_when_not_saved() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let mut clipper = RobustCellClipper::new();
         clipper.start_cell(cell);
 

@@ -1041,7 +1041,7 @@ mod tests {
         let p = LatLng::from_degrees(0.0, 0.0).to_point();
         index.add(p, 0);
         let query = ClosestPointQuery::new(&index, Options::default());
-        let cell = Cell::from(CellId::from_point(&p).parent_at_level(10));
+        let cell = Cell::from(CellId::from_point(&p).parent_at_level(Level::new(10)));
         let mut target = CellTarget::new(cell);
         let dist = query.get_distance(&mut target);
         // Point should be inside or very near the cell.

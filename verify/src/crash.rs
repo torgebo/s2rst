@@ -17,7 +17,7 @@
     reason = "`__` marks a split-family member (harness-conventions)"
 )]
 
-use s2rst::s2::{CellId, Level, from_face_ij, lsb_for_level, size_ij};
+use s2rst::s2::{BoundedKind, CellId, Face, Level, from_face_ij, lsb_for_level, size_ij};
 
 use crate::domain::{any_face, any_face_t, any_level, any_u64, any_valid, any_valid_or_end};
 use crate::spec;
@@ -46,7 +46,7 @@ fn c_sentinel() {
 #[kani::proof]
 fn c_from_face() {
     let f = any_face();
-    let c = CellId::from_face(f);
+    let c = CellId::from_face(Face::from_u8(f));
     kani::cover!(f == 0, "face 0");
     kani::cover!(f == 5, "face 5");
     kani::cover!(c.0 != 0, "non-zero id");
@@ -61,7 +61,7 @@ fn c_from_face_pos_level() {
     let pos: u64 = kani::any();
     kani::assume(pos < (1u64 << 61));
     let l = any_level();
-    let c = CellId::from_face_pos_level(f, pos, l);
+    let c = CellId::from_face_pos_level(Face::from_u8(f), pos, l);
     kani::cover!(l.as_u8() == 0, "level 0");
     kani::cover!(l.as_u8() == 30, "level 30");
     kani::cover!(
@@ -595,65 +595,77 @@ fn c_vertex_neighbors() {
 // it states), an `o_*` harness proves that they do, in every build. `make verify-release` runs
 // the `n_*` harnesses whose panic is in every build, the `r_*` and the `o_*` ones.
 
-/// N-Level: `impl From<u8> for Level` panics for every raw level above 30, in every build, and
-/// so does each operation that takes `impl Into<Level>` (its `# Panics`: "the conversion to
-/// `Level` panics"), before it reads its other arguments.
+/// N-Level: `Level::new` panics for every raw level above 30, in every build.
 ///
-/// The unwind bound is for the code after the panic: the checker does not simplify the failed
-/// check's condition (`raw ≤ 30` under the assumption `raw > 30`) to false, so it explores that
-/// code too, on paths no input takes, and the neighbour operations' loops timed out at 10
-/// minutes without it. Unwinding checks stay on, so a reachable loop beyond the bound would
-/// fail the proof.
+/// Before spec 009, `impl From<u8> for Level` panicked so, and with it each of the 12 `CellId`
+/// operations that took `impl Into<Level>` (`n_raw_level`, retired). Those operations take a
+/// `Level` now, so none can be handed a level out of range: a raw level fails only where it is
+/// converted, through `Level::new` (this proof) or `Level::try_from` (`c_level_try_from`).
 #[kani::proof]
 #[kani::should_panic]
-#[kani::unwind(2)]
-fn n_raw_level() {
+fn n_level_new() {
     let raw: u8 = kani::any();
     kani::assume(raw > 30);
-    let (c, _) = any_valid();
-    let op: u8 = kani::any();
-    match op {
-        0 => {
-            let _ = Level::from(raw);
+    let _ = Level::new(raw);
+    kani::cover!(true, "returns");
+}
+
+/// C-Level::try_from: the fallible conversion accepts exactly `0..=30`, gives the value back,
+/// and reports a rejected value with its kind (spec 009). The `u8` source agrees with the `i64`
+/// one.
+#[kani::proof]
+fn c_level_try_from() {
+    let raw: i64 = kani::any();
+    match Level::try_from(raw) {
+        Ok(l) => {
+            assert!((0..=30).contains(&raw));
+            assert!(i64::from(l.as_u8()) == raw);
         }
-        1 => {
-            let _ = CellId::from_face_pos_level(0u8, 0, raw);
-        }
-        2 => {
-            let _ = c.child_position(raw);
-        }
-        3 => {
-            let _ = c.parent_at_level(raw);
-        }
-        4 => {
-            let _ = c.child_begin_at_level(raw);
-        }
-        5 => {
-            let _ = c.child_end_at_level(raw);
-        }
-        6 => {
-            let _ = CellId::begin(raw);
-        }
-        7 => {
-            let _ = CellId::end(raw);
-        }
-        8 => {
-            let _ = lsb_for_level(raw);
-        }
-        9 => {
-            let _ = size_ij(raw);
-        }
-        10 => {
-            let _ = CellId::size_st(raw);
-        }
-        11 => {
-            let _ = c.vertex_neighbors(raw);
-        }
-        _ => {
-            let _ = c.all_neighbors(raw);
+        Err(e) => {
+            assert!(!(0..=30).contains(&raw));
+            assert!(e.value() == raw);
+            assert!(e.kind() == BoundedKind::Level);
         }
     }
+    let small: u8 = kani::any();
+    assert!(Level::try_from(small).ok() == Level::try_from(i64::from(small)).ok());
+    kani::cover!(raw == 30, "the last level");
+    kani::cover!(raw == 31, "the first level rejected");
+}
+
+/// N-Face::from_u8: panics for every face number above 5, in every build (an index out of
+/// bounds). Since spec 009 the face constructors take a `Face`, so a raw face number fails only
+/// where it is converted: here, or through `Face::try_from` (`c_face_try_from`).
+#[kani::proof]
+#[kani::should_panic]
+fn n_face_from_u8() {
+    let raw: u8 = kani::any();
+    kani::assume(raw > 5);
+    let _ = Face::from_u8(raw);
     kani::cover!(true, "returns");
+}
+
+/// C-Face::try_from: the fallible conversion accepts exactly `0..=5`, gives the face numbered so
+/// back, and reports a rejected number with its kind (spec 009). The `u8` source agrees with the
+/// `i64` one.
+#[kani::proof]
+fn c_face_try_from() {
+    let raw: i64 = kani::any();
+    match Face::try_from(raw) {
+        Ok(f) => {
+            assert!((0..=5).contains(&raw));
+            assert!(i64::from(f.as_u8()) == raw);
+        }
+        Err(e) => {
+            assert!(!(0..=5).contains(&raw));
+            assert!(e.value() == raw);
+            assert!(e.kind() == BoundedKind::Face);
+        }
+    }
+    let small: u8 = kani::any();
+    assert!(Face::try_from(small).ok() == Face::try_from(i64::from(small)).ok());
+    kani::cover!(raw == 5, "the last face");
+    kani::cover!(raw == 6, "the first face rejected");
 }
 
 /// N-level: `CellId::level` panics for every id with 62 or more trailing zero bits (`0`,

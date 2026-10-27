@@ -7,6 +7,8 @@
 
 //! Integration tests for Loop geometry operations, ported from C++ `s2loop_test.cc`.
 
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::text_format;
 use s2rst::s2::{Cell, CellId, LatLng, Loop, Region};
 use std::f64::consts::PI;
@@ -44,7 +46,7 @@ fn test_full_loop() {
 // ---------------------------------------------------------------------------
 #[test]
 fn test_loop_from_cell() {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 5));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(5)));
     let l = Loop::from_cell(&cell);
 
     assert_eq!(l.num_vertices(), 4);
@@ -205,7 +207,7 @@ fn test_loop_validate_ok() {
 // ---------------------------------------------------------------------------
 #[test]
 fn test_loop_contains_cell() {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 10));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(10)));
 
     let full = Loop::full();
     assert!(
@@ -225,7 +227,7 @@ fn test_loop_contains_cell() {
 // ---------------------------------------------------------------------------
 #[test]
 fn test_loop_intersects_cell() {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 10));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(10)));
 
     let full = Loop::full();
     assert!(

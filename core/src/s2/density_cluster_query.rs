@@ -15,11 +15,11 @@
 //! ```
 //! use s2rst::s2::density_cluster_query::DensityClusterQuery;
 //! use s2rst::s2::density_tree::{S2DensityTree, TreeEncoder};
-//! use s2rst::s2::CellId;
+//! use s2rst::s2::{CellId, Face};
 //!
 //! let mut enc = TreeEncoder::new();
-//! enc.put(CellId::from_face(0), 100);
-//! enc.put(CellId::from_face(1), 100);
+//! enc.put(CellId::from_face(Face::F0), 100);
+//! enc.put(CellId::from_face(Face::F1), 100);
 //! let mut tree = S2DensityTree::new();
 //! enc.build(&mut tree);
 //!
@@ -34,7 +34,6 @@ use crate::s2::builder::S2Error;
 use crate::s2::cell_id::CellId;
 use crate::s2::cell_union::CellUnion;
 use crate::s2::coords::Level;
-use crate::s2::coords::MAX_CELL_LEVEL;
 use crate::s2::density_tree::{S2DensityTree, VisitAction};
 
 /// A cluster is a cell range `[begin, end)` and an expected weight.
@@ -53,12 +52,12 @@ impl Cluster {
     ///
     /// # Panics
     ///
-    /// In every build, if `begin` or `end` is neither a leaf cell nor `CellId::end(30)`, or if
-    /// `begin > end`: the rule of [`CellUnion::from_begin_end`], which
+    /// In every build, if `begin` or `end` is neither a leaf cell nor `CellId::end(Level::MAX)`,
+    /// or if `begin > end`: the rule of [`CellUnion::from_begin_end`], which
     /// [`covering`](Self::covering) calls, so a cluster that `new` returns has a covering. (The
     /// check was debug-only, and a release build panicked later, in `covering`.)
     pub fn new(begin: CellId, end: CellId, weight: i64) -> Self {
-        let leaf_end = CellId::end(MAX_CELL_LEVEL);
+        let leaf_end = CellId::end(Level::MAX);
         let in_range = |id: CellId| (id.is_valid() && id.is_leaf()) || id == leaf_end;
         assert!(
             in_range(begin) && in_range(end),
@@ -231,8 +230,8 @@ impl DensityClusterQuery {
     pub fn clusters(&self, density: &S2DensityTree) -> Result<Vec<Cluster>, S2Error> {
         let tree = density.normalize()?;
         let mut result = Vec::new();
-        let mut begin = CellId::begin(MAX_CELL_LEVEL);
-        let end = CellId::end(MAX_CELL_LEVEL);
+        let mut begin = CellId::begin(Level::MAX);
+        let end = CellId::end(Level::MAX);
         loop {
             let c = self.next_cluster(&tree, begin, end, 0)?;
             if c.weight == 0 {
@@ -345,6 +344,7 @@ impl DensityClusterQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::density_tree::TreeEncoder;
 
     /// Helper to build a density tree from (`CellId`, weight) pairs.
@@ -376,12 +376,12 @@ mod tests {
     #[test]
     fn test_clusters_as_faces() {
         let tree = density(&[
-            (CellId::from_face(0), 100),
-            (CellId::from_face(1), 100),
-            (CellId::from_face(2), 100),
-            (CellId::from_face(3), 100),
-            (CellId::from_face(4), 100),
-            (CellId::from_face(5), 100),
+            (CellId::from_face(Face::F0), 100),
+            (CellId::from_face(Face::F1), 100),
+            (CellId::from_face(Face::F2), 100),
+            (CellId::from_face(Face::F3), 100),
+            (CellId::from_face(Face::F4), 100),
+            (CellId::from_face(Face::F5), 100),
         ]);
 
         let query100 = DensityClusterQuery::new(100);
@@ -411,12 +411,12 @@ mod tests {
     #[test]
     fn test_clusters_divide_faces() {
         let tree = density(&[
-            (CellId::from_face(0).children()[1], 50),
-            (CellId::from_face(0).children()[2], 50),
-            (CellId::from_face(1).children()[0].children()[0], 25),
-            (CellId::from_face(1).children()[0].children()[1], 25),
-            (CellId::from_face(1).children()[0].children()[2], 25),
-            (CellId::from_face(1).children()[2].children()[0], 25),
+            (CellId::from_face(Face::F0).children()[1], 50),
+            (CellId::from_face(Face::F0).children()[2], 50),
+            (CellId::from_face(Face::F1).children()[0].children()[0], 25),
+            (CellId::from_face(Face::F1).children()[0].children()[1], 25),
+            (CellId::from_face(Face::F1).children()[0].children()[2], 25),
+            (CellId::from_face(Face::F1).children()[2].children()[0], 25),
         ]);
 
         let query50 = DensityClusterQuery::new(50);
@@ -427,43 +427,43 @@ mod tests {
         assert_eq!(clusters[0].num_cells(), 1);
         assert_eq!(
             clusters[0].cell_ids()[0],
-            CellId::from_face(0).children()[1]
+            CellId::from_face(Face::F0).children()[1]
         );
 
         // Second cluster: face 0 child 2
         assert_eq!(clusters[1].num_cells(), 1);
         assert_eq!(
             clusters[1].cell_ids()[0],
-            CellId::from_face(0).children()[2]
+            CellId::from_face(Face::F0).children()[2]
         );
 
         // Third cluster: two grandchildren
         assert_eq!(clusters[2].num_cells(), 2);
         assert_eq!(
             clusters[2].cell_ids()[0],
-            CellId::from_face(1).children()[0].children()[0]
+            CellId::from_face(Face::F1).children()[0].children()[0]
         );
         assert_eq!(
             clusters[2].cell_ids()[1],
-            CellId::from_face(1).children()[0].children()[1]
+            CellId::from_face(Face::F1).children()[0].children()[1]
         );
 
         // Fourth cluster: remaining two
         assert_eq!(clusters[3].num_cells(), 2);
         assert_eq!(
             clusters[3].cell_ids()[0],
-            CellId::from_face(1).children()[0].children()[2]
+            CellId::from_face(Face::F1).children()[0].children()[2]
         );
         assert_eq!(
             clusters[3].cell_ids()[1],
-            CellId::from_face(1).children()[2].children()[0]
+            CellId::from_face(Face::F1).children()[2].children()[0]
         );
     }
 
     // Java: testUninterpolate
     #[test]
     fn test_uninterpolate() {
-        let face = CellId::from_face(0);
+        let face = CellId::from_face(Face::F0);
         let child1 = face.children()[1];
         let interp = CellInterpolator::new(face);
         let result = interp.uninterpolate(child1);
@@ -476,7 +476,7 @@ mod tests {
     // Java: testInterpolationOnFaces (face 0)
     #[test]
     fn test_interpolation_on_face_0() {
-        let tree = density(&[(CellId::from_face(0), 100)]);
+        let tree = density(&[(CellId::from_face(Face::F0), 100)]);
 
         let query50 = DensityClusterQuery::new(50);
         let clusters = query50.tight_coverings(&tree).unwrap();
@@ -486,20 +486,20 @@ mod tests {
         assert_eq!(clusters[0].num_cells(), 2);
         assert_eq!(
             clusters[0].cell_ids()[0],
-            CellId::from_face(0).children()[0]
+            CellId::from_face(Face::F0).children()[0]
         );
         assert_eq!(
             clusters[0].cell_ids()[1],
-            CellId::from_face(0).children()[1]
+            CellId::from_face(Face::F0).children()[1]
         );
         assert_eq!(clusters[1].num_cells(), 2);
         assert_eq!(
             clusters[1].cell_ids()[0],
-            CellId::from_face(0).children()[2]
+            CellId::from_face(Face::F0).children()[2]
         );
         assert_eq!(
             clusters[1].cell_ids()[1],
-            CellId::from_face(0).children()[3]
+            CellId::from_face(Face::F0).children()[3]
         );
 
         // With weight 32, should produce 3 clusters.
@@ -512,7 +512,7 @@ mod tests {
     #[test]
     fn test_normalizing_tree() {
         // Build a tree where deeper nodes have redundant weight.
-        let face0 = CellId::from_face(0);
+        let face0 = CellId::from_face(Face::F0);
         let child0 = face0.children()[0];
         let child2 = face0.children()[2];
 
@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn test_single_leaf() {
-        let tree = density(&[(CellId::from_face(3), 50)]);
+        let tree = density(&[(CellId::from_face(Face::F3), 50)]);
         let query = DensityClusterQuery::new(50);
         let clusters = query.clusters(&tree).unwrap();
         assert_eq!(clusters.len(), 1);
@@ -562,8 +562,8 @@ mod tests {
 
     #[test]
     fn test_cluster_display() {
-        let begin = CellId::begin(MAX_CELL_LEVEL);
-        let end = CellId::end(MAX_CELL_LEVEL);
+        let begin = CellId::begin(Level::MAX);
+        let end = CellId::end(Level::MAX);
         let c = Cluster::new(begin, end, 42);
         let s = c.to_string();
         assert!(s.contains("42"), "Display should show weight");
@@ -573,11 +573,11 @@ mod tests {
     /// returned (code review of v0.4.0..74b9bc1).
     #[test]
     fn test_new_panics_on_an_invalid_range_in_every_build() {
-        let leaf = CellId::from_face(2).child_begin_at_level(MAX_CELL_LEVEL);
+        let leaf = CellId::from_face(Face::F2).child_begin_at_level(Level::MAX);
         let next = leaf.next();
         for (begin, end) in [
             (CellId(0), leaf),
-            (leaf, CellId::from_face(2)),
+            (leaf, CellId::from_face(Face::F2)),
             (next, leaf),
         ] {
             let result = std::panic::catch_unwind(|| Cluster::new(begin, end, 1));
@@ -607,12 +607,12 @@ mod tests {
         use crate::s2::density_tree::DecodedPath;
 
         let leaves = &[
-            (CellId::from_face(2).children()[1], 50_i64),
-            (CellId::from_face(2).children()[2], 50),
-            (CellId::from_face(4).children()[0].children()[0], 25),
-            (CellId::from_face(4).children()[2].children()[1], 25),
-            (CellId::from_face(4).children()[2].children()[2], 25),
-            (CellId::from_face(4).children()[3].children()[0], 25),
+            (CellId::from_face(Face::F2).children()[1], 50_i64),
+            (CellId::from_face(Face::F2).children()[2], 50),
+            (CellId::from_face(Face::F4).children()[0].children()[0], 25),
+            (CellId::from_face(Face::F4).children()[2].children()[1], 25),
+            (CellId::from_face(Face::F4).children()[2].children()[2], 25),
+            (CellId::from_face(Face::F4).children()[3].children()[0], 25),
         ];
         let tree = density(leaves);
         let mut error = S2Error::ok();
@@ -624,7 +624,7 @@ mod tests {
             // The weight may include ancestor sums, so just verify > 0.
         }
         // Face 0 should have no weight.
-        let cell = path.get_cell(CellId::from_face(0), &mut error);
+        let cell = path.get_cell(CellId::from_face(Face::F0), &mut error);
         assert!(error.is_ok());
         assert_eq!(cell.weight(), 0);
     }
@@ -632,7 +632,7 @@ mod tests {
     // Java: testInterpolationOnFaces (face 1 and face 4)
     #[test]
     fn test_interpolation_on_face_1() {
-        let tree = density(&[(CellId::from_face(1), 100)]);
+        let tree = density(&[(CellId::from_face(Face::F1), 100)]);
         let query = DensityClusterQuery::new(50);
         let clusters = query.tight_coverings(&tree).unwrap();
         assert_eq!(clusters.len(), 2);
@@ -642,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_interpolation_on_face_4() {
-        let tree = density(&[(CellId::from_face(4), 100)]);
+        let tree = density(&[(CellId::from_face(Face::F4), 100)]);
         let query = DensityClusterQuery::new(50);
         let clusters = query.tight_coverings(&tree).unwrap();
         assert_eq!(clusters.len(), 2);
@@ -652,7 +652,10 @@ mod tests {
 
     #[test]
     fn test_coverings() {
-        let tree = density(&[(CellId::from_face(0), 100), (CellId::from_face(1), 100)]);
+        let tree = density(&[
+            (CellId::from_face(Face::F0), 100),
+            (CellId::from_face(Face::F1), 100),
+        ]);
         let query = DensityClusterQuery::new(100);
         let coverings = query.coverings(&tree).unwrap();
         assert_eq!(coverings.len(), 2);

@@ -11,8 +11,8 @@
     reason = "`__` marks a split-family member (harness-conventions)"
 )]
 
-use s2rst::s2::CellUnion;
 use s2rst::s2::coords::Level;
+use s2rst::s2::{CellUnion, LevelMod};
 
 use crate::domain::any_level;
 use crate::spec::Decomposed;
@@ -48,7 +48,7 @@ macro_rules! p_uden {
         #[kani::unwind(17)]
         fn $d1() {
             let (u, ds, m, k) = inputs::<$n>();
-            let out = u.denormalize(m, k);
+            let out = u.denormalize(m, LevelMod::new(k));
             let want = union_spec::denormalize(&ds, m.as_u8(), k);
             assert!(out_ids_equal::<{ 16 * $n }>(out.cell_ids(), &want));
             kani::cover!(want.len() > $n || $n == 0, "a cell replaced by its descendants");
@@ -69,7 +69,7 @@ macro_rules! p_uden {
         #[kani::unwind(17)]
         fn $d1v() {
             let (u, _, m, k) = inputs::<$n>();
-            let out = u.denormalize(m, k);
+            let out = u.denormalize(m, LevelMod::new(k));
             assert!(out_valid::<{ 16 * $n }>(out.cell_ids()));
             kani::cover!(out.num_cells() > $n || $n == 0, "a cell replaced by its descendants");
         }
@@ -88,7 +88,7 @@ macro_rules! p_uden {
         #[kani::unwind(17)]
         fn $d2() {
             let (u, ds, m, k) = inputs::<$n>();
-            let out = u.denormalize(m, k);
+            let out = u.denormalize(m, LevelMod::new(k));
             let ids = out.cell_ids();
             assert!(ids.len() <= 16 * $n);
             for i in 0..16 * $n {

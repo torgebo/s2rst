@@ -14,6 +14,8 @@ use std::hint::black_box;
 use std::ops::ControlFlow;
 
 use s2rst::s1::Angle;
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::lax_polygon::LaxPolygon;
 use s2rst::s2::shape_index::ShapeIndex;
 use s2rst::s2::shape_index_region::ShapeIndexRegion;
@@ -53,7 +55,7 @@ fn visit_and_count(index: &ShapeIndex, cell: &Cell) -> usize {
 fn visit_intersecting_parent_cell() -> usize {
     let index = build_polygon_index(50);
     // Use a large cell (face 0 at level 1) as query — parent of index cells.
-    let cell = Cell::from_cell_id(CellId::from_face(0).children()[0]);
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0).children()[0]);
     black_box(visit_and_count(&index, &cell))
 }
 
@@ -62,7 +64,7 @@ fn visit_intersecting_parent_cell() -> usize {
 fn visit_intersecting_index_cells() -> usize {
     let index = build_polygon_index(50);
     let center = LatLng::from_degrees(0.0, 0.0).to_point();
-    let cell = Cell::from_cell_id(CellId::from_point(&center).parent_at_level(10));
+    let cell = Cell::from_cell_id(CellId::from_point(&center).parent_at_level(Level::new(10)));
     black_box(visit_and_count(&index, &cell))
 }
 
@@ -79,7 +81,7 @@ fn visit_intersecting_descendant_cells() -> usize {
 #[library_benchmark]
 fn visit_intersecting_200_polygons() -> usize {
     let index = build_polygon_index(200);
-    let cell = Cell::from_cell_id(CellId::from_face(0).children()[0]);
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0).children()[0]);
     black_box(visit_and_count(&index, &cell))
 }
 

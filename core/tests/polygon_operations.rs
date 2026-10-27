@@ -7,6 +7,8 @@
 
 //! Integration tests for Polygon operations, ported from C++ `s2polygon_test.cc`.
 
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::shape::{Dimension, Shape};
 use s2rst::s2::text_format;
 use s2rst::s2::{Cell, CellId, LatLng, Loop, Point, Polygon, Region};
@@ -79,7 +81,7 @@ fn test_polygon_from_single_loop() {
 // ---------------------------------------------------------------------------
 #[test]
 fn test_polygon_from_cell() {
-    let cell_id = CellId::from_face_pos_level(3, 0, 10);
+    let cell_id = CellId::from_face_pos_level(Face::F3, 0, Level::new(10));
     let cell = Cell::from_cell_id(cell_id);
     let poly = Polygon::from_cell(&cell);
 
@@ -246,7 +248,7 @@ fn test_polygon_validate() {
 #[test]
 fn test_polygon_contains_small_cell() {
     let poly = text_format::make_polygon("-30:-30, -30:30, 30:30, 30:-30");
-    let inside_id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(20);
+    let inside_id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(Level::new(20));
     let inside_cell = Cell::from_cell_id(inside_id);
     assert!(
         poly.contains_cell(&inside_cell),
@@ -260,7 +262,7 @@ fn test_polygon_contains_small_cell() {
 #[test]
 fn test_polygon_does_not_contain_outside_cell() {
     let poly = text_format::make_polygon("-10:-10, -10:10, 10:10, 10:-10");
-    let outside_id = CellId::from_point(&p(80.0, 80.0)).parent_at_level(16);
+    let outside_id = CellId::from_point(&p(80.0, 80.0)).parent_at_level(Level::new(16));
     let outside_cell = Cell::from_cell_id(outside_id);
     assert!(
         !poly.contains_cell(&outside_cell),

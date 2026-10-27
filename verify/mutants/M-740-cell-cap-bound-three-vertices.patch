@@ -7,12 +7,12 @@ Defect: `Cell::cap_bound` adds only three of the four vertices
 diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
 --- a/core/src/s2/cell.rs
 +++ b/core/src/s2/cell.rs
-@@ -407,7 +407,7 @@
+@@ -530,7 +530,7 @@
          let uv_center = self.uv.center();
          let cap_center = Point(face_uv_to_xyz(self.face, uv_center.x, uv_center.y).normalize());
          let mut cap = Cap::from_point(cap_center);
--        for k in 0..4 {
-+        for k in 0..3 {
-             cap = cap.add_point(self.vertex(k));
+-        for &v in &CellVertex::ALL {
++        for &v in CellVertex::ALL.iter().take(3) {
+             cap = cap.add_point(self.vertex(v));
          }
          cap

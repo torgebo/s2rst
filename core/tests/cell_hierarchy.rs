@@ -9,6 +9,8 @@
 //!
 //! Ported from C++ `s2cell_test.cc` and `s2cell_id_test.cc`.
 
+use s2rst::s2::CellVertex;
+use s2rst::s2::Level;
 use s2rst::s2::{Cell, CellId, Face, LatLng, Point, Region};
 use std::f64::consts::PI;
 
@@ -16,12 +18,12 @@ use std::f64::consts::PI;
 // CellId tests
 // ---------------------------------------------------------------------------
 
-/// Face cells (level 0): `CellId::from_face_pos_level(f`, 0, 0) has level=0,
+/// Face cells (level 0): `CellId::from_face_pos_level(f, 0, Level::MIN)` has level=0,
 /// face=f, `is_face()=true`.
 #[test]
 fn test_cellid_face_level() {
     for face in Face::iter() {
-        let id = CellId::from_face_pos_level(face, 0, 0);
+        let id = CellId::from_face_pos_level(face, 0, Level::new(0));
         assert!(id.is_valid(), "face {face} cell should be valid");
         assert_eq!(id.level(), 0, "face {face} cell should be level 0");
         assert_eq!(
@@ -38,7 +40,7 @@ fn test_cellid_face_level() {
 /// parent is original cell.
 #[test]
 fn test_cellid_parent_child() {
-    let face_id = CellId::from_face_pos_level(3, 0, 0);
+    let face_id = CellId::from_face_pos_level(Face::F3, 0, Level::new(0));
     let level5 = face_id.children()[0].children()[1].children()[2].children()[0].children()[1];
     assert_eq!(level5.level(), 5);
 
@@ -69,7 +71,7 @@ fn test_cellid_parent_child() {
 /// sibling.
 #[test]
 fn test_cellid_containment() {
-    let parent = CellId::from_face_pos_level(0, 0, 0).children()[0];
+    let parent = CellId::from_face_pos_level(Face::F0, 0, Level::new(0)).children()[0];
     assert_eq!(parent.level(), 1);
 
     let children = parent.children();
@@ -165,7 +167,8 @@ fn test_cellid_from_lat_lng() {
 /// `range_min.level()` == 30.
 #[test]
 fn test_cellid_range() {
-    let id = CellId::from_face_pos_level(2, 0, 0).children()[1].children()[2].children()[0]
+    let id = CellId::from_face_pos_level(Face::F2, 0, Level::new(0)).children()[1].children()[2]
+        .children()[0]
         .children()[3]
         .children()[1];
     assert_eq!(id.level(), 5);
@@ -190,7 +193,7 @@ fn test_cellid_range() {
 /// `children()` returns 4 cells, all at level+1, all contained by parent.
 #[test]
 fn test_cellid_children_array() {
-    let parent = CellId::from_face_pos_level(1, 0, 0).children()[2];
+    let parent = CellId::from_face_pos_level(Face::F1, 0, Level::new(0)).children()[2];
     assert_eq!(parent.level(), 1);
 
     let children = parent.children();
@@ -221,7 +224,8 @@ fn test_cellid_children_array() {
 /// advance(0) = self, advance(1) = `next()`, advance(-1) = `prev()`.
 #[test]
 fn test_cellid_advance() {
-    let id = CellId::from_face_pos_level(4, 0, 0).children()[1].children()[0].children()[3];
+    let id = CellId::from_face_pos_level(Face::F4, 0, Level::new(0)).children()[1].children()[0]
+        .children()[3];
     assert_eq!(id.level(), 3);
 
     // advance(0) is identity
@@ -251,7 +255,7 @@ fn test_cellid_advance() {
 /// Cell from face-0 level-10 cellid: face=0, level=10, 4 vertices not equal.
 #[test]
 fn test_cell_from_cellid() {
-    let id = CellId::from_face_pos_level(0, 0, 0);
+    let id = CellId::from_face_pos_level(Face::F0, 0, Level::new(0));
     // Navigate down to level 10 by repeatedly taking child 0.
     let mut cid = id;
     for _ in 0..10 {
@@ -268,8 +272,8 @@ fn test_cell_from_cellid() {
     for i in 0..4 {
         for j in (i + 1)..4 {
             assert_ne!(
-                cell.vertex(i),
-                cell.vertex(j),
+                cell.vertex(CellVertex::ALL[i]),
+                cell.vertex(CellVertex::ALL[j]),
                 "vertex {i} and vertex {j} should be distinct"
             );
         }
@@ -281,20 +285,21 @@ fn test_cell_from_cellid() {
 fn test_cell_vertices_distinct() {
     // Test on several different cells at various levels and faces
     let test_cells = [
-        Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 0)),
-        Cell::from_cell_id(CellId::from_face_pos_level(3, 0, 0).children()[2]),
+        Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(0))),
+        Cell::from_cell_id(CellId::from_face_pos_level(Face::F3, 0, Level::new(0)).children()[2]),
         Cell::from_point(Point::from_coords(0.5, 0.7, -0.3)),
         Cell::from_cell_id(
-            CellId::from_face_pos_level(5, 0, 0).children()[1].children()[3].children()[0],
+            CellId::from_face_pos_level(Face::F5, 0, Level::new(0)).children()[1].children()[3]
+                .children()[0],
         ),
     ];
 
     for (ci, cell) in test_cells.iter().enumerate() {
         let vertices: [Point; 4] = [
-            cell.vertex(0),
-            cell.vertex(1),
-            cell.vertex(2),
-            cell.vertex(3),
+            cell.vertex(CellVertex::LowerLeft),
+            cell.vertex(CellVertex::LowerRight),
+            cell.vertex(CellVertex::UpperRight),
+            cell.vertex(CellVertex::UpperLeft),
         ];
 
         for i in 0..4 {
@@ -320,7 +325,7 @@ fn test_cell_vertices_distinct() {
 fn test_cell_contains_center() {
     for face in Face::iter() {
         // Level 0 face cell
-        let cell0 = Cell::from_cell_id(CellId::from_face_pos_level(face, 0, 0));
+        let cell0 = Cell::from_cell_id(CellId::from_face_pos_level(face, 0, Level::new(0)));
         let center0 = cell0.id().to_point();
         assert!(
             cell0.contains_point(center0),
@@ -328,8 +333,9 @@ fn test_cell_contains_center() {
         );
 
         // A deeper cell
-        let deeper_id =
-            CellId::from_face_pos_level(face, 0, 0).children()[1].children()[2].children()[0];
+        let deeper_id = CellId::from_face_pos_level(face, 0, Level::new(0)).children()[1]
+            .children()[2]
+            .children()[0];
         let deeper_cell = Cell::from_cell_id(deeper_id);
         let deeper_center = deeper_id.to_point();
         assert!(
@@ -353,7 +359,8 @@ fn test_cell_contains_center() {
 #[test]
 fn test_cell_children() {
     // Non-leaf cell should have children
-    let parent = Cell::from_cell_id(CellId::from_face_pos_level(2, 0, 0).children()[0]);
+    let parent =
+        Cell::from_cell_id(CellId::from_face_pos_level(Face::F2, 0, Level::new(0)).children()[0]);
     assert!(!parent.is_leaf());
 
     let children = parent.children();
@@ -386,8 +393,9 @@ fn test_cell_children() {
 /// Parent cell area > child cell area.
 #[test]
 fn test_cell_area_ordering() {
-    let parent = Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 0));
-    let child = Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 0).children()[0]);
+    let parent = Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(0)));
+    let child =
+        Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(0)).children()[0]);
 
     let parent_area = parent.approx_area();
     let child_area = child.approx_area();
@@ -407,7 +415,7 @@ fn test_cell_area_ordering() {
 
     // Test across multiple levels
     let mut prev_area = parent_area;
-    let mut cid = CellId::from_face_pos_level(0, 0, 0);
+    let mut cid = CellId::from_face_pos_level(Face::F0, 0, Level::new(0));
     for level in 1..=5u8 {
         cid = cid.children()[0];
         let cell = Cell::from_cell_id(cid);
@@ -424,10 +432,13 @@ fn test_cell_area_ordering() {
 #[test]
 fn test_cell_cap_bound_contains_vertices() {
     let test_cells = [
-        Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 0)),
-        Cell::from_cell_id(CellId::from_face_pos_level(1, 0, 0).children()[1].children()[2]),
+        Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(0))),
         Cell::from_cell_id(
-            CellId::from_face_pos_level(4, 0, 0).children()[0].children()[1].children()[2]
+            CellId::from_face_pos_level(Face::F1, 0, Level::new(0)).children()[1].children()[2],
+        ),
+        Cell::from_cell_id(
+            CellId::from_face_pos_level(Face::F4, 0, Level::new(0)).children()[0].children()[1]
+                .children()[2]
                 .children()[3],
         ),
         Cell::from_point(Point::from_coords(-0.5, 0.8, 0.1)),
@@ -438,7 +449,7 @@ fn test_cell_cap_bound_contains_vertices() {
         assert!(!cap.is_empty(), "cell {ci}: cap_bound should not be empty");
 
         for k in 0..4 {
-            let v = cell.vertex(k);
+            let v = cell.vertex(CellVertex::ALL[k]);
             assert!(
                 cap.contains_point(v),
                 "cell {ci}: cap_bound should contain vertex {k}"
@@ -458,10 +469,13 @@ fn test_cell_cap_bound_contains_vertices() {
 #[test]
 fn test_cell_rect_bound() {
     let test_cells = [
-        Cell::from_cell_id(CellId::from_face_pos_level(0, 0, 0)),
-        Cell::from_cell_id(CellId::from_face_pos_level(2, 0, 0).children()[0].children()[1]),
+        Cell::from_cell_id(CellId::from_face_pos_level(Face::F0, 0, Level::new(0))),
         Cell::from_cell_id(
-            CellId::from_face_pos_level(5, 0, 0).children()[3].children()[2].children()[1],
+            CellId::from_face_pos_level(Face::F2, 0, Level::new(0)).children()[0].children()[1],
+        ),
+        Cell::from_cell_id(
+            CellId::from_face_pos_level(Face::F5, 0, Level::new(0)).children()[3].children()[2]
+                .children()[1],
         ),
         Cell::from_point(Point::from_coords(0.7, -0.4, 0.6)),
     ];
@@ -475,7 +489,7 @@ fn test_cell_rect_bound() {
         );
 
         for k in 0..4 {
-            let v = cell.vertex(k);
+            let v = cell.vertex(CellVertex::ALL[k]);
             assert!(
                 rect.contains_point(v),
                 "cell {ci}: rect_bound should contain vertex {k}"
@@ -488,7 +502,7 @@ fn test_cell_rect_bound() {
 #[test]
 fn test_cell_containment_hierarchy() {
     // Build a level-5 cell
-    let mut cid = CellId::from_face_pos_level(1, 0, 0);
+    let mut cid = CellId::from_face_pos_level(Face::F1, 0, Level::new(0));
     for _ in 0..5 {
         cid = cid.children()[1];
     }

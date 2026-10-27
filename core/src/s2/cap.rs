@@ -33,16 +33,10 @@
 //!     = a² + h²
 //! ```
 
-#![expect(
-    clippy::cast_sign_loss,
-    reason = "MAX_CELL_LEVEL (u8) cast to i32 — always fits"
-)]
-#![expect(
-    clippy::cast_possible_truncation,
-    reason = "MAX_CELL_LEVEL (u8->i32) clamping — always fits"
-)]
 use crate::r3::Vector;
 use crate::s1::{Angle, ChordAngle};
+use crate::s2::CellVertex;
+use crate::s2::Face;
 use crate::s2::metric::MIN_WIDTH;
 use crate::s2::{Cell, CellEdge, CellId, LatLng, Point};
 use std::f64::consts::{FRAC_PI_2, PI};
@@ -466,13 +460,10 @@ impl Cap {
         // `MIN_WIDTH.max_level`. (`floor(log2(...))` rounds a quotient just below a power of
         // two up to it, which gave a level one too fine; spec 008 K1, FR-017.)
         let radius = self.angle_radius().radians();
-        let level = i32::from(MIN_WIDTH.max_level(radius).as_u8()) - 1;
-
-        if level < 0 {
-            return (0..6).map(CellId::from_face).collect();
+        match MIN_WIDTH.max_level(radius).checked_sub(1) {
+            None => Face::ALL.into_iter().map(CellId::from_face).collect(),
+            Some(level) => CellId::from_point(&self.center).vertex_neighbors(level),
         }
-
-        CellId::from_point(&self.center).vertex_neighbors(level as u8)
     }
 
     /// Returns the true centroid of the cap multiplied by its surface area.
@@ -497,10 +488,10 @@ impl Cap {
     /// small cap cannot be represented accurately.
     pub(crate) fn contains_cell_upstream(self, cell: &Cell) -> bool {
         let vertices = [
-            cell.vertex(0),
-            cell.vertex(1),
-            cell.vertex(2),
-            cell.vertex(3),
+            cell.vertex(CellVertex::LowerLeft),
+            cell.vertex(CellVertex::LowerRight),
+            cell.vertex(CellVertex::UpperRight),
+            cell.vertex(CellVertex::UpperLeft),
         ];
         if !vertices.iter().all(|&v| self.contains_point(v)) {
             return false;
@@ -512,10 +503,10 @@ impl Cap {
     /// the cap contains a vertex, otherwise the edge test.
     pub(crate) fn may_intersect_cell(self, cell: &Cell) -> bool {
         let vertices = [
-            cell.vertex(0),
-            cell.vertex(1),
-            cell.vertex(2),
-            cell.vertex(3),
+            cell.vertex(CellVertex::LowerLeft),
+            cell.vertex(CellVertex::LowerRight),
+            cell.vertex(CellVertex::UpperRight),
+            cell.vertex(CellVertex::UpperLeft),
         ];
         if vertices.iter().any(|&v| self.contains_point(v)) {
             return true;
@@ -1312,6 +1303,7 @@ mod tests {
 #[cfg(test)]
 mod quickcheck_tests {
     use super::*;
+    use crate::s2::Level;
     use quickcheck_macros::quickcheck;
     use std::f64::consts::PI;
 
@@ -1642,7 +1634,7 @@ mod quickcheck_tests {
         use crate::s2::metric::MIN_WIDTH;
         let cap = Cap::from_center_angle(
             Point::from_coords(1.0, 1.0, 1.0).normalize(),
-            Angle::from_radians(MIN_WIDTH.value(1)),
+            Angle::from_radians(MIN_WIDTH.value(Level::new(1))),
         );
         let covering = cap.cell_union_bound();
         assert_eq!(

@@ -143,6 +143,7 @@ impl RegionSharder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::cap::Cap;
     use crate::s2::text_format;
 
@@ -150,7 +151,7 @@ mod tests {
     fn test_single_shard() {
         // One shard covering the whole sphere.
         let shards = vec![CellUnion::from_cell_ids(
-            (0..6).map(CellId::from_face).collect(),
+            Face::ALL.into_iter().map(CellId::from_face).collect(),
         )];
         let sharder = RegionSharder::new(&shards);
 
@@ -166,8 +167,8 @@ mod tests {
     #[test]
     fn test_no_overlap() {
         // Two shards covering different parts of the sphere.
-        let shard0 = CellUnion::from_cell_ids(vec![CellId::from_face(0)]);
-        let shard1 = CellUnion::from_cell_ids(vec![CellId::from_face(5)]);
+        let shard0 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
+        let shard1 = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F5)]);
         let sharder = RegionSharder::new(&[shard0, shard1]);
 
         // Cap at face 2 — should not overlap either shard.
@@ -186,13 +187,13 @@ mod tests {
     fn test_most_intersecting() {
         // Create shards for each face.
         let shards: Vec<CellUnion> = (0..6)
-            .map(|f| CellUnion::from_cell_ids(vec![CellId::from_face(f)]))
+            .map(|f| CellUnion::from_cell_ids(vec![CellId::from_face(Face::from_u8(f))]))
             .collect();
         let sharder = RegionSharder::new(&shards);
 
         // Cap centered on face 0.
         let cap = Cap::from_center_angle(
-            CellId::from_face(0).to_point(),
+            CellId::from_face(Face::F0).to_point(),
             crate::s1::Angle::from_degrees(5.0),
         );
 
@@ -204,7 +205,7 @@ mod tests {
     fn test_multiple_intersecting_shards() {
         // Create shards for each face.
         let shards: Vec<CellUnion> = (0..6)
-            .map(|f| CellUnion::from_cell_ids(vec![CellId::from_face(f)]))
+            .map(|f| CellUnion::from_cell_ids(vec![CellId::from_face(Face::from_u8(f))]))
             .collect();
         let sharder = RegionSharder::new(&shards);
 

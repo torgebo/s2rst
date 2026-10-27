@@ -11,6 +11,8 @@ use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
 use s2rst::s1;
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::region_coverer::RegionCoverer;
 use s2rst::s2::{Cap, Cell, CellId, CellUnion, LatLng, Loop};
 
@@ -18,15 +20,25 @@ use s2rst::s2::{Cap, Cell, CellId, CellUnion, LatLng, Loop};
 fn bench_covering_cap() -> CellUnion {
     let center = LatLng::from_degrees(47.6, -122.3).to_point();
     let cap = Cap::from_center_angle(center, s1::Angle::from_degrees(5.0));
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let cap = black_box(cap);
     black_box(coverer.covering(&cap))
 }
 
 #[library_benchmark]
 fn bench_covering_cell() -> CellUnion {
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(3, 0x12345678, 10));
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(
+        Face::F3,
+        0x12345678,
+        Level::new(10),
+    ));
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let cell = black_box(cell);
     black_box(coverer.covering(&cell))
 }
@@ -40,7 +52,10 @@ fn bench_covering_loop() -> CellUnion {
         LatLng::from_degrees(1.0, 1.0).to_point(),
         LatLng::from_degrees(1.0, 0.0).to_point(),
     ]);
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let loop_ = black_box(loop_);
     black_box(coverer.covering(&loop_))
 }
@@ -50,7 +65,10 @@ fn bench_covering_cap_fine() -> CellUnion {
     // A tiny cap that requires deep covering.
     let center = LatLng::from_degrees(47.6, -122.3).to_point();
     let cap = Cap::from_center_angle(center, s1::Angle::from_degrees(0.001));
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let cap = black_box(cap);
     black_box(coverer.covering(&cap))
 }
@@ -65,11 +83,14 @@ fn bench_covering_cell_union_4() -> CellUnion {
         .map(|i| {
             let lat = -60.0 + 30.0 * i as f64;
             let lng = -120.0 + 60.0 * i as f64;
-            CellId::from_lat_lng(&LatLng::from_degrees(lat, lng)).parent_at_level(15)
+            CellId::from_lat_lng(&LatLng::from_degrees(lat, lng)).parent_at_level(Level::new(15))
         })
         .collect();
     let cu = CellUnion::from_cell_ids(ids);
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let cu = black_box(cu);
     black_box(coverer.covering(&cu))
 }
@@ -81,11 +102,14 @@ fn bench_covering_cell_union_64() -> CellUnion {
             let t = i as f64 / 64.0;
             let lat = -80.0 + 160.0 * t;
             let lng = -170.0 + 340.0 * ((i * 37) % 64) as f64 / 64.0;
-            CellId::from_lat_lng(&LatLng::from_degrees(lat, lng)).parent_at_level(15)
+            CellId::from_lat_lng(&LatLng::from_degrees(lat, lng)).parent_at_level(Level::new(15))
         })
         .collect();
     let cu = CellUnion::from_cell_ids(ids);
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let cu = black_box(cu);
     black_box(coverer.covering(&cu))
 }
@@ -101,7 +125,10 @@ fn bench_covering_loop_32_vertices() -> CellUnion {
         })
         .collect();
     let loop_ = Loop::new(pts);
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let loop_ = black_box(loop_);
     black_box(coverer.covering(&loop_))
 }
@@ -115,7 +142,10 @@ fn bench_covering_loop_256_vertices() -> CellUnion {
         })
         .collect();
     let loop_ = Loop::new(pts);
-    let coverer = RegionCoverer::new().min_level(0).max_level(30).max_cells(8);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(0))
+        .max_level(Level::new(30))
+        .max_cells(8);
     let loop_ = black_box(loop_);
     black_box(coverer.covering(&loop_))
 }

@@ -7,6 +7,7 @@
 //! (`specs/008-formal-verify-cap/probe/cpp/survey_cpp.txt`, `v0.14.0-40`).
 
 use super::*;
+use crate::s2::Level;
 use crate::s2::metric::MIN_WIDTH;
 use crate::s2::region::Region;
 use crate::s2::{Cell, CellId};
@@ -56,7 +57,7 @@ fn covering_level_matches_upstream_near_every_power_of_two() {
 /// Upstream's `Contains(S2Cell)` and `MayIntersect` (s2cap.cc:225–290), transcribed for the
 /// grid below; the survey's transcription agreed with C++ on every case.
 fn grid() -> impl Iterator<Item = (Cap, Cell)> {
-    let face0 = Cell::from_cell_id(CellId::from_face(0));
+    let face0 = Cell::from_cell_id(CellId::from_face(Face::F0));
     (0..=12).flat_map(move |dlat| {
         [56.0, 58.0, 60.0, 62.0, 64.0].into_iter().map(move |rad| {
             (
@@ -75,7 +76,7 @@ fn contains_cell_matches_upstream() {
     assert_eq!(n, 38);
     let (cap, cell) = (
         Cap::from_center_angle(ll(4.0, 0.0), Angle::from_degrees(58.0)),
-        Cell::from_cell_id(CellId::from_face(0)),
+        Cell::from_cell_id(CellId::from_face(Face::F0)),
     );
     assert!(
         cap.contains_cell(&cell),
@@ -88,9 +89,9 @@ fn contains_cell_matches_upstream() {
 #[test]
 fn intersects_cell_matches_upstream() {
     let cap = Cap::from_center_angle(ll(0.0, 50.0), Angle::from_degrees(2.0));
-    let face0 = Cell::from_cell_id(CellId::from_face(0));
+    let face0 = Cell::from_cell_id(CellId::from_face(Face::F0));
     assert!(!cap.intersects_cell(&face0));
-    assert!(cap.intersects_cell(&Cell::from_cell_id(CellId::from_face(1))));
+    assert!(cap.intersects_cell(&Cell::from_cell_id(CellId::from_face(Face::F1))));
 }
 
 /// FR-018: cells inside, outside and straddling a cap, at levels 0, 5 and 20.
@@ -100,13 +101,13 @@ fn cell_tests_inside_outside_straddling() {
     let cap = Cap::from_center_angle(center, Angle::from_degrees(1.0));
     let id = CellId::from_point(&center);
     // Level 20 around the centre: well inside (≈ 10 m against ≈ 110 km).
-    let inside = Cell::from_cell_id(id.parent_at_level(20u8));
+    let inside = Cell::from_cell_id(id.parent_at_level(Level::new(20)));
     assert!(cap.contains_cell(&inside) && cap.intersects_cell(&inside));
     // Level 5 around the centre: much larger than the cap, so it straddles the boundary.
-    let straddling = Cell::from_cell_id(id.parent_at_level(5u8));
+    let straddling = Cell::from_cell_id(id.parent_at_level(Level::new(5)));
     assert!(!cap.contains_cell(&straddling) && cap.intersects_cell(&straddling));
     // Level 0 on the opposite face: outside.
-    let far = Cell::from_cell_id(CellId::from_point(&-center).parent_at_level(0u8));
+    let far = Cell::from_cell_id(CellId::from_point(&-center).parent_at_level(Level::new(0)));
     assert!(!cap.contains_cell(&far) && !cap.intersects_cell(&far));
     // The full cap contains every cell; the empty cap intersects none.
     assert!(Cap::full().contains_cell(&far));

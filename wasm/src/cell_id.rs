@@ -3,6 +3,7 @@
 
 use wasm_bindgen::prelude::*;
 
+use crate::bounded::{face_arg, level_arg};
 use crate::latlng::LatLng;
 use crate::point::Point;
 
@@ -27,9 +28,11 @@ impl CellId {
     }
 
     /// Create from a face (0–5).
+    ///
+    /// Throws unless `face` is an integer in 0..=5.
     #[wasm_bindgen(js_name = "fromFace")]
-    pub fn from_face(face: u8) -> CellId {
-        CellId(s2rst::s2::CellId::from_face(face))
+    pub fn from_face(face: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(s2rst::s2::CellId::from_face(face_arg(face)?)))
     }
 
     /// Create from a `Point`.
@@ -105,9 +108,11 @@ impl CellId {
     }
 
     /// The parent at a given level.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "parentAtLevel")]
-    pub fn parent_at_level(&self, level: u8) -> CellId {
-        CellId(self.0.parent_at_level(level))
+    pub fn parent_at_level(&self, level: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(self.0.parent_at_level(level_arg(level)?)))
     }
 
     /// The four children.
@@ -118,9 +123,15 @@ impl CellId {
     // -- Hierarchy / range iteration (Tier 1.4) --------------------------------
 
     /// Construct from a face, Hilbert-curve position (BigInt), and level.
+    ///
+    /// Throws unless `face` is an integer in 0..=5 and `level` an integer in 0..=30.
     #[wasm_bindgen(js_name = "fromFacePosLevel")]
-    pub fn from_face_pos_level(face: u8, pos: u64, level: u8) -> CellId {
-        CellId(s2rst::s2::CellId::from_face_pos_level(face, pos, level))
+    pub fn from_face_pos_level(face: f64, pos: u64, level: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(s2rst::s2::CellId::from_face_pos_level(
+            face_arg(face)?,
+            pos,
+            level_arg(level)?,
+        )))
     }
 
     /// Position along the Hilbert curve within the cell's face (BigInt).
@@ -134,9 +145,11 @@ impl CellId {
     }
 
     /// Which child (0–3) this cell is of its ancestor at `level`.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "childPosition")]
-    pub fn child_position(&self, level: u8) -> u8 {
-        self.0.child_position(level)
+    pub fn child_position(&self, level: f64) -> Result<u8, JsValue> {
+        Ok(self.0.child_position(level_arg(level)?))
     }
 
     /// First child (immediate). Use with `childEnd()` to iterate children.
@@ -152,25 +165,33 @@ impl CellId {
     }
 
     /// First descendant at `level`.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "childBeginAtLevel")]
-    pub fn child_begin_at_level(&self, level: u8) -> CellId {
-        CellId(self.0.child_begin_at_level(level))
+    pub fn child_begin_at_level(&self, level: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(self.0.child_begin_at_level(level_arg(level)?)))
     }
 
     /// Past-the-end descendant at `level`.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "childEndAtLevel")]
-    pub fn child_end_at_level(&self, level: u8) -> CellId {
-        CellId(self.0.child_end_at_level(level))
+    pub fn child_end_at_level(&self, level: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(self.0.child_end_at_level(level_arg(level)?)))
     }
 
     /// First cell id at `level` (across the whole sphere).
-    pub fn begin(level: u8) -> CellId {
-        CellId(s2rst::s2::CellId::begin(level))
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
+    pub fn begin(level: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(s2rst::s2::CellId::begin(level_arg(level)?)))
     }
 
     /// Past-the-end cell id at `level` (across the whole sphere).
-    pub fn end(level: u8) -> CellId {
-        CellId(s2rst::s2::CellId::end(level))
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
+    pub fn end(level: f64) -> Result<CellId, JsValue> {
+        Ok(CellId(s2rst::s2::CellId::end(level_arg(level)?)))
     }
 
     /// Advance `steps` cells at this id's level (negative steps go back).
@@ -247,21 +268,27 @@ impl CellId {
     }
 
     /// Vertex neighbors at the given level.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "vertexNeighbors")]
-    pub fn vertex_neighbors(&self, level: u8) -> Vec<CellId> {
-        self.0
-            .vertex_neighbors(level)
+    pub fn vertex_neighbors(&self, level: f64) -> Result<Vec<CellId>, JsValue> {
+        Ok(self
+            .0
+            .vertex_neighbors(level_arg(level)?)
             .into_iter()
             .map(CellId)
-            .collect()
+            .collect())
     }
 
     /// All neighbors at the given level.
+    ///
+    /// Throws unless `level` is an integer in 0..=30.
     #[wasm_bindgen(js_name = "allNeighbors")]
-    pub fn all_neighbors(&self, level: u8) -> Option<Vec<CellId>> {
-        self.0
-            .all_neighbors(level)
-            .map(|v| v.into_iter().map(CellId).collect())
+    pub fn all_neighbors(&self, level: f64) -> Result<Option<Vec<CellId>>, JsValue> {
+        Ok(self
+            .0
+            .all_neighbors(level_arg(level)?)
+            .map(|v| v.into_iter().map(CellId).collect()))
     }
 
     /// Common ancestor level, or -1 if none.

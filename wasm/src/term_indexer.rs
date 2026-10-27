@@ -8,6 +8,7 @@
 
 use wasm_bindgen::prelude::*;
 
+use crate::bounded::{check_level_order, level_arg};
 use crate::cap::Cap;
 use crate::cell_union::CellUnion;
 use crate::point::Point;
@@ -21,6 +22,15 @@ pub struct RegionTermIndexer(s2rst::s2::region_term_indexer::RegionTermIndexer);
 impl Default for RegionTermIndexer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl RegionTermIndexer {
+    /// An error unless the minimum level is at most the maximum level, which the core's term
+    /// methods require (spec 009, B12).
+    fn check_levels(&self) -> Result<(), JsValue> {
+        let o = self.0.options();
+        check_level_order(o.min_level, o.max_level)
     }
 }
 
@@ -40,17 +50,23 @@ impl RegionTermIndexer {
     }
 
     /// Set the minimum cell level (0–30).
+    ///
+    /// Throws unless `level` is an integer in 0..=30. Like a successful call, a
+    /// failed one consumes this object.
     #[wasm_bindgen(js_name = "setMinLevel")]
-    pub fn set_min_level(mut self, level: u8) -> RegionTermIndexer {
-        self.0.options_mut().min_level = s2rst::s2::Level::new(level);
-        self
+    pub fn set_min_level(mut self, level: f64) -> Result<RegionTermIndexer, JsValue> {
+        self.0.options_mut().min_level = level_arg(level)?;
+        Ok(self)
     }
 
     /// Set the maximum cell level (0–30).
+    ///
+    /// Throws unless `level` is an integer in 0..=30. Like a successful call, a
+    /// failed one consumes this object.
     #[wasm_bindgen(js_name = "setMaxLevel")]
-    pub fn set_max_level(mut self, level: u8) -> RegionTermIndexer {
-        self.0.options_mut().max_level = s2rst::s2::Level::new(level);
-        self
+    pub fn set_max_level(mut self, level: f64) -> Result<RegionTermIndexer, JsValue> {
+        self.0.options_mut().max_level = level_arg(level)?;
+        Ok(self)
     }
 
     /// If true, only point-containment queries are supported (smaller index).
@@ -63,66 +79,96 @@ impl RegionTermIndexer {
     // -- Point terms --------------------------------------------------------
 
     /// Terms to index for a point.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "indexTermsForPoint")]
-    pub fn index_terms_for_point(&self, point: &Point) -> Vec<String> {
-        self.0.get_index_terms_for_point(point.0)
+    pub fn index_terms_for_point(&self, point: &Point) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_index_terms_for_point(point.0))
     }
 
     /// Terms to query for a point.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "queryTermsForPoint")]
-    pub fn query_terms_for_point(&self, point: &Point) -> Vec<String> {
-        self.0.get_query_terms_for_point(point.0)
+    pub fn query_terms_for_point(&self, point: &Point) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_query_terms_for_point(point.0))
     }
 
     // -- Covering terms -----------------------------------------------------
 
     /// Terms to index for a precomputed `CellUnion` covering.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "indexTermsForCovering")]
-    pub fn index_terms_for_covering(&self, covering: &CellUnion) -> Vec<String> {
-        self.0.get_index_terms_for_covering(&covering.0)
+    pub fn index_terms_for_covering(&self, covering: &CellUnion) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_index_terms_for_covering(&covering.0))
     }
 
     /// Terms to query for a precomputed `CellUnion` covering.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "queryTermsForCovering")]
-    pub fn query_terms_for_covering(&self, covering: &CellUnion) -> Vec<String> {
-        self.0.get_query_terms_for_covering(&covering.0)
+    pub fn query_terms_for_covering(&self, covering: &CellUnion) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_query_terms_for_covering(&covering.0))
     }
 
     // -- Typed region terms -------------------------------------------------
 
     /// Terms to index for a `Cap`.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "indexTermsForCap")]
-    pub fn index_terms_for_cap(&self, cap: &Cap) -> Vec<String> {
-        self.0.get_index_terms(&cap.0)
+    pub fn index_terms_for_cap(&self, cap: &Cap) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_index_terms(&cap.0))
     }
 
     /// Terms to query for a `Cap`.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "queryTermsForCap")]
-    pub fn query_terms_for_cap(&self, cap: &Cap) -> Vec<String> {
-        self.0.get_query_terms(&cap.0)
+    pub fn query_terms_for_cap(&self, cap: &Cap) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_query_terms(&cap.0))
     }
 
     /// Terms to index for a `Rect`.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "indexTermsForRect")]
-    pub fn index_terms_for_rect(&self, rect: &Rect) -> Vec<String> {
-        self.0.get_index_terms(&rect.0)
+    pub fn index_terms_for_rect(&self, rect: &Rect) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_index_terms(&rect.0))
     }
 
     /// Terms to query for a `Rect`.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "queryTermsForRect")]
-    pub fn query_terms_for_rect(&self, rect: &Rect) -> Vec<String> {
-        self.0.get_query_terms(&rect.0)
+    pub fn query_terms_for_rect(&self, rect: &Rect) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_query_terms(&rect.0))
     }
 
     /// Terms to index for a `Polygon`.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "indexTermsForPolygon")]
-    pub fn index_terms_for_polygon(&self, polygon: &Polygon) -> Vec<String> {
-        self.0.get_index_terms(&polygon.0)
+    pub fn index_terms_for_polygon(&self, polygon: &Polygon) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_index_terms(&polygon.0))
     }
 
     /// Terms to query for a `Polygon`.
+    ///
+    /// Throws unless the minimum level is at most the maximum level.
     #[wasm_bindgen(js_name = "queryTermsForPolygon")]
-    pub fn query_terms_for_polygon(&self, polygon: &Polygon) -> Vec<String> {
-        self.0.get_query_terms(&polygon.0)
+    pub fn query_terms_for_polygon(&self, polygon: &Polygon) -> Result<Vec<String>, JsValue> {
+        self.check_levels()?;
+        Ok(self.0.get_query_terms(&polygon.0))
     }
 }

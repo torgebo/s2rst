@@ -1,0 +1,17 @@
+Mutant: M-811
+Targets: C-CellVertex::try_from
+Expect-Fail: cl_crash::c_cell_vertex_try_from
+Defect: CellVertex::try_from accepts index 4, one past the last vertex
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -142,7 +142,7 @@
+     /// The vertex numbered `k`, or [`OutOfRange`] outside `0..=3`.
+     fn try_from(k: i64) -> Result<Self, OutOfRange> {
+         match usize::try_from(k) {
+-            Ok(i) if i < CellVertex::ALL.len() => Ok(CellVertex::ALL[i]),
++            Ok(i) if i <= CellVertex::ALL.len() => Ok(CellVertex::ALL[i % 4]),
+             _ => Err(OutOfRange::new(BoundedKind::CellVertex, k)),
+         }
+     }

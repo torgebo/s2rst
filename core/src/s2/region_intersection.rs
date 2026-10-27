@@ -86,6 +86,7 @@ impl Region for RegionIntersection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
 
     #[test]
     fn test_empty_intersection() {
@@ -147,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_cell_containment() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let full = Rect::full();
         let r = RegionIntersection::from_regions(vec![Box::new(full)]);
         // Full rect contains all cells.

@@ -27,6 +27,7 @@
     reason = "usize -> i32 for vertex index — always in range"
 )]
 use crate::s1::Angle;
+use crate::s2::CellVertex;
 use crate::s2::contains_point_query::{ContainsPointQuery, VertexModel};
 use crate::s2::edge_crosser::EdgeCrosser;
 use crate::s2::edge_crossings::Crossing;
@@ -178,7 +179,7 @@ impl Loop {
 
     /// Creates a loop from a cell's four vertices.
     pub fn from_cell(cell: &Cell) -> Self {
-        let verts = (0..4).map(|i| cell.vertex(i)).collect();
+        let verts = CellVertex::ALL.iter().map(|&v| cell.vertex(v)).collect();
         Self::new(verts)
     }
 
@@ -1453,7 +1454,9 @@ impl Region for Loop {
 
     fn contains_cell(&self, cell: &Cell) -> bool {
         // A loop contains a cell if it contains all four vertices.
-        (0..4).all(|i| self.contains_point(&cell.vertex(i)))
+        CellVertex::ALL
+            .into_iter()
+            .all(|v| self.contains_point(&cell.vertex(v)))
     }
 
     fn intersects_cell(&self, cell: &Cell) -> bool {
@@ -1462,8 +1465,8 @@ impl Region for Loop {
             return false;
         }
         // Check if any cell vertex is inside the loop.
-        for i in 0..4 {
-            if self.contains_point(&cell.vertex(i)) {
+        for &v in &CellVertex::ALL {
+            if self.contains_point(&cell.vertex(v)) {
                 return true;
             }
         }
@@ -1475,9 +1478,9 @@ impl Region for Loop {
         }
         // Check edge crossings.
         let n = self.vertices.len();
-        for j in 0..4 {
+        for &j in &CellVertex::ALL {
             let cell_a = cell.vertex(j);
-            let cell_b = cell.vertex((j + 1) & 3);
+            let cell_b = cell.vertex(j.next());
             let mut crosser = EdgeCrosser::new(cell_a, cell_b);
             for i in 0..n {
                 let next = (i + 1) % n;
@@ -1605,7 +1608,9 @@ fn match_boundaries(a: &Loop, b: &Loop, a_offset: usize, max_error: Angle) -> bo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::LatLng;
+    use crate::s2::Level;
 
     fn p(lat: f64, lng: f64) -> Point {
         LatLng::from_degrees(lat, lng).to_point()
@@ -1718,7 +1723,7 @@ mod tests {
 
     #[test]
     fn test_from_cell() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let l = Loop::from_cell(&cell);
         assert_eq!(l.num_vertices(), 4);
         assert_eq!(l.num_edges(), 4);
@@ -1936,7 +1941,7 @@ mod tests {
 
         // A cell deep inside the loop (at the center) should be contained.
         let center_pt = p(0.0, 0.0);
-        let center_cell_id = CellId::from_point(&center_pt).parent_at_level(16);
+        let center_cell_id = CellId::from_point(&center_pt).parent_at_level(Level::new(16));
         let center_cell = Cell::from_cell_id(center_cell_id);
         assert!(
             l.contains_cell(&center_cell),
@@ -1949,7 +1954,7 @@ mod tests {
 
         // A cell far outside the loop should not be contained or intersected.
         let outside_pt = p(80.0, 80.0);
-        let outside_cell_id = CellId::from_point(&outside_pt).parent_at_level(16);
+        let outside_cell_id = CellId::from_point(&outside_pt).parent_at_level(Level::new(16));
         let outside_cell = Cell::from_cell_id(outside_cell_id);
         assert!(
             !l.contains_cell(&outside_cell),
@@ -1963,7 +1968,7 @@ mod tests {
         // A large cell near the boundary should intersect but not be fully contained.
         // Use a coarse cell (level 5) near one of the loop's edges.
         let boundary_pt = p(20.0, 0.0);
-        let boundary_cell_id = CellId::from_point(&boundary_pt).parent_at_level(5);
+        let boundary_cell_id = CellId::from_point(&boundary_pt).parent_at_level(Level::new(5));
         let boundary_cell = Cell::from_cell_id(boundary_cell_id);
         // The cell straddles the boundary, so it should intersect but not be contained.
         assert!(

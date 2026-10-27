@@ -58,9 +58,9 @@ impl Metric {
     /// Returns the value of the metric at the given cell level.
     ///
     /// Equivalent to `deriv * 2^(-dim * level)`.
-    pub fn value(&self, level: impl Into<Level>) -> f64 {
+    pub fn value(&self, level: Level) -> f64 {
         // ldexp(deriv, -dim*level)
-        let exp = -(i32::from(self.dim) * level.into().as_i32());
+        let exp = -(i32::from(self.dim) * level.as_i32());
         self.deriv * f64::from_bits(((1023i64 + i64::from(exp)) as u64) << 52)
     }
 
@@ -194,21 +194,21 @@ mod tests {
 
     #[test]
     fn test_value_at_level_zero() {
-        assert_eq!(MIN_ANGLE_SPAN.value(0), MIN_ANGLE_SPAN.deriv);
-        assert_eq!(AVG_AREA.value(0), AVG_AREA.deriv);
+        assert_eq!(MIN_ANGLE_SPAN.value(Level::new(0)), MIN_ANGLE_SPAN.deriv);
+        assert_eq!(AVG_AREA.value(Level::new(0)), AVG_AREA.deriv);
     }
 
     #[test]
     fn test_value_halves_per_level_for_length() {
-        let v0 = AVG_EDGE.value(0);
-        let v1 = AVG_EDGE.value(1);
+        let v0 = AVG_EDGE.value(Level::new(0));
+        let v1 = AVG_EDGE.value(Level::new(1));
         assert!((v1 - v0 / 2.0).abs() < 1e-15);
     }
 
     #[test]
     fn test_value_quarters_per_level_for_area() {
-        let v0 = AVG_AREA.value(0);
-        let v1 = AVG_AREA.value(1);
+        let v0 = AVG_AREA.value(Level::new(0));
+        let v1 = AVG_AREA.value(Level::new(1));
         assert!((v1 - v0 / 4.0).abs() < 1e-15);
     }
 
@@ -216,47 +216,47 @@ mod tests {
     fn test_min_max_avg_ordering() {
         for level in 0..=MAX_CELL_LEVEL {
             assert!(
-                MIN_ANGLE_SPAN.value(level) <= AVG_ANGLE_SPAN.value(level),
+                MIN_ANGLE_SPAN.value(Level::new(level)) <= AVG_ANGLE_SPAN.value(Level::new(level)),
                 "level {level}"
             );
             assert!(
-                AVG_ANGLE_SPAN.value(level) <= MAX_ANGLE_SPAN.value(level),
-                "level {level}"
-            );
-
-            assert!(
-                MIN_WIDTH.value(level) <= AVG_WIDTH.value(level),
-                "level {level}"
-            );
-            assert!(
-                AVG_WIDTH.value(level) <= MAX_WIDTH.value(level),
+                AVG_ANGLE_SPAN.value(Level::new(level)) <= MAX_ANGLE_SPAN.value(Level::new(level)),
                 "level {level}"
             );
 
             assert!(
-                MIN_EDGE.value(level) <= AVG_EDGE.value(level),
+                MIN_WIDTH.value(Level::new(level)) <= AVG_WIDTH.value(Level::new(level)),
                 "level {level}"
             );
             assert!(
-                AVG_EDGE.value(level) <= MAX_EDGE.value(level),
-                "level {level}"
-            );
-
-            assert!(
-                MIN_DIAG.value(level) <= AVG_DIAG.value(level),
-                "level {level}"
-            );
-            assert!(
-                AVG_DIAG.value(level) <= MAX_DIAG.value(level),
+                AVG_WIDTH.value(Level::new(level)) <= MAX_WIDTH.value(Level::new(level)),
                 "level {level}"
             );
 
             assert!(
-                MIN_AREA.value(level) <= AVG_AREA.value(level),
+                MIN_EDGE.value(Level::new(level)) <= AVG_EDGE.value(Level::new(level)),
                 "level {level}"
             );
             assert!(
-                AVG_AREA.value(level) <= MAX_AREA.value(level),
+                AVG_EDGE.value(Level::new(level)) <= MAX_EDGE.value(Level::new(level)),
+                "level {level}"
+            );
+
+            assert!(
+                MIN_DIAG.value(Level::new(level)) <= AVG_DIAG.value(Level::new(level)),
+                "level {level}"
+            );
+            assert!(
+                AVG_DIAG.value(Level::new(level)) <= MAX_DIAG.value(Level::new(level)),
+                "level {level}"
+            );
+
+            assert!(
+                MIN_AREA.value(Level::new(level)) <= AVG_AREA.value(Level::new(level)),
+                "level {level}"
+            );
+            assert!(
+                AVG_AREA.value(Level::new(level)) <= MAX_AREA.value(Level::new(level)),
                 "level {level}"
             );
         }
@@ -267,16 +267,17 @@ mod tests {
         for level in 0..=MAX_CELL_LEVEL {
             // Width <= angle span
             assert!(
-                MIN_WIDTH.value(level) <= MIN_ANGLE_SPAN.value(level) + 1e-15,
+                MIN_WIDTH.value(Level::new(level))
+                    <= MIN_ANGLE_SPAN.value(Level::new(level)) + 1e-15,
                 "level {level}"
             );
             // Edge <= diagonal
             assert!(
-                MIN_EDGE.value(level) <= MIN_DIAG.value(level) + 1e-15,
+                MIN_EDGE.value(Level::new(level)) <= MIN_DIAG.value(Level::new(level)) + 1e-15,
                 "level {level}"
             );
             assert!(
-                MAX_EDGE.value(level) <= MAX_DIAG.value(level) + 1e-15,
+                MAX_EDGE.value(Level::new(level)) <= MAX_DIAG.value(Level::new(level)) + 1e-15,
                 "level {level}"
             );
         }
@@ -325,7 +326,7 @@ mod tests {
         // At level k, the metric value is deriv * 2^(-k).
         // min_level(val) should return the smallest k such that value(k) <= val.
         for level in 0..=MAX_CELL_LEVEL {
-            let val = MIN_DIAG.value(level);
+            let val = MIN_DIAG.value(Level::new(level));
             assert_eq!(MIN_DIAG.min_level(val), level);
         }
     }
@@ -333,7 +334,7 @@ mod tests {
     #[test]
     fn test_max_level_boundary() {
         for level in 0..=MAX_CELL_LEVEL {
-            let val = MIN_DIAG.value(level);
+            let val = MIN_DIAG.value(Level::new(level));
             assert_eq!(MIN_DIAG.max_level(val), level);
         }
     }
@@ -469,7 +470,7 @@ mod tests {
     #[test]
     fn test_avg_area_consistency() {
         // Total sphere area is 4π, divided among 6 face cells.
-        let face_area = AVG_AREA.value(0);
+        let face_area = AVG_AREA.value(Level::new(0));
         let total = face_area * 6.0;
         assert!(
             (total - 4.0 * std::f64::consts::PI).abs() < 1e-14,

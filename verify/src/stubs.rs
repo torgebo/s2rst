@@ -41,7 +41,7 @@
 
 use s2rst::r3::Vector;
 use s2rst::s1::ChordAngle;
-use s2rst::s2::{Cap, Cell, CellEdge, Point};
+use s2rst::s2::{Cap, Cell, CellEdge, CellVertex, Point};
 use std::f64::consts::{FRAC_PI_2, PI};
 use std::sync::Mutex;
 
@@ -450,8 +450,8 @@ pub fn draw_abstract_cell() {
 
 /// `Cell::vertex`, from the abstract cell: the cell's own geometry is abstracted away, so a law
 /// proven over it holds for every real cell (research R7).
-pub fn fixed_vertex(_c: Cell, k: usize) -> Point {
-    from3(VERTS.lock().unwrap()[k & 3])
+pub fn fixed_vertex(_c: Cell, k: CellVertex) -> Point {
+    from3(VERTS.lock().unwrap()[k.index()])
 }
 
 /// `Cell::edge_raw`, from the abstract cell.
@@ -496,7 +496,7 @@ pub fn draw_abstract_pair() {
 /// same for one id, so equal cells keep equal vertices (`fixed_vertex` gives every cell the same
 /// four, which would tie two cells together). A third id shares the second's vertices; no
 /// harness has one.
-pub fn pair_vertex(c: Cell, k: usize) -> Point {
+pub fn pair_vertex(c: Cell, k: CellVertex) -> Point {
     let id = c.id().id();
     let mut ids = PAIR_IDS.lock().unwrap();
     let slot = if ids.1 > 0 && ids.0[0] == id {
@@ -511,7 +511,7 @@ pub fn pair_vertex(c: Cell, k: usize) -> Point {
     } else {
         1
     };
-    from3(PAIR_VERTS.lock().unwrap()[slot][k & 3])
+    from3(PAIR_VERTS.lock().unwrap()[slot][k.index()])
 }
 
 // ---- the abstract u-v bound (gap 2) -----------------------------------------------------------
@@ -521,7 +521,7 @@ pub fn pair_vertex(c: Cell, k: usize) -> Point {
 /// a rectangle (the quadratic projection maps [0, 1] onto [−1, 1], increasing), so a crash proof
 /// over this abstraction covers every cell, and spares the checker the projection of a symbolic
 /// (i, j). The cell's face, level, orientation and id stay its own.
-pub fn any_uv_bound<L: Into<s2rst::s2::Level>>(_i: i32, _j: i32, _level: L) -> s2rst::r2::Rect {
+pub fn any_uv_bound(_i: i32, _j: i32, _level: s2rst::s2::Level) -> s2rst::r2::Rect {
     let b: [f64; 4] = kani::any();
     kani::assume(b[0] >= -1.0 && b[0] <= b[1] && b[1] <= 1.0);
     kani::assume(b[2] >= -1.0 && b[2] <= b[3] && b[3] <= 1.0);

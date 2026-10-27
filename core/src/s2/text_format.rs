@@ -447,6 +447,7 @@ pub fn index_to_string(index: &crate::s2::shape_index::ShapeIndex) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::region::Region;
 
     #[test]
@@ -871,14 +872,14 @@ mod tests {
     fn test_to_string_face_cell_id() {
         // C++ TEST(ToString, FaceCellId)
         use crate::s2::CellId;
-        assert_eq!("2/", CellId::from_face(2).to_debug_string());
+        assert_eq!("2/", CellId::from_face(Face::F2).to_debug_string());
     }
 
     #[test]
     fn test_to_string_level3_cell_id() {
         // C++ TEST(ToString, Level3CellId)
         use crate::s2::CellId;
-        let id = CellId::from_face(2).children()[0].children()[3].children()[3];
+        let id = CellId::from_face(Face::F2).children()[0].children()[3].children()[3];
         assert_eq!("2/033", id.to_debug_string());
     }
 

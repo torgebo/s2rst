@@ -8,12 +8,12 @@ Defect: the covering level without `− 1` (P-CPBND-02 is stated on the expressi
 diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
 --- a/core/src/s2/cap.rs
 +++ b/core/src/s2/cap.rs
-@@ -455,7 +455,7 @@
+@@ -459,7 +459,7 @@
          // `MIN_WIDTH.max_level`. (`floor(log2(...))` rounds a quotient just below a power of
          // two up to it, which gave a level one too fine; spec 008 K1, FR-017.)
          let radius = self.angle_radius().radians();
--        let level = i32::from(MIN_WIDTH.max_level(radius).as_u8()) - 1;
-+        let level = i32::from(MIN_WIDTH.max_level(radius).as_u8());
- 
-         if level < 0 {
-             return (0..6).map(CellId::from_face).collect();
+-        match MIN_WIDTH.max_level(radius).checked_sub(1) {
++        match MIN_WIDTH.max_level(radius).checked_sub(0) {
+             None => Face::ALL.into_iter().map(CellId::from_face).collect(),
+             Some(level) => CellId::from_point(&self.center).vertex_neighbors(level),
+         }

@@ -13,6 +13,7 @@
 //! Run with: `cargo run --example region_covering`
 #![allow(clippy::print_stdout, reason = "example binary")]
 
+use s2rst::s2::Level;
 use s2rst::s2::earth;
 use s2rst::s2::region_coverer::RegionCoverer;
 use s2rst::s2::{Cap, CellUnion, LatLng, Loop, Rect};
@@ -23,7 +24,7 @@ fn main() {
     let berlin = LatLng::from_degrees(52.5200, 13.4050);
     let cap = Cap::from_center_angle(berlin.to_point(), earth::km_to_angle(50.0));
 
-    let coverer = RegionCoverer::new().max_level(12).max_cells(8);
+    let coverer = RegionCoverer::new().max_level(Level::new(12)).max_cells(8);
     let covering = coverer.covering(&cap);
     print_covering("Cap", &covering);
 
@@ -50,7 +51,7 @@ fn main() {
     let ne = LatLng::from_degrees(47.808, 10.492);
     let rect = Rect::from_lat_lng(sw).add_point(ne);
 
-    let coverer = RegionCoverer::new().max_level(10).max_cells(20);
+    let coverer = RegionCoverer::new().max_level(Level::new(10)).max_cells(20);
     let covering = coverer.covering(&rect);
     print_covering("Rect", &covering);
 
@@ -64,7 +65,7 @@ fn main() {
     let area_km2 = earth::steradians_to_square_km(bermuda.area());
     println!("  Triangle area: {area_km2:.0} km²");
 
-    let coverer = RegionCoverer::new().max_level(8).max_cells(30);
+    let coverer = RegionCoverer::new().max_level(Level::new(8)).max_cells(30);
     let covering = coverer.covering(&bermuda);
     print_covering("Loop", &covering);
 
@@ -73,7 +74,7 @@ fn main() {
     let tokyo = LatLng::from_degrees(35.6762, 139.6503);
     let tokyo_cap = Cap::from_center_angle(tokyo.to_point(), earth::km_to_angle(100.0));
 
-    let coverer = RegionCoverer::new().max_level(10).max_cells(12);
+    let coverer = RegionCoverer::new().max_level(Level::new(10)).max_cells(12);
     let outer = coverer.covering(&tokyo_cap);
     let inner = coverer.interior_covering(&tokyo_cap);
 
@@ -94,7 +95,10 @@ fn main() {
 
     // ── Covering with level constraints ─────────────────────────────────
     println!("\n=== Level-constrained covering (levels 5-8 only) ===\n");
-    let coverer = RegionCoverer::new().min_level(5).max_level(8).max_cells(12);
+    let coverer = RegionCoverer::new()
+        .min_level(Level::new(5))
+        .max_level(Level::new(8))
+        .max_cells(12);
     let constrained = coverer.covering(&tokyo_cap);
     print_covering("Constrained", &constrained);
 

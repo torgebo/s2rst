@@ -36,7 +36,7 @@
 use std::collections::{BinaryHeap, HashSet};
 
 use crate::s2::coords::{Level, MAX_CELL_LEVEL};
-use crate::s2::{Cell, CellId, CellUnion, Point, Region};
+use crate::s2::{Cell, CellId, CellUnion, LevelMod, Point, Region};
 
 // ─── Public Configuration ───────────────────────────────────────────────
 
@@ -49,18 +49,36 @@ use crate::s2::{Cell, CellId, CellUnion, Point, Region};
 ///
 /// ```
 /// use s2rst::s1::Angle;
-/// use s2rst::s2::{Cap, LatLng};
+/// use s2rst::s2::{Cap, LatLng, Level};
 /// use s2rst::s2::region_coverer::RegionCoverer;
 ///
 /// let center = LatLng::from_degrees(40.0, -74.0).to_point();
 /// let cap = Cap::from_center_angle(center, Angle::from_degrees(1.0));
 ///
 /// let coverer = RegionCoverer::new()
-///     .max_level(12)
+///     .max_level(Level::new(12))
 ///     .max_cells(8);
 /// let covering = coverer.covering(&cap);
 /// assert!(!covering.is_empty());
 /// assert!(covering.len() <= 8);
+/// ```
+///
+/// The level modulus is a `LevelMod`, so a coverer cannot hold one outside 1..=3, whether it is
+/// set through the setter, the public field or deserialisation (spec 009):
+///
+/// ```
+/// use s2rst::s2::LevelMod;
+/// use s2rst::s2::region_coverer::RegionCoverer;
+///
+/// let coverer = RegionCoverer { level_mod: LevelMod::new(3), ..Default::default() };
+/// assert_eq!(coverer.level_mod.get(), 3);
+/// ```
+///
+/// ```compile_fail
+/// let coverer = s2rst::s2::region_coverer::RegionCoverer {
+///     level_mod: 7,
+///     ..Default::default()
+/// };
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -71,8 +89,9 @@ pub struct RegionCoverer {
     pub max_level: Level,
     /// Level modulo: 1, 2, or 3. Controls branching factor (4, 16, or 64).
     /// Only cells where `(level - min_level) % level_mod == 0` are used.
-    /// Default 1.
-    pub level_mod: u8,
+    /// Default 1. A [`LevelMod`], so it cannot be set outside 1..=3, by assignment or by
+    /// deserialisation.
+    pub level_mod: LevelMod,
     /// Maximum desired cells in the approximation (default 8).
     pub max_cells: usize,
 }
@@ -82,7 +101,7 @@ impl Default for RegionCoverer {
         RegionCoverer {
             min_level: Level::MIN,
             max_level: Level::MAX,
-            level_mod: 1,
+            level_mod: LevelMod::DEFAULT,
             max_cells: 8,
         }
     }
@@ -95,24 +114,45 @@ impl RegionCoverer {
     }
 
     /// Sets the minimum cell level.
-    pub fn min_level(mut self, level: impl Into<Level>) -> Self {
-        self.min_level = level.into();
+    pub fn min_level(mut self, level: Level) -> Self {
+        self.min_level = level;
         self
     }
 
     /// Sets the maximum cell level.
-    pub fn max_level(mut self, level: impl Into<Level>) -> Self {
-        self.max_level = level.into();
+    pub fn max_level(mut self, level: Level) -> Self {
+        self.max_level = level;
         self
     }
 
     /// Sets the level modulo (1, 2, or 3).
-    pub fn level_mod(mut self, modulo: u8) -> Self {
-        self.level_mod = modulo.clamp(1, 3);
+    ///
+    /// Upstream's `set_level_mod(int)` checks the range with `ABSL_DCHECK` and then clamps it in
+    /// release builds; this setter takes a [`LevelMod`], so there is nothing to clamp: a raw
+    /// value is converted, or rejected, by `LevelMod::try_from` (spec 009). Before spec 009 it
+    /// took a `u8` and clamped silently in every build.
+    pub fn level_mod(mut self, modulo: LevelMod) -> Self {
+        self.level_mod = modulo;
         self
     }
 
+    /// Panics unless `min_level ≤ max_level`, the one relation between the settings that their
+    /// types cannot carry. Upstream checks it with `ABSL_DCHECK` only; before spec 009 so did
+    /// this crate, and a release build's `covering` then did not finish (B12).
+    #[track_caller]
+    fn check_levels(&self) {
+        assert!(
+            self.min_level <= self.max_level,
+            "min_level ({}) must not exceed max_level ({})",
+            self.min_level,
+            self.max_level
+        );
+    }
+
     /// Sets the maximum number of cells.
+    ///
+    /// A value of 0 is stored as 1. Upstream's `set_max_cells(int)` stores it as given, so this
+    /// is a deviation (recorded in `BOUNDED_TYPES.md`, section 5, as a follow-up).
     pub fn max_cells(mut self, cells: usize) -> Self {
         self.max_cells = cells.max(1);
         self
@@ -122,35 +162,48 @@ impl RegionCoverer {
     ///
     /// The covering respects all parameters. If `level_mod > 1`, the result
     /// is denormalized to ensure all cells satisfy the level constraints.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build (upstream checks it with `ABSL_DCHECK`).
     pub fn covering(&self, region: &dyn Region) -> CellUnion {
-        debug_assert!(self.min_level <= self.max_level);
+        self.check_levels();
         let mut c = Coverer::new(self);
         c.interior_covering = false;
         c.covering_internal(region);
         let mut cu = c.result;
         cu.normalize();
-        if self.min_level > 0 || self.level_mod > 1 {
+        if self.min_level > 0 || self.level_mod.get() > 1 {
             cu = cu.denormalize(self.min_level, self.level_mod);
         }
         cu
     }
 
     /// Returns a normalized `CellUnion` contained within the given region.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build (upstream checks it with `ABSL_DCHECK`).
     pub fn interior_covering(&self, region: &dyn Region) -> CellUnion {
-        debug_assert!(self.min_level <= self.max_level);
+        self.check_levels();
         let mut c = Coverer::new(self);
         c.interior_covering = true;
         c.covering_internal(region);
         let mut cu = c.result;
         cu.normalize();
-        if self.min_level > 0 || self.level_mod > 1 {
+        if self.min_level > 0 || self.level_mod.get() > 1 {
             cu = cu.denormalize(self.min_level, self.level_mod);
         }
         cu
     }
 
     /// Returns a `CellUnion` that covers the region, without denormalization.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build (upstream checks it with `ABSL_DCHECK`).
     pub fn cell_union(&self, region: &dyn Region) -> CellUnion {
+        self.check_levels();
         let mut c = Coverer::new(self);
         c.interior_covering = false;
         c.covering_internal(region);
@@ -166,7 +219,12 @@ impl RegionCoverer {
     /// covering of an empty `Cap`, `Rect` or `CellUnion` is not empty but the empty
     /// cap's four level-29 cells around (1, 0, 0) (see [`Region::cell_union_bound`]);
     /// [`covering`](Self::covering) returns none.
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build (upstream checks it with `ABSL_DCHECK`).
     pub fn fast_covering(&self, region: &dyn Region) -> CellUnion {
+        self.check_levels();
         let c = Coverer::new(self);
         let ids = region.cell_union_bound();
         let mut cu = CellUnion::from_cell_ids(ids);
@@ -186,10 +244,9 @@ impl RegionCoverer {
     pub fn get_simple_covering(
         region: &dyn Region,
         start: &Point,
-        level: impl Into<Level>,
+        level: Level,
         output: &mut Vec<CellId>,
     ) {
-        let level = level.into();
         Self::flood_fill(
             region,
             CellId::from_point(start).parent_at_level(level),
@@ -221,16 +278,16 @@ impl RegionCoverer {
     /// Returns the maximum level that will actually be used in coverings,
     /// adjusted for `level_mod`.
     fn true_max_level(&self) -> Level {
-        if self.level_mod == 1 {
+        if self.level_mod.get() == 1 {
             return self.max_level;
         }
-        self.max_level - (self.max_level - self.min_level) % self.level_mod
+        self.max_level - (self.max_level - self.min_level) % self.level_mod.get()
     }
 
     /// Adjusts `level` downward so that it satisfies `level_mod`.
     fn adjust_level(&self, level: Level) -> Level {
-        if self.level_mod > 1 && level > self.min_level {
-            level - ((level - self.min_level) % self.level_mod)
+        if self.level_mod.get() > 1 && level > self.min_level {
+            level - ((level - self.min_level) % self.level_mod.get())
         } else {
             level
         }
@@ -246,10 +303,15 @@ impl RegionCoverer {
     ///    have a common ancestor at `min_level` or higher.
     ///  - There must be no sequence of `4^level_mod` cells that all share
     ///    a common parent (and could thus be replaced by that parent).
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build (upstream checks it with `ABSL_DCHECK`).
     pub fn is_canonical(&self, covering: &[CellId]) -> bool {
+        self.check_levels();
         let min_level = self.min_level;
         let max_level = self.true_max_level();
-        let level_mod = self.level_mod;
+        let level_mod = self.level_mod.get();
         let too_many_cells = covering.len() > self.max_cells;
         let mut same_parent_count: usize = 1;
         let mut prev_id = CellId::none();
@@ -307,7 +369,7 @@ impl RegionCoverer {
     /// Checks whether `covering` contains all `4^level_mod` children of `id`
     /// at the next valid level.
     fn contains_all_children(&self, covering: &[CellId], id: CellId) -> bool {
-        let level = id.level() + self.level_mod;
+        let level = id.level() + self.level_mod.get();
         let pos = covering.partition_point(|&c| c < id.range_min());
         let mut it = pos;
         let mut child = id.child_begin_at_level(level);
@@ -335,10 +397,15 @@ impl RegionCoverer {
 
     /// Modifies the given covering so that it conforms to the current
     /// covering parameters (`max_level`, `level_mod`, `min_level`, `max_cells`).
+    ///
+    /// # Panics
+    ///
+    /// If `min_level > max_level`, in every build (upstream checks it with `ABSL_DCHECK`).
     pub fn canonicalize_covering(&self, covering: &mut Vec<CellId>) {
+        self.check_levels();
         // If any cells are too small or don't satisfy level_mod, replace
         // with ancestors.
-        if self.max_level < MAX_CELL_LEVEL || self.level_mod > 1 {
+        if self.max_level < MAX_CELL_LEVEL || self.level_mod.get() > 1 {
             for id in covering.iter_mut() {
                 let level = id.level();
                 let new_level = self.adjust_level(level.min(self.max_level));
@@ -353,7 +420,7 @@ impl RegionCoverer {
 
         // Make sure covering satisfies min_level and level_mod, possibly
         // at the expense of satisfying max_cells.
-        if self.min_level > 0 || self.level_mod > 1 {
+        if self.min_level > 0 || self.level_mod.get() > 1 {
             cu = cu.denormalize(self.min_level, self.level_mod);
         }
 
@@ -396,7 +463,7 @@ impl RegionCoverer {
                 // cell are present, and replace with the parent if so.
                 let mut level = best_level;
                 while level > self.min_level.as_i32() {
-                    level -= i32::from(self.level_mod);
+                    level -= i32::from(self.level_mod.get());
                     id = id.parent_at_level(Level::new(level as u8));
                     if !self.contains_all_children(covering, id) {
                         break;
@@ -446,6 +513,7 @@ impl Ord for Candidate {
 struct Coverer {
     min_level: Level,
     max_level: Level,
+    /// `RegionCoverer::level_mod`'s value, 1..=3, for the arithmetic.
     level_mod: u8,
     max_cells: usize,
     interior_covering: bool,
@@ -458,7 +526,7 @@ impl Coverer {
         Coverer {
             min_level: rc.min_level.min(Level::MAX),
             max_level: rc.max_level.min(Level::MAX).max(rc.min_level),
-            level_mod: rc.level_mod.clamp(1, 3),
+            level_mod: rc.level_mod.get(),
             max_cells: rc.max_cells.max(1),
             interior_covering: false,
             result: CellUnion::from_cell_ids(vec![]),
@@ -634,7 +702,7 @@ impl Coverer {
         let temp = RegionCoverer {
             min_level: Level::MIN,
             max_level: self.max_level,
-            level_mod: 1,
+            level_mod: LevelMod::DEFAULT,
             max_cells: self.max_cells.min(4),
         };
         let cells = temp.fast_covering(region);
@@ -700,7 +768,7 @@ impl Coverer {
         // Make sure covering satisfies min_level and level_mod,
         // possibly at the expense of satisfying max_cells.
         if self.min_level > 0 || self.level_mod > 1 {
-            *cu = cu.denormalize(self.min_level, self.level_mod);
+            *cu = cu.denormalize(self.min_level, LevelMod::new(self.level_mod));
         }
     }
 }
@@ -710,6 +778,7 @@ impl Coverer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::region::Region;
     use crate::s2::{Cap, LatLng, Point, Rect};
 
@@ -722,7 +791,7 @@ mod tests {
         let rc = RegionCoverer::new();
         assert_eq!(rc.min_level, 0);
         assert_eq!(rc.max_level, MAX_CELL_LEVEL);
-        assert_eq!(rc.level_mod, 1);
+        assert_eq!(rc.level_mod, LevelMod::new(1));
         assert_eq!(rc.max_cells, 8);
     }
 
@@ -770,7 +839,7 @@ mod tests {
         let ll2 = LatLng::from_degrees(20.0, 30.0);
         let rect = Rect::empty().add_point(ll1).add_point(ll2);
 
-        let rc = RegionCoverer::new().max_cells(20).max_level(10);
+        let rc = RegionCoverer::new().max_cells(20).max_level(Level::new(10));
         let covering = rc.covering(&rect);
         assert!(!covering.is_empty());
 
@@ -793,7 +862,7 @@ mod tests {
         let center = p(0.0, 0.0);
         let cap = Cap::from_center_angle(center, crate::s1::Angle::from_degrees(0.001));
 
-        let rc = RegionCoverer::new().max_level(5).max_cells(100);
+        let rc = RegionCoverer::new().max_level(Level::new(5)).max_cells(100);
         let covering = rc.covering(&cap);
 
         for &id in &covering {
@@ -836,7 +905,7 @@ mod tests {
     #[test]
     fn test_covering_cell() {
         // Covering a single cell should return that cell (or its parent).
-        let id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(10);
+        let id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(Level::new(10));
         let cell = Cell::from(id);
 
         let rc = RegionCoverer::new().max_cells(1);
@@ -858,14 +927,16 @@ mod tests {
         let center = p(0.0, 0.0);
         let cap = Cap::from_center_angle(center, crate::s1::Angle::from_degrees(1.0));
 
-        let rc = RegionCoverer::new().level_mod(2).max_cells(20);
+        let rc = RegionCoverer::new()
+            .level_mod(LevelMod::new(2))
+            .max_cells(20);
         let covering = rc.covering(&cap);
 
         for &id in &covering {
             let level = id.level();
             if level > rc.min_level {
                 assert!(
-                    (level - rc.min_level).is_multiple_of(rc.level_mod),
+                    (level - rc.min_level).is_multiple_of(rc.level_mod.get()),
                     "level {} does not satisfy level_mod {}",
                     level,
                     rc.level_mod
@@ -881,7 +952,8 @@ mod tests {
         let rc = RegionCoverer::new().max_cells(1);
         for face in 0..6 {
             for level in [0u8, 5, 15, MAX_CELL_LEVEL] {
-                let id = CellId::from_face(face).child_begin_at_level(level);
+                let id =
+                    CellId::from_face(Face::from_u8(face)).child_begin_at_level(Level::new(level));
                 let cell = Cell::from(id);
                 let covering = rc.covering(&cell);
                 assert_eq!(
@@ -899,7 +971,10 @@ mod tests {
         // Interior covering of a large cap with level constraints should
         // produce cells only at valid levels.
         let cap = Cap::from_center_angle(p(0.0, 0.0), crate::s1::Angle::from_degrees(10.0));
-        let rc = RegionCoverer::new().max_cells(50).min_level(3).max_level(8);
+        let rc = RegionCoverer::new()
+            .max_cells(50)
+            .min_level(Level::new(3))
+            .max_level(Level::new(8));
         let interior = rc.interior_covering(&cap);
 
         for &id in &interior {
@@ -922,7 +997,7 @@ mod tests {
         let center = p(37.7749, -122.4194);
         let cap = Cap::from_center_angle(center, crate::s1::Angle::from_degrees(0.5));
 
-        let rc = RegionCoverer::new().max_cells(20).max_level(15);
+        let rc = RegionCoverer::new().max_cells(20).max_level(Level::new(15));
         let covering1 = rc.covering(&cap);
         let covering2 = rc.covering(&cap);
         assert_eq!(covering1, covering2, "covering should be deterministic");
@@ -934,7 +1009,7 @@ mod tests {
         let center = p(0.0, 0.0);
         let cap = Cap::from_center_angle(center, crate::s1::Angle::from_degrees(5.0));
 
-        let rc = RegionCoverer::new().min_level(3).max_cells(100);
+        let rc = RegionCoverer::new().min_level(Level::new(3)).max_cells(100);
         let covering = rc.covering(&cap);
 
         for &id in &covering {
@@ -980,7 +1055,7 @@ mod tests {
             .collect();
         let polyline = Polyline::new(vertices);
 
-        let rc = RegionCoverer::new().max_cells(50).max_level(12);
+        let rc = RegionCoverer::new().max_cells(50).max_level(Level::new(12));
         let covering = rc.covering(&polyline);
         assert!(
             !covering.is_empty(),
@@ -1043,21 +1118,21 @@ mod tests {
 
     #[test]
     fn test_is_canonical_min_level() {
-        let rc = RegionCoverer::new().min_level(2);
+        let rc = RegionCoverer::new().min_level(Level::new(2));
         assert!(is_canonical(&["1/31"], &rc));
         assert!(!is_canonical(&["1/3"], &rc));
     }
 
     #[test]
     fn test_is_canonical_max_level() {
-        let rc = RegionCoverer::new().max_level(2);
+        let rc = RegionCoverer::new().max_level(Level::new(2));
         assert!(is_canonical(&["1/31"], &rc));
         assert!(!is_canonical(&["1/312"], &rc));
     }
 
     #[test]
     fn test_is_canonical_level_mod() {
-        let rc = RegionCoverer::new().level_mod(2);
+        let rc = RegionCoverer::new().level_mod(LevelMod::new(2));
         assert!(is_canonical(&["1/31"], &rc));
         assert!(!is_canonical(&["1/312"], &rc));
     }
@@ -1085,7 +1160,9 @@ mod tests {
             &rc
         ));
 
-        let rc2 = RegionCoverer::new().max_cells(20).level_mod(2);
+        let rc2 = RegionCoverer::new()
+            .max_cells(20)
+            .level_mod(LevelMod::new(2));
         assert!(is_canonical(
             &[
                 "1/1101", "1/1102", "1/1103", "1/1110", "1/1111", "1/1112", "1/1113", "1/1120",
@@ -1135,7 +1212,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_max_level_exceeded() {
-        let rc = RegionCoverer::new().max_level(2);
+        let rc = RegionCoverer::new().max_level(Level::new(2));
         test_canonicalize(
             &["0/3001", "0/3002", "4/012301230123"],
             &["0/30", "4/01"],
@@ -1145,7 +1222,9 @@ mod tests {
 
     #[test]
     fn test_canonicalize_wrong_level_mod() {
-        let rc = RegionCoverer::new().min_level(1).level_mod(3);
+        let rc = RegionCoverer::new()
+            .min_level(Level::new(1))
+            .level_mod(LevelMod::new(3));
         test_canonicalize(
             &["0/0", "1/11", "2/222", "3/3333"],
             &["0/0", "1/1", "2/2", "3/3333"],
@@ -1156,7 +1235,7 @@ mod tests {
     #[test]
     fn test_canonicalize_replaced_by_parent() {
         // 16 children should be replaced by their parent when level_mod == 2.
-        let rc = RegionCoverer::new().level_mod(2);
+        let rc = RegionCoverer::new().level_mod(LevelMod::new(2));
         test_canonicalize(
             &[
                 "0/00", "0/01", "0/02", "0/03", "0/10", "0/11", "0/12", "0/13", "0/20", "0/21",
@@ -1170,7 +1249,9 @@ mod tests {
     #[test]
     fn test_canonicalize_denormalized() {
         // All 4 children may be used when necessary to satisfy min_level/level_mod.
-        let rc = RegionCoverer::new().min_level(1).level_mod(2);
+        let rc = RegionCoverer::new()
+            .min_level(Level::new(1))
+            .level_mod(LevelMod::new(2));
         // Note: we skip the S2CellUnion variant test per C++ (denormalized input
         // changes when converted to S2CellUnion).
         let mut actual: Vec<CellId> = ["0/", "1/130", "1/131", "1/132", "1/133"]
@@ -1225,7 +1306,7 @@ mod tests {
             let center = p(37.0, -122.0);
             let cap = Cap::from_center_angle(center, Angle::from_degrees(0.5));
             let mut covering = Vec::new();
-            RegionCoverer::get_simple_covering(&cap, &center, level, &mut covering);
+            RegionCoverer::get_simple_covering(&cap, &center, Level::new(level), &mut covering);
             assert!(!covering.is_empty(), "covering at level {level} is empty");
 
             // All cells should be at the requested level.
@@ -1234,7 +1315,7 @@ mod tests {
             }
 
             // The covering should contain the center.
-            let center_id = CellId::from_point(&center).parent_at_level(level);
+            let center_id = CellId::from_point(&center).parent_at_level(Level::new(level));
             assert!(
                 covering.contains(&center_id),
                 "covering should contain the center cell"
@@ -1260,7 +1341,7 @@ mod tests {
         let cap = Cap::from_center_angle(center, Angle::from_degrees(2.0));
         let level = 8;
         let mut covering = Vec::new();
-        RegionCoverer::get_simple_covering(&cap, &center, level, &mut covering);
+        RegionCoverer::get_simple_covering(&cap, &center, Level::new(level), &mut covering);
 
         // Check a grid of points inside the cap.
         for dlat in -3..=3 {
@@ -1269,7 +1350,7 @@ mod tests {
                 if !cap.contains_point(pt) {
                     continue;
                 }
-                let pt_id = CellId::from_point(&pt).parent_at_level(level);
+                let pt_id = CellId::from_point(&pt).parent_at_level(Level::new(level));
                 assert!(
                     covering.contains(&pt_id),
                     "point ({}, {}) inside cap not covered",
@@ -1284,7 +1365,7 @@ mod tests {
     fn test_flood_fill_single_cell() {
         // Flood fill with a region that contains exactly one cell should
         // return just that cell.
-        let id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(10);
+        let id = CellId::from_point(&p(0.0, 0.0)).parent_at_level(Level::new(10));
         let cell = Cell::from(id);
         let mut output = Vec::new();
         RegionCoverer::flood_fill(&cell, id, &mut output);
@@ -1296,7 +1377,7 @@ mod tests {
         // Flood fill starting from any cell on face 0 with the full cap
         // should cover the entire face (and no more at that level).
         let level = 1u8;
-        let start = CellId::from_face(0).child_begin_at_level(level);
+        let start = CellId::from_face(Face::F0).child_begin_at_level(Level::new(level));
         let cap = Cap::full();
         let mut output = Vec::new();
         RegionCoverer::flood_fill(&cap, start, &mut output);
@@ -1315,7 +1396,7 @@ mod tests {
         let rc = RegionCoverer {
             min_level: Level::new(2),
             max_level: Level::new(10),
-            level_mod: 2,
+            level_mod: LevelMod::new(2),
             max_cells: 16,
         };
         let json = serde_json::to_string(&rc).unwrap();
@@ -1326,3 +1407,7 @@ mod tests {
         assert_eq!(rc.max_cells, back.max_cells);
     }
 }
+
+#[cfg(test)]
+#[path = "region_coverer_tests.rs"]
+mod region_coverer_tests;

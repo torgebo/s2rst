@@ -14,6 +14,7 @@
 #![allow(clippy::print_stdout, reason = "example binary")]
 
 use s2rst::s1::Angle;
+use s2rst::s2::Level;
 use s2rst::s2::encoding::{S2Decode, S2Encode};
 use s2rst::s2::lax_polygon::LaxPolygon;
 use s2rst::s2::shape_index::ShapeIndex;
@@ -32,7 +33,7 @@ fn main() {
     );
 
     // ── CellId ─────────────────────────────────────────────────────────
-    let cell_id = CellId::from_point(&p).parent_at_level(15);
+    let cell_id = CellId::from_point(&p).parent_at_level(Level::new(15));
     roundtrip("CellId", &cell_id);
     println!("  Token: {}\n", cell_id.to_token());
 

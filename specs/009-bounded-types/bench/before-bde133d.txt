@@ -1,0 +1,271 @@
+   Compiling s2rst v0.5.0 (/home/t/sources/s2rst_multi/3/core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 21.86s
+     Running benches/cell.rs (target/release/deps/cell-d55053d3df46f5d6)
+cell::cell_benchmarks::bench_cell_from_cell_id
+  Instructions:                                        232|N/A                  (*********)
+  L1 Hits:                                             257|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             28|N/A                  (*********)
+  Total read+write:                                    285|N/A                  (*********)
+  Estimated Cycles:                                   1237|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_from_point
+  Instructions:                                        412|N/A                  (*********)
+  L1 Hits:                                             436|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             59|N/A                  (*********)
+  Total read+write:                                    495|N/A                  (*********)
+  Estimated Cycles:                                   2501|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_vertex
+  Instructions:                                        172|N/A                  (*********)
+  L1 Hits:                                             194|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             25|N/A                  (*********)
+  Total read+write:                                    219|N/A                  (*********)
+  Estimated Cycles:                                   1069|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_children
+  Instructions:                                        279|N/A                  (*********)
+  L1 Hits:                                             328|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             30|N/A                  (*********)
+  Total read+write:                                    358|N/A                  (*********)
+  Estimated Cycles:                                   1378|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_contains_point
+  Instructions:                                         89|N/A                  (*********)
+  L1 Hits:                                              96|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             14|N/A                  (*********)
+  Total read+write:                                    110|N/A                  (*********)
+  Estimated Cycles:                                    586|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_cap_bound
+  Instructions:                                        276|N/A                  (*********)
+  L1 Hits:                                             291|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             36|N/A                  (*********)
+  Total read+write:                                    327|N/A                  (*********)
+  Estimated Cycles:                                   1551|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_rect_bound
+  Instructions:                                        941|N/A                  (*********)
+  L1 Hits:                                            1109|N/A                  (*********)
+  LL Hits:                                               2|N/A                  (*********)
+  RAM Hits:                                             76|N/A                  (*********)
+  Total read+write:                                   1187|N/A                  (*********)
+  Estimated Cycles:                                   3779|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_distance_to_point
+  Instructions:                                        157|N/A                  (*********)
+  L1 Hits:                                             165|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             23|N/A                  (*********)
+  Total read+write:                                    188|N/A                  (*********)
+  Estimated Cycles:                                    970|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_distance_to_edge
+  Instructions:                                       3970|N/A                  (*********)
+  L1 Hits:                                            4890|N/A                  (*********)
+  LL Hits:                                               7|N/A                  (*********)
+  RAM Hits:                                            105|N/A                  (*********)
+  Total read+write:                                   5002|N/A                  (*********)
+  Estimated Cycles:                                   8600|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_distance_to_cell
+  Instructions:                                        178|N/A                  (*********)
+  L1 Hits:                                             207|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             28|N/A                  (*********)
+  Total read+write:                                    235|N/A                  (*********)
+  Estimated Cycles:                                   1187|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_subdivide
+  Instructions:                                         12|N/A                  (*********)
+  L1 Hits:                                              18|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              2|N/A                  (*********)
+  Total read+write:                                     20|N/A                  (*********)
+  Estimated Cycles:                                     88|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_is_distance_less
+  Instructions:                                    5648833|N/A                  (*********)
+  L1 Hits:                                         7613721|N/A                  (*********)
+  LL Hits:                                             914|N/A                  (*********)
+  RAM Hits:                                            542|N/A                  (*********)
+  Total read+write:                                7615177|N/A                  (*********)
+  Estimated Cycles:                                7637261|N/A                  (*********)
+cell::cell_benchmarks::bench_cell_distance_same_face
+  Instructions:                                        182|N/A                  (*********)
+  L1 Hits:                                             210|N/A                  (*********)
+  LL Hits:                                               1|N/A                  (*********)
+  RAM Hits:                                             30|N/A                  (*********)
+  Total read+write:                                    241|N/A                  (*********)
+  Estimated Cycles:                                   1265|N/A                  (*********)
+
+Gungraun result: Ok. 13 without regressions; 0 regressed; 0 filtered; 13 benchmarks finished in 4.13500s
+     Running benches/cell_id.rs (target/release/deps/cell_id-edecb06830497683)
+cell_id::cellid_benchmarks::bench_cellid_from_point
+  Instructions:                                        213|N/A                  (*********)
+  L1 Hits:                                             218|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             33|N/A                  (*********)
+  Total read+write:                                    251|N/A                  (*********)
+  Estimated Cycles:                                   1373|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_to_point
+  Instructions:                                        225|N/A                  (*********)
+  L1 Hits:                                             241|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             26|N/A                  (*********)
+  Total read+write:                                    267|N/A                  (*********)
+  Estimated Cycles:                                   1151|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_to_point_raw
+  Instructions:                                        202|N/A                  (*********)
+  L1 Hits:                                             219|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             24|N/A                  (*********)
+  Total read+write:                                    243|N/A                  (*********)
+  Estimated Cycles:                                   1059|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_from_lat_lng
+  Instructions:                                        466|N/A                  (*********)
+  L1 Hits:                                             532|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             61|N/A                  (*********)
+  Total read+write:                                    593|N/A                  (*********)
+  Estimated Cycles:                                   2667|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_from_face_ij
+  Instructions:                                        126|N/A                  (*********)
+  L1 Hits:                                             133|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             12|N/A                  (*********)
+  Total read+write:                                    145|N/A                  (*********)
+  Estimated Cycles:                                    553|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_level
+  Instructions:                                         16|N/A                  (*********)
+  L1 Hits:                                              19|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              2|N/A                  (*********)
+  Total read+write:                                     21|N/A                  (*********)
+  Estimated Cycles:                                     89|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_parent
+  Instructions:                                         16|N/A                  (*********)
+  L1 Hits:                                              20|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              1|N/A                  (*********)
+  Total read+write:                                     21|N/A                  (*********)
+  Estimated Cycles:                                     55|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_parent_at_level
+  Instructions:                                         11|N/A                  (*********)
+  L1 Hits:                                              15|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              1|N/A                  (*********)
+  Total read+write:                                     16|N/A                  (*********)
+  Estimated Cycles:                                     50|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_child_position
+  Instructions:                                         10|N/A                  (*********)
+  L1 Hits:                                              15|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              0|N/A                  (*********)
+  Total read+write:                                     15|N/A                  (*********)
+  Estimated Cycles:                                     15|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_children
+  Instructions:                                         21|N/A                  (*********)
+  L1 Hits:                                              27|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              1|N/A                  (*********)
+  Total read+write:                                     28|N/A                  (*********)
+  Estimated Cycles:                                     62|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_all_neighbors
+  Instructions:                                       2365|N/A                  (*********)
+  L1 Hits:                                            2790|N/A                  (*********)
+  LL Hits:                                               6|N/A                  (*********)
+  RAM Hits:                                             73|N/A                  (*********)
+  Total read+write:                                   2869|N/A                  (*********)
+  Estimated Cycles:                                   5375|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_advance
+  Instructions:                                         30|N/A                  (*********)
+  L1 Hits:                                              33|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              2|N/A                  (*********)
+  Total read+write:                                     35|N/A                  (*********)
+  Estimated Cycles:                                    103|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_contains
+  Instructions:                                         23|N/A                  (*********)
+  L1 Hits:                                              28|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              2|N/A                  (*********)
+  Total read+write:                                     30|N/A                  (*********)
+  Estimated Cycles:                                     98|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_edge_neighbors
+  Instructions:                                        896|N/A                  (*********)
+  L1 Hits:                                             972|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                             59|N/A                  (*********)
+  Total read+write:                                   1031|N/A                  (*********)
+  Estimated Cycles:                                   3037|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_to_token
+  Instructions:                                        840|N/A                  (*********)
+  L1 Hits:                                            1091|N/A                  (*********)
+  LL Hits:                                               2|N/A                  (*********)
+  RAM Hits:                                             41|N/A                  (*********)
+  Total read+write:                                   1134|N/A                  (*********)
+  Estimated Cycles:                                   2536|N/A                  (*********)
+cell_id::cellid_benchmarks::bench_cellid_from_token
+  Instructions:                                        133|N/A                  (*********)
+  L1 Hits:                                             144|N/A                  (*********)
+  LL Hits:                                               0|N/A                  (*********)
+  RAM Hits:                                              3|N/A                  (*********)
+  Total read+write:                                    147|N/A                  (*********)
+  Estimated Cycles:                                    249|N/A                  (*********)
+
+Gungraun result: Ok. 16 without regressions; 0 regressed; 0 filtered; 16 benchmarks finished in 4.83020s
+     Running benches/region_coverer.rs (target/release/deps/region_coverer-161cfaecd274f00b)
+region_coverer::region_coverer_benchmarks::bench_covering_cap
+  Instructions:                                      80902|81693                (-0.96826%) [-1.00978x]
+  L1 Hits:                                          106025|106631               (-0.56832%) [-1.00572x]
+  LL Hits:                                              21|21                   (No change)
+  RAM Hits:                                            409|406                  (+0.73892%) [+1.00739x]
+  Total read+write:                                 106455|107058               (-0.56325%) [-1.00566x]
+  Estimated Cycles:                                 120445|120946               (-0.41423%) [-1.00416x]
+region_coverer::region_coverer_benchmarks::bench_covering_cell
+  Instructions:                                       1852|1852                 (No change)
+  L1 Hits:                                            2692|2696                 (-0.14837%) [-1.00149x]
+  LL Hits:                                               5|4                    (+25.0000%) [+1.25000x]
+  RAM Hits:                                             79|76                   (+3.94737%) [+1.03947x]
+  Total read+write:                                   2776|2776                 (No change)
+  Estimated Cycles:                                   5482|5376                 (+1.97173%) [+1.01972x]
+region_coverer::region_coverer_benchmarks::bench_covering_loop
+  Instructions:                                    2716119|2716126              (-0.00026%) [-1.00000x]
+  L1 Hits:                                         3765234|3766178              (-0.02507%) [-1.00025x]
+  LL Hits:                                            8082|7139                 (+13.2091%) [+1.13209x]
+  RAM Hits:                                            957|963                  (-0.62305%) [-1.00627x]
+  Total read+write:                                3774273|3774280              (-0.00019%) [-1.00000x]
+  Estimated Cycles:                                3839139|3835578              (+0.09284%) [+1.00093x]
+region_coverer::region_coverer_benchmarks::bench_covering_cap_fine
+  Instructions:                                      67487|68122                (-0.93215%) [-1.00941x]
+  L1 Hits:                                           88584|89064                (-0.53894%) [-1.00542x]
+  LL Hits:                                              18|21                   (-14.2857%) [-1.16667x]
+  RAM Hits:                                            403|406                  (-0.73892%) [-1.00744x]
+  Total read+write:                                  89005|89491                (-0.54307%) [-1.00546x]
+  Estimated Cycles:                                 102779|103379               (-0.58039%) [-1.00584x]
+region_coverer::covering_cell_union::bench_covering_cell_union_4
+  Instructions:                                     129190|129113               (+0.05964%) [+1.00060x]
+  L1 Hits:                                          173314|173242               (+0.04156%) [+1.00042x]
+  LL Hits:                                              18|13                   (+38.4615%) [+1.38462x]
+  RAM Hits:                                            316|316                  (No change)
+  Total read+write:                                 173648|173571               (+0.04436%) [+1.00044x]
+  Estimated Cycles:                                 184464|184367               (+0.05261%) [+1.00053x]
+region_coverer::covering_cell_union::bench_covering_cell_union_64
+  Instructions:                                     131887|130730               (+0.88503%) [+1.00885x]
+  L1 Hits:                                          164591|163442               (+0.70300%) [+1.00703x]
+  LL Hits:                                              29|25                   (+16.0000%) [+1.16000x]
+  RAM Hits:                                            499|495                  (+0.80808%) [+1.00808x]
+  Total read+write:                                 165119|163962               (+0.70565%) [+1.00706x]
+  Estimated Cycles:                                 182201|180892               (+0.72364%) [+1.00724x]
+region_coverer::covering_loop_scaling::bench_covering_loop_32_vertices
+  Instructions:                                     193092|193090               (+0.00104%) [+1.00001x]
+  L1 Hits:                                          264947|264945               (+0.00075%) [+1.00001x]
+  LL Hits:                                              93|94                   (-1.06383%) [-1.01075x]
+  RAM Hits:                                            856|855                  (+0.11696%) [+1.00117x]
+  Total read+write:                                 265896|265894               (+0.00075%) [+1.00001x]
+  Estimated Cycles:                                 295372|295340               (+0.01083%) [+1.00011x]
+region_coverer::covering_loop_scaling::bench_covering_loop_256_vertices
+  Instructions:                                     913322|913320               (+0.00022%) [+1.00000x]
+  L1 Hits:                                         1253365|1253446              (-0.00646%) [-1.00006x]
+  LL Hits:                                            1759|1676                 (+4.95227%) [+1.04952x]
+  RAM Hits:                                           2315|2315                 (No change)
+  Total read+write:                                1257439|1257437              (+0.00016%) [+1.00000x]
+  Estimated Cycles:                                1343185|1342851              (+0.02487%) [+1.00025x]
+
+Gungraun result: Ok. 8 without regressions; 0 regressed; 0 filtered; 8 benchmarks finished in 2.82550s
+exit=0

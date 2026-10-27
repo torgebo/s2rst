@@ -252,7 +252,8 @@ impl PaddedCell {
             return self.id;
         }
 
-        from_face_ij(self.id.face(), i_min, j_min).parent_at_level(level as u8)
+        // `level` is above the cell's own and below 30, by construction.
+        from_face_ij(self.id.face(), i_min, j_min).parent_at_level(Level::new(level as u8))
     }
 }
 
@@ -261,10 +262,11 @@ impl PaddedCell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
 
     #[test]
     fn test_padded_cell_face() {
-        let id = CellId::from_face(3);
+        let id = CellId::from_face(Face::F3);
         let pc = PaddedCell::from_cell_id(id, 0.5);
         assert_eq!(pc.cell_id(), id);
         assert_eq!(pc.level(), 0);
@@ -278,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_center() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let pc = PaddedCell::from_cell_id(id, 0.0);
         let center = pc.center();
         // Face 0 center is (1, 0, 0).
@@ -289,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_middle() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let mut pc = PaddedCell::from_cell_id(id, 0.25);
         let mid = pc.middle();
         // For a face cell with padding 0.25, middle should be [-0.25, 0.25]^2.
@@ -299,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_from_parent() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let mut parent = PaddedCell::from_cell_id(id, 0.0);
         let child = PaddedCell::from_parent_ij(&mut parent, 0, 0);
         assert_eq!(child.level(), 1);
@@ -310,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_child_ij() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let pc = PaddedCell::from_cell_id(id, 0.0);
         // All 4 positions should give valid (i,j) in {0,1}.
         for pos in 0..4 {
@@ -322,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_entry_exit_vertex() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let pc = PaddedCell::from_cell_id(id, 0.0);
         let entry = pc.entry_vertex();
         let exit = pc.exit_vertex();
@@ -335,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_shrink_to_fit_full_rect() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let mut pc = PaddedCell::from_cell_id(id, 0.0);
         // A rect that contains the center should return the cell itself.
         let rect = r2::Rect::new(r1::Interval::new(-0.5, 0.5), r1::Interval::new(-0.5, 0.5));
@@ -344,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_padded_cell_shrink_to_fit_corner() {
-        let id = CellId::from_face(0);
+        let id = CellId::from_face(Face::F0);
         let mut pc = PaddedCell::from_cell_id(id, 0.0);
         // A rect in the corner should shrink to a child.
         let rect = r2::Rect::new(r1::Interval::new(0.5, 0.9), r1::Interval::new(0.5, 0.9));

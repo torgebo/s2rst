@@ -421,11 +421,11 @@ impl Ord for QueueEntry {
 /// ```
 /// use s2rst::s2::closest_cell_query::{ClosestCellQuery, Options, PointTarget};
 /// use s2rst::s2::cell_index::CellIndex;
-/// use s2rst::s2::{CellId, LatLng};
+/// use s2rst::s2::{CellId, LatLng, Level};
 ///
 /// let mut index = CellIndex::new();
 /// let id = CellId::from_point(&LatLng::from_degrees(0.0, 0.0).to_point())
-///     .parent_at_level(10);
+///     .parent_at_level(Level::new(10));
 /// index.add(id, 42);
 /// index.build();
 ///
@@ -906,6 +906,7 @@ fn intersect_sorted(a: &[CellId], b: &[CellId]) -> Vec<CellId> {
 )]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::LatLng;
 
     fn make_index(cells: &[(CellId, i32)]) -> CellIndex {
@@ -929,7 +930,7 @@ mod tests {
     #[test]
     fn test_single_cell() {
         let p = LatLng::from_degrees(0.0, 0.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(10);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(10));
         let index = make_index(&[(cell_id, 0)]);
         let query = ClosestCellQuery::new(&index, Options::default());
         let mut target = PointTarget::new(p);
@@ -944,8 +945,8 @@ mod tests {
     fn test_max_distance() {
         let p1 = LatLng::from_degrees(0.0, 0.0).to_point();
         let p2 = LatLng::from_degrees(10.0, 0.0).to_point();
-        let cell1 = CellId::from_point(&p1).parent_at_level(10);
-        let cell2 = CellId::from_point(&p2).parent_at_level(10);
+        let cell1 = CellId::from_point(&p1).parent_at_level(Level::new(10));
+        let cell2 = CellId::from_point(&p2).parent_at_level(Level::new(10));
         let index = make_index(&[(cell1, 0), (cell2, 1)]);
         let mut opts = Options::default();
         opts.max_distance = ChordAngle::from_angle(crate::s1::Angle::from_degrees(5.0));
@@ -961,7 +962,7 @@ mod tests {
         let mut cells = Vec::new();
         for i in 0..20 {
             let p = LatLng::from_degrees(f64::from(i) * 0.5, 0.0).to_point();
-            cells.push((CellId::from_point(&p).parent_at_level(10), i));
+            cells.push((CellId::from_point(&p).parent_at_level(Level::new(10)), i));
         }
         let index = make_index(&cells);
         let mut opts = Options::default();
@@ -978,7 +979,7 @@ mod tests {
     #[test]
     fn test_get_distance() {
         let p = LatLng::from_degrees(1.0, 0.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(15);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(15));
         let index = make_index(&[(cell_id, 0)]);
         let query = ClosestCellQuery::new(&index, Options::default());
         let mut target = PointTarget::new(LatLng::from_degrees(2.0, 0.0).to_point());
@@ -990,7 +991,7 @@ mod tests {
     #[test]
     fn test_is_distance_less() {
         let p = LatLng::from_degrees(0.0, 0.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(10);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(10));
         let index = make_index(&[(cell_id, 0)]);
         let query = ClosestCellQuery::new(&index, Options::default());
         let mut target = PointTarget::new(LatLng::from_degrees(1.0, 0.0).to_point());
@@ -1007,7 +1008,7 @@ mod tests {
     #[test]
     fn test_edge_target() {
         let p = LatLng::from_degrees(0.0, 1.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(10);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(10));
         let index = make_index(&[(cell_id, 0)]);
         let query = ClosestCellQuery::new(&index, Options::default());
         let a = LatLng::from_degrees(0.0, 0.0).to_point();
@@ -1020,10 +1021,10 @@ mod tests {
     #[test]
     fn test_cell_target() {
         let p = LatLng::from_degrees(0.0, 0.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(10);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(10));
         let index = make_index(&[(cell_id, 0)]);
         let query = ClosestCellQuery::new(&index, Options::default());
-        let target_cell = Cell::from(CellId::from_point(&p).parent_at_level(5));
+        let target_cell = Cell::from(CellId::from_point(&p).parent_at_level(Level::new(5)));
         let mut target = CellTarget::new(target_cell);
         let dist = query.get_distance(&mut target);
         // Cell at level 10 is inside cell at level 5 → distance 0.
@@ -1033,7 +1034,7 @@ mod tests {
     #[test]
     fn test_multiple_labels_same_cell() {
         let p = LatLng::from_degrees(0.0, 0.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(10);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(10));
         let index = make_index(&[(cell_id, 0), (cell_id, 1), (cell_id, 2)]);
         let query = ClosestCellQuery::new(&index, Options::default());
         let mut target = PointTarget::new(p);
@@ -1047,7 +1048,7 @@ mod tests {
         for i in 0..50 {
             let lat = -25.0 + f64::from(i);
             let p = LatLng::from_degrees(lat, 0.0).to_point();
-            cells.push((CellId::from_point(&p).parent_at_level(10), i));
+            cells.push((CellId::from_point(&p).parent_at_level(Level::new(10)), i));
         }
         let index = make_index(&cells);
         let target_point = LatLng::from_degrees(0.0, 0.0).to_point();
@@ -1135,7 +1136,7 @@ mod tests {
     #[test]
     fn test_target_point_inside_indexed_cell() {
         // C++ TargetPointInsideIndexedCell.
-        let cell_id = CellId::from_face(4).children()[0].children()[1].children()[2];
+        let cell_id = CellId::from_face(Face::F4).children()[0].children()[1].children()[2];
         let index = make_index(&[(cell_id, 1)]);
         let query = ClosestCellQuery::new(&index, Options::default());
         let mut target = PointTarget::new(cell_id.to_point());
@@ -1167,12 +1168,12 @@ mod tests {
         // Create a CellIndex with one cell near (0,0) and one near (10,0).
         let p1 = LatLng::from_degrees(0.0, 0.0).to_point();
         let p2 = LatLng::from_degrees(10.0, 0.0).to_point();
-        let cell1 = CellId::from_point(&p1).parent_at_level(10);
-        let cell2 = CellId::from_point(&p2).parent_at_level(10);
+        let cell1 = CellId::from_point(&p1).parent_at_level(Level::new(10));
+        let cell2 = CellId::from_point(&p2).parent_at_level(Level::new(10));
         let index = make_index(&[(cell1, 0), (cell2, 1)]);
 
         // Create a CellUnion target near (0,0).
-        let target_cell = CellId::from_point(&p1).parent_at_level(5);
+        let target_cell = CellId::from_point(&p1).parent_at_level(Level::new(5));
         let cu = crate::s2::cell_union::CellUnion::from_cell_ids(vec![target_cell]);
         let mut target = CellUnionTarget::new(cu);
 
@@ -1189,12 +1190,12 @@ mod tests {
     fn test_cell_union_target_max_distance() {
         let p1 = LatLng::from_degrees(0.0, 0.0).to_point();
         let p2 = LatLng::from_degrees(20.0, 0.0).to_point();
-        let cell1 = CellId::from_point(&p1).parent_at_level(10);
-        let cell2 = CellId::from_point(&p2).parent_at_level(10);
+        let cell1 = CellId::from_point(&p1).parent_at_level(Level::new(10));
+        let cell2 = CellId::from_point(&p2).parent_at_level(Level::new(10));
         let index = make_index(&[(cell1, 0), (cell2, 1)]);
 
         // CellUnion near (0,0), max_distance < distance to cell2.
-        let target_cell = CellId::from_point(&p1).parent_at_level(5);
+        let target_cell = CellId::from_point(&p1).parent_at_level(Level::new(5));
         let cu = crate::s2::cell_union::CellUnion::from_cell_ids(vec![target_cell]);
         let mut target = CellUnionTarget::new(cu);
         let mut opts = Options::default();
@@ -1211,7 +1212,7 @@ mod tests {
         let mut cells = Vec::new();
         for i in 0..10 {
             let p = LatLng::from_degrees(f64::from(i) * 2.0, 0.0).to_point();
-            cells.push((CellId::from_point(&p).parent_at_level(10), i));
+            cells.push((CellId::from_point(&p).parent_at_level(Level::new(10)), i));
         }
         let index = make_index(&cells);
 
@@ -1239,7 +1240,7 @@ mod tests {
         //
         // Use a very small cell so the cell center ≈ cell boundary.
         let p = LatLng::from_degrees(5.0, 5.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(28);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(28));
         let index = make_index(&[(cell_id, 42)]);
 
         // Polygon that contains (5,5).
@@ -1272,7 +1273,7 @@ mod tests {
         let mut cells = Vec::new();
         for i in 0..10 {
             let p = LatLng::from_degrees(f64::from(i) * 5.0, 0.0).to_point();
-            cells.push((CellId::from_point(&p).parent_at_level(10), i));
+            cells.push((CellId::from_point(&p).parent_at_level(Level::new(10)), i));
         }
         let index = make_index(&cells);
 
@@ -1310,7 +1311,7 @@ mod tests {
     fn test_region_filter_empty() {
         // Region that doesn't intersect any indexed cells → empty results.
         let p = LatLng::from_degrees(0.0, 0.0).to_point();
-        let cell_id = CellId::from_point(&p).parent_at_level(10);
+        let cell_id = CellId::from_point(&p).parent_at_level(Level::new(10));
         let index = make_index(&[(cell_id, 0)]);
 
         let far_center = LatLng::from_degrees(80.0, 0.0).to_point();
@@ -1330,7 +1331,7 @@ mod tests {
     fn test_serde_result_roundtrip() {
         let r = Result {
             distance: ChordAngle::from_degrees(10.0),
-            cell_id: CellId::from_face(crate::s2::coords::Face::F0),
+            cell_id: CellId::from_face(Face::F0),
             label: 42,
         };
         let json = serde_json::to_string(&r).unwrap();

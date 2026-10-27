@@ -1,0 +1,17 @@
+Mutant: M-809
+Targets: C-Face::try_from
+Expect-Fail: crash::c_face_try_from
+Defect: Face::try_from accepts 6, one past the last face
+
+diff --git a/core/src/s2/coords.rs b/core/src/s2/coords.rs
+--- a/core/src/s2/coords.rs
++++ b/core/src/s2/coords.rs
+@@ -394,7 +394,7 @@
+     #[inline]
+     fn try_from(v: i64) -> Result<Face, OutOfRange> {
+         match usize::try_from(v) {
+-            Ok(i) if i < Face::ALL.len() => Ok(Face::ALL[i]),
++            Ok(i) if i <= Face::ALL.len() => Ok(Face::ALL[i % 6]),
+             _ => Err(OutOfRange::new(BoundedKind::Face, v)),
+         }
+     }

@@ -4,15 +4,14 @@ Expect-Fail: cu_range::p_urange_04
 Defect: whole_sphere() builds five faces
 
 diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
-index 4669eb0..21f134f 100644
 --- a/core/src/s2/cell_union.rs
 +++ b/core/src/s2/cell_union.rs
-@@ -282,7 +282,7 @@ impl CellUnion {
+@@ -296,7 +296,7 @@
  
      /// Creates a cell union covering the entire sphere (all 6 face cells).
      pub fn whole_sphere() -> Self {
--        CellUnion::from_cell_ids((0..6).map(CellId::from_face).collect())
-+        CellUnion::from_cell_ids((0..5).map(CellId::from_face).collect())
+-        CellUnion::from_cell_ids(Face::ALL.into_iter().map(CellId::from_face).collect())
++        CellUnion::from_cell_ids(Face::ALL.into_iter().take(5).map(CellId::from_face).collect())
      }
  
      /// Creates a cell union from a closed range of leaf cells `[min_id, max_id]`.

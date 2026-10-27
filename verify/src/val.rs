@@ -6,7 +6,7 @@
 //! model `spec`. Each harness's doc gives its kind and plain-language statement first
 //! (`verify/PROPERTIES_BY_KIND.md`), then the exact statement.
 
-use s2rst::s2::{CellId, lsb_for_level, size_ij};
+use s2rst::s2::{CellId, Face, lsb_for_level, size_ij};
 
 use crate::domain::{any_decomposed, any_face, any_level, any_u64, any_valid};
 use crate::spec::{self, Decomposed};
@@ -129,7 +129,7 @@ fn p_val_08() {
 fn p_val_09() {
     let f = any_face();
     assert_eq!(
-        CellId::from_face(f).0,
+        CellId::from_face(Face::from_u8(f)).0,
         spec::compose(Decomposed {
             face: f,
             level: 0,
@@ -156,7 +156,10 @@ fn p_val_10() {
         path: pos >> 1,
     };
     let want = spec::compose(spec::ancestor(leaf, l.as_u8()));
-    assert_eq!(CellId::from_face_pos_level(f, pos, l).0, want);
+    assert_eq!(
+        CellId::from_face_pos_level(Face::from_u8(f), pos, l).0,
+        want
+    );
     kani::cover!(l.as_u8() == 0, "face");
     kani::cover!(
         l.as_u8() == 30 && pos & 1 == 0,

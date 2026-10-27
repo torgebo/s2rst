@@ -10,6 +10,8 @@
 use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
+use s2rst::s2::Face;
+use s2rst::s2::Level;
 use s2rst::s2::{CellId, CellUnion, LatLng};
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -21,7 +23,7 @@ fn make_cell_ids(n: usize, level: u8) -> Vec<CellId> {
             let t = i as f64 / n as f64;
             let lat = -60.0 + 120.0 * t;
             let lng = -160.0 + 320.0 * ((i * 137) % n) as f64 / n as f64;
-            CellId::from_lat_lng(&LatLng::from_degrees(lat, lng)).parent_at_level(level)
+            CellId::from_lat_lng(&LatLng::from_degrees(lat, lng)).parent_at_level(Level::new(level))
         })
         .collect()
 }
@@ -65,14 +67,16 @@ fn normalize_1000() {
 #[library_benchmark]
 fn contains_cell_id_100() -> bool {
     let cu = CellUnion::from_cell_ids(make_cell_ids(100, 15));
-    let target = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(20);
+    let target =
+        CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(Level::new(20));
     black_box(black_box(cu).contains_cell_id(black_box(target)))
 }
 
 #[library_benchmark]
 fn contains_cell_id_1000() -> bool {
     let cu = CellUnion::from_cell_ids(make_cell_ids(1000, 15));
-    let target = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(20);
+    let target =
+        CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(Level::new(20));
     black_box(black_box(cu).contains_cell_id(black_box(target)))
 }
 
@@ -88,7 +92,8 @@ fn contains_point_1000() -> bool {
 #[library_benchmark]
 fn intersects_cell_id_1000() -> bool {
     let cu = CellUnion::from_cell_ids(make_cell_ids(1000, 15));
-    let target = CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(10);
+    let target =
+        CellId::from_lat_lng(&LatLng::from_degrees(0.0, 0.0)).parent_at_level(Level::new(10));
     black_box(black_box(cu).intersects_cell_id(black_box(target)))
 }
 
@@ -118,15 +123,15 @@ fn leaf_cells_covered_1000() -> i64 {
 
 #[library_benchmark]
 fn from_range_full_sphere() -> CellUnion {
-    let begin = CellId::from_face(0).child_begin_at_level(30);
-    let end = CellId::from_face(5).child_end_at_level(30);
+    let begin = CellId::from_face(Face::F0).child_begin_at_level(Level::new(30));
+    let end = CellId::from_face(Face::F5).child_end_at_level(Level::new(30));
     black_box(CellUnion::from_begin_end(begin, end))
 }
 
 #[library_benchmark]
 fn from_range_single_face() -> CellUnion {
-    let begin = CellId::from_face(2).child_begin_at_level(30);
-    let end = CellId::from_face(2).child_end_at_level(30);
+    let begin = CellId::from_face(Face::F2).child_begin_at_level(Level::new(30));
+    let end = CellId::from_face(Face::F2).child_end_at_level(Level::new(30));
     black_box(CellUnion::from_begin_end(begin, end))
 }
 

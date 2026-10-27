@@ -24,7 +24,7 @@
 )]
 
 use s2rst::s1::{Angle, ChordAngle};
-use s2rst::s2::{Cap, Cell, CellId, Region};
+use s2rst::s2::{Cap, Cell, CellId, Face, Region};
 
 use crate::stubs;
 use crate::value_domain::{any_box_cap, any_box_point, any_finite_nonneg_angle};
@@ -182,7 +182,7 @@ fn c_add_cap() {
 fn c_cell_tests__vertices() {
     stubs::draw_abstract_cell();
     let a = any_box_cap();
-    let cell = Cell::from_cell_id(CellId::from_face(0));
+    let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
     let _ = (a.contains_cell(&cell), a.intersects_cell(&cell));
     kani::cover!(a.intersects_cell(&cell), "an intersecting cell");
 }
@@ -201,7 +201,7 @@ fn c_cell_tests__vertices() {
 fn c_cell_tests__edges_contains() {
     stubs::draw_abstract_cell();
     let a = any_box_cap();
-    let r = a.contains_cell(&Cell::from_cell_id(CellId::from_face(0)));
+    let r = a.contains_cell(&Cell::from_cell_id(CellId::from_face(Face::F0)));
     kani::cover!(r, "a contained cell");
     kani::cover!(!r, "a cell not contained");
 }
@@ -218,7 +218,7 @@ fn c_cell_tests__edges_contains() {
 fn c_cell_tests__edges_intersects() {
     stubs::draw_abstract_cell();
     let a = any_box_cap();
-    let r = a.intersects_cell(&Cell::from_cell_id(CellId::from_face(0)));
+    let r = a.intersects_cell(&Cell::from_cell_id(CellId::from_face(Face::F0)));
     kani::cover!(r, "an intersecting cell");
     kani::cover!(!r, "a disjoint cell");
 }

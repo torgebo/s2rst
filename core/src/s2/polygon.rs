@@ -15,6 +15,7 @@
 //! Corresponds to C++ `s2polygon.h`, Go `s2/polygon.go`.
 
 use crate::s1::Angle;
+use crate::s2::CellVertex;
 use crate::s2::boolean_operation::{self, OpType, S2BooleanOperation};
 use crate::s2::builder::polygon_layer::S2PolygonLayer;
 use crate::s2::builder::snap::{IdentitySnapFunction, SnapFunction};
@@ -713,7 +714,7 @@ impl Polygon {
     /// given level, with edge-chain topology preserved.
     ///
     /// Corresponds to C++ `S2Polygon::InitToSnapped(polygon, snap_level)`.
-    pub fn snapped(polygon: &Polygon, snap_level: impl Into<Level>) -> Polygon {
+    pub fn snapped(polygon: &Polygon, snap_level: Level) -> Polygon {
         use crate::s2::builder::Options;
         use crate::s2::builder::snap::S2CellIdSnapFunction;
         let snap_fn = S2CellIdSnapFunction::new(snap_level);
@@ -1531,7 +1532,9 @@ impl Region for Polygon {
     }
 
     fn contains_cell(&self, cell: &Cell) -> bool {
-        (0..4).all(|i| self.contains_point(&cell.vertex(i)))
+        CellVertex::ALL
+            .into_iter()
+            .all(|v| self.contains_point(&cell.vertex(v)))
     }
 
     fn intersects_cell(&self, cell: &Cell) -> bool {
@@ -1539,8 +1542,8 @@ impl Region for Polygon {
             return false;
         }
         // Check if any cell vertex is inside the polygon.
-        for i in 0..4 {
-            if self.contains_point(&cell.vertex(i)) {
+        for &v in &CellVertex::ALL {
+            if self.contains_point(&cell.vertex(v)) {
                 return true;
             }
         }
@@ -1553,7 +1556,7 @@ impl Region for Polygon {
             }
         }
         // Check if any polygon edge crosses any cell edge.
-        let cell_vertices: [Point; 4] = std::array::from_fn(|i| cell.vertex(i));
+        let cell_vertices: [Point; 4] = CellVertex::ALL.map(|v| cell.vertex(v));
         for l in &self.loops {
             for i in 0..l.num_vertices() {
                 let a = l.vertex(i);
@@ -1707,6 +1710,7 @@ impl Default for Polygon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
     use crate::s2::LatLng;
 
     fn p(lat: f64, lng: f64) -> Point {
@@ -1769,7 +1773,7 @@ mod tests {
 
     #[test]
     fn test_from_cell() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let poly = Polygon::from_cell(&cell);
         assert_eq!(poly.num_loops(), 1);
         assert_eq!(poly.num_edges(), 4);
@@ -2228,7 +2232,7 @@ mod tests {
 
         // A small cell deep inside should be contained.
         let center_pt = p(0.0, 0.0);
-        let center_cell_id = CellId::from_point(&center_pt).parent_at_level(16);
+        let center_cell_id = CellId::from_point(&center_pt).parent_at_level(Level::new(16));
         let center_cell = Cell::from_cell_id(center_cell_id);
         assert!(
             poly.contains_cell(&center_cell),
@@ -2246,7 +2250,7 @@ mod tests {
 
         // A cell far outside should not be contained or intersected.
         let outside_pt = p(80.0, 80.0);
-        let outside_cell_id = CellId::from_point(&outside_pt).parent_at_level(16);
+        let outside_cell_id = CellId::from_point(&outside_pt).parent_at_level(Level::new(16));
         let outside_cell = Cell::from_cell_id(outside_cell_id);
         assert!(
             !poly.contains_cell(&outside_cell),
@@ -2259,7 +2263,7 @@ mod tests {
 
         // A large cell near the boundary should intersect but not be fully contained.
         let boundary_pt = p(20.0, 0.0);
-        let boundary_cell_id = CellId::from_point(&boundary_pt).parent_at_level(5);
+        let boundary_cell_id = CellId::from_point(&boundary_pt).parent_at_level(Level::new(5));
         let boundary_cell = Cell::from_cell_id(boundary_cell_id);
         assert!(
             poly.intersects_cell(&boundary_cell),
@@ -2735,7 +2739,7 @@ mod tests {
     fn test_get_snap_level_snapped() {
         // Create a polygon whose vertices are all cell centers at the same level.
         let level = Level::new(10);
-        let id = CellId::from_face_pos_level(0, 0, level);
+        let id = CellId::from_face_pos_level(Face::F0, 0, level);
         // Use the 4 children as vertices (they're cell centers at level+1).
         let child_level = level + 1;
         let v0 = id.child_begin_at_level(child_level).to_point();
@@ -2935,7 +2939,7 @@ mod tests {
             p(0.0, 10.0),
             p(10.0, 5.0),
         ])]);
-        let snapped = Polygon::snapped(&input, 10);
+        let snapped = Polygon::snapped(&input, Level::new(10));
         // The snapped polygon should be non-empty and have ~3 vertices
         // (possibly more due to edge splitting).
         assert!(
@@ -2952,7 +2956,7 @@ mod tests {
             for j in 0..lp.num_vertices() {
                 let v = lp.vertex(j);
                 let cell_id = CellId::from_point(&v);
-                let center = cell_id.parent_at_level(10).to_point();
+                let center = cell_id.parent_at_level(Level::new(10)).to_point();
                 let dist = v.chord_angle(center);
                 assert!(
                     dist.to_angle().radians() < 1e-10,
@@ -2966,7 +2970,7 @@ mod tests {
     #[test]
     fn test_snapped_empty() {
         let input = Polygon::empty();
-        let snapped = Polygon::snapped(&input, 10);
+        let snapped = Polygon::snapped(&input, Level::new(10));
         assert!(snapped.is_empty_polygon());
     }
 
@@ -2981,7 +2985,7 @@ mod tests {
             vertices.push(p(lat, lng));
         }
         let input = Polygon::from_loops(vec![Loop::new(vertices)]);
-        let snap_fn = S2CellIdSnapFunction::new(15);
+        let snap_fn = S2CellIdSnapFunction::new(Level::new(15));
         let simplified = Polygon::simplified(&input, Box::new(snap_fn));
         // Simplified polygon should exist and have fewer or equal vertices.
         assert!(simplified.num_loops() > 0);

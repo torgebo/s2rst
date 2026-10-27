@@ -26,7 +26,8 @@
     clippy::cast_possible_wrap,
     reason = "usize -> i32 for cell index — always in range"
 )]
-use crate::s2::coords::MAX_CELL_LEVEL;
+use crate::s2::Face;
+use crate::s2::coords::Level;
 use crate::s2::{CellId, CellUnion};
 
 /// Special label indicating the contents iterator is done.
@@ -141,12 +142,12 @@ impl CellIndex {
 
         // Sentinel deltas at the beginning and end of the CellId range.
         deltas.push(Delta {
-            start_id: CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL),
+            start_id: CellId::from_face(Face::F0).child_begin_at_level(Level::MAX),
             cell_id: CellId::none(),
             label: -1,
         });
         deltas.push(Delta {
-            start_id: CellId::from_face(5).child_end_at_level(MAX_CELL_LEVEL),
+            start_id: CellId::from_face(Face::F5).child_end_at_level(Level::MAX),
             cell_id: CellId::none(),
             label: -1,
         });
@@ -469,7 +470,7 @@ mod tests {
     #[test]
     fn test_one_face_cell() {
         let mut index = CellIndex::new();
-        let face0 = CellId::from_face(0);
+        let face0 = CellId::from_face(Face::F0);
         index.add(face0, 0);
         index.build();
 
@@ -493,7 +494,7 @@ mod tests {
     #[test]
     fn test_one_leaf_cell() {
         let mut index = CellIndex::new();
-        let leaf = CellId::from_face(3).child_begin_at_level(MAX_CELL_LEVEL);
+        let leaf = CellId::from_face(Face::F3).child_begin_at_level(Level::MAX);
         index.add(leaf, 42);
         index.build();
 
@@ -513,7 +514,7 @@ mod tests {
     #[test]
     fn test_duplicate_values() {
         let mut index = CellIndex::new();
-        let cell = CellId::from_face(2);
+        let cell = CellId::from_face(Face::F2);
         index.add(cell, 1);
         index.add(cell, 2);
         index.build();
@@ -539,8 +540,8 @@ mod tests {
     #[test]
     fn test_disjoint_cells() {
         let mut index = CellIndex::new();
-        let c0 = CellId::from_face(0);
-        let c5 = CellId::from_face(5);
+        let c0 = CellId::from_face(Face::F0);
+        let c5 = CellId::from_face(Face::F5);
         index.add(c0, 10);
         index.add(c5, 20);
         index.build();
@@ -564,7 +565,7 @@ mod tests {
     #[test]
     fn test_nested_cells() {
         let mut index = CellIndex::new();
-        let parent = CellId::from_face(1);
+        let parent = CellId::from_face(Face::F1);
         let child = parent.children()[0];
         index.add(parent, 0);
         index.add(child, 1);
@@ -588,7 +589,7 @@ mod tests {
     #[test]
     fn test_non_empty_range_iterator() {
         let mut index = CellIndex::new();
-        let face0 = CellId::from_face(0);
+        let face0 = CellId::from_face(Face::F0);
         index.add(face0, 0);
         index.build();
 
@@ -603,7 +604,7 @@ mod tests {
     #[test]
     fn test_range_iterator_finish() {
         let mut index = CellIndex::new();
-        index.add(CellId::from_face(0), 0);
+        index.add(CellId::from_face(Face::F0), 0);
         index.build();
 
         let mut ri = CellIndexRangeIterator::new(&index);
@@ -614,7 +615,7 @@ mod tests {
     #[test]
     fn test_range_iterator_prev() {
         let mut index = CellIndex::new();
-        index.add(CellId::from_face(0), 0);
+        index.add(CellId::from_face(Face::F0), 0);
         index.build();
 
         let mut ri = CellIndexRangeIterator::new(&index);
@@ -631,7 +632,10 @@ mod tests {
     #[test]
     fn test_add_cell_union() {
         let mut index = CellIndex::new();
-        let cu = CellUnion::from_cell_ids(vec![CellId::from_face(0), CellId::from_face(1)]);
+        let cu = CellUnion::from_cell_ids(vec![
+            CellId::from_face(Face::F0),
+            CellId::from_face(Face::F1),
+        ]);
         index.add_cell_union(&cu, 99);
         index.build();
 
@@ -639,13 +643,13 @@ mod tests {
         let mut ci = CellIndexContentsIterator::new(&index);
 
         // Both faces should be present with label 99.
-        ri.seek(CellId::from_face(0).range_min());
+        ri.seek(CellId::from_face(Face::F0).range_min());
         ci.start_union(&ri);
         assert!(!ci.done());
         assert_eq!(ci.label(), 99);
 
         ci.clear();
-        ri.seek(CellId::from_face(1).range_min());
+        ri.seek(CellId::from_face(Face::F1).range_min());
         ci.start_union(&ri);
         assert!(!ci.done());
         assert_eq!(ci.label(), 99);
@@ -656,7 +660,7 @@ mod tests {
         // When visiting ranges in monotonically increasing order,
         // contents should be reported exactly once.
         let mut index = CellIndex::new();
-        let parent = CellId::from_face(0);
+        let parent = CellId::from_face(Face::F0);
         index.add(parent, 0);
         index.build();
 

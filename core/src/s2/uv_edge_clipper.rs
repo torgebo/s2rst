@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_clip_cell() {
-        let cell_id = crate::s2::CellId::from_face(0).children()[0];
+        let cell_id = crate::s2::CellId::from_face(Face::F0).children()[0];
         let cell = Cell::from_cell_id(cell_id);
         let mut clipper = UVEdgeClipper::from_cell(cell);
 

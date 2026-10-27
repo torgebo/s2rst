@@ -10,6 +10,7 @@ use s2rst::s2::builder::snap::S2CellIdSnapFunction;
 use s2rst::s2::polyline::Polyline;
 
 use crate::angle::PyAngle;
+use crate::bounded::LevelArg;
 use crate::cells::PyCellId;
 use crate::regions::{PyCap, PyRect};
 use crate::s2point::{PyLatLng, PyS2Point, PyS2PointIter};
@@ -715,18 +716,22 @@ impl PyPolygon {
 
     /// A copy of `polygon` with all vertices snapped to S2 cell centers at the
     /// given level.
+    ///
+    /// Raises `ValueError` unless `0 <= snap_level <= 30`.
     #[classmethod]
-    fn snapped(_cls: &Bound<'_, PyType>, polygon: &PyPolygon, snap_level: u8) -> Self {
-        PyPolygon(s2::Polygon::snapped(&polygon.0, snap_level))
+    fn snapped(_cls: &Bound<'_, PyType>, polygon: &PyPolygon, snap_level: LevelArg) -> Self {
+        PyPolygon(s2::Polygon::snapped(&polygon.0, snap_level.0))
     }
 
     /// A simplified copy of `polygon`: vertices are snapped to S2 cell centers
     /// at the given level and detail finer than that is removed.
+    ///
+    /// Raises `ValueError` unless `0 <= snap_level <= 30`.
     #[classmethod]
-    fn simplified(_cls: &Bound<'_, PyType>, polygon: &PyPolygon, snap_level: u8) -> Self {
+    fn simplified(_cls: &Bound<'_, PyType>, polygon: &PyPolygon, snap_level: LevelArg) -> Self {
         PyPolygon(s2::Polygon::simplified(
             &polygon.0,
-            Box::new(S2CellIdSnapFunction::new(snap_level)),
+            Box::new(S2CellIdSnapFunction::new(snap_level.0)),
         ))
     }
 

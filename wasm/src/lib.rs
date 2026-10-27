@@ -25,6 +25,7 @@
 use wasm_bindgen::prelude::*;
 
 mod angle;
+mod bounded;
 mod buffer;
 mod builder;
 mod cap;

@@ -4,15 +4,14 @@ Expect-Fail: val::p_val_09
 Defect: from_face() builds a level-1 cell
 
 diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
-index 9a961e1..2037916 100644
 --- a/core/src/s2/cell_id.rs
 +++ b/core/src/s2/cell_id.rs
-@@ -223,7 +223,7 @@ impl CellId {
+@@ -239,7 +239,7 @@
+     /// ```
      #[inline]
-     pub fn from_face(face: impl Into<u8>) -> Self {
-         let f: u8 = face.into();
--        CellId((u64::from(f) << POS_BITS) + lsb_for_level(Level::MIN))
-+        CellId((u64::from(f) << POS_BITS) + lsb_for_level(Level::new(1)))
+     pub fn from_face(face: Face) -> Self {
+-        CellId((u64::from(face.as_u8()) << POS_BITS) + lsb_for_level(Level::MIN))
++        CellId((u64::from(face.as_u8()) << POS_BITS) + lsb_for_level(Level::new(1)))
      }
  
      /// Returns a cell given its face (0–5), the 61-bit Hilbert curve position

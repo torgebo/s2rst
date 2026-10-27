@@ -10,6 +10,7 @@
 use gungraun::{library_benchmark, library_benchmark_group, main};
 use std::hint::black_box;
 
+use s2rst::s2::Face;
 use s2rst::s2::shape::Dimension;
 use s2rst::s2::shape_tracker::ShapeTracker;
 use s2rst::s2::{Cell, CellId};
@@ -46,7 +47,7 @@ fn add_all_face_boundaries() -> bool {
     let mut t = ShapeTracker::new(Dimension::Polygon, 1);
     t.mark_chain(0);
     for face in 0..6 {
-        let cell = Cell::from_cell_id(CellId::from_face(face));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         t.add_cell_boundary(cell);
     }
     black_box(t.finished())
@@ -119,7 +120,7 @@ fn process_crossings_face() -> bool {
     let mut t = ShapeTracker::new(Dimension::Polygon, 1);
     t.mark_chain(0);
     for face in 0..6 {
-        let cell = Cell::from_cell_id(CellId::from_face(face));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::from_u8(face)));
         t.process_crossings(cell, &crossings);
     }
     black_box(t.finished())

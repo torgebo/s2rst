@@ -37,9 +37,7 @@ use std::collections::BTreeMap;
 
 use crate::r1;
 use crate::r2;
-use crate::s2::coords::{
-    Face, Level, MAX_CELL_LEVEL, face_uv_to_xyz, get_face, valid_face_xyz_to_uv,
-};
+use crate::s2::coords::{Face, Level, face_uv_to_xyz, get_face, valid_face_xyz_to_uv};
 use crate::s2::edge_clipping::{
     EDGE_CLIP_ERROR_UV_COORD, FACE_CLIP_ERROR_UV_COORD, clip_to_padded_face, interpolate_float64,
 };
@@ -163,7 +161,7 @@ impl InteriorTracker {
             is_active: false,
             a: origin,
             b: origin,
-            next_cell_id: CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL),
+            next_cell_id: CellId::from_face(Face::F0).child_begin_at_level(Level::MAX),
             crosser: EdgeCrosser::new(origin, origin),
             shape_ids: Vec::new(),
         };
@@ -1205,6 +1203,7 @@ fn clip_and_push(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::CellVertex;
     use crate::s2::LatLng;
     use crate::s2::shape::{Chain, ChainPosition, ReferencePoint};
 
@@ -1372,7 +1371,7 @@ mod tests {
 
         let mut it = index.iter();
         // The face cell should contain the indexed cell.
-        let face_id = CellId::from_face(0);
+        let face_id = CellId::from_face(Face::F0);
         let rel = it.locate_cell_id(face_id);
         assert!(
             rel == CellRelation::Indexed || rel == CellRelation::Subdivided,
@@ -1541,10 +1540,11 @@ mod tests {
             index.add(Box::new(polyline));
         }
         // Add a small loop (dimension 2, has interior).
-        let cell = crate::s2::Cell::from(CellId::from_face(0).child_begin_at_level(MAX_CELL_LEVEL));
+        let cell =
+            crate::s2::Cell::from(CellId::from_face(Face::F0).child_begin_at_level(Level::MAX));
         let mut vertices = Vec::new();
         for i in 0..4 {
-            vertices.push(cell.vertex(i));
+            vertices.push(cell.vertex(CellVertex::ALL[i]));
         }
         let lp = crate::s2::s2loop::Loop::new(vertices);
         index.add(Box::new(lp));
@@ -1552,7 +1552,7 @@ mod tests {
 
         // Face 1 has no geometry, so locating it should return Disjoint.
         let mut it = index.iter();
-        let rel = it.locate_cell_id(CellId::from_face(1));
+        let rel = it.locate_cell_id(CellId::from_face(Face::F1));
         assert_eq!(
             rel,
             CellRelation::Disjoint,

@@ -5,23 +5,17 @@
 //! spatial regions into string index/query terms, and assigning regions to
 //! shards based on spatial overlap.
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 use s2rst::s2::region_sharder::RegionSharder;
 use s2rst::s2::region_term_indexer::{Options, RegionTermIndexer};
-use s2rst::s2::{CellUnion, Level, Region};
+use s2rst::s2::{CellUnion, Level, LevelMod, Region};
 
+use crate::bounded::{LevelArg, LevelModArg, check_level_order};
 use crate::cells::PyCellUnion;
 use crate::regions::{PyCap, PyRect};
 use crate::s2point::PyS2Point;
-
-/// Convert a Python cell-level integer into a core `Level`, mapping the
-/// out-of-range case to a `ValueError` instead of panicking.
-fn to_level(value: u8, name: &str) -> PyResult<Level> {
-    Level::try_new(value)
-        .ok_or_else(|| PyValueError::new_err(format!("{name} must be in 0..=30, got {value}")))
-}
 
 /// Dispatch a closure over the supported concrete region types (`Cap`, `Rect`,
 /// `CellUnion`), borrowing each as `&dyn Region`. Mirrors `coverer.rs`.
@@ -61,32 +55,40 @@ impl PyRegionTermIndexer {
     /// to the S2 norms: `max_cells=8`, `min_level=4`, `max_level=16`,
     /// `level_mod=1`, `index_contains_points_only=False`,
     /// `optimize_for_space=False`, `marker_character='$'`.
+    ///
+    /// Raises `ValueError` unless `0 <= min_level <= max_level <= 30` and `1 <= level_mod <= 3`.
     #[new]
     #[pyo3(signature = (
         *,
         max_cells = 8,
-        min_level = 4,
-        max_level = 16,
-        level_mod = 1,
+        min_level = LevelArg(Level::new(4)),
+        max_level = LevelArg(Level::new(16)),
+        level_mod = LevelModArg(LevelMod::DEFAULT),
         index_contains_points_only = false,
         optimize_for_space = false,
         marker_character = '$',
     ))]
+    // PyO3 shows a non-literal default as `...`; the explicit signature keeps the literal
+    // defaults visible, as the stub states them.
+    #[pyo3(
+        text_signature = "(*, max_cells=8, min_level=4, max_level=16, level_mod=1, index_contains_points_only=False, optimize_for_space=False, marker_character='$')"
+    )]
     #[allow(clippy::too_many_arguments)]
     fn new(
         max_cells: usize,
-        min_level: u8,
-        max_level: u8,
-        level_mod: usize,
+        min_level: LevelArg,
+        max_level: LevelArg,
+        level_mod: LevelModArg,
         index_contains_points_only: bool,
         optimize_for_space: bool,
         marker_character: char,
     ) -> PyResult<Self> {
+        check_level_order(min_level.0, max_level.0)?;
         let options = Options {
             max_cells,
-            min_level: to_level(min_level, "min_level")?,
-            max_level: to_level(max_level, "max_level")?,
-            level_mod,
+            min_level: min_level.0,
+            max_level: max_level.0,
+            level_mod: level_mod.0,
             index_contains_points_only,
             optimize_for_space,
             marker_character,
@@ -112,8 +114,8 @@ impl PyRegionTermIndexer {
     }
 
     #[getter]
-    fn level_mod(&self) -> usize {
-        self.0.options().level_mod
+    fn level_mod(&self) -> u8 {
+        self.0.options().level_mod.get()
     }
 
     #[getter]

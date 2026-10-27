@@ -7,7 +7,8 @@ implementation steps.
 State on branch `003-next-specs/1` at commit `537e7fd` (2026-10-07), with the six value types
 of specs 004–006 added on 2026-10-14 (sections 2.4–2.6) and spec 007's two on 2026-10-18
 (section 2.7; the counts in section 1 and the tables of sections 3 and 4 include them), and
-spec 008's `Cap` on 2026-10-25 (section 2.9). Sources: the inventories (`verify/INVENTORY.md`,
+spec 008's `Cap` on 2026-10-25 (section 2.9), and spec 009's bounded types on 2026-10-27 (section
+2.10). Sources: the inventories (`verify/INVENTORY.md`,
 `verify/cell_union/INVENTORY.md`, `verify/decoding/INVENTORY.md`, `verify/values/INVENTORY.md`),
 their property catalogues and evaluations, and `cargo kani list` on the current tree.
 
@@ -226,6 +227,23 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 - **Records:** `verify/values/INVENTORY.md` §9, `PROPERTIES.md` §10, the spec-008 part of
   `EVALUATION.md`, `TRUSTED_BASE.md` (the contracts and stubs), `MUTANTS.md` (`M-701` …
   `M-741`).
+
+### 2.10 Bounded types (spec 009)
+
+Spec 009 made four range-restricted parameters into types that are checked when an instance is
+created (`BOUNDED_TYPES.md`). Each has a proof that its constructors accept exactly its range,
+and the operations that took the raw values take the type, so they cannot be handed a value
+outside it:
+
+| Type | Range | Constructor proofs | Operations that take it |
+|------|-------|--------------------|-------------------------|
+| `Level` | 0..=30 | `crash::c_level_try_from` (`try_from` exact, `OutOfRange` with kind and value), `crash::n_level_new` (`new` panics exactly above 30) | the 25 functions that took `impl Into<Level>`; `crash::n_raw_level` retired |
+| `Face` | 0..=5 | `crash::c_face_try_from`, `crash::n_face_from_u8` | `CellId::from_face`, `Cell::from_face`, both `from_face_pos_level`; `cl_crash::n_from_cell_id` lost its face cases |
+| `LevelMod` | 1..=3 | `cu_crash::c_level_mod_try_from`, `cu_crash::n_level_mod_new` | `CellUnion::denormalize`, `RegionCoverer::level_mod`, the term indexer's options; `n_denormalize__n2` keeps only its id half |
+| `CellVertex` | 0..=3 | `cl_crash::c_cell_vertex_try_from` | `Cell::vertex`, `Cell::vertex_raw`; `cl_crash::n_vertex` retired |
+
+Non-vacuity: M-803 and M-806 (re-pointed to `Level::new` and `LevelMod::new`), and M-809, M-810
+and M-811 (each `try_from` accepting one value too many). The proofs take under a second each.
 
 ## 3. Traits
 

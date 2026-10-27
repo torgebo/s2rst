@@ -362,13 +362,15 @@ href="COVERAGE.md"><code>COVERAGE.md</code></a>).</p>
 <tbody>
 <tr class="odd">
 <td><code>CellId</code></td>
-<td>21 operations: every raw level above 30 panics in every operation
-that takes a level; <code>level</code> on the ids with no level marker;
+<td>21 operations: a raw level above 30 panics where it is converted
+(<code>Level::new</code>; since spec 009 no operation takes a raw
+level); <code>level</code> on the ids with no level marker;
 <code>child_position</code>, <code>parent</code>, the child operations
 and the wrapping steps outside their domain (debug builds; release
 builds return); <code>vertex_neighbors</code> at level 30;
 <code>common_ancestor_level(none, none)</code></td>
-<td><code>crash::n_*</code>, <code>crash::r_*</code></td>
+<td><code>crash::n_*</code>, <code>crash::r_*</code>,
+<code>crash::c_level_try_from</code></td>
 <td><a href="INVENTORY.md"><code>INVENTORY.md</code></a> section 3</td>
 </tr>
 <tr class="even">
@@ -376,9 +378,11 @@ builds return); <code>vertex_neighbors</code> at level 30;
 <td>11 operations, for unions of one or two ids: the normalising
 constructors on invalid ids outside every valid cell, the cell queries
 on invalid ids, <code>leaf_cells_covered</code> and
-<code>denormalize</code> without a level marker or with a bad
-<code>level_mod</code>, and the three range constructors outside their
-bounds</td>
+<code>denormalize</code> without a level marker (a bad
+<code>level_mod</code> is unrepresentable since spec 009;
+<code>LevelMod::new</code> panics on one,
+<code>cu_crash::n_level_mod_new</code>), and the three range
+constructors outside their bounds</td>
 <td><code>cu_crash::n_*</code>, <code>cu_crash::r_*</code></td>
 <td><a
 href="cell_union/INVENTORY.md"><code>cell_union/INVENTORY.md</code></a>
@@ -406,6 +410,26 @@ NaN margin on full longitudes, the empty cap expanded by +∞)</td>
 <code>o_*</code></td>
 <td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
 section 10</td>
+</tr>
+<tr class="odd">
+<td>Bounded types (spec 009)</td>
+<td>each constructor accepts exactly its range: <code>Level</code>
+(0..=30), <code>Face</code> (0..=5), <code>LevelMod</code> (1..=3),
+<code>CellVertex</code> (0..=3). <code>try_from</code> returns
+<code>Ok</code> exactly in range, with the value back, and
+<code>OutOfRange</code> (kind and value) outside it; <code>new</code>
+(<code>Face::from_u8</code>) panics exactly outside it, in every build.
+The operations that took the raw values take the types, so their range
+panics (<code>crash::n_raw_level</code>,
+<code>cl_crash::n_vertex</code>, <code>denormalize</code>’s
+<code>level_mod</code>) are retired</td>
+<td><code>crash::c_level_try_from</code>, <code>n_level_new</code>,
+<code>c_face_try_from</code>, <code>n_face_from_u8</code>;
+<code>cu_crash::c_level_mod_try_from</code>,
+<code>n_level_mod_new</code>;
+<code>cl_crash::c_cell_vertex_try_from</code></td>
+<td><a href="COVERAGE.md"><code>COVERAGE.md</code></a>, “Spec 009”; <a
+href="../BOUNDED_TYPES.md"><code>../BOUNDED_TYPES.md</code></a></td>
 </tr>
 </tbody>
 </table>

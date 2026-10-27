@@ -159,6 +159,7 @@ impl Region for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::s2::Face;
 
     #[test]
     fn test_cap_region() {
@@ -180,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_cell_region() {
-        let cell = Cell::from_cell_id(CellId::from_face(0));
+        let cell = Cell::from_cell_id(CellId::from_face(Face::F0));
         let r: &dyn Region = &cell;
         assert!(!r.cap_bound().is_empty());
         assert!(!r.rect_bound().is_empty());
@@ -193,7 +194,7 @@ mod tests {
         let regions: Vec<Box<dyn Region>> = vec![
             Box::new(Cap::full()),
             Box::new(Rect::full()),
-            Box::new(Cell::from_cell_id(CellId::from_face(0))),
+            Box::new(Cell::from_cell_id(CellId::from_face(Face::F0))),
         ];
         for region in &regions {
             assert!(!region.cap_bound().is_empty());

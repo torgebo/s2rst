@@ -9,6 +9,8 @@
 //! and `s2cell_union_test.cc`.
 
 use s2rst::s1::Angle;
+use s2rst::s2::Face;
+use s2rst::s2::LevelMod;
 use s2rst::s2::coords::Level;
 use s2rst::s2::region_coverer::RegionCoverer;
 use s2rst::s2::{Cap, Cell, CellId, CellUnion, LatLng, Point};
@@ -40,8 +42,8 @@ fn test_covering_level_constraints() {
     let center = Point::from_coords(0.0, 1.0, 0.0);
     let cap = Cap::from_center_angle(center, Angle::from_degrees(10.0));
     let coverer = RegionCoverer::new()
-        .min_level(5)
-        .max_level(10)
+        .min_level(Level::new(5))
+        .max_level(Level::new(10))
         .max_cells(100);
     let covering = coverer.covering(&cap);
 
@@ -122,7 +124,7 @@ fn test_interior_covering_is_contained() {
 #[test]
 fn test_cell_union_normalize_siblings() {
     // Four siblings should merge into their parent.
-    let parent = CellId::from_face_pos_level(0, 0, 5);
+    let parent = CellId::from_face_pos_level(Face::F0, 0, Level::new(5));
     let children = parent.children();
     let mut cu = CellUnion::from_cell_ids(children.to_vec());
     cu.normalize();
@@ -138,7 +140,7 @@ fn test_cell_union_normalize_siblings() {
 
 #[test]
 fn test_cell_union_contains_child() {
-    let parent = CellId::from_face_pos_level(0, 0, 5);
+    let parent = CellId::from_face_pos_level(Face::F0, 0, Level::new(5));
     let cu = CellUnion::from_cell_ids(vec![parent]);
     let child = parent.children()[2];
     assert!(
@@ -149,7 +151,7 @@ fn test_cell_union_contains_child() {
 
 #[test]
 fn test_cell_union_intersects() {
-    let id1 = CellId::from_face_pos_level(0, 0, 5);
+    let id1 = CellId::from_face_pos_level(Face::F0, 0, Level::new(5));
     let id2 = id1.children()[0]; // child of id1
 
     let cu1 = CellUnion::from_cell_ids(vec![id1]);
@@ -162,8 +164,8 @@ fn test_cell_union_intersects() {
 
 #[test]
 fn test_cell_union_disjoint() {
-    let id1 = CellId::from_face_pos_level(0, 0, 10);
-    let id2 = CellId::from_face_pos_level(3, 0, 10);
+    let id1 = CellId::from_face_pos_level(Face::F0, 0, Level::new(10));
+    let id2 = CellId::from_face_pos_level(Face::F3, 0, Level::new(10));
 
     let cu1 = CellUnion::from_cell_ids(vec![id1]);
     let cu2 = CellUnion::from_cell_ids(vec![id2]);
@@ -181,7 +183,7 @@ fn test_cell_union_disjoint() {
 #[test]
 fn test_cell_union_leaf_cells_covered() {
     // A single face cell (level 0) covers a known number of leaf cells.
-    let face_id = CellId::from_face(0);
+    let face_id = CellId::from_face(Face::F0);
     let cu = CellUnion::from_cell_ids(vec![face_id]);
     let leaves = cu.leaf_cells_covered();
     // A level-0 cell contains 4^30 leaf cells.
@@ -191,9 +193,9 @@ fn test_cell_union_leaf_cells_covered() {
 
 #[test]
 fn test_cell_union_denormalize() {
-    let id = CellId::from_face_pos_level(0, 0, 4);
+    let id = CellId::from_face_pos_level(Face::F0, 0, Level::new(4));
     let cu = CellUnion::from_cell_ids(vec![id]);
-    let denorm = cu.denormalize(Level::new(6), 2);
+    let denorm = cu.denormalize(Level::new(6), LevelMod::new(2));
 
     // All resulting cells should be at level 6 (min_level=6, level_mod=2).
     for cell_id in denorm.cell_ids() {
@@ -211,7 +213,7 @@ fn test_cell_union_denormalize() {
 
 #[test]
 fn test_cell_union_contains_point() {
-    let id = CellId::from_face_pos_level(0, 0, 10);
+    let id = CellId::from_face_pos_level(Face::F0, 0, Level::new(10));
     let cu = CellUnion::from_cell_ids(vec![id]);
     let center = id.to_point();
     assert!(
@@ -231,7 +233,7 @@ fn test_cell_union_empty() {
 #[test]
 fn test_covering_cell_as_region() {
     // Covering a single cell should return that cell (or its parent).
-    let cell = Cell::from_cell_id(CellId::from_face_pos_level(2, 0, 10));
+    let cell = Cell::from_cell_id(CellId::from_face_pos_level(Face::F2, 0, Level::new(10)));
     let coverer = RegionCoverer::new().max_cells(1);
     let covering = coverer.covering(&cell);
 

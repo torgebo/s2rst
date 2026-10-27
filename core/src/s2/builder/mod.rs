@@ -2415,6 +2415,7 @@ mod tests {
     use super::*;
     use crate::s2::CellId;
     use crate::s2::LatLng;
+    use crate::s2::Level;
     use crate::s2::edge_crossings;
     use crate::s2::edge_distances;
     use crate::s2::polyline::Polyline;
@@ -2494,7 +2495,7 @@ mod tests {
 
     #[test]
     fn test_options_accessor() {
-        let snap_fn = S2CellIdSnapFunction::new(10);
+        let snap_fn = S2CellIdSnapFunction::new(Level::new(10));
         let expected_radius = snap_fn.snap_radius();
         let opts = Options::new(Box::new(snap_fn));
         let builder = S2Builder::new(opts);
@@ -2750,7 +2751,7 @@ mod tests {
     /// cell centers.
     #[test]
     fn test_cell_id_snapping_points() {
-        let snap_fn = S2CellIdSnapFunction::new(10);
+        let snap_fn = S2CellIdSnapFunction::new(Level::new(10));
         let opts = Options::new(Box::new(snap_fn));
 
         let output = Rc::new(RefCell::new(Vec::new()));
@@ -2766,7 +2767,7 @@ mod tests {
 
         // Output point should be a cell center at level 10.
         let cell_center = CellId::from_point(&result[0])
-            .parent_at_level(10)
+            .parent_at_level(Level::new(10))
             .to_point();
         assert_eq!(result[0], cell_center);
     }
@@ -3016,7 +3017,7 @@ mod tests {
         };
         let level = level % 21; // levels 0-20 for reasonable test speed
 
-        let snap_fn = S2CellIdSnapFunction::new(level);
+        let snap_fn = S2CellIdSnapFunction::new(Level::new(level));
         let opts = Options::new(Box::new(snap_fn));
 
         let output = Rc::new(RefCell::new(Vec::new()));
@@ -3033,7 +3034,9 @@ mod tests {
         for polyline in result.iter() {
             for i in 0..polyline.num_vertices() {
                 let v = polyline.vertex(i);
-                let expected = CellId::from_point(&v).parent_at_level(level).to_point();
+                let expected = CellId::from_point(&v)
+                    .parent_at_level(Level::new(level))
+                    .to_point();
                 if v != expected {
                     return false;
                 }
@@ -3126,7 +3129,7 @@ mod tests {
     #[quickcheck]
     fn prop_empty_input_never_panics(level: u8) -> bool {
         let level = level % 31;
-        let snap_fn = S2CellIdSnapFunction::new(level);
+        let snap_fn = S2CellIdSnapFunction::new(Level::new(level));
         let opts = Options::new(Box::new(snap_fn));
 
         let output = Rc::new(RefCell::new(Polygon::empty()));
@@ -3146,7 +3149,7 @@ mod tests {
         };
         let level = level % 21;
 
-        let snap_fn = S2CellIdSnapFunction::new(level);
+        let snap_fn = S2CellIdSnapFunction::new(Level::new(level));
         let snap_radius = snap_fn.snap_radius();
         let opts = Options::new(Box::new(snap_fn));
 
@@ -3897,8 +3900,8 @@ mod tests {
     #[test]
     fn test_max_snap_radius_can_snap_at_level_0() {
         assert!(
-            S2CellIdSnapFunction::min_snap_radius_for_level(0) <= snap::MAX_SNAP_RADIUS,
-            "min_snap_radius_for_level(0) should be <= MAX_SNAP_RADIUS"
+            S2CellIdSnapFunction::min_snap_radius_for_level(Level::new(0)) <= snap::MAX_SNAP_RADIUS,
+            "min_snap_radius_for_level(Level::new(0)) should be <= MAX_SNAP_RADIUS"
         );
     }
 
@@ -4319,7 +4322,7 @@ mod tests {
              49.9311087:-124.8327042, 49.9318176:-124.8312621, \
              49.9318866:-124.8334451",
         );
-        let snap_fn = S2CellIdSnapFunction::new(crate::s2::coords::MAX_CELL_LEVEL);
+        let snap_fn = S2CellIdSnapFunction::new(Level::MAX);
         let snap_radius = snap_fn.snap_radius();
         let opts = Options::new(Box::new(snap_fn));
 
@@ -4336,7 +4339,7 @@ mod tests {
         );
 
         // Second pass should be identical to first.
-        let snap_fn2 = S2CellIdSnapFunction::new(crate::s2::coords::MAX_CELL_LEVEL);
+        let snap_fn2 = S2CellIdSnapFunction::new(Level::MAX);
         let opts2 = Options::new(Box::new(snap_fn2));
         let output2 = Rc::new(RefCell::new(Polygon::empty()));
         let mut builder2 = S2Builder::new(opts2);
@@ -4398,7 +4401,7 @@ mod tests {
     fn test_s2_cell_id_snapping_at_all_levels() {
         let input = text_format::make_polygon("0:0, 0:2, 2:0; 0:0, 0:-2, -2:-2, -2:0");
         for level in 0..=crate::s2::coords::MAX_CELL_LEVEL {
-            let snap_fn = S2CellIdSnapFunction::new(level);
+            let snap_fn = S2CellIdSnapFunction::new(Level::new(level));
             let _snap_radius = snap_fn.snap_radius();
             let opts = Options::new(Box::new(snap_fn));
 
@@ -5326,9 +5329,9 @@ mod tests {
             // Choose a snap function based on iteration.
             let snap: Box<dyn SnapFunction> = match iter % 3 {
                 0 => Box::new(IntLatLngSnapFunction::new((iter % 10) as i32)),
-                1 => Box::new(S2CellIdSnapFunction::new(
+                1 => Box::new(S2CellIdSnapFunction::new(Level::new(
                     crate::s2::coords::MAX_CELL_LEVEL.min((10 + iter % 15) as u8),
-                )),
+                ))),
                 _ => Box::new(IdentitySnapFunction::new(s1::Angle::from_degrees(
                     0.001 + (iter as f64 * 0.789).sin().abs() * 5.0,
                 ))),

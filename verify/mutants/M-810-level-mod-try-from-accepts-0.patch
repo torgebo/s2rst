@@ -1,0 +1,17 @@
+Mutant: M-810
+Targets: C-LevelMod::try_from
+Expect-Fail: cu_crash::c_level_mod_try_from
+Defect: LevelMod::try_from accepts 0, one value outside 1..=3
+
+diff --git a/core/src/s2/bounded.rs b/core/src/s2/bounded.rs
+--- a/core/src/s2/bounded.rs
++++ b/core/src/s2/bounded.rs
+@@ -172,7 +172,7 @@
+     /// The modulus `v`, or [`OutOfRange`] outside `1..=3`.
+     fn try_from(v: i64) -> Result<Self, OutOfRange> {
+         match u8::try_from(v) {
+-            Ok(m @ 1..=3) => Ok(LevelMod(m)),
++            Ok(m @ 0..=3) => Ok(LevelMod(m)),
+             _ => Err(OutOfRange::new(BoundedKind::LevelMod, v)),
+         }
+     }
