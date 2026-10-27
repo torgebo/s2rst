@@ -30,3 +30,6 @@ cp_mea::p_cpmea_01__centroid P-CPMEA-01
 cp_lem::l_cp_06a L-CP-06
 cp_crash::c_cell_tests__real C-s2::Cap::contains_cell
 cp_crash::c_cell_union_bound C-s2::Cap::cell_union_bound
+rl_crash::c_fg_boundary_intersects C-s2::Rect::boundary_intersects
+rl_crash::c_fg_get_distance C-s2::Rect::get_distance
+rl_crash::c_fg_hausdorff C-s2::Rect::get_hausdorff_distance

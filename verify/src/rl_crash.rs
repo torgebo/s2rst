@@ -21,11 +21,12 @@
 //! domains non-empty and the outcomes FR-009 names reachable: rectangles at a pole, across the
 //! antimeridian, empty and full, and an out-of-range point that `add_point` ignores.
 
+use s2rst::s1::Angle;
 use s2rst::s2::{LatLng, Rect, RectVertex, Region};
 use std::f64::consts::{FRAC_PI_2, PI};
 
 use crate::rect_spec;
-use crate::value_domain::{any_f64, any_lat_lng, any_rect, any_valid_lat_lng};
+use crate::value_domain::{any_box_point, any_f64, any_lat_lng, any_rect, any_valid_lat_lng};
 
 /// Every latitude–longitude, NaN components included.
 fn any_ll() -> LatLng {
@@ -220,4 +221,373 @@ fn c_eq_and_bound() {
     let (inherent, region) = (a.rect_bound(), Region::rect_bound(&a));
     kani::cover!(eq && rect_spec::empty(a), "equal empty rectangles");
     kani::cover!(inherent == region, "the two bounds");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (gap 1; `crash.rs` explains the `n_*` and `r_*`
+// conventions). The longitude checks are `s1::Interval`'s `debug_assert!`s.
+// ---------------------------------------------------------------------------------------------
+
+/// Every latitude–longitude whose longitude is outside [−π, π] or NaN, with any latitude.
+fn any_bad_lng() -> LatLng {
+    let (lat, lng): (f64, f64) = (kani::any(), kani::any());
+    kani::assume(!crate::arc_spec::in_range(lng));
+    LatLng::from_radians(lat, lng)
+}
+
+/// N-s2::Rect::from_lat_lng, N-from_point_pair: in debug builds, each panics for every point
+/// whose longitude is outside [−π, π] or NaN (for `from_point_pair`, either point), whatever
+/// the latitude.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_from_points() {
+    let bad = any_bad_lng();
+    let other = any_lat_lng();
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = Rect::from_lat_lng(bad);
+        }
+        1 => {
+            let _ = Rect::from_point_pair(bad, other);
+        }
+        _ => {
+            let _ = Rect::from_point_pair(other, bad);
+        }
+    }
+    kani::cover!(true, "returns");
+}
+
+/// R-s2::Rect::from_lat_lng, R-from_point_pair: in a build without debug assertions, each
+/// completes without panic or overflow on the same points.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_from_points() {
+    let (bad, other) = (any_bad_lng(), any_lat_lng());
+    let (a, b, c) = (
+        Rect::from_lat_lng(bad),
+        Rect::from_point_pair(bad, other),
+        Rect::from_point_pair(other, bad),
+    );
+    kani::cover!(
+        !a.is_valid() && !b.is_valid() && !c.is_valid(),
+        "invalid rectangles"
+    );
+}
+
+/// The complement of `from_center_size`'s domain: a centre whose longitude is outside [−π, π]
+/// or NaN with any size, or a centre with a valid longitude and a NaN longitude size.
+///
+/// The latitudes are finite: an infinite centre latitude with an infinite size latitude gives
+/// `∞ − ∞` in the latitude interval, which comes first and which Kani reports as a failure
+/// (NaN), although Rust gives NaN without a panic.
+fn outside_center_size() -> (LatLng, LatLng) {
+    let (lat, lng, slat, slng): (f64, f64, f64, f64) =
+        (kani::any(), kani::any(), kani::any(), kani::any());
+    kani::assume(lat.is_finite() && slat.is_finite());
+    kani::assume(!crate::arc_spec::in_range(lng) || slng.is_nan());
+    (
+        LatLng::from_radians(lat, lng),
+        LatLng::from_radians(slat, slng),
+    )
+}
+
+/// N-s2::Rect::from_center_size: in debug builds, panics for every centre whose longitude is
+/// outside [−π, π] or NaN, and every size whose longitude is NaN.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_from_center_size() {
+    let (c, s) = outside_center_size();
+    let _ = Rect::from_center_size(c, s);
+    kani::cover!(true, "returns");
+}
+
+/// R-s2::Rect::from_center_size: in a build without debug assertions, completes without panic
+/// or overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_from_center_size() {
+    let (c, s) = outside_center_size();
+    let r = Rect::from_center_size(c, s);
+    kani::cover!(!r.is_valid(), "an invalid rectangle");
+}
+
+/// N-s2::Rect::interior_contains_lat_lng: in debug builds, panics for every valid rectangle and
+/// every point whose latitude is strictly inside the rectangle's latitudes and whose longitude
+/// is outside [−π, π] or NaN. The latitude is tested first: over every point the first version
+/// of this harness returned (2026-10-26), for a latitude outside, which answers `false` before
+/// the longitude is checked, as upstream.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_interior_contains_lat_lng() {
+    let (r, ll) = (any_rect(), any_bad_lng());
+    kani::assume(crate::real_spec::interior(r.lat, ll.lat.radians()));
+    let _ = r.interior_contains_lat_lng(ll);
+    kani::cover!(true, "returns");
+}
+
+/// R-s2::Rect::interior_contains_lat_lng: in a build without debug assertions, completes
+/// without panic or overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_interior_contains_lat_lng() {
+    let (r, ll) = (any_rect(), any_bad_lng());
+    kani::assume(crate::real_spec::interior(r.lat, ll.lat.radians()));
+    let c = r.interior_contains_lat_lng(ll);
+    kani::cover!(!c, "not contained");
+}
+
+/// N-s2::Rect::expanded: in debug builds, panics for every valid rectangle whose longitudes
+/// are not full and every margin whose longitude is NaN. Over every valid rectangle the first
+/// version of this harness returned (2026-10-26): full longitudes, as `o_expanded_nan_full_lng`
+/// proves.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_expanded() {
+    let r = any_rect();
+    kani::assume(!crate::arc_spec::full(r.lng));
+    let m = LatLng::from_radians(kani::any(), f64::NAN);
+    let _ = r.expanded(m);
+    kani::cover!(true, "returns");
+}
+
+/// O-s2::Rect::expanded (outside its domain, returns): completes without panic or overflow, in
+/// every build, for every valid rectangle with full longitudes and every margin whose longitude is
+/// NaN (its `# Panics`: the longitudes stay full).
+#[kani::proof]
+fn o_expanded_nan_full_lng() {
+    let r = any_rect();
+    kani::assume(crate::arc_spec::full(r.lng));
+    let e = r.expanded(LatLng::from_radians(kani::any(), f64::NAN));
+    assert!(e.is_empty() || e.lng.is_full());
+    kani::cover!(!e.is_empty(), "full longitudes kept");
+}
+
+/// R-s2::Rect::expanded: in a build without debug assertions, completes without panic or
+/// overflow on the same inputs as `n_expanded`.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_expanded() {
+    let r = any_rect();
+    kani::assume(!crate::arc_spec::full(r.lng));
+    let e = r.expanded(LatLng::from_radians(kani::any(), f64::NAN));
+    kani::cover!(!e.is_valid(), "an invalid rectangle");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Floating-point geometry (gap 2 of the 2026-10-26 coverage review): the entries spec 005
+// excluded as floating-point geometry, proven crash-free under the function contracts of
+// `stubs` where they reach a C library function the checker does not model (spec 008 FR-003).
+// Each harness names its contracts; `sin` and `cos` are the checker's models.
+// ---------------------------------------------------------------------------------------------
+
+/// C-s2::Rect::area: completes without panic, overflow or undefined behaviour for every valid
+/// rectangle.
+#[kani::proof]
+fn c_fg_area() {
+    let r = any_rect();
+    let a = r.area();
+    kani::cover!(r.is_empty() && a == 0.0, "the empty rectangle");
+    kani::cover!(!r.is_empty(), "a rectangle with an area");
+}
+
+/// C-s2::Rect::contains_point, interior_contains_point and Region::contains_point: complete for
+/// every valid rectangle and every box point, under `atan2`'s contract (the point's latitude and
+/// longitude, which the contract keeps in [−π, π], so `interior_contains_lat_lng`'s debug check
+/// holds).
+///
+/// Under contract: `atan2_contract`.
+#[kani::proof]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+fn c_fg_contains_point() {
+    let (r, p) = (any_rect(), any_box_point());
+    let c = (
+        r.contains_point(p),
+        r.interior_contains_point(p),
+        Region::contains_point(&r, &p),
+    );
+    kani::cover!(c.0, "a contained point");
+    kani::cover!(!c.0, "a point outside");
+}
+
+/// C-s2::Rect::expanded_by_distance, a negative distance: completes for every valid rectangle
+/// and every finite negative angle, under the contracts of `asin`, `sin` and `cos`. With the
+/// checker's own `sin` and `cos` it failed (2026-10-26): they let `sin(−d)` or `cos(max |lat|)`
+/// take the wrong sign, so `asin`'s argument left [−1, 1] and its NaN reached `s1::Interval`'s
+/// debug check. The real values: the latitudes are non-empty only for `|d| ≤ π/2`, where both are
+/// non-negative.
+///
+/// Under contract: `asin_contract`, `sin_contract`, `cos_contract`.
+#[kani::proof]
+#[kani::stub(f64::asin, crate::stubs::asin_contract)]
+#[kani::stub(f64::sin, crate::stubs::sin_contract)]
+#[kani::stub(f64::cos, crate::stubs::cos_contract)]
+fn c_fg_expanded_by_distance__neg() {
+    let r = any_rect();
+    let d: f64 = kani::any();
+    kani::assume(d.is_finite() && d < 0.0);
+    let e = r.expanded_by_distance(Angle::from_radians(d));
+    kani::cover!(e.is_empty() && !r.is_empty(), "shrunk to empty");
+}
+
+/// C-s2::Rect::expanded_by_distance, a distance of at least 0: completes for every valid
+/// rectangle and every finite non-negative angle, under the contracts of `asin`, `atan2` and
+/// `cos` (the vertices' caps' `rect_bound`, spec 008).
+///
+/// Under contract: `asin_contract`, `atan2_contract`, `cos_contract`.
+#[cfg(feature = "slow")]
+#[kani::proof]
+#[kani::stub(f64::asin, crate::stubs::asin_contract)]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+#[kani::stub(f64::cos, crate::stubs::cos_contract)]
+fn c_fg_expanded_by_distance__pos() {
+    let r = any_rect();
+    let d = crate::value_domain::any_finite_nonneg_angle();
+    let e = r.expanded_by_distance(d);
+    kani::cover!(!r.is_empty() && e.is_full(), "grown to the full rectangle");
+}
+
+/// C-s2::Rect::expand_for_subregions: completes for every valid rectangle.
+#[kani::proof]
+fn c_fg_expand_for_subregions() {
+    let r = any_rect();
+    let e = r.expand_for_subregions();
+    kani::cover!(!r.is_full() && e.is_full(), "nearly antipodal points: full");
+}
+
+/// C-s2::Rect::cap_bound and Region::cap_bound: complete for every valid rectangle.
+#[cfg(feature = "slow")]
+#[kani::proof]
+fn c_fg_cap_bound() {
+    let r = any_rect();
+    let (c, _) = (r.cap_bound(), Region::cap_bound(&r));
+    kani::cover!(r.is_empty() && c.is_empty(), "the empty rectangle");
+    kani::cover!(!r.is_empty() && !c.is_full(), "a proper cap");
+}
+
+/// C-s2::Rect::centroid: completes for every valid rectangle.
+#[kani::proof]
+fn c_fg_centroid() {
+    let r = any_rect();
+    let _ = r.centroid();
+    kani::cover!(!r.is_empty(), "a rectangle with a centroid");
+}
+
+/// C-s2::Rect::boundary_intersects: completes for every valid rectangle and every pair of box
+/// points, under `atan2`'s contract.
+///
+/// Under contract: `atan2_contract`.
+///
+/// **Not proven:** times out at 60 minutes weekly (2026-10-27; the robust crossing test, `EdgeCrosser`), a tool limit listed in
+/// `known-timeouts.txt`.
+#[cfg(feature = "slow")]
+#[kani::proof]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+fn c_fg_boundary_intersects() {
+    let (r, a, b) = (any_rect(), any_box_point(), any_box_point());
+    let x = r.boundary_intersects(a, b);
+    kani::cover!(x, "crossing the boundary");
+}
+
+/// C-s2::Rect::get_distance: completes for every pair of non-empty valid rectangles (its debug
+/// checks), under the contracts of `asin`, `atan2` and `sin_cos` (as `get_distance_to_latlng`).
+///
+/// Under contract: `asin_contract`, `atan2_contract`, `sin_cos_contract`.
+///
+/// **Not proven:** times out at 60 minutes weekly (2026-10-27; four `distance_from_segment`s), a tool limit listed in
+/// `known-timeouts.txt`.
+#[cfg(feature = "slow")]
+#[kani::proof]
+#[kani::stub(f64::asin, crate::stubs::asin_contract)]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+#[kani::stub(f64::sin_cos, crate::stubs::sin_cos_contract)]
+fn c_fg_get_distance() {
+    let (a, b) = (any_rect(), any_rect());
+    kani::assume(!rect_spec::empty(a) && !rect_spec::empty(b));
+    let d = a.get_distance(b);
+    kani::cover!(d.radians() > 0.0, "apart");
+}
+
+/// C-s2::Rect::get_hausdorff_distance and get_directed_hausdorff_distance: complete for every
+/// pair of valid rectangles, under the contracts of `asin`, `atan2` and `sin_cos` (as
+/// `get_distance_to_latlng`).
+///
+/// Under contract: `asin_contract`, `atan2_contract`, `sin_cos_contract`.
+///
+/// **Not proven:** times out at 60 minutes weekly (2026-10-27; the directed distances in both directions), a tool limit listed in
+/// `known-timeouts.txt`.
+#[cfg(feature = "slow")]
+#[kani::proof]
+#[kani::stub(f64::asin, crate::stubs::asin_contract)]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+#[kani::stub(f64::sin_cos, crate::stubs::sin_cos_contract)]
+fn c_fg_hausdorff() {
+    let (a, b) = (any_rect(), any_rect());
+    let d = (
+        a.get_hausdorff_distance(b),
+        a.get_directed_hausdorff_distance(b),
+    );
+    kani::cover!(d.1.radians() > 0.0, "apart");
+}
+
+/// C-Region for s2::Rect::contains_cell and intersects_cell: complete for every valid rectangle
+/// and every valid cell, under `atan2`'s contract (the cell's `rect_bound`).
+///
+/// Under contract: `atan2_contract`. Stubs: `any_uv_bound`.
+#[cfg(feature = "slow")]
+#[kani::proof]
+#[kani::unwind(9)]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+#[kani::stub(s2rst::s2::ij_level_to_bound_uv, crate::stubs::any_uv_bound)]
+fn c_fg_region_cells() {
+    let r = any_rect();
+    let (c, _) = crate::value_domain::any_cell();
+    let x = (
+        Region::contains_cell(&r, &c),
+        Region::intersects_cell(&r, &c),
+    );
+    kani::cover!(x.1 && !x.0, "intersecting, not containing");
+}
+
+/// N-s2::Rect::get_distance_to_latlng: in debug builds, panics for every empty valid rectangle and
+/// every point, and for every valid rectangle and every invalid point, NaN included (its two
+/// `debug_assert!`s, first).
+///
+/// Stubs: `any_segment_distance`, for the code after the checks, which no input reaches (an
+/// any-value stub cannot hide an input that returns).
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+#[kani::stub(
+    s2rst::s2::edge_distances::distance_from_segment,
+    crate::stubs::any_segment_distance
+)]
+fn n_get_distance_to_latlng() {
+    let r = any_rect();
+    let (lat, lng): (f64, f64) = (kani::any(), kani::any());
+    kani::assume(rect_spec::empty(r) || !rect_spec::ll_valid(lat, lng));
+    let _ = r.get_distance_to_latlng(LatLng::from_radians(lat, lng));
+    kani::cover!(true, "returns");
+}
+
+/// N-s2::Rect::get_distance: in debug builds, panics for every pair of valid rectangles of which
+/// one is empty.
+///
+/// Stubs: `any_segment_distance`, as `n_get_distance_to_latlng`.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+#[kani::stub(
+    s2rst::s2::edge_distances::distance_from_segment,
+    crate::stubs::any_segment_distance
+)]
+fn n_get_distance() {
+    let (a, b) = (any_rect(), any_rect());
+    kani::assume(rect_spec::empty(a) || rect_spec::empty(b));
+    let _ = a.get_distance(b);
+    kani::cover!(true, "returns");
 }

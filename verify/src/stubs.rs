@@ -7,8 +7,10 @@
 //! that uses one names it, with what it rests on, in its doc comment.
 //!
 //! **Function contracts** replace a C library function the checker does not model (`asin`,
-//! `atan2`) or models too loosely (`cos`: CBMC let `cos(1.1e-308)` be 0, research R0) by any
-//! value in its documented range. A property proven with them holds for every value the
+//! `atan2`; since gap 2 of the 2026-10-26 coverage review also `tan` and `atan`) or models too
+//! loosely (`cos`: CBMC let `cos(1.1e-308)` be 0, research R0; since gap 2 also `sin` and
+//! `sin_cos`, whose models lose the sign and `sin² + cos² = 1`) by any value in its documented
+//! range. A property proven with them holds for every value the
 //! contract allows, the real one among them; `tests/libm_contracts.rs` checks that the real
 //! functions satisfy the contracts.
 //!
@@ -100,6 +102,8 @@ static FROM_ANGLE: Mutex<Table<1>> = Mutex::new(Table::new());
 static NORMALIZE: Mutex<[([u64; 3], [u64; 3]); 2]> = Mutex::new([([0; 3], [0; 3]); 2]);
 static NORMALIZE_USED: Mutex<usize> = Mutex::new(0);
 static VERTS: Mutex<[[u64; 3]; 4]> = Mutex::new([[0; 3]; 4]);
+static PAIR_VERTS: Mutex<[[[u64; 3]; 4]; 2]> = Mutex::new([[[0; 3]; 4]; 2]);
+static PAIR_IDS: Mutex<([u64; 2], usize)> = Mutex::new(([0; 2], 0));
 static EDGES: Mutex<[[u64; 3]; 4]> = Mutex::new([[0; 3]; 4]);
 
 /// Clears every table. Kani runs each harness from a fresh state; a harness that uses a lemma
@@ -140,7 +144,8 @@ fn any_length2() -> u64 {
     v.to_bits()
 }
 
-// ---- function contracts (FR-003) -----------------------------------------------------------------
+// ---- function contracts (FR-003)
+// -----------------------------------------------------------------
 
 /// `asin`'s contract: NaN outside [−1, 1] and for NaN; ±0 for ±0; otherwise any value in
 /// [−π/2, π/2] with the argument's sign. Checked by `libm_contracts::asin`.
@@ -195,6 +200,84 @@ pub fn cos_contract(x: f64) -> f64 {
     r
 }
 
+/// `tan`'s contract: NaN for a non-finite argument; ±0 for ±0; otherwise any finite value, at
+/// least 0 on (0, `FRAC_PI_2`] and at most 0 on [−`FRAC_PI_2`, 0), and at most 1.7·10¹⁶ in
+/// magnitude wherever |x| ≤ 2 (tan of the `f64` nearest π/2 is 1.63·10¹⁶). Checked by
+/// `libm_contracts::tan` (gap 2, 2026-10-26).
+pub fn tan_contract(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    if x == 0.0 {
+        return x;
+    }
+    let r: f64 = kani::any();
+    kani::assume(r.is_finite());
+    if x.abs() <= 2.0 {
+        kani::assume(r.abs() <= 1.7e16);
+    }
+    if x > 0.0 && x <= FRAC_PI_2 {
+        kani::assume(r >= 0.0);
+    }
+    if x < 0.0 && x >= -FRAC_PI_2 {
+        kani::assume(r <= 0.0);
+    }
+    r
+}
+
+/// `atan`'s contract: NaN for NaN; ±0 for ±0; otherwise any value in [−π/2, π/2] with the
+/// argument's sign (the infinities included). Checked by `libm_contracts::atan`.
+pub fn atan_contract(x: f64) -> f64 {
+    if x.is_nan() {
+        return f64::NAN;
+    }
+    if x == 0.0 {
+        return x;
+    }
+    let r: f64 = kani::any();
+    kani::assume(r.abs() <= FRAC_PI_2);
+    kani::assume(if x > 0.0 { r >= 0.0 } else { r <= 0.0 });
+    r
+}
+
+/// `sin`'s contract: NaN for a non-finite argument; ±0 for ±0; otherwise in [−1, 1], at least 0
+/// on (0, π] and at most 0 on [−π, 0) (sin of `PI`, the `f64` below π, is 1.2·10⁻¹⁶). The
+/// checker's own `sin` loses the sign. Checked by `libm_contracts::sin`.
+pub fn sin_contract(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    if x == 0.0 {
+        return x;
+    }
+    let r: f64 = kani::any();
+    kani::assume(r.abs() <= 1.0);
+    if x > 0.0 && x <= PI {
+        kani::assume(r >= 0.0);
+    }
+    if x < 0.0 && x >= -PI {
+        kani::assume(r <= 0.0);
+    }
+    r
+}
+
+/// `sin_cos`'s contract: NaN twice for a non-finite argument; (±0, 1) for ±0; otherwise both in
+/// [−1, 1], and the larger in magnitude at least 0.7 (sin² + cos² = 1 puts it at 1/√2 or more).
+/// The checker's own `sin` and `cos` lose that last fact, which keeps `LatLng::to_point` off the
+/// zero vector. Checked by `libm_contracts::sin_cos`.
+pub fn sin_cos_contract(x: f64) -> (f64, f64) {
+    if !x.is_finite() {
+        return (f64::NAN, f64::NAN);
+    }
+    if x == 0.0 {
+        return (x, 1.0);
+    }
+    let (s, c): (f64, f64) = (kani::any(), kani::any());
+    kani::assume(s.abs() <= 1.0 && c.abs() <= 1.0);
+    kani::assume(s.abs() >= 0.7 || c.abs() >= 0.7);
+    (s, c)
+}
+
 // ---- lemma stubs (FR-003a) ---------------------------------------------------------------------
 
 /// `Point::chord_angle`, pure: 0 for a point and itself (L-CP-01), otherwise any length in
@@ -221,8 +304,9 @@ pub fn pure_chord_sym(a: Point, b: Point) -> ChordAngle {
     }
 }
 
-/// `ChordAngle + ChordAngle`, pure: the left operand when the right is zero, the right one when
-/// the left is zero, either zero `+0` or −0 (L-CP-08; 007's P-CAARI-01 for `+0` on the right), otherwise any length in [0, 4] at least each operand (L-CP-05), one per ordered pair.
+/// `ChordAngle + ChordAngle`, pure: the left operand when the right is zero, the right one when the
+/// left is zero, either zero `+0` or −0 (L-CP-08; 007's P-CAARI-01 for `+0` on the right),
+/// otherwise any length in [0, 4] at least each operand (L-CP-05), one per ordered pair.
 pub fn pure_add(a: ChordAngle, b: ChordAngle) -> ChordAngle {
     let (la, lb) = (a.length2(), b.length2());
     if lb == 0.0 {
@@ -240,11 +324,11 @@ pub fn pure_add(a: ChordAngle, b: ChordAngle) -> ChordAngle {
     ChordAngle::from_length2(f64::from_bits(v))
 }
 
-/// `ChordAngle + ChordAngle`, pure and symmetric for non-zero operands: the real zero rules
-/// first (a zero right operand returns the left one, a zero left operand the right one, either
-/// zero `+0` or −0, L-CP-08, so `+0 + −0` is `+0` and `−0 + +0` is `−0`), then as [`pure_add`], one value
-/// per unordered pair (L-CP-06, commutativity of non-zero lengths, by composition from
-/// L-CP-06a and L-CP-06b).
+/// `ChordAngle + ChordAngle`, pure and symmetric for non-zero operands: the real zero rules first
+/// (a zero right operand returns the left one, a zero left operand the right one, either zero `+0`
+/// or −0, L-CP-08, so `+0 + −0` is `+0` and `−0 + +0` is `−0`), then as [`pure_add`], one value per
+/// unordered pair (L-CP-06, commutativity of non-zero lengths, by composition from L-CP-06a and
+/// L-CP-06b).
 pub fn pure_add_sym(a: ChordAngle, b: ChordAngle) -> ChordAngle {
     if b.length2() == 0.0 {
         return a;
@@ -344,7 +428,8 @@ pub fn pure_approx_eq_angle(a: Point, b: Point, eps: s2rst::s1::Angle) -> bool {
         == 1
 }
 
-// ---- the abstract cell (research R7) -------------------------------------------------------------
+// ---- the abstract cell (research R7)
+// -------------------------------------------------------------
 
 fn any_box_point() -> Point {
     let (x, y, z): (f64, f64, f64) = (kani::any(), kani::any(), kani::any());
@@ -374,6 +459,13 @@ pub fn fixed_edge(_c: Cell, e: CellEdge) -> Point {
     from3(EDGES.lock().unwrap()[(e as usize) & 3])
 }
 
+/// `edge_distances::distance_from_segment`, abstracted: any angle. For the `n_*` harnesses whose
+/// panic comes first: the code after it runs on no input, and an any-value stub cannot hide an
+/// input that returns.
+pub fn any_segment_distance(_x: Point, _a: Point, _b: Point) -> s2rst::s1::Angle {
+    s2rst::s1::Angle::from_radians(kani::any())
+}
+
 /// `Cell::contains_point`, abstracted: any answer.
 pub fn any_contains_point(_c: Cell, _p: Point) -> bool {
     kani::any()
@@ -383,4 +475,58 @@ pub fn any_contains_point(_c: Cell, _p: Point) -> bool {
 /// any answer. The cell laws that use it depend only on the order of the vertex tests.
 pub fn any_edge_result(_c: Cap, _cell: &Cell, _v: &[Point; 4]) -> bool {
     kani::any()
+}
+
+// ---- the abstract pair of cells (gap 2)
+// ----------------------------------------------------------
+
+/// Draws an abstract pair of cells: four box points as the vertices of each of two cells, given
+/// to the first two cell ids `pair_vertex` meets. A harness over two cells calls it first.
+pub fn draw_abstract_pair() {
+    let mut v = PAIR_VERTS.lock().unwrap();
+    for c in 0..2 {
+        for k in 0..4 {
+            v[c][k] = bits3(any_box_point());
+        }
+    }
+    *PAIR_IDS.lock().unwrap() = ([0; 2], 0);
+}
+
+/// `Cell::vertex`, from the abstract pair: one cell's vertices for each of the first two ids, the
+/// same for one id, so equal cells keep equal vertices (`fixed_vertex` gives every cell the same
+/// four, which would tie two cells together). A third id shares the second's vertices; no
+/// harness has one.
+pub fn pair_vertex(c: Cell, k: usize) -> Point {
+    let id = c.id().id();
+    let mut ids = PAIR_IDS.lock().unwrap();
+    let slot = if ids.1 > 0 && ids.0[0] == id {
+        0
+    } else if ids.1 > 1 && ids.0[1] == id {
+        1
+    } else if ids.1 < 2 {
+        let n = ids.1;
+        ids.0[n] = id;
+        ids.1 += 1;
+        n
+    } else {
+        1
+    };
+    from3(PAIR_VERTS.lock().unwrap()[slot][k & 3])
+}
+
+// ---- the abstract u-v bound (gap 2) -----------------------------------------------------------
+
+/// `s2::ij_level_to_bound_uv`, abstracted: any rectangle inside [−1, 1]² with ordered bounds.
+/// `Cell::from_cell_id` stores its result as the cell's u-v bound; every real cell's bound is such
+/// a rectangle (the quadratic projection maps [0, 1] onto [−1, 1], increasing), so a crash proof
+/// over this abstraction covers every cell, and spares the checker the projection of a symbolic
+/// (i, j). The cell's face, level, orientation and id stay its own.
+pub fn any_uv_bound<L: Into<s2rst::s2::Level>>(_i: i32, _j: i32, _level: L) -> s2rst::r2::Rect {
+    let b: [f64; 4] = kani::any();
+    kani::assume(b[0] >= -1.0 && b[0] <= b[1] && b[1] <= 1.0);
+    kani::assume(b[2] >= -1.0 && b[2] <= b[3] && b[3] <= 1.0);
+    s2rst::r2::Rect {
+        x: s2rst::r1::Interval { lo: b[0], hi: b[1] },
+        y: s2rst::r1::Interval { lo: b[2], hi: b[3] },
+    }
 }

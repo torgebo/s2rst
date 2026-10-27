@@ -1458,12 +1458,14 @@ class Cap:
 
     @classmethod
     def from_center_height(cls, center: S2Point, height: float) -> "Cap":
-        """Create from center point and height (between 0 and 2)."""
+        """Create from center point and height (between 0 and 2). A negative height gives the
+        empty cap, whose height is -0.5."""
         ...
 
     @classmethod
     def from_center_area(cls, center: S2Point, area: float) -> "Cap":
-        """Create from center point and area (in steradians)."""
+        """Create from center point and area (in steradians). A negative area gives the empty
+        cap, whose height is -0.5."""
         ...
 
     @classmethod
@@ -1490,7 +1492,8 @@ class Cap:
         ...
 
     def height(self) -> float:
-        """Height of the cap (distance from the center plane to the base plane)."""
+        """Height of the cap (distance from the center plane to the base plane); -0.5 for every
+        empty cap."""
         ...
 
     def area(self) -> float:

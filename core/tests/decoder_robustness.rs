@@ -1170,7 +1170,8 @@ fn k2_inputs() -> Vec<(&'static str, Vec<u8>)> {
     let mut cell_ids = vec![0x00]; // shift code 0, base length 0
     cell_ids.extend_from_slice(&u64_header);
     let mut strings = Vec::new();
-    encode_uint_vector_u64(&[499_999_999], &mut strings).unwrap();
+    // The largest data length the string vector accepts (it rejects one above 500,000,000).
+    encode_uint_vector_u64(&[500_000_000], &mut strings).unwrap();
     vec![
         ("uint_vector_u64", u64_header),
         ("uint_vector_u32", leb128(50_000_000 * 4)),

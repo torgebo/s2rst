@@ -194,3 +194,22 @@ fn c_approx_eq() {
         "a short interval matches the empty one"
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panic (gap 1; `crash.rs` explains the `n_*` convention).
+// ---------------------------------------------------------------------------------------------
+
+/// N-r1::Interval::project: panics, in every build, for every empty interval (`lo > hi`) and
+/// every interval with a NaN bound, whatever the point (a debug check, then `f64::clamp`'s
+/// assertion, which release builds keep).
+#[kani::proof]
+#[kani::should_panic]
+fn n_project() {
+    let x = Interval {
+        lo: kani::any(),
+        hi: kani::any(),
+    };
+    kani::assume(x.lo.is_nan() || x.hi.is_nan() || x.lo > x.hi);
+    let _ = x.project(any_f64());
+    kani::cover!(true, "returns");
+}

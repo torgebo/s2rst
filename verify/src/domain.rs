@@ -79,6 +79,14 @@ pub fn any_valid_on_face(face: u8) -> (CellId, Decomposed) {
     (CellId(spec::compose(d)), d)
 }
 
+/// Every `u64` that is not a valid cell id, the complement of `Valid` (the `n_*` harnesses):
+/// outside the model's image, by `spec::valid_by_marker`, which needs no level search.
+pub fn any_invalid() -> CellId {
+    let x: u64 = kani::any();
+    kani::assume(!spec::valid_by_marker(x));
+    CellId(x)
+}
+
 /// `ValidOrEnd`: a valid cell, `end(l)` for any level `l`, or `sentinel`.
 pub fn any_valid_or_end() -> CellId {
     let k: u8 = kani::any();

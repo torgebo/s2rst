@@ -6,8 +6,8 @@ Defect: `height` is a quarter of the length²
 diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
 --- a/core/src/s2/cap.rs
 +++ b/core/src/s2/cap.rs
-@@ -197,7 +197,7 @@
-     /// point to the cutoff plane.
+@@ -210,7 +210,7 @@
+     /// there (spec 007 FR-017; see [`from_center_height`](Self::from_center_height)).
      #[inline]
      pub fn height(self) -> f64 {
 -        0.5 * self.radius.length2()

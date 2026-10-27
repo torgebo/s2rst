@@ -102,3 +102,17 @@ fn header_varint_cut_short_is_rejected() {
     let err = decode_s2point_vector(&mut [0x80u8, 0x80].as_slice()).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
 }
+
+/// Code review of v0.4.0..74b9bc1, finding 1: a count of 2³² + 1 points is over the limit on
+/// every target. On wasm32 it was truncated to 1 before the check, and the input decoded as one
+/// point. `wasm/tests/web.rs` runs it on wasm32.
+#[test]
+fn count_above_u32_max_is_rejected() {
+    let mut b = Vec::new();
+    write_uvarint(&mut b, ((1u64 << 32) + 1) << ENCODING_FORMAT_BITS).unwrap();
+    for x in [1.0f64, 0.0, 0.0] {
+        b.extend_from_slice(&x.to_le_bytes());
+    }
+    let err = decode_s2point_vector(&mut b.as_slice()).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}

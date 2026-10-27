@@ -578,3 +578,251 @@ fn c_vertex_neighbors() {
     kani::cover!(v.len() == 3, "cube vertex");
     kani::cover!(v.len() == 4, "4 cells");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (code review of 074e923's coverage, gap 1)
+// ---------------------------------------------------------------------------------------------
+//
+// The harnesses above prove that an operation does not panic inside its domain. These prove
+// the other half of its `# Panics` section: for every input outside the domain it panics (`n_*`,
+// `#[kani::should_panic]`), so the section is exact. Kani passes a `should_panic` harness when
+// one input panics; each one therefore ends in a single cover after the call, which only an
+// input that returns would satisfy, and `run-verify.sh` requires it unsatisfied (covers
+// `never`). A panic that the section calls debug-only is proven in the debug build (`n_*`, under
+// `cfg(debug_assertions)`), and the release build's behaviour on the same inputs separately
+// (`r_*`, under `cfg(not(debug_assertions))`, `make verify-release`): no panic and no overflow.
+// Where a `# Panics` names inputs outside the domain that return (an unspecified result, or one
+// it states), an `o_*` harness proves that they do, in every build. `make verify-release` runs
+// the `n_*` harnesses whose panic is in every build, the `r_*` and the `o_*` ones.
+
+/// N-Level: `impl From<u8> for Level` panics for every raw level above 30, in every build, and
+/// so does each operation that takes `impl Into<Level>` (its `# Panics`: "the conversion to
+/// `Level` panics"), before it reads its other arguments.
+///
+/// The unwind bound is for the code after the panic: the checker does not simplify the failed
+/// check's condition (`raw ≤ 30` under the assumption `raw > 30`) to false, so it explores that
+/// code too, on paths no input takes, and the neighbour operations' loops timed out at 10
+/// minutes without it. Unwinding checks stay on, so a reachable loop beyond the bound would
+/// fail the proof.
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(2)]
+fn n_raw_level() {
+    let raw: u8 = kani::any();
+    kani::assume(raw > 30);
+    let (c, _) = any_valid();
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = Level::from(raw);
+        }
+        1 => {
+            let _ = CellId::from_face_pos_level(0u8, 0, raw);
+        }
+        2 => {
+            let _ = c.child_position(raw);
+        }
+        3 => {
+            let _ = c.parent_at_level(raw);
+        }
+        4 => {
+            let _ = c.child_begin_at_level(raw);
+        }
+        5 => {
+            let _ = c.child_end_at_level(raw);
+        }
+        6 => {
+            let _ = CellId::begin(raw);
+        }
+        7 => {
+            let _ = CellId::end(raw);
+        }
+        8 => {
+            let _ = lsb_for_level(raw);
+        }
+        9 => {
+            let _ = size_ij(raw);
+        }
+        10 => {
+            let _ = CellId::size_st(raw);
+        }
+        11 => {
+            let _ = c.vertex_neighbors(raw);
+        }
+        _ => {
+            let _ = c.all_neighbors(raw);
+        }
+    }
+    kani::cover!(true, "returns");
+}
+
+/// N-level: `CellId::level` panics for every id with 62 or more trailing zero bits (`0`,
+/// `1 << 62`, `1 << 63`, `3 << 62`), in every build: the ids its `# Panics` names.
+#[kani::proof]
+#[kani::should_panic]
+fn n_level() {
+    let x: u64 = kani::any();
+    kani::assume(x.trailing_zeros() >= 62);
+    let _ = CellId(x).level();
+    kani::cover!(true, "returns");
+}
+
+/// The complement of `child_position`'s domain: an invalid id with any level, or a valid cell
+/// with a level outside `1..=level`.
+fn outside_child_position() -> (CellId, Level, bool) {
+    let x: u64 = kani::any();
+    let l = any_level();
+    let valid = spec::valid_by_marker(x);
+    if valid {
+        // The level whose marker bit is the lowest set bit.
+        let level = (60 - x.trailing_zeros()) / 2;
+        kani::assume(l.as_u8() < 1 || u32::from(l.as_u8()) > level);
+    }
+    (CellId(x), l, !valid)
+}
+
+/// N-child_position: in debug builds, `CellId::child_position` panics for every invalid id and
+/// every valid cell with a level outside `1..=level` (its `debug_assert!`s).
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_child_position() {
+    let (c, l, _) = outside_child_position();
+    let _ = c.child_position(l);
+    kani::cover!(true, "returns");
+}
+
+/// R-child_position: in a build without debug assertions, `CellId::child_position` completes
+/// without panic or overflow on the same inputs (its `# Panics` names debug builds only).
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_child_position() {
+    let (c, l, invalid) = outside_child_position();
+    let _ = c.child_position(l);
+    kani::cover!(invalid, "an invalid id");
+    kani::cover!(!invalid, "a level outside 1..=level");
+}
+
+/// N-parent: in debug builds, `CellId::parent` panics for every face cell.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_parent() {
+    let (c, _) = crate::domain::any_valid_at(0);
+    let _ = c.parent();
+    kani::cover!(true, "returns");
+}
+
+/// R-parent: in a build without debug assertions, `CellId::parent` completes without panic or
+/// overflow for every face cell.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_parent() {
+    let (c, d) = crate::domain::any_valid_at(0);
+    let _ = c.parent();
+    kani::cover!(d.face == 5, "face 5");
+}
+
+/// The complement of the child operations' domain: an invalid id or a leaf.
+fn outside_children() -> (CellId, bool) {
+    let leaf: bool = kani::any();
+    if leaf {
+        (crate::domain::any_valid_at(30).0, true)
+    } else {
+        (crate::domain::any_invalid(), false)
+    }
+}
+
+/// N-children, N-child_begin, N-child_end: in debug builds, each of `CellId::children`,
+/// `child_begin` and `child_end` panics for every invalid id and every leaf.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_children() {
+    let (c, _) = outside_children();
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = c.children();
+        }
+        1 => {
+            let _ = c.child_begin();
+        }
+        _ => {
+            let _ = c.child_end();
+        }
+    }
+    kani::cover!(true, "returns");
+}
+
+/// R-children, R-child_begin, R-child_end: in a build without debug assertions, each completes
+/// without panic or overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_children() {
+    let (c, leaf) = outside_children();
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = c.children();
+        }
+        1 => {
+            let _ = c.child_begin();
+        }
+        _ => {
+            // `child_end`'s sum overflows for the ids within 5/4 of their lowest set bit of
+            // 2^64, `sentinel` among them (2026-10-26). A release build wraps there, without a
+            // panic, but Kani checks overflow in every build, so those ids are outside this
+            // proof.
+            let lsb = c.0 & c.0.wrapping_neg();
+            kani::assume(c.0.checked_add(lsb + (lsb >> 2)).is_some());
+            let _ = c.child_end();
+        }
+    }
+    kani::cover!(leaf, "a leaf");
+    kani::cover!(!leaf, "an invalid id");
+}
+
+/// N-next_wrap, N-prev_wrap: in debug builds, `CellId::next_wrap` and `prev_wrap` panic for
+/// every invalid id.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_wrap() {
+    let c = crate::domain::any_invalid();
+    if kani::any::<bool>() {
+        let _ = c.next_wrap();
+    } else {
+        let _ = c.prev_wrap();
+    }
+    kani::cover!(true, "returns");
+}
+
+/// R-next_wrap, R-prev_wrap: in a build without debug assertions, both complete without panic
+/// or overflow for every invalid id.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_wrap() {
+    let c = crate::domain::any_invalid();
+    let (n, p) = (c.next_wrap(), c.prev_wrap());
+    kani::cover!(c.0 == 0 && n.0 == 0 && p.0 == 0, "none stays none");
+}
+
+/// N-vertex_neighbors: `CellId::vertex_neighbors` panics for every valid cell at level 30, in
+/// every build (its `# Panics`: `Level::new(31)`).
+#[kani::proof]
+#[kani::should_panic]
+fn n_vertex_neighbors() {
+    let (c, _) = any_valid();
+    let _ = c.vertex_neighbors(Level::new(30));
+    kani::cover!(true, "returns");
+}
+
+/// N-common_ancestor_level: `CellId::common_ancestor_level` panics for the pair (`none`,
+/// `none`), in every build (`ilog2(0)`).
+#[kani::proof]
+#[kani::should_panic]
+fn n_common_ancestor_level() {
+    let _ = CellId::none().common_ancestor_level(CellId::none());
+    kani::cover!(true, "returns");
+}

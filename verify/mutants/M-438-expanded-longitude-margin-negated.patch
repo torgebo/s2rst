@@ -7,8 +7,8 @@ Tier: slow
 diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
 --- a/core/src/s2/rect.rs
 +++ b/core/src/s2/rect.rs
-@@ -488,7 +488,7 @@
-     /// result is a rectangle that is not valid.
+@@ -490,7 +490,7 @@
+     /// a rectangle that is not valid.
      pub fn expanded(self, margin: LatLng) -> Rect {
          let lat = self.lat.expanded(margin.lat.radians());
 -        let lng = self.lng.expanded(margin.lng.radians());

@@ -7,8 +7,8 @@ Tier: slow
 diff --git a/core/src/r2/rect.rs b/core/src/r2/rect.rs
 --- a/core/src/r2/rect.rs
 +++ b/core/src/r2/rect.rs
-@@ -155,7 +155,7 @@
-     /// that invalid rectangle.
+@@ -156,7 +156,7 @@
+     /// does (`r2rect.cc:25`). Release builds return that invalid rectangle.
      pub fn from_center_size(center: Point, size: Point) -> Self {
          let r = Rect {
 -            x: r1::Interval::new(center.x - 0.5 * size.x, center.x + 0.5 * size.x),

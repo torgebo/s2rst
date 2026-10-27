@@ -131,6 +131,11 @@ impl Cap {
     /// Creates a cap with the given center and height. The height is the
     /// distance from the center point to the cutoff plane. A negative height
     /// yields an empty cap; a height of 2 or more yields a full cap.
+    ///
+    /// The empty cap does not keep a negative height: its radius is
+    /// [`ChordAngle::NEGATIVE`], so [`height`](Self::height) returns −0.5 whatever the height
+    /// given. Upstream keeps it (`S2Cap::FromCenterHeight(c, -3).height()` is −3); a
+    /// documented deviation, see [`ChordAngle`]'s "Deviation from upstream" (spec 007 FR-017).
     #[inline]
     pub fn from_center_height(center: Point, height: f64) -> Self {
         Self::from_center_chord_angle(center, ChordAngle::from_length2(2.0 * height))
@@ -140,6 +145,10 @@ impl Cap {
     /// also be interpreted as the solid angle subtended by the cap (because
     /// the sphere has unit radius). A negative area yields an empty cap;
     /// an area of 4π or more yields a full cap.
+    ///
+    /// As for [`from_center_height`](Self::from_center_height), the empty cap's radius is
+    /// [`ChordAngle::NEGATIVE`] and its [`height`](Self::height) −0.5, where upstream keeps
+    /// `area / 2π` (spec 007 FR-017). Its [`area`](Self::area) is 0 in both.
     #[inline]
     pub fn from_center_area(center: Point, area: f64) -> Self {
         Self::from_center_chord_angle(center, ChordAngle::from_length2(area / PI))
@@ -195,6 +204,10 @@ impl Cap {
 
     /// Returns the height of the cap. This is the distance from the center
     /// point to the cutoff plane.
+    ///
+    /// −0.5 for every empty cap, the height of the radius [`ChordAngle::NEGATIVE`], also one
+    /// built from a negative height or area. Upstream returns the negative value it was given
+    /// there (spec 007 FR-017; see [`from_center_height`](Self::from_center_height)).
     #[inline]
     pub fn height(self) -> f64 {
         0.5 * self.radius.length2()
@@ -304,8 +317,9 @@ impl Cap {
     /// # Panics
     ///
     /// In debug builds, when `distance` is negative or NaN (upstream's `ABSL_DCHECK_GE`), and
-    /// when it is +∞: its chord angle is `INFINITY`, and the chord-angle sum checks for special
-    /// operands (spec 007 FR-019), as upstream's does.
+    /// when it is +∞ and the cap is not empty: its chord angle is `INFINITY`, and the
+    /// chord-angle sum checks for special operands (spec 007 FR-019), as upstream's does. The
+    /// empty cap returns before the sum, so +∞ leaves it empty.
     pub fn expanded(self, distance: Angle) -> Cap {
         debug_assert!(distance.radians() >= 0.0);
         if self.is_empty() {
@@ -652,8 +666,8 @@ impl<'de> serde::Deserialize<'de> for Cap {
         if !f.center.is_unit() {
             return Err(D::Error::custom("cap centre is not unit length"));
         }
-        // Unreachable through `ChordAngle`'s own deserialiser (spec 007 FR-020), kept so that
-        // this impl states the whole rule.
+        // `INFINITY`, which `ChordAngle`'s deserialiser returns for a `null` radius (spec 007
+        // FR-020): `serde_json` writes +∞ as `null`, and before 0.5 also a radius of −∞ or NaN.
         if f.radius.length2() > 4.0 {
             return Err(D::Error::custom("cap radius is above STRAIGHT"));
         }

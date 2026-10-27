@@ -74,7 +74,8 @@ impl CellUnion {
     /// # Panics
     ///
     /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
-    /// valid ids).
+    /// valid ids), unless it lies in the leaf range of a valid cell of the input
+    /// ([`CellId::range_min`]..=[`CellId::range_max`]), which drops it as a contained cell.
     pub fn from_cell_ids(ids: Vec<CellId>) -> Self {
         let mut cu = CellUnion(ids);
         cu.normalize();
@@ -164,7 +165,8 @@ impl CellUnion {
     /// # Panics
     ///
     /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
-    /// valid ids).
+    /// valid ids), unless it lies in the leaf range of a valid cell of the input
+    /// ([`CellId::range_min`]..=[`CellId::range_max`]), which drops it as a contained cell.
     pub fn normalize(&mut self) {
         self.0.sort_unstable();
         let mut output: Vec<CellId> = Vec::with_capacity(self.0.len());
@@ -211,7 +213,9 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `id` is not a valid cell, or if this union is not valid.
+    /// In debug builds, panics if `id` is not a valid cell. On a union that is not valid the
+    /// result is unspecified, and in debug builds it may be a panic (an id 0 in the union
+    /// underflows in [`CellId::range_max`]).
     pub fn contains_cell_id(&self, id: CellId) -> bool {
         debug_assert!(id.is_valid());
         // Find the first cell that does not entirely precede `id`.
@@ -224,7 +228,9 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `id` is not a valid cell, or if this union is not valid.
+    /// In debug builds, panics if `id` is not a valid cell. On a union that is not valid the
+    /// result is unspecified, and in debug builds it may be a panic (an id 0 in the union
+    /// underflows in [`CellId::range_max`]).
     pub fn intersects_cell_id(&self, id: CellId) -> bool {
         debug_assert!(id.is_valid());
         // Find the first cell that does not entirely precede `id`.
@@ -236,7 +242,8 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if this union is not valid.
+    /// On a union that is not valid the result is unspecified, and in debug builds it may be a
+    /// panic.
     pub fn contains_point(&self, p: Point) -> bool {
         self.contains_cell_id(CellId::from_point(&p))
     }
@@ -245,7 +252,8 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if either union is not valid.
+    /// On unions that are not valid the result is unspecified, and in debug builds it may be a
+    /// panic: an invalid id of `other` panics when the test reaches it.
     pub fn contains_union(&self, other: &CellUnion) -> bool {
         other.0.iter().all(|id| self.contains_cell_id(*id))
     }
@@ -254,7 +262,8 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if either union is not valid.
+    /// On unions that are not valid the result is unspecified, and in debug builds it may be a
+    /// panic: an invalid id of `other` panics when the test reaches it.
     pub fn intersects_union(&self, other: &CellUnion) -> bool {
         other.0.iter().any(|id| self.intersects_cell_id(*id))
     }
@@ -292,7 +301,10 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// If `min_id` or `max_id` is not a valid leaf cell, or if `min_id > max_id`.
+    /// If `max_id` is not a valid leaf cell, if `min_id` is not one either and is not
+    /// `max_id.next()`, or if `min_id > max_id.next()`. So `min_id == max_id.next()` (the next
+    /// leaf, or `CellId::end(30)` after the last one) gives the empty union, as C++
+    /// `FromMinMax` does through `FromBeginEnd`.
     pub fn from_min_max(min_id: CellId, max_id: CellId) -> Self {
         assert!(
             max_id.is_valid() && max_id.is_leaf(),
@@ -340,7 +352,9 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if either union holds an id that is not a valid cell.
+    /// As [`CellUnion::from_cell_ids`] on the ids of both: in debug builds, panics if either
+    /// union holds an id that is not a valid cell, unless it lies in the leaf range of a valid
+    /// cell of the two.
     pub fn union(&self, other: &CellUnion) -> CellUnion {
         let mut ids = Vec::with_capacity(self.0.len() + other.0.len());
         ids.extend_from_slice(&self.0);
@@ -352,7 +366,8 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if either union is not valid.
+    /// On unions that are not valid the result is unspecified, and in debug builds it may be a
+    /// panic.
     pub fn intersection(&self, other: &CellUnion) -> CellUnion {
         let mut result = Vec::new();
         get_intersection(&self.0, &other.0, &mut result);
@@ -363,7 +378,9 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `id` is not a valid cell, or if this union is not valid.
+    /// In debug builds, panics if `id` is not a valid cell. On a union that is not valid the
+    /// result is unspecified, and in debug builds it may be a panic (an id 0 in the union
+    /// underflows in [`CellId::range_max`]).
     pub fn intersection_with_cell_id(&self, id: CellId) -> CellUnion {
         if self.contains_cell_id(id) {
             return CellUnion(vec![id]);
@@ -383,7 +400,8 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if either union is not valid.
+    /// On unions that are not valid the result is unspecified, and in debug builds it may be a
+    /// panic.
     pub fn difference(&self, other: &CellUnion) -> CellUnion {
         let mut result = Vec::new();
         for &id in &self.0 {
@@ -467,8 +485,9 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// Panics if an id is not a valid cell, in all builds (building its `Cell` needs a
-    /// valid id).
+    /// Panics, in all builds, if an id has no level marker or is on face 6 or 7, where
+    /// building its `Cell` panics ([`Cell::from_cell_id`]). The other invalid ids give an
+    /// unspecified area.
     pub fn approx_area(&self) -> f64 {
         self.0
             .iter()
@@ -481,8 +500,9 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// Panics if an id is not a valid cell, in all builds (building its `Cell` needs a
-    /// valid id).
+    /// Panics, in all builds, if an id has no level marker or is on face 6 or 7, where
+    /// building its `Cell` panics ([`Cell::from_cell_id`]). The other invalid ids give an
+    /// unspecified area.
     pub fn exact_area(&self) -> f64 {
         self.0
             .iter()
@@ -503,7 +523,9 @@ impl CellUnion {
     /// # Panics
     ///
     /// If `level_mod` is not 1, 2 or 3, or if an id has no level marker (through
-    /// [`CellId::level`]). In debug builds, also if an id is not a valid cell.
+    /// [`CellId::level`]). Another invalid id gives an unspecified result, and in debug builds
+    /// may panic (an arithmetic overflow while it is expanded); a face-6 leaf, for one, is kept
+    /// as it is.
     pub fn denormalize(&self, min_level: Level, level_mod: u8) -> CellUnion {
         assert!(
             (1..=3).contains(&level_mod),
@@ -667,7 +689,8 @@ impl<'de> serde::Deserialize<'de> for CellUnion {
 ///
 /// # Panics
 ///
-/// In debug builds, panics if an id is not a valid cell.
+/// As [`CellUnion::from_cell_ids`]: in debug builds, panics if an id is not a valid cell, unless
+/// it lies in the leaf range of a valid cell of the input.
 impl FromIterator<CellId> for CellUnion {
     fn from_iter<I: IntoIterator<Item = CellId>>(iter: I) -> Self {
         CellUnion::from_cell_ids(iter.into_iter().collect())
@@ -694,9 +717,11 @@ impl<'a> IntoIterator for &'a CellUnion {
 ///
 /// # Panics
 ///
-/// The bounds (`cap_bound`, `rect_bound`, `cell_union_bound`) panic if an id is not a valid
-/// cell, in all builds. `contains_cell`, `intersects_cell` and `contains_point` panic in
-/// debug builds if the union is not valid.
+/// The bounds (`cap_bound`, `rect_bound`, `cell_union_bound`) panic, in all builds, if an id
+/// has no level marker or is on face 6 or 7, where building its `Cell` panics
+/// ([`Cell::from_cell_id`]); the other invalid ids give an unspecified bound. On a union that is
+/// not valid, `contains_cell`, `intersects_cell` and `contains_point` give an unspecified
+/// result, and in debug builds may panic.
 impl Region for CellUnion {
     fn cap_bound(&self) -> Cap {
         if self.0.is_empty() {

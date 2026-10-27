@@ -243,6 +243,16 @@ verify-values: verify-kani-check ## Run the value-type proofs only: Cell, s1::In
 	$(if $(filter-out angle,$(P)),,cd verify && cargo test --release --test angle_enumeration -- --ignored)
 	cd verify && ./run-verify.sh $(VALUES_HARNESSES)
 
+# The release pass (the documented panics, gap 1 of the 2026-10-26 coverage review): built
+# without debug assertions, it runs the `n_*` harnesses whose panic is in every build (the
+# debug-only ones compile out), the `r_*` harnesses, which prove that the debug checks a
+# release build skips leave no panic or overflow on the same inputs, and the `o_*` ones (inputs
+# outside a domain that return, in every build). Its own target directory
+# (verify/target/no-debug-assertions), so it does not rebuild the debug one.
+.PHONY: verify-release
+verify-release: verify-kani-check ## Run the documented panics' release-build proofs (every-build n_*, r_*, o_*), without debug assertions
+	cd verify && VERIFY_DEBUG_ASSERTIONS=0 ./run-verify.sh --harness ::n_ --harness ::r_ --harness ::o_
+
 .PHONY: verify-verus-check
 verify-verus-check: ## Check that the pinned Verus release and its Rust toolchain are installed [VERUS=<path to verus>]
 	@$(VERUS) --version 2>/dev/null | grep -q "Version: $(VERUS_VERSION)" || { \
@@ -312,7 +322,10 @@ verify-slow: verify-kani-check ## Run the weekly slow-tier proofs, one at a time
 # preflight refuses to start unless the ceiling plus 2 GiB is available, so it does not run
 # on a smaller workstation by accident. No CI job runs it.
 XLARGE_MEM ?= 26G
-XLARGE_HARNESSES = $(if $(H),--exact --harness $(H),--harness cd_xlarge::)
+# Since the 2026-10-26 coverage review (verify/COVERAGE.md) the tier also holds five `Cell`
+# float-geometry crash proofs that run out of memory at 8 GiB weekly.
+XLARGE_VALUES = cl_crash::c_fg_exact_area cl_crash::c_fg_distance_to_edge cl_crash::c_fg_max_distance_to_edge cl_crash::c_fg_distance_to_cell cl_crash::c_fg_max_distance_to_cell
+XLARGE_HARNESSES = $(if $(H),--exact --harness $(H),--harness cd_xlarge:: $(addprefix --harness ,$(XLARGE_VALUES)))
 
 .PHONY: verify-xlarge
 verify-xlarge: verify-kani-check ## Run the xlarge tier on a 32 GB machine: one harness at a time, 26G ceiling, 4 h each [H=<module>::<fn>] [XLARGE_MEM=<n>G]

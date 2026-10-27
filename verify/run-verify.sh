@@ -27,13 +27,25 @@
 #   VERIFY_PLAYBACK         0 skips the concrete-playback re-run of failed harnesses
 #                           (run-mutants.sh sets it: a kill needs only the FAILED status, and
 #                           the re-run can take as long as the time limit)
+#   VERIFY_DEBUG_ASSERTIONS 0 builds without debug assertions, as a release build runs the
+#                           debug-only checks (`make verify-release`), in its own target
+#                           directory (default target/no-debug-assertions), and drops CBMC's
+#                           NaN check (Kani's --no-overflow-checks): a release build's skipped
+#                           check leaves a NaN that Rust computes without a panic. rustc's
+#                           arithmetic overflow and division-by-zero checks stay on.
 #
 # Statuses: SUCCESSFUL, FAILED, OOM (hit the ceiling, in the solver or before it: CBMC's
-# exit status 6), TIMEOUT (hit the time limit), ERROR (the tool failed without a failed
-# check), NOT-RUN (its Kani driver crashed before reaching it), KNOWN-DEFECT D-NNN (listed in
-# known-defects.txt), KNOWN-TIMEOUT (a TIMEOUT listed in known-timeouts.txt, a recorded tool
-# limit). The run fails on any FAILED/OOM/ERROR/NOT-RUN and unlisted TIMEOUT, on any unsatisfied cover (Kani 0.68.0 itself exits 0 then), on a stale
-# known-defect or known-timeout entry, and when the memory backstop is hit. Failed harnesses
+# exit status 6, read from the main run or from a re-run of an ERROR), TIMEOUT (hit the time
+# limit), ERROR (the tool failed without a failed check), NOT-RUN (its Kani driver crashed before reaching it), KNOWN-DEFECT D-NNN (a FAILED
+# listed in known-defects.txt), KNOWN-TIMEOUT (a TIMEOUT listed in known-timeouts.txt, a
+# recorded tool limit). A `#[kani::should_panic]` harness (`n_*`, "every input outside the
+# domain panics") ends in one cover after the call: it is SUCCESSFUL when some input panics
+# and that cover is unsatisfied (covers `never`), RETURNS when an input reaches it, FAILED when
+# nothing panics. A listed harness that ends in any other status keeps it. The run fails
+# on any FAILED/RETURNS/OOM/ERROR/NOT-RUN and unlisted TIMEOUT, on any unsatisfied cover (Kani 0.68.0
+# itself exits 0 then), on a stale known-defect or known-timeout entry, when the memory
+# backstop is hit, and when the selection holds no harness or a --harness filter selects none
+# (one naming a whole module, `<module>::`, need only name a module of src/). Failed harnesses
 # are re-run with concrete playback, so the output shows a concrete counterexample.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -43,6 +55,20 @@ cd "$(dirname "$0")"
 log_dir=${VERIFY_RUN_DIR:-target/run-verify}
 mkdir -p "$log_dir"
 log="$log_dir/kani.log"
+
+# Without debug assertions (the release pass), in a target directory of its own: the profile
+# setting is part of cargo's fingerprint, so one directory would rebuild on every switch.
+# Kani's --no-overflow-checks removes only CBMC's `--nan-check` (and adds
+# `--no-div-by-zero-check`, for floats; 2026-10-26): the overflow and division checks that panic
+# in Rust are rustc's, which Kani compiles in for every build, so they remain. A NaN is a value
+# in Rust, and the release behaviour of a skipped debug check is often one (`ChordAngle::sin` of
+# a sentinel), so the release pass does not report it.
+check_flags=()
+if [ "${VERIFY_DEBUG_ASSERTIONS:-1}" = 0 ]; then
+    export CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false
+    export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-target/no-debug-assertions}
+    check_flags=(--no-overflow-checks)
+fi
 
 # ---- memory ceiling and parallelism (research R15) ------------------------------------
 to_kib() {   # to_kib <value> <variable name, for the error message>
@@ -82,14 +108,18 @@ else
 fi
 
 # The caller's build options (for example `--features slow`), without the harness
-# selection, for the single-harness re-runs below.
+# selection, for the single-harness re-runs below; and the selection's filters, for the check
+# after the build.
 build_args=()
+filters=()
+exact=false
 skip_next=false
 for a in "$@"; do
-    if $skip_next; then skip_next=false; continue; fi
+    if $skip_next; then skip_next=false; filters+=("$a"); continue; fi
     case "$a" in
         --harness) skip_next=true ;;
-        --harness=*|--exact) ;;
+        --harness=*) filters+=("${a#--harness=}") ;;
+        --exact) exact=true ;;
         *) build_args+=("$a") ;;
     esac
 done
@@ -105,7 +135,7 @@ fi
 
 # ---- step 1: build once, without a memory limit ---------------------------------------
 echo "run-verify: building harnesses (cargo kani --only-codegen)"
-if ! cargo kani --only-codegen "${stub_flag[@]}" "$@" > "$log_dir/codegen.log" 2>&1; then
+if ! cargo kani --only-codegen "${stub_flag[@]}" ${check_flags[@]+"${check_flags[@]}"} "$@" > "$log_dir/codegen.log" 2>&1; then
     tail -n 40 "$log_dir/codegen.log"
     echo "run-verify: codegen failed (full log: verify/$log_dir/codegen.log)" >&2
     exit 1
@@ -128,6 +158,34 @@ if [ -n "$rlib" ]; then
         python3 -c 'import json, sys
 for h in sorted(p["pretty_name"] for p in json.load(open(sys.argv[1]))["proof_harnesses"]):
     print(h)' "$meta" > "$harnesses" && listed=true
+    fi
+fi
+# A selection that holds no harness fails here, before any run: a typo in a filter or a
+# renamed harness would otherwise run no batch and pass (code review of v0.4.0..74b9bc1,
+# finding 4). So does each filter that names harnesses and selects none of the build, by
+# Kani's rule: the whole name with --exact, a part of it without. A filter that names a whole
+# module (`<module>::`) need only name a module of src/: it may select nothing in this tier,
+# as `make verify-values P=<part>` names every module of the part and some hold weekly members
+# only.
+if $listed; then
+    unmatched=()
+    for f in "${filters[@]}"; do
+        if $exact; then
+            grep -qxF -e "$f" "$harnesses" || unmatched+=("$f")
+        elif [[ "$f" =~ ^[a-z0-9_]+::$ ]]; then
+            [ -f "src/${f%::}.rs" ] || unmatched+=("$f")
+        else
+            grep -qF -e "$f" "$harnesses" || unmatched+=("$f")
+        fi
+    done
+    if [ "${#unmatched[@]}" -gt 0 ]; then
+        echo "run-verify: no harness or module matches the filter(s) ${unmatched[*]}; check" \
+             "the names" >&2
+        exit 1
+    fi
+    if [ ! -s "$harnesses" ]; then
+        echo "run-verify: the selection holds no harness (build log: verify/$log_dir/codegen.log)" >&2
+        exit 1
     fi
 fi
 # 32 harnesses at the default 4 GiB ceiling: a batch of 64 peaked at 3.6 GB (KI-010).
@@ -197,13 +255,34 @@ n_fail = 0
 progress = open(progress_path, 'w')
 
 def new():
-    return {'covers': None, 'failed': None, 'status': None, 'time': None}
+    return {'covers': None, 'failed': None, 'status': None, 'time': None, 'panic': None,
+            'oom': False}
 
 def status(r):
     st = r['status'] or 'ERROR'
+    if r['panic'] == 'none':
+        return 'FAILED'            # a should_panic harness in which nothing panicked
     if st == 'FAILED' and not r['failed']:
-        st = 'ERROR'               # failed without a failed check: OOM or tool error
+        # Failed without a failed check: out of memory when CBMC said so in this harness's
+        # block (its status 6, before the solver or in it), otherwise a tool error, which step 3
+        # re-runs alone to tell (an out-of-memory re-run took up to 30 minutes, 2026-10-27).
+        st = 'OOM' if r['oom'] else 'ERROR'
+    if st == 'SUCCESSFUL' and r['panic'] == 'expected':
+        # A `should_panic` harness (`n_*`) ends in one cover after the call, which only an
+        # input that returns satisfies. Kani passes the harness if one input panics; the
+        # unsatisfied cover shows that every input does.
+        c = r['covers']
+        if c == (1, 1):
+            st = 'RETURNS'
+        elif c != (0, 1):
+            st = 'ERROR'           # not the one cover the convention requires
     return st
+
+def covers(r):
+    c = r['covers']
+    if r['panic'] == 'expected' and c == (0, 1):
+        return 'never'             # the "returns" cover, unsatisfied as required
+    return '-' if c is None else '%d/%d' % c
 
 def show(h):
     # The progress line, once per harness. Known defects and covers as in step 3; an ERROR
@@ -214,17 +293,17 @@ def show(h):
     shown.add(h)
     r = res[h]
     st = status(r)
-    if h in known:
+    if h in known and st in ('FAILED', 'SUCCESSFUL'):
         stale = st == 'SUCCESSFUL'
         st = ('SUCCESSFUL, STALE KNOWN-DEFECT ' if stale else 'KNOWN-DEFECT ') + known[h]
     elif h in known_timeouts and st in ('TIMEOUT', 'SUCCESSFUL'):
         st = 'KNOWN-TIMEOUT' if st == 'TIMEOUT' else 'SUCCESSFUL, STALE KNOWN-TIMEOUT'
     c = r['covers']
-    if c is not None and c[0] < c[1]:
+    if c is not None and c[0] < c[1] and r['panic'] is None:
         st += ', UNSATISFIED COVERS'
     if st != 'SUCCESSFUL' and not st.startswith(('KNOWN-DEFECT', 'KNOWN-TIMEOUT')):
         n_fail += 1
-    cov = '-' if c is None else '%d/%d' % c
+    cov = covers(r)
     t = '-' if r['time'] is None else '%.1f' % r['time']
     line = '[%s] %-44s %-24s covers %-6s %ss  (%d done, %d failing)' % (
         time.strftime('%H:%M:%S'), h, st, cov, t, len(shown), n_fail)
@@ -243,6 +322,7 @@ for line in sys.stdin:
             cur = m.group(2)
         else:
             by_thread[m.group(1)] = m.group(2)
+        res[last] = new()              # run again after its driver crashed: the last run counts
         continue
     m = thread_hdr.match(line)
     if m:
@@ -258,8 +338,14 @@ for line in sys.stdin:
         r['covers'] = (int(m.group(1)), int(m.group(2)))
     elif m := re.match(r'^ \*\* (\d+) of (\d+) failed', line):
         r['failed'] = int(m.group(1))
-    elif m := re.match(r'^VERIFICATION:- (SUCCESSFUL|FAILED)', line):
+    elif m := re.match(r'^VERIFICATION:- (SUCCESSFUL|FAILED)(.*)', line):
         r['status'] = m.group(1)
+        if 'panics as expected' in m.group(2):
+            r['panic'] = 'expected'
+        elif 'encountered no panics' in m.group(2):
+            r['panic'] = 'none'
+    elif re.search(r'CBMC failed with status 6|ran out of memory|std::bad_alloc', line):
+        r['oom'] = True
     elif line.startswith('CBMC timed out'):
         r['status'] = 'TIMEOUT'
         show(cur)
@@ -277,10 +363,8 @@ for h in sorted(res):
     show(h)
 with open(out, 'w') as f:
     for h, r in sorted(res.items()):
-        c = r['covers']
-        cov = '-' if c is None else '%d/%d' % c
         t = '-' if r['time'] is None else '%.1f' % r['time']
-        f.write('\t'.join((h, status(r), cov, t)) + '\n')
+        f.write('\t'.join((h, status(r), covers(r), t)) + '\n')
 PY
 
 # ---- step 2: the guarded run, parsed as it goes -----------------------------------------
@@ -299,26 +383,41 @@ fi
 echo "run-verify: one line per harness as it finishes (also verify/$progress)"
 
 # Runs the batches one after the other (each with $jobs jobs), or "$@" in one driver
-# without a list. Writes the last nonzero exit status, and any backstop hit, to $log_dir.
-rm -f "$log_dir/kani_rc" "$log_dir/backstop"
+# without a list. A batch whose driver crashes ("No exit code?": it ran out of memory, KI-010)
+# runs again as two batches, each with its own driver, down to single harnesses; the parser
+# keeps each harness's last result. A decoding batch of 32 took its driver to 4.0 GB of address
+# space (2026-10-26), most of it while the first seven were in flight, so a smaller default
+# would not have been enough. Writes the last nonzero exit status of a driver that did not
+# crash, any backstop hit and the crashes to $log_dir.
+rm -f "$log_dir/kani_rc" "$log_dir/backstop" "$log_dir/crashes"
 run_main() {
-    local rc=0 r i=0 names=() sel
+    local rc=0 r j k=0 half names=() queue=() b=() sel out="$log_dir/batch.log"
     if ! $listed; then
-        guarded main cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" "${time_limit[@]}" \
+        guarded main cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" ${check_flags[@]+"${check_flags[@]}"} "${time_limit[@]}" \
             "$@" < /dev/null 2>&1
         rc=$?
         backstop_hit main && echo main >> "$log_dir/backstop"
     else
         mapfile -t names < "$harnesses"
-        while [ "$i" -lt "${#names[@]}" ]; do
+        for (( j = 0; j < ${#names[@]}; j += batch )); do queue+=("${names[*]:j:batch}"); done
+        while [ "$k" -lt "${#queue[@]}" ]; do
+            read -ra b <<< "${queue[k]}"
             sel=()
-            for h in "${names[@]:i:batch}"; do sel+=(--harness "$h"); done
-            guarded "main$i" cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" \
-                "${time_limit[@]}" "${build_args[@]}" --exact "${sel[@]}" < /dev/null 2>&1
-            r=$?
-            [ "$r" -ne 0 ] && rc=$r
-            backstop_hit "main$i" && echo "main$i" >> "$log_dir/backstop"
-            i=$(( i + batch ))
+            for h in "${b[@]}"; do sel+=(--harness "$h"); done
+            guarded "main$k" cargo kani -j "$jobs" --output-format terse "${stub_flag[@]}" ${check_flags[@]+"${check_flags[@]}"} \
+                "${time_limit[@]}" "${build_args[@]}" --exact "${sel[@]}" < /dev/null 2>&1 \
+                | tee "$out"
+            r=${PIPESTATUS[0]}
+            backstop_hit "main$k" && echo "main$k" >> "$log_dir/backstop"
+            if grep -q '^No exit code?' "$out" && [ "${#b[@]}" -gt 1 ]; then
+                half=$(( (${#b[@]} + 1) / 2 ))
+                queue+=("${b[*]:0:half}" "${b[*]:half}")
+                echo "split ${#b[@]}" >> "$log_dir/crashes"
+            else
+                if grep -q '^No exit code?' "$out"; then echo "alone ${b[0]}" >> "$log_dir/crashes"; fi
+                [ "$r" -ne 0 ] && rc=$r
+            fi
+            k=$(( k + 1 ))
         done
     fi
     echo "$rc" > "$log_dir/kani_rc"
@@ -337,7 +436,17 @@ if [ "${rcs[1]}" -ne 0 ] || [ "${rcs[2]}" -ne 0 ]; then
     echo "run-verify: logging or parsing the run failed (tee ${rcs[1]}, parser ${rcs[2]})" >&2
     exit 1
 fi
-if grep -q '^No exit code?' "$log"; then
+if [ -s "$log_dir/crashes" ]; then
+    n_split=$(grep -c '^split' "$log_dir/crashes" || true)
+    if [ "$n_split" -gt 0 ]; then
+        echo "run-verify: $n_split Kani driver(s) crashed (KI-010); each batch ran again as two" \
+             "(log: verify/$log)" >&2
+    fi
+    if grep -q '^alone' "$log_dir/crashes"; then
+        echo "run-verify: Kani's driver crashed on a single harness, which is ERROR:" \
+             "$(sed -n 's/^alone //p' "$log_dir/crashes" | tr '\n' ' ')(log: verify/$log)" >&2
+    fi
+elif grep -q '^No exit code?' "$log"; then
     echo "run-verify: Kani's driver crashed; harnesses it had not finished are ERROR or" \
          "NOT-RUN (KI-010; log: verify/$log)" >&2
 fi
@@ -364,9 +473,11 @@ declare -A fam_total=() fam_ok=()
 report="$log_dir/report.txt"
 : > "$report"
 while IFS=$'\t' read -r h st cov t; do
+    reran=false
     if [ "$st" = ERROR ]; then          # re-run alone in regular output to tell OOM apart
+        reran=true
         set +e
-        guarded "rerun$RANDOM" cargo kani "${stub_flag[@]}" "${build_args[@]}" --exact --harness "$h" "${time_limit[@]}" \
+        guarded "rerun$RANDOM" cargo kani "${stub_flag[@]}" ${check_flags[@]+"${check_flags[@]}"} "${build_args[@]}" --exact --harness "$h" "${time_limit[@]}" \
             < /dev/null > "$log_dir/rerun.log" 2>&1
         set -e
         # CBMC's own messages: the solver's "ran out of memory", the pre-solver "Out of
@@ -375,11 +486,14 @@ while IFS=$'\t' read -r h st cov t; do
         # bound, not a tool fix (research R18).
         if grep -qiE "$oom_pattern" "$log_dir/rerun.log"; then st=OOM; fi
     fi
+    # A known defect excuses a failed check only: a listed harness that ends in ERROR, OOM,
+    # TIMEOUT or NOT-RUN keeps that status and fails the run (code review of v0.4.0..74b9bc1,
+    # finding 7).
     if [ -n "${known[$h]:-}" ]; then
         if [ "$st" = SUCCESSFUL ]; then
             echo "run-verify: stale known-defect entry: $h ${known[$h]} now succeeds" >&2
             fail=1
-        else
+        elif [ "$st" = FAILED ]; then
             st="KNOWN-DEFECT ${known[$h]}"
         fi
     elif [ -n "${known_timeout[$h]:-}" ]; then
@@ -391,7 +505,7 @@ while IFS=$'\t' read -r h st cov t; do
             st=KNOWN-TIMEOUT
         fi
     fi
-    if [ "$cov" != - ] && [ "${cov%/*}" -lt "${cov#*/}" ]; then
+    if [[ "$cov" == */* ]] && [ "${cov%/*}" -lt "${cov#*/}" ]; then
         st="$st, UNSATISFIED COVERS"
     fi
     case "$st" in
@@ -410,7 +524,7 @@ while IFS=$'\t' read -r h st cov t; do
         echo "---- counterexample for $h (concrete playback) ----"
         set +e
         guard_kib=$playback_kib guarded "play$RANDOM" cargo kani -Z concrete-playback \
-            --concrete-playback=print "${stub_flag[@]}" "${build_args[@]}" --exact --harness "$h" \
+            --concrete-playback=print "${stub_flag[@]}" ${check_flags[@]+"${check_flags[@]}"} "${build_args[@]}" --exact --harness "$h" \
             --output-format terse "${time_limit[@]}" < /dev/null > "$log_dir/playback.log" 2>&1
         set -e
         if grep -q '^Concrete playback unit test for' "$log_dir/playback.log"; then
@@ -427,7 +541,13 @@ while IFS=$'\t' read -r h st cov t; do
         fi
         echo "---- end counterexample for $h ----"
     fi
-    if [ "$st" = OOM ] || [ "$st" = ERROR ]; then
+    if [ "$st" = RETURNS ]; then
+        echo "---- RETURNS: $h: an input outside the operation's domain returns without a" \
+             "panic. Drop #[kani::should_panic] and run it with --concrete-playback to see one ----"
+    fi
+    if [ "$st" = OOM ] && ! $reran; then
+        echo "---- OOM: $h (CBMC's out-of-memory status in the main run; verify/$log) ----"
+    elif [ "$st" = OOM ] || [ "$st" = ERROR ]; then
         echo "---- $st: $h (tool output) ----"
         grep -iE -m 2 "$oom_pattern" "$log_dir/rerun.log" || true
         grep -vE '^(Unwinding|Not unwinding|aborting|Check [0-9]+:|\s+- )' \
@@ -447,7 +567,7 @@ echo "run-verify: $total harnesses: $n_ok SUCCESSFUL, $n_known KNOWN-DEFECT, $n_
 if [ "$total" -eq 0 ]; then
     echo "run-verify: no harness ran" >&2
     grep -E "error|No proof harnesses" "$log" | head -n 5 >&2 || true
-    [ "$kani_rc" -eq 0 ] || fail=1
+    fail=1
 fi
 if [ "$kani_rc" -ne 0 ] && [ "$n_fail" -eq 0 ] && [ "$n_known" -eq 0 ] && [ "$n_timeout" -eq 0 ] \
     && [ "$total" -gt 0 ]; then

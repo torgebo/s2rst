@@ -153,3 +153,21 @@ fn c_order() {
     kani::cover!(ord.is_none(), "NaN is unordered");
     kani::cover!(ord == Some(Ordering::Greater), "greater");
 }
+
+// ---------------------------------------------------------------------------------------------
+// The tool limit of spec 007 (gap 2 of the 2026-10-26 coverage review): `tan`, proven
+// crash-free under its function contract (`stubs::tan_contract`).
+// ---------------------------------------------------------------------------------------------
+
+/// C-s1::Angle::tan: completes without panic, overflow or undefined behaviour for every angle,
+/// NaN and the infinities included, under `tan`'s contract.
+///
+/// Under contract: `tan_contract`.
+#[kani::proof]
+#[kani::stub(f64::tan, crate::stubs::tan_contract)]
+fn c_fg_tan() {
+    let a = any_angle();
+    let t = a.tan();
+    kani::cover!(t.is_nan(), "a non-finite angle");
+    kani::cover!(t.is_finite(), "a finite tangent");
+}

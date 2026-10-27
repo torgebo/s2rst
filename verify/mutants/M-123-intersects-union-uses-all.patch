@@ -5,12 +5,11 @@ Tier: slow
 Defect: intersects_union() requires every cell of the other union to intersect
 
 diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
-index 4669eb0..95278cc 100644
 --- a/core/src/s2/cell_union.rs
 +++ b/core/src/s2/cell_union.rs
-@@ -253,7 +253,7 @@ impl CellUnion {
-     ///
-     /// In debug builds, panics if either union is not valid.
+@@ -265,7 +265,7 @@
+     /// On unions that are not valid the result is unspecified, and in debug builds it may be a
+     /// panic: an invalid id of `other` panics when the test reaches it.
      pub fn intersects_union(&self, other: &CellUnion) -> bool {
 -        other.0.iter().any(|id| self.intersects_cell_id(*id))
 +        other.0.iter().all(|id| self.intersects_cell_id(*id))

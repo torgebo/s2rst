@@ -245,6 +245,12 @@ fn deserialise_rejects_invalid_caps() {
         let b: Cap = serde_json::from_value(serde_json::to_value(c).unwrap()).unwrap();
         assert!(b == c);
     }
+    // Code review of v0.4.0..74b9bc1, finding 2: a `null` radius reads as `INFINITY`, above
+    // `STRAIGHT`. Versions before 0.5 wrote a radius of −∞ or NaN as `null` too.
+    let mut v = value.clone();
+    v["radius"] = serde_json::Value::Null;
+    let err = serde_json::from_value::<Cap>(v).unwrap_err().to_string();
+    assert!(err.contains("above STRAIGHT"), "{err}");
 }
 
 /// D-009: the area of a cap whose radius has length² −0 is +0, as upstream's
@@ -285,4 +291,20 @@ fn empty_cap_covering_matches_upstream() {
     want.sort_unstable();
     assert_eq!(got, want);
     assert_eq!(Region::cell_union_bound(&cap).len(), 4);
+}
+
+/// Code review of v0.4.0..74b9bc1, finding 3: an empty cap built from a negative height or area
+/// has the radius `NEGATIVE`, so its height is −0.5, not the value given (upstream's, and v0.4.0's,
+/// `height()` returns −3 for the first). Its area is 0 either way.
+#[test]
+fn empty_cap_from_a_negative_height_or_area_has_height_minus_one_half() {
+    for cap in [
+        Cap::from_center_height(ll(10.0, 20.0), -3.0),
+        Cap::from_center_area(ll(10.0, 20.0), -1.0),
+    ] {
+        assert!(cap.is_empty());
+        assert_eq!(cap.chord_radius(), ChordAngle::NEGATIVE);
+        assert_eq!(cap.height(), -0.5);
+        assert_eq!(cap.area(), 0.0);
+    }
 }

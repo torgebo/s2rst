@@ -189,3 +189,112 @@ fn c_add_sub() {
         "an ordinary sum and difference"
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (gap 1; `crash.rs` explains the `n_*` and `r_*`
+// conventions). Each check is a `debug_assert!`.
+// ---------------------------------------------------------------------------------------------
+
+/// A special chord angle, `NEGATIVE` or `INFINITY`.
+fn any_special() -> ChordAngle {
+    if kani::any() {
+        ChordAngle::NEGATIVE
+    } else {
+        ChordAngle::INFINITY
+    }
+}
+
+/// N-s1::ChordAngle::sin, N-sin2, N-cos, N-tan: in debug builds, each panics for both special
+/// chord angles.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_trigonometry() {
+    let a = any_special();
+    let op: u8 = kani::any();
+    let _ = match op {
+        0 => a.sin(),
+        1 => a.sin2(),
+        2 => a.cos(),
+        _ => a.tan(),
+    };
+    kani::cover!(true, "returns");
+}
+
+/// R-s1::ChordAngle::sin, R-sin2, R-cos, R-tan: in a build without debug assertions, each
+/// completes without panic or overflow for both special chord angles, with the values their
+/// `# Panics` gives (NaN, −1.25 and 1.5 for `NEGATIVE`; NaN, −∞ and −∞ for `INFINITY`).
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_trigonometry() {
+    let n = ChordAngle::NEGATIVE;
+    let i = ChordAngle::INFINITY;
+    assert!(n.sin().is_nan() && n.sin2() == -1.25 && n.cos() == 1.5 && n.tan().is_nan());
+    assert!(i.sin().is_nan() && i.sin2() == f64::NEG_INFINITY && i.cos() == f64::NEG_INFINITY);
+    assert!(i.tan().is_nan());
+    kani::cover!(true, "both sentinels");
+}
+
+/// Two chord angles of which at least one is special.
+fn any_special_pair() -> (ChordAngle, ChordAngle) {
+    let (a, b) = (any_chord(), any_chord());
+    kani::assume(a.is_special() || b.is_special());
+    (a, b)
+}
+
+/// N-Add for s1::ChordAngle, N-Sub: in debug builds, each panics for every pair of chord angles
+/// of which one is special.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_add_sub() {
+    let (a, b) = any_special_pair();
+    let _ = if kani::any::<bool>() { a + b } else { a - b };
+    kani::cover!(true, "returns");
+}
+
+/// R-Add for s1::ChordAngle, R-Sub: in a build without debug assertions, each completes without
+/// panic or overflow on the same pairs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_add_sub() {
+    let (a, b) = any_special_pair();
+    let (s, d) = (a + b, a - b);
+    kani::cover!(
+        a == ChordAngle::NEGATIVE && s == ChordAngle::STRAIGHT,
+        "NEGATIVE + a length"
+    );
+    kani::cover!(d == ChordAngle::ZERO, "a difference of zero");
+}
+
+// ---------------------------------------------------------------------------------------------
+// The tool limits of spec 007 (gap 2 of the 2026-10-26 coverage review): the conversions through
+// `asin`, proven crash-free under its function contract (`stubs::asin_contract`, spec 008
+// FR-003).
+// ---------------------------------------------------------------------------------------------
+
+/// C-s1::ChordAngle::to_angle, radians, degrees, e5, e6, e7 and `From<ChordAngle> for Angle`:
+/// complete without panic, overflow or undefined behaviour for every chord angle, the
+/// sentinels included, under `asin`'s contract.
+///
+/// Under contract: `asin_contract`.
+#[kani::proof]
+#[kani::stub(f64::asin, crate::stubs::asin_contract)]
+fn c_fg_conversions() {
+    let c = any_chord();
+    let a = c.to_angle();
+    let _ = (
+        c.radians(),
+        c.degrees(),
+        c.e5(),
+        c.e6(),
+        c.e7(),
+        s2rst::s1::Angle::from(c),
+    );
+    kani::cover!(
+        c == ChordAngle::INFINITY && a.radians() == f64::INFINITY,
+        "INFINITY"
+    );
+    kani::cover!(c == ChordAngle::NEGATIVE && a.radians() == -1.0, "NEGATIVE");
+    kani::cover!(!c.is_special() && a.radians() > 0.0, "a length");
+}

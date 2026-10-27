@@ -13,8 +13,9 @@ pub struct CellUnion(pub(crate) s2rst::s2::CellUnion);
 
 /// Checks a leaf-cell range against C++ `S2CellUnion::FromBeginEnd`'s `DCHECK`s: both ends
 /// are leaf cells (either may also be the end of the leaves, when `end_allowed`) and
-/// `lo <= hi`. The core checks them only in debug builds, as C++ does; in release builds an
-/// invalid id can make it loop forever, so a bad call throws here instead.
+/// `lo <= hi`. The core checks them in every build and panics, which traps (C++ only in debug
+/// builds, because an invalid id can make the tiling loop forever), so a bad call throws here
+/// instead.
 fn check_leaf_range(
     lo: s2rst::s2::CellId,
     hi: s2rst::s2::CellId,

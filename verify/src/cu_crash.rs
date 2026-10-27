@@ -20,9 +20,9 @@
 
 use s2rst::s2::{Cell, CellId, CellUnion, Region};
 
-use crate::domain::{any_level, any_valid};
+use crate::domain::{any_invalid, any_level, any_u64, any_valid};
 use crate::spec::{self, Decomposed};
-use crate::union_domain::{any_level_mod, any_valid_seq, any_valid_union};
+use crate::union_domain::{any_level_mod, any_seq, any_valid_seq, any_valid_union};
 use crate::union_spec;
 
 // ---------------------------------------------------------------------------------------------
@@ -327,3 +327,179 @@ denormalize!(
         kani::cover!(r.num_cells() > 2, "replaced by descendants");
     },
 );
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (gap 1; `crash.rs` explains the `n_*` and `r_*`
+// conventions). A union argument of the queries is any sequence (`Seq`): a `# Panics` that names
+// the cell argument holds whatever the union is.
+// ---------------------------------------------------------------------------------------------
+
+/// N-CellUnion::from_cell_ids, normalize, from_iter: in debug builds, each panics for a
+/// sequence of one invalid id (the final `debug_assert!(is_normalized())`).
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(3)]
+fn n_from_cell_ids__n1() {
+    let v = vec![any_invalid()];
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = CellUnion::from_cell_ids(v);
+        }
+        1 => CellUnion::from_verbatim(v).normalize(),
+        _ => {
+            let _: CellUnion = v.into_iter().collect();
+        }
+    }
+    kani::cover!(true, "returns");
+}
+
+/// Whether `x` lies in the leaf range of the valid cell `c`, `[c − (lsb − 1), c + (lsb − 1)]`.
+fn in_leaf_range(x: u64, c: u64) -> bool {
+    let lsb = c & c.wrapping_neg();
+    c - (lsb - 1) <= x && x <= c + (lsb - 1)
+}
+
+/// N-CellUnion::from_cell_ids: in debug builds, panics for every sequence of two ids with an
+/// invalid id that is not in the leaf range of a valid one (its `# Panics`: such an id is
+/// dropped as a contained cell). An invalid id in a valid cell's range returns: the first
+/// version of this harness, over every pair with an invalid id, returned (2026-10-26).
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(3)]
+fn n_from_cell_ids__n2() {
+    let (v, raw) = any_seq::<2>();
+    let ok = [spec::valid_by_marker(raw[0]), spec::valid_by_marker(raw[1])];
+    let kept = |i: usize| !ok[i] && !(ok[1 - i] && in_leaf_range(raw[i], raw[1 - i]));
+    kani::assume(kept(0) || kept(1));
+    let _ = CellUnion::from_cell_ids(v);
+    kani::cover!(true, "returns");
+}
+
+/// N-CellUnion::contains_cell_id, intersects_cell_id, intersection_with_cell_id, and
+/// Region::contains_cell, intersects_cell through them: in debug builds, each panics for every
+/// invalid id, whatever the union (its `debug_assert!`, before the union is read).
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(3)]
+fn n_cell_queries__n2() {
+    let (v, _) = any_seq::<2>();
+    let u = CellUnion::from_verbatim(v);
+    let c = any_invalid();
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = u.contains_cell_id(c);
+        }
+        1 => {
+            let _ = u.intersects_cell_id(c);
+        }
+        _ => {
+            let _ = u.intersection_with_cell_id(c);
+        }
+    }
+    kani::cover!(true, "returns");
+}
+
+/// N-CellUnion::leaf_cells_covered (and average_based_area through it): panics for every
+/// sequence of two ids of which one has no level marker, in every build.
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(3)]
+fn n_leaf_cells_covered__n2() {
+    let (v, raw) = any_seq::<2>();
+    kani::assume(raw[0].trailing_zeros() >= 62 || raw[1].trailing_zeros() >= 62);
+    let _ = CellUnion::from_verbatim(v).leaf_cells_covered();
+    kani::cover!(true, "returns");
+}
+
+/// N-CellUnion::denormalize: panics for every `level_mod` outside 1–3, whatever the union and
+/// `min_level` (its `assert!`, first), and for every union of two ids whose first has no level
+/// marker, in every build. (A later id without one panics too, once the loop reaches it, after
+/// the earlier cells' descendants, which no bound covers.)
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(3)]
+fn n_denormalize__n2() {
+    let (v, raw) = any_seq::<2>();
+    let m = any_level();
+    let k: u8 = kani::any();
+    kani::assume(!(1..=3).contains(&k) || raw[0].trailing_zeros() >= 62);
+    let _ = CellUnion::from_verbatim(v).denormalize(m, k);
+    kani::cover!(true, "returns");
+}
+
+/// N-CellUnion::from_begin_end, from_range (tool-limit rows for crash freedom): panic for every
+/// pair outside their domain, a bound that is neither a leaf nor `end(30)` or `begin > end`, in
+/// every build (the `assert!`s, before the tiling loop). The unwind bound is for that loop after
+/// the panic, as in `crash::n_raw_level`.
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(2)]
+fn n_from_begin_end() {
+    let (b, e) = (any_u64(), any_u64());
+    let leaf_end = spec::end(30);
+    let in_range = |x: u64| (spec::valid_by_marker(x) && x & 1 == 1) || x == leaf_end;
+    kani::assume(!in_range(b.0) || !in_range(e.0) || b.0 > e.0);
+    if kani::any::<bool>() {
+        let _ = CellUnion::from_begin_end(b, e);
+    } else {
+        #[allow(deprecated, reason = "the deprecated name has the same `# Panics`")]
+        let _ = CellUnion::from_range(b, e);
+    }
+    kani::cover!(true, "returns");
+}
+
+/// N-CellUnion::from_min_max (a tool-limit row): panics, in every build, for every pair its
+/// `# Panics` names: `max` not a valid leaf, `min` neither a valid leaf nor `max.next()`, or
+/// `min > max.next()`. The first version of this harness, over "a bound not a valid leaf, or
+/// `min > max`", returned (2026-10-26): `min == max.next()` gives the empty union, as upstream.
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(2)]
+fn n_from_min_max() {
+    let (a, b) = (any_u64(), any_u64());
+    let leaf = |x: u64| spec::valid_by_marker(x) && x & 1 == 1;
+    // A leaf's successor is two ids on, `end(30)` after the last leaf.
+    let after = b.0.wrapping_add(2);
+    kani::assume(!(leaf(b.0) && (leaf(a.0) || a.0 == after) && a.0 <= after));
+    let _ = CellUnion::from_min_max(a, b);
+    kani::cover!(true, "returns");
+}
+
+/// R-CellUnion::from_cell_ids, normalize, from_iter: in a build without debug assertions, each
+/// completes without panic or overflow for a sequence of one invalid id, and keeps it.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+#[kani::unwind(3)]
+fn r_from_cell_ids__n1() {
+    let c = any_invalid();
+    let u = CellUnion::from_cell_ids(vec![c]);
+    let mut n = CellUnion::from_verbatim(vec![c]);
+    n.normalize();
+    let i: CellUnion = vec![c].into_iter().collect();
+    assert!(u.cell_ids() == [c] && n.cell_ids() == [c] && i.cell_ids() == [c]);
+    kani::cover!(c.0 == 0, "none");
+}
+
+/// R-CellUnion::contains_cell_id, intersects_cell_id, intersection_with_cell_id: in a build
+/// without debug assertions, each completes without panic or overflow for every valid union of
+/// two cells and every invalid id except `none`, whose `range_min` subtracts 1 from a zero
+/// lowest bit: a release build wraps there, without a panic, but Kani checks overflow in every
+/// build.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+#[kani::unwind(4)]
+fn r_cell_queries__n2() {
+    let (v, _) = any_valid_union::<2>();
+    let u = CellUnion::from_verbatim(v);
+    let c = any_invalid();
+    kani::assume(c.0 != 0);
+    let (a, b) = (u.contains_cell_id(c), u.intersects_cell_id(c));
+    let r = u.intersection_with_cell_id(c);
+    kani::cover!(a, "an invalid id inside a cell of the union");
+    kani::cover!(!b && r.is_empty(), "disjoint");
+}

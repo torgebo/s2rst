@@ -6,8 +6,8 @@ Defect: `from_center_height` takes the height as the length² (no `2 ·`)
 diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
 --- a/core/src/s2/cap.rs
 +++ b/core/src/s2/cap.rs
-@@ -133,7 +133,7 @@
-     /// yields an empty cap; a height of 2 or more yields a full cap.
+@@ -138,7 +138,7 @@
+     /// documented deviation, see [`ChordAngle`]'s "Deviation from upstream" (spec 007 FR-017).
      #[inline]
      pub fn from_center_height(center: Point, height: f64) -> Self {
 -        Self::from_center_chord_angle(center, ChordAngle::from_length2(2.0 * height))

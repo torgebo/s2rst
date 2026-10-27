@@ -186,3 +186,155 @@ fn c_approx_eq() {
     kani::cover!(a && x != y, "approximately but not exactly equal");
     kani::cover!(b, "equal within 1e-15");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (gap 1; `crash.rs` explains the `n_*` and `r_*`
+// conventions). The point checks are `debug_assert!`s, so each has a release counterpart.
+// ---------------------------------------------------------------------------------------------
+
+/// Every `f64` outside [−π, π], NaN and the infinities included.
+fn any_bad_point() -> f64 {
+    let p: f64 = kani::any();
+    kani::assume(!arc_spec::in_range(p));
+    p
+}
+
+/// N-s1::Interval::new, N-from_point_pair: in debug builds, each panics for every pair of
+/// endpoints of which one is outside [−π, π] or NaN.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_constructors() {
+    let (p, q) = (any_f64(), any_f64());
+    kani::assume(!arc_spec::in_range(p) || !arc_spec::in_range(q));
+    if kani::any::<bool>() {
+        let _ = Interval::new(p, q);
+    } else {
+        let _ = Interval::from_point_pair(p, q);
+    }
+    kani::cover!(true, "returns");
+}
+
+/// R-s1::Interval::new, R-from_point_pair: in a build without debug assertions, each completes
+/// without panic or overflow on the same pairs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_constructors() {
+    let (p, q) = (any_f64(), any_f64());
+    kani::assume(!arc_spec::in_range(p) || !arc_spec::in_range(q));
+    let (n, pair) = (Interval::new(p, q), Interval::from_point_pair(p, q));
+    kani::cover!(p.is_nan() && n.lo.is_nan(), "a NaN endpoint");
+    kani::cover!(
+        q == f64::INFINITY && !pair.is_valid(),
+        "an infinite endpoint"
+    );
+}
+
+/// N-s1::Interval::contains, N-interior_contains, N-add_point: in debug builds, each panics for
+/// every valid interval and every point outside [−π, π] or NaN.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_point_operations() {
+    let (x, p) = (any_interval(), any_bad_point());
+    let op: u8 = kani::any();
+    match op {
+        0 => {
+            let _ = x.contains(p);
+        }
+        1 => {
+            let _ = x.interior_contains(p);
+        }
+        _ => {
+            let _ = x.add_point(p);
+        }
+    }
+    kani::cover!(true, "returns");
+}
+
+/// R-s1::Interval::contains, R-interior_contains, R-add_point: in a build without debug
+/// assertions, each completes without panic or overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_point_operations() {
+    let (x, p) = (any_interval(), any_bad_point());
+    let (c, _, a) = (x.contains(p), x.interior_contains(p), x.add_point(p));
+    kani::cover!(p.is_nan() && !c, "a NaN point");
+    kani::cover!(!a.is_valid(), "an invalid result");
+}
+
+/// The complement of `project`'s domain: an empty valid interval with any point, or a valid
+/// interval with a point outside [−π, π] or NaN.
+fn outside_project() -> (Interval, f64) {
+    let x = any_interval();
+    let p = any_f64();
+    kani::assume(arc_spec::empty(x) || !arc_spec::in_range(p));
+    (x, p)
+}
+
+/// N-s1::Interval::project: in debug builds, panics for every empty interval and every point
+/// outside [−π, π] or NaN.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_project() {
+    let (x, p) = outside_project();
+    let _ = x.project(p);
+    kani::cover!(true, "returns");
+}
+
+/// R-s1::Interval::project: in a build without debug assertions, completes without panic or
+/// overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_project() {
+    let (x, p) = outside_project();
+    let _ = x.project(p);
+    kani::cover!(arc_spec::empty(x), "the empty interval");
+    kani::cover!(!arc_spec::empty(x) && p.is_nan(), "a NaN point");
+}
+
+/// N-s1::Interval::expanded: in debug builds, panics for every valid interval but the full one
+/// and a NaN margin (through `new`'s check). Over every valid interval the first version of this
+/// harness returned (2026-10-26): the full interval, as `o_expanded_nan_full` proves.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_expanded() {
+    let x = any_interval();
+    kani::assume(!arc_spec::full(x));
+    let _ = x.expanded(f64::NAN);
+    kani::cover!(true, "returns");
+}
+
+/// O-s1::Interval::expanded (outside its domain, returns): the full interval with a NaN margin
+/// returns itself, without a panic, in every build (its `# Panics`).
+#[kani::proof]
+fn o_expanded_nan_full() {
+    let e = Interval::full().expanded(f64::NAN);
+    assert!(e.is_full());
+    kani::cover!(true, "returns the full interval");
+}
+
+/// R-s1::Interval::expanded: in a build without debug assertions, completes without panic or
+/// overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_expanded() {
+    let x = any_interval();
+    kani::assume(!arc_spec::full(x));
+    let e = x.expanded(f64::NAN);
+    kani::cover!(!e.is_valid(), "an invalid result");
+}
+
+/// N-s1::Interval::bound: panics for every valid interval and every index above 1, in every
+/// build (an index out of bounds).
+#[kani::proof]
+#[kani::should_panic]
+fn n_bound() {
+    let x = any_interval();
+    let i: usize = kani::any();
+    kani::assume(i > 1);
+    let _ = x.bound(i);
+    kani::cover!(true, "returns");
+}

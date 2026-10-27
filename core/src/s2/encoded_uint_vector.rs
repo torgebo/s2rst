@@ -109,8 +109,10 @@ pub fn encode_uint_vector_u64(v: &[u64], w: &mut dyn Write) -> io::Result<()> {
     Ok(())
 }
 
-/// Maximum number of elements to decode in a uint vector (safety limit).
-const MAX_DECODE_COUNT: usize = 50_000_000;
+/// Maximum number of elements to decode in a uint vector (safety limit). A `u64`, so the
+/// decoded count is compared before any conversion to `usize`: on a 32-bit target (wasm32) a
+/// conversion first would truncate a count above `u32::MAX` to one under the limit.
+const MAX_DECODE_COUNT: u64 = 50_000_000;
 
 /// Decodes a vector of `u32` values from the `EncodedUintVector` format.
 ///
@@ -127,7 +129,7 @@ const MAX_DECODE_COUNT: usize = 50_000_000;
 /// width of 1–4 bytes and every value is accepted, as upstream.
 pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
     let size_len = read_uvarint(r)?;
-    let count = (size_len / 4) as usize; // sizeof(u32) == 4
+    let count = size_len / 4; // sizeof(u32) == 4
     if count > MAX_DECODE_COUNT {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -156,7 +158,7 @@ pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
 /// of 1–8 bytes and every value is accepted, as upstream.
 pub fn decode_uint_vector_u64(r: &mut dyn Read) -> io::Result<Vec<u64>> {
     let size_len = read_uvarint(r)?;
-    let count = (size_len / 8) as usize; // sizeof(u64) == 8
+    let count = size_len / 8; // sizeof(u64) == 8
     if count > MAX_DECODE_COUNT {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,

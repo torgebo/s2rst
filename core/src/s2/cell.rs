@@ -119,11 +119,12 @@ impl Cell {
     /// # Panics
     ///
     /// The identifier must be a valid cell ([`CellId::is_valid`]); upstream's `S2Cell(S2CellId)`
-    /// states no precondition, and reaches undefined behaviour on such ids. Panics on the null
-    /// identifier (an arithmetic overflow in debug builds, "level must be 0..=30" in release
-    /// builds) and on an identifier with face 6 or 7 (an index out of bounds). Any other
-    /// invalid identifier, one whose lowest set bit is at an odd position, gives a cell whose
-    /// fields are unspecified.
+    /// states no precondition, and reaches undefined behaviour on such ids. Panics on an
+    /// identifier with no level marker, 62 or more trailing zero bits (`0`, `1 << 62`, `1 << 63`
+    /// and `3 << 62`: an arithmetic overflow in debug builds, "level must be 0..=30" in release
+    /// builds), and on an identifier with face 6 or 7 (an index out of bounds). Any other
+    /// invalid identifier, one whose lowest set bit is at an odd position up to 61, gives a cell
+    /// whose fields are unspecified.
     #[inline]
     pub fn from_cell_id(id: CellId) -> Self {
         let (f, i, j, o) = id.to_face_ij_orientation();
@@ -137,12 +138,21 @@ impl Cell {
     }
 
     /// Constructs a leaf cell containing the given point.
+    ///
+    /// # Panics
+    ///
+    /// As [`CellId::from_point`]: in debug builds, panics for the zero vector, and may panic for
+    /// a point with a NaN coordinate.
     #[inline]
     pub fn from_point(p: Point) -> Self {
         Self::from_cell_id(CellId::from_point(&p))
     }
 
     /// Constructs a leaf cell containing the given lat/lng.
+    ///
+    /// # Panics
+    ///
+    /// As [`CellId::from_lat_lng`]: in debug builds, may panic if a component is not finite.
     #[inline]
     pub fn from_lat_lng(ll: LatLng) -> Self {
         Self::from_cell_id(CellId::from_lat_lng(&ll))
@@ -225,12 +235,20 @@ impl Cell {
     // --- Vertices and edges ---
 
     /// Returns the normalized k-th vertex (k = 0,1,2,3) in CCW order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `k > 3`, in every build (an index out of bounds).
     #[inline]
     pub fn vertex(self, k: usize) -> Point {
         Point(self.vertex_raw(k).vector().normalize())
     }
 
     /// Returns the unnormalized k-th vertex.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `k > 3`, in every build (an index out of bounds).
     #[inline]
     pub fn vertex_raw(self, k: usize) -> Point {
         let verts = self.uv.vertices();

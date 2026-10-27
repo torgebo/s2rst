@@ -181,6 +181,60 @@ mod serde_canonical {
         assert!(back.is_infinity());
     }
 
+    /// A format that keeps the newtype wrapper, as RON writes `ChordAngle::RIGHT` as `(2.0)`:
+    /// the number reaches only `visit_newtype_struct`, and there is no bare-number form.
+    struct Wrapped<D>(D);
+
+    impl<'de, D> serde::Deserializer<'de> for Wrapped<D>
+    where
+        D: serde::Deserializer<'de, Error = serde::de::value::Error>,
+    {
+        type Error = serde::de::value::Error;
+
+        fn deserialize_any<V: serde::de::Visitor<'de>>(
+            self,
+            visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            Err(serde::de::Error::invalid_type(
+                serde::de::Unexpected::NewtypeStruct,
+                &visitor,
+            ))
+        }
+
+        fn deserialize_newtype_struct<V: serde::de::Visitor<'de>>(
+            self,
+            name: &'static str,
+            visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            assert_eq!(name, "ChordAngle");
+            visitor.visit_newtype_struct(self.0)
+        }
+
+        serde::forward_to_deserialize_any! {
+            bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
+            option unit unit_struct seq tuple tuple_struct map struct enum identifier ignored_any
+        }
+    }
+
+    /// Code review of v0.4.0..74b9bc1, finding 2: the derived `Serialize` writes a newtype struct,
+    /// and a format that keeps the wrapper reads it back. Reading a bare number failed there.
+    #[test]
+    fn the_newtype_wrapper_is_read() {
+        let read = |x: f64| ChordAngle::deserialize(Wrapped(x.into_deserializer()));
+        assert_eq!(read(2.0).unwrap(), ChordAngle::RIGHT);
+        assert_eq!(read(-5.0).unwrap(), ChordAngle::NEGATIVE);
+        assert!(read(f64::INFINITY).unwrap().is_infinity());
+        let e = read(5.0).unwrap_err().to_string();
+        assert!(e.contains("not a chord angle length"), "{e}");
+        let unit: serde::de::value::UnitDeserializer<serde::de::value::Error> =
+            ().into_deserializer();
+        assert!(
+            ChordAngle::deserialize(Wrapped(unit))
+                .unwrap()
+                .is_infinity()
+        );
+    }
+
     #[test]
     fn canonical_values_round_trip_bit_for_bit() {
         for x in [-1.0, 0.0, -0.0, f64::from_bits(1), 2.0, 4.0, f64::INFINITY] {

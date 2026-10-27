@@ -4,15 +4,14 @@ Expect-Fail: cd_uv::p_uv_03__b6
 Defect: decode_uint_vector_u64 masks the width with 3, as for u32, so widths 5–8 read as 1–4
 
 diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
-index 459f2bf..7186f6e 100644
 --- a/core/src/s2/encoded_uint_vector.rs
 +++ b/core/src/s2/encoded_uint_vector.rs
-@@ -161,7 +161,7 @@ pub fn decode_uint_vector_u64(r: &mut dyn Read) -> io::Result<Vec<u64>> {
+@@ -165,7 +165,7 @@
              "uint vector too large",
          ));
      }
 -    let len = ((size_len & 7) + 1) as usize;
 +    let len = ((size_len & 3) + 1) as usize;
      // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
-     // declaring a huge count must not reserve memory for it).
-     let mut result = Vec::new();
+     // declaring a huge count must not reserve memory for it). Not even a capped reservation:
+     // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach

@@ -5,12 +5,11 @@ Tier: slow
 Defect: decode() reads one id fewer than the count
 
 diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
-index 537bd64..00821d9 100644
 --- a/core/src/s2/encoding.rs
 +++ b/core/src/s2/encoding.rs
-@@ -346,7 +346,7 @@ impl S2Decode for CellUnion {
-             return Err(CellUnionDecodeError::TooManyCells(n).into());
-         }
+@@ -429,7 +429,7 @@
+         // data puts them out of their Kani proofs' reach; this decoder's proofs (spec 002,
+         // `cu_enc`) hold with it.
          let mut ids: Vec<CellId> = Vec::with_capacity((n as usize).min(MAX_PREALLOC));
 -        for _ in 0..n {
 +        for _ in 1..n {

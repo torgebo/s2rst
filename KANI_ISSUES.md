@@ -26,8 +26,9 @@ again. The reproducers are harnesses in a library crate with
 | [KI-007](#ki-007-sqrt-is-not-a-function) | `sqrt` gives two results for one input | false alarm | 006; re-run 2026-10-25 | no harness compares two `sqrt` results | — |
 | [KI-008](#ki-008-misaligned-cast-when-dropping-an-ioerror) | "misaligned pointer to reference cast" when some `io::Error`s are dropped | false alarm | 003, from the record | decoding harnesses forget the error | — |
 | [KI-009](#ki-009-an-out-of-memory-kill-reads-as-a-failure) | a harness killed for memory reports `FAILED` with "0 of N failed" | misleading report | 001, from the record | `run-verify.sh` re-runs it alone and reports `OOM` | — |
-| [KI-010](#ki-010-the-driver-keeps-memory-for-every-harness-it-has-run) | the driver's memory grows with every harness until it runs out | crash (driver) | 003, 008 | `run-verify.sh` runs batches of 32 | — |
+| [KI-010](#ki-010-the-driver-keeps-memory-for-every-harness-it-has-run) | the driver's memory grows with every harness until it runs out | crash (driver) | 003, 008 | `run-verify.sh` runs batches of 32, and splits a batch whose driver crashes | — |
 | [KI-011](#ki-011---verbose-panics-the-compiler) | `--verbose` panics `kani-compiler` | crash (compiler) | 008 | not used | — |
+| [KI-012](#ki-012---no-overflow-checks-keeps-the-overflow-checks) | `--no-overflow-checks` keeps rustc's overflow checks and drops the NaN check | misleading option | gap 1, 2026-10-26 | the release pass claims "no overflow", and uses the option for the NaN check | — |
 
 ## KI-001: `<` and `<=` on symbolic bools
 
@@ -257,7 +258,11 @@ fn sqrt_deterministic() {
   harness that no driver reached is reported `NOT-RUN`. With batches of 64, the whole suite
   ran (829 of 829 successful, 59 minutes with 7 jobs), but the largest driver peaked at 3.6 GB
   of address space, hence 32. Each batch compiles the code its harnesses reach: the 13 batches
-  took 101 s and 2.6 GB of `verify/target/kani` in all.
+  took 101 s and 2.6 GB of `verify/target/kani` in all. On 2026-10-26 a decoding batch of 32
+  (`cd_fx::p_fx_10__b9` … `cd_uv::p_uv_03__b8`, 7 jobs) took its driver to 4.0 GB of address
+  space (3.6 GB resident) and crashed, twice: 2.3 GB came while its first seven harnesses were
+  in flight, then about 50 MB per harness. So a batch whose driver crashes runs again as two
+  batches, each with its own driver, down to single harnesses (`run_main` in `run-verify.sh`).
 - **Records:** `verify/decoding/EVALUATION.md` (spec 003's crash).
 
 ## KI-011: `--verbose` panics the compiler
@@ -269,6 +274,33 @@ fn sqrt_deterministic() {
 - **Expected:** the same build, with more output.
 - **Workaround:** `--verbose` is not used.
 
+## KI-012: `--no-overflow-checks` keeps the overflow checks
+
+- **Observed** (2026-10-26, a scratch crate): with `--no-overflow-checks`, and also with
+  `CARGO_PROFILE_DEV_OVERFLOW_CHECKS=false` or `RUSTFLAGS=-Coverflow-checks=off`,
+
+  ```rust
+  #[kani::proof]
+  fn wraps() {
+      let x: u8 = kani::any();
+      kani::assume(x == 255);
+      let y = x + core::hint::black_box(1u8);
+      assert!(y == 0);
+  }
+  ```
+
+  still fails with "attempt to add with overflow": Kani compiles rustc's overflow checks into
+  every build. What the option changes is CBMC's flags: `--nan-check` goes, and
+  `--no-div-by-zero-check` comes (compared with `--verbose`'s command line on a harness without
+  stubs, KI-011). `CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false` does turn `debug_assert!` off.
+- **Expected:** an option named for overflow checks that turns them off, or a way to verify the
+  wrapping arithmetic of a release build.
+- **Workaround:** the release pass (`make verify-release`) proves "no panic and no arithmetic
+  overflow", stronger than a release build needs; where a release build wraps, the inputs are
+  outside the proof (`crash::r_children`'s `child_end`, `cu_crash::r_cell_queries__n2`'s `none`).
+  It passes `--no-overflow-checks` for its other effect, so that a NaN, which a release build's
+  skipped check often leaves and Rust computes without a panic, is not reported.
+
 ## Limits that are not bugs
 
 Documented behaviour or cost, worked around in the same way:
@@ -279,12 +311,28 @@ Documented behaviour or cost, worked around in the same way:
   gives 1; inside spec 008's `rect_bound` harness it gave 0. Spec 008 stubs `cos` with a range
   contract that tests check against the real libm (`verify/src/stubs.rs`), and FR-017 removed
   `log2` from the library.
-- **`asin`, `atan2` and `tan` are not supported.** Each is a foreign C call that Kani replaces
-  with a failing check: "call to foreign "C" function `asin` is not currently supported by
-  Kani" (re-run 2026-10-25). Kani tracks these in its issue 2423. Spec 008 stubs `asin` and
-  `atan2` with range contracts.
+- **`asin`, `atan2`, `tan`, `atan`, `acos` and `hypot` are not supported.** Each is a foreign C
+  call that Kani replaces with a failing check: "call to foreign "C" function `asin` is not
+  currently supported by Kani" (re-run 2026-10-25; `atan`, `acos`, `hypot` 2026-10-26). Kani
+  tracks these in its issue 2423. Spec 008 stubs `asin` and `atan2` with range contracts, and the
+  float-geometry proofs of 2026-10-26 `tan` and `atan`; `ln`, `exp`, `powi`, `round`, `floor` and
+  `sin_cos` are supported.
+- **The loose `sin` and `cos` lose relations a proof can need.** Each is a value in [−1, 1]
+  on its own: `sin_cos` can give (0, 0), so `LatLng::to_point` can be the zero vector, which no
+  face contains (`Cell::from_lat_lng` failed a debug check, 2026-10-26), and `sin` of a positive
+  angle can be negative (`Rect::expanded_by_distance` failed through `asin` of a ratio above 1).
+  Both are over-approximations, sound for a crash proof that passes, but they fail ones that
+  should pass; contracts for `sin` and `sin_cos` (`verify/src/stubs.rs`) restore the facts.
 - **An unsatisfied `kani::cover!` does not fail a run** (Kani exits 0). `run-verify.sh` enforces
   covers itself.
+- **`#[kani::should_panic]` is existential.** It passes when one input panics and every failed
+  check is a panic; `kani::assert(false)` after the call counts as a panic too (re-run
+  2026-10-26). The `n_*` harnesses end in one `kani::cover!` after the call instead, which is
+  unreachable exactly when no input returns, and `run-verify.sh` requires it unsatisfied.
+- **A symbolic panic condition keeps the code after it alive.** After `assume(raw > 30)`, a
+  failed `assert!(raw <= 30)` is not simplified to false, so CBMC explores what follows on paths
+  no input takes; loops there timed out (`crash::n_raw_level`, 10 minutes). A small unwind bound
+  fixes it, with unwinding checks still on. A constant condition is pruned.
 - **Terse output gives no counterexample values.** `run-verify.sh` re-runs failures with concrete
   playback.
 - **Concrete playback needs more memory than the harness.** On a neighbour harness Kani's driver
@@ -298,6 +346,13 @@ Documented behaviour or cost, worked around in the same way:
   - symbolic-length collections and strings, and `core::fmt`;
   - `memcmp` on `Vec`s, which needs an unwind of the byte length;
   - a `Vec` in a static;
-  - a law that recomputes a float product, which needs a lemma stub.
+  - a law that recomputes a float product, which needs a lemma stub;
+  - the robust predicates' exact fallback (`num-bigint` multiplication), which every edge
+    crossing and closest-point computation reaches on symbolic points: `Cell`'s distances to an
+    edge and to a cell, `exact_area` and `Rect::boundary_intersects` ran out of memory at 8 GiB
+    or timed out at 60 minutes (2026-10-27);
+  - a `Cell` built from a symbolic id, whose u-v bound is the quadratic projection of a symbolic
+    (i, j): stubbing `ij_level_to_bound_uv` with any rectangle in [−1, 1]² (`any_uv_bound`) cut
+    `Cell::vertex`'s proof from 326 s to 25 s and `rect_bound`'s from 30 minutes to 280 s.
 
   See `verify/README.md` and research of specs 002, 003 and 008.

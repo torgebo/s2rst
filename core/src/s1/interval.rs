@@ -107,8 +107,9 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if a point is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
-    /// checks the same precondition with `ABSL_DCHECK`.
+    /// In debug builds, panics if a point is outside \[-π, π\] or NaN. In release builds the check
+    /// is skipped and the result is unspecified, as in upstream, which checks the same precondition
+    /// with `ABSL_DCHECK`.
     pub fn from_point_pair(p1: f64, p2: f64) -> Self {
         debug_assert!(p1.abs() <= PI);
         debug_assert!(p2.abs() <= PI);
@@ -218,8 +219,9 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
-    /// checks the same precondition with `ABSL_DCHECK`.
+    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is
+    /// skipped and the result is unspecified, as in upstream, which checks the same precondition
+    /// with `ABSL_DCHECK`.
     pub fn contains(self, p: f64) -> bool {
         debug_assert!(p.abs() <= PI);
         let p = if p == -PI { PI } else { p };
@@ -230,8 +232,9 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
-    /// checks the same precondition with `ABSL_DCHECK`.
+    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is
+    /// skipped and the result is unspecified, as in upstream, which checks the same precondition
+    /// with `ABSL_DCHECK`.
     pub fn interior_contains(self, p: f64) -> bool {
         debug_assert!(p.abs() <= PI);
         let p = if p == -PI { PI } else { p };
@@ -336,8 +339,9 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
-    /// checks the same precondition with `ABSL_DCHECK`.
+    /// In debug builds, panics if `p` is outside \[-π, π\] or NaN. In release builds the check is
+    /// skipped and the result is unspecified, as in upstream, which checks the same precondition
+    /// with `ABSL_DCHECK`.
     pub fn add_point(self, p: f64) -> Interval {
         debug_assert!(p.abs() <= PI);
         let p = if p == -PI { PI } else { p };
@@ -359,8 +363,8 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if the interval is empty, or if `p` is outside \[-π, π\] or
-    /// NaN. In release builds the check is skipped and the result is unspecified, as in upstream, which
+    /// In debug builds, panics if the interval is empty, or if `p` is outside \[-π, π\] or NaN. In
+    /// release builds the check is skipped and the result is unspecified, as in upstream, which
     /// checks the same precondition with `ABSL_DCHECK`.
     pub fn project(self, p: f64) -> f64 {
         debug_assert!(!self.is_empty());
@@ -398,10 +402,11 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `margin` is NaN (through [`Interval::new`]'s check). In
-    /// release builds a NaN margin gives an interval that is not valid, as in upstream, whose
-    /// constructor checks validity with `ABSL_DCHECK`. Every other margin, including the
-    /// infinities, is accepted.
+    /// In debug builds, panics if `margin` is NaN (through [`Interval::new`]'s check), unless
+    /// the interval is full, which a NaN margin returns as it is (as upstream, whose negative
+    /// branch returns a full interval first). In release builds a NaN margin gives an interval
+    /// that is not valid, as in upstream, whose constructor checks validity with `ABSL_DCHECK`.
+    /// Every other margin, including the infinities, is accepted.
     pub fn expanded(self, margin: f64) -> Interval {
         if margin >= 0.0 {
             if self.is_empty() {

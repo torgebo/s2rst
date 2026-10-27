@@ -1,0 +1,18 @@
+Mutant: M-808
+Targets: O-s1::Interval::expanded
+Expect-Fail: iv_crash::o_expanded_nan_full
+Defect: s1::Interval::expanded's negative branch no longer returns the full interval first, so a NaN margin on it panics in debug builds
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -414,9 +414,6 @@
+                 return Interval::full();
+             }
+         } else {
+-            if self.is_full() {
+-                return self;
+-            }
+             // Check whether this interval will be empty after expansion, allowing
+             // for a 1-bit rounding error when computing each endpoint.
+             if self.length() + 2.0 * margin - 2.0 * f64::EPSILON <= 0.0 {

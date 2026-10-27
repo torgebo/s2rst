@@ -1,5 +1,7 @@
 # Harnesses that fail on a recorded defect whose separate fix (FR-010) has not landed yet.
 # One line per harness: `<fully qualified harness> D-NNN`, e.g. `anc::p_anc_01 D-001`.
-# run-verify.sh reports a listed harness that fails as `KNOWN-DEFECT D-NNN`, and treats a
-# listed harness that succeeds as an error ("stale known-defect entry"), so remove the line
-# when the fix lands. FR-015 and FR-016 never appear here (research R9).
+# run-verify.sh reports a listed harness that fails a check (FAILED) as `KNOWN-DEFECT D-NNN`,
+# and treats a listed harness that succeeds as an error ("stale known-defect entry"), so remove
+# the line when the fix lands. A listed harness that ends in ERROR, OOM, TIMEOUT or NOT-RUN
+# keeps that status and fails the run as any other. FR-015 and FR-016 never appear here
+# (research R9).

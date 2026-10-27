@@ -510,3 +510,34 @@ T073, on the final tree (2026-10-06).
 | SC-012 | met | Every one of the 479 mutants is classified (MUTATION.md): 452 caught, 3 unviable, and of the 24 survivors 2 killed by the proofs and 22 undetected, each with a written reason. The before and after counts are in "Mutation measurement" |
 | SC-013 | met | "Summary" answers "continue?" (yes, for code that reads untrusted bytes), "with which methods?" (differential tests and fuzzing to find defects, Kani for the library's code and the fixed-size codecs, Verus for the variable-length codecs), "is the deductive track worth its cost?" (yes: a day's work and 17 s per run, for the only every-length evidence) and "what next?" (the xlarge tier, T064, the missing `80 80` test, then the ranked follow-ups) |
 | SC-014 | met | U-004 and U-005 have tasks T074 and T075 (created during planning, confirmed in T067), and U-006 has T077 (found after the proofs, while writing `UPSTREAM.md`); all three have rows under "Upstream findings"; D-003 and D-004 are under "Defects found" |
+
+## Addendum: code review of v0.4.0..74b9bc1 (2026-10-26)
+
+- **32-bit truncation (finding 1).** The integer, point and string vector decoders converted a
+  decoded `u64` count or end offset to `usize` before comparing it with the limit or the data.
+  On a 32-bit target (wasm32), a count of 2³² + 1 became 1 and passed the 50,000,000 limit, and
+  an end offset of 2³² + 1 landed inside the data, so these inputs decoded where a 64-bit
+  build rejects them. They now compare in `u64` first, as the Verus restatements already did
+  (`count: u64`, `start: u64`). The string vector mirror's permitted difference "u64 offsets
+  for the usize casts" is gone, and the drift guard's fingerprints were blessed again after the
+  review. The Kani proofs run on x86-64, where the conversion is the identity, so their results
+  stand. Regression tests: core unit tests, and four tests in `wasm/tests/web.rs` that fail on
+  the old decoders under wasm32 and pass now. The same shape was fixed outside this spec's
+  scope: the `LaxPolygon` loop count, the compressed points' off-center count and indices, and
+  the shape index cell decoder's counts.
+- **Decoder legs past the old bounds (finding 10).** P-PV-02's members ended at 1 byte, too
+  short for a point, so the point vector decoder was compared with the reference on the empty
+  vector only, and P-PV-01's round trip by composition held for `n = 0`. The new members
+  `cd_pv::p_pv_02__n1_b26` and `__n2_b50` fix the header byte to one or two uncompressed points
+  and leave the point bytes and one trailing byte symbolic: 11.5 s and 15.8 s at a 4 GiB
+  ceiling, so they run per change (the codecs leg). P-PV-01 now holds by composition for
+  `n ≤ 2`. Likewise `cd_uv::p_uv_03__n2_b18` (53.1 s, the vectors leg) covers two `u64`
+  elements of any width, so P-UV-01's composition holds for every `n ≤ 2` (before, `n = 2`
+  only with widths up to 5). The cell-id vector's composition stays at `n = 0`: its missing
+  leg is the encoder (P-CV-03 at one id runs out of memory at 8 GiB; xlarge, not run).
+- **Mutants.** The new `M-257` (the uncompressed branch skips the first point) is killed by
+  both new point members; the 0- and 1-byte members cannot see it. Ten patches across the
+  suite no longer applied: five since earlier comment edits (`M-154`, `M-204`, `M-253`,
+  `M-254`, `M-731`) and five after this change (`M-202`, `M-219`, `M-701`, `M-702`, `M-707`).
+  Each was regenerated with the same mutation and checked on the working tree (the patch
+  applied, its harnesses and tests run, the patch reversed): all ten killed.

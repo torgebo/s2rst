@@ -93,6 +93,16 @@ pub fn valid(x: u64) -> bool {
     decompose(x).is_some()
 }
 
+/// [`valid`] without the level search: the marker bit `60 − 2·level` is the lowest set bit, so
+/// an id is valid exactly when its lowest set bit is at an even position up to 60 and its face
+/// is at most 5. For the harnesses' domains, where the search would need an unwind of 32;
+/// `tests/spec_vs_cpp.rs` checks that the two agree.
+#[must_use]
+pub fn valid_by_marker(x: u64) -> bool {
+    let tz = x.trailing_zeros();
+    tz % 2 == 0 && tz <= 60 && x >> 61 <= 5
+}
+
 /// The marker bit of a cell at `level`: `1 << (60 − 2·level)`.
 #[must_use]
 pub fn lsb_for_level(level: u8) -> u64 {

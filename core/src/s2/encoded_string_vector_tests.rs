@@ -61,3 +61,15 @@ fn million_string_vector_round_trips() {
     encode_string_vector(&refs, &mut buf).unwrap();
     assert_eq!(decode_string_vector(&mut buf.as_slice()).unwrap(), v);
 }
+
+/// Code review of v0.4.0..74b9bc1, finding 1: an end offset past the data decodes as an empty
+/// string on every target. On wasm32 the offset 2³² + 1 was truncated to 1 before the
+/// comparison, and the entries decoded as `a` and `b`. `wasm/tests/web.rs` runs it on wasm32.
+#[test]
+fn offset_above_u32_max_is_past_the_data() {
+    let mut buf = Vec::new();
+    encode_uint_vector_u64(&[(1u64 << 32) + 1, 2], &mut buf).unwrap();
+    buf.extend_from_slice(b"ab");
+    let decoded = decode_string_vector(&mut buf.as_slice()).unwrap();
+    assert_eq!(decoded, vec![Vec::<u8>::new(), Vec::new()]);
+}

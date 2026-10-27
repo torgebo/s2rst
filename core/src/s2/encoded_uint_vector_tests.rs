@@ -50,3 +50,21 @@ fn million_element_vector_round_trips() {
         .collect();
     assert!(round_trip_u64(&v));
 }
+
+/// Code review of v0.4.0..74b9bc1, finding 1: the decoded count is checked against the limit
+/// before it is converted to `usize`. On a 32-bit target (wasm32) the conversion came first and
+/// truncated a count of 2³² + 1 to 1, so these inputs decoded as one element there, where a
+/// 64-bit build rejects them. `wasm/tests/web.rs` runs the same inputs on wasm32.
+#[test]
+fn count_above_u32_max_is_rejected() {
+    let input = |element_size: u64| {
+        let mut b = Vec::new();
+        write_uvarint(&mut b, ((1u64 << 32) + 1) * element_size).unwrap();
+        b.push(7);
+        b
+    };
+    let err = decode_uint_vector_u64(&mut input(8).as_slice()).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    let err = decode_uint_vector_u32(&mut input(4).as_slice()).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}

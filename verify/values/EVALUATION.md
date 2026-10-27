@@ -605,7 +605,10 @@ returns the straight angle (a silent deviation), the special values in the arith
 ## Limitations (spec 006)
 
 - The proofs cover the default build; with hardware FMA the dot and cross products fuse, and
-  `distance` is not symmetric (K9). Nothing in the suite checks an FMA build.
+  `distance` is not symmetric (K9). Nothing in the suite checks an FMA build. Since 2026-10-26
+  the verify crate refuses to build with the `fma` target feature (`compile_error!` in
+  `src/lib.rs`; code review of v0.4.0..74b9bc1, finding 8), so its unfused restatements are
+  never paired with a fused library.
 - The point's geometry is proven over the box, a superset of the unit sphere, so its
   statements are stronger than needed where they hold and do not distinguish unit inputs.
 - `sin` and `cos` are over-approximated, `sqrt` is under-determined and `atan2` is absent:
@@ -1365,3 +1368,11 @@ on the workstation only. SC-001 is met in part and SC-003 is not met.
 | SC-011 index by kind | met | Every new id appears once in `PROPERTIES_BY_KIND.md`, `property_kinds` passes, and the HTML is re-rendered. |
 | SC-012 upstream findings | met | U-015 (T060) and Kani's `thread_local!` crash (T057), both under "Upstream findings", are recorded in `UPSTREAM.md` and `KANI_ISSUES.md` (2026-10-25); neither is filed. |
 | SC-013 answerable from the evaluation | met | "Summary" says how much of `Cap` is proven. "What next" names the `Region` implementors the laws reach next (`Rect`, `Cell`, `PointRegion`, `CellUnion`) and gives `LatLng` a go. |
+
+## The coverage review of 2026-10-26
+
+A review after `074e923` found two gaps in the value types' crash-freedom records: the inputs
+outside each documented domain (does the operation panic exactly as its `# Panics` says?) and the
+62 floating-point entries specs 004–007 excluded. Both are recorded in
+[`../COVERAGE.md`](../COVERAGE.md): sections 10 and 11 of `INVENTORY.md` carry the per-entry
+results, and 12 `# Panics` sections were corrected (none in behaviour).

@@ -86,13 +86,15 @@ pub fn decode_string_vector(r: &mut dyn Read) -> io::Result<Vec<Vec<u8>>> {
         ));
     }
 
-    // Grow on demand, as above (research R7), although `offsets.len()` is known here.
+    // Grow on demand, as above (research R7), although `offsets.len()` is known here. The
+    // offsets are compared as decoded, in `u64`, and converted only once they are within the
+    // data: on a 32-bit target a conversion first would truncate an offset above `u32::MAX`
+    // into the data.
     let mut result = Vec::new();
-    let mut start = 0usize;
+    let mut start = 0u64;
     for &end in &offsets {
-        let end = end as usize;
-        if start <= end && end <= data.len() {
-            result.push(data[start..end].to_vec());
+        if start <= end && end <= total_len {
+            result.push(data[start as usize..end as usize].to_vec());
         } else {
             result.push(Vec::new());
         }

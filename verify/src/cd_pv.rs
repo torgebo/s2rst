@@ -6,14 +6,18 @@
 //! - **P-PV-01** (FAST round trip) by composition: the encoder agreement `p_pv_01_enc__n<k>`,
 //!   P-PV-02, and the model's round trip `p_pv_mrt__n<k>`;
 //! - **P-PV-02:** the agreement on the uncompressed branch and the unknown tags, at T029's
-//!   bound: the empty input and every 1-byte input except tag 1;
+//!   bound: the empty input and every 1-byte input except tag 1; and on every input whose
+//!   header declares one or two uncompressed points (`p_pv_02__n<k>_b<L>`), so on their
+//!   encodings;
 //! - **P-PV-03** (the compact branch) is a tool limit (T029) and has no harness here.
 #![allow(
     non_snake_case,
     reason = "`__` marks a split-family member (harness-conventions)"
 )]
 
-use crate::codec::{PtVec, check_agreement, check_encoder, check_model_round_trip};
+use crate::codec::{
+    PtVec, check_agreement, check_agreement_on, check_encoder, check_model_round_trip,
+};
 
 /// One agreement member per `name = length, unwind => |input, accepted| covers`.
 macro_rules! agreement {
@@ -64,6 +68,42 @@ agreement!(PtVec, "P-PV-02 (exact input): the point vector decoder agrees with u
         kani::cover!(!accepted && b[0] & 7 == 0, "truncated");
     },
 );
+
+/// The agreement on every `L`-byte input whose one-byte header declares `n` points in the
+/// uncompressed format: the `24n` point bytes and what follows them are any bits.
+fn points_after_header<const L: usize>(n: u8) {
+    let mut b: [u8; L] = kani::any();
+    b[0] = n << 3;
+    check_agreement_on::<PtVec, L>(&b, |_b, accepted| {
+        kani::cover!(accepted, "the points decoded, a byte left over");
+    });
+}
+
+/// P-PV-02 (exact input): the point vector decoder agrees with upstream on the uncompressed
+/// format, on an encoding of one point.
+///
+/// On every 26-byte input whose header byte is `0x08` (one point, the uncompressed format): the
+/// library's decoder and the reference description agree on acceptance, value (bit for bit)
+/// and bytes consumed. The `__b<L>` members stop at 1 byte, too short for a point, so they
+/// compare the decoders on the empty vector only (code review of v0.4.0..74b9bc1, finding 10);
+/// with this member, P-PV-01's composition holds for one point.
+#[kani::proof]
+#[kani::unwind(27)]
+fn p_pv_02__n1_b26() {
+    points_after_header::<26>(1);
+}
+
+/// P-PV-02 (exact input): the point vector decoder agrees with upstream on the uncompressed
+/// format, on an encoding of two points.
+///
+/// On every 50-byte input whose header byte is `0x10` (two points, the uncompressed format):
+/// the library's decoder and the reference description agree on acceptance, value (bit for bit)
+/// and bytes consumed. With it, P-PV-01's composition holds for two points.
+#[kani::proof]
+#[kani::unwind(51)]
+fn p_pv_02__n2_b50() {
+    points_after_header::<50>(2);
+}
 
 encoder!(PtVec, "P-PV-01 (round trip): every vector of points round-trips through the \
                  uncompressed (FAST) format, bit for bit.";

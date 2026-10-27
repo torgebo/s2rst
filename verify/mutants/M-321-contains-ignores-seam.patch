@@ -6,8 +6,8 @@ Defect: contains(p) does not treat −π as π
 diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
 --- a/core/src/s1/interval.rs
 +++ b/core/src/s1/interval.rs
-@@ -222,7 +222,6 @@
-     /// checks the same precondition with `ABSL_DCHECK`.
+@@ -224,7 +224,6 @@
+     /// with `ABSL_DCHECK`.
      pub fn contains(self, p: f64) -> bool {
          debug_assert!(p.abs() <= PI);
 -        let p = if p == -PI { PI } else { p };

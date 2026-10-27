@@ -53,14 +53,26 @@ impl Cluster {
     ///
     /// # Panics
     ///
-    /// Panics if `begin` or `end` are not leaf cells, or if `begin > end`.
+    /// In every build, if `begin` or `end` is neither a leaf cell nor `CellId::end(30)`, or if
+    /// `begin > end`: the rule of [`CellUnion::from_begin_end`], which
+    /// [`covering`](Self::covering) calls, so a cluster that `new` returns has a covering. (The
+    /// check was debug-only, and a release build panicked later, in `covering`.)
     pub fn new(begin: CellId, end: CellId, weight: i64) -> Self {
-        debug_assert!(begin.is_leaf() && end.is_leaf());
-        debug_assert!(begin <= end);
+        let leaf_end = CellId::end(MAX_CELL_LEVEL);
+        let in_range = |id: CellId| (id.is_valid() && id.is_leaf()) || id == leaf_end;
+        assert!(
+            in_range(begin) && in_range(end),
+            "Cluster::new: begin and end must be leaf cells or the end of the leaves"
+        );
+        assert!(begin <= end, "Cluster::new: begin is after end");
         Self { begin, end, weight }
     }
 
     /// Returns the covering of this cluster as a `CellUnion`.
+    ///
+    /// # Panics
+    ///
+    /// If the public fields break [`new`](Self::new)'s rule.
     pub fn covering(&self) -> CellUnion {
         CellUnion::from_begin_end(self.begin, self.end)
     }
@@ -555,6 +567,24 @@ mod tests {
         let c = Cluster::new(begin, end, 42);
         let s = c.to_string();
         assert!(s.contains("42"), "Display should show weight");
+    }
+
+    /// `new` checks its range in every build, so that `covering` cannot panic on a cluster it
+    /// returned (code review of v0.4.0..74b9bc1).
+    #[test]
+    fn test_new_panics_on_an_invalid_range_in_every_build() {
+        let leaf = CellId::from_face(2).child_begin_at_level(MAX_CELL_LEVEL);
+        let next = leaf.next();
+        for (begin, end) in [
+            (CellId(0), leaf),
+            (leaf, CellId::from_face(2)),
+            (next, leaf),
+        ] {
+            let result = std::panic::catch_unwind(|| Cluster::new(begin, end, 1));
+            assert!(result.is_err(), "{begin:?}..{end:?}");
+        }
+        let c = Cluster::new(leaf, next, 1);
+        assert_eq!(c.covering().cell_ids(), &[leaf]);
     }
 
     #[test]

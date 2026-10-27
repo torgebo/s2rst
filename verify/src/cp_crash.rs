@@ -325,3 +325,81 @@ fn c_cell_tests__real() {
     let (cell, _) = crate::value_domain::any_cell();
     let _ = (a.contains_cell(&cell), a.intersects_cell(&cell));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (gap 1; `crash.rs` explains the `n_*` and `r_*`
+// conventions). Both checks are `debug_assert!`s.
+// ---------------------------------------------------------------------------------------------
+
+/// N-s2::Cap::from_center_angle: in debug builds, panics for every centre that is not unit
+/// length, whatever the angle (NaN included: its radius, `STRAIGHT`, is valid).
+///
+/// Stubs: `pure_is_unit` (L-CP-07, L-CP-04), as `c_from_center_angle`: the domain's `is_unit`
+/// and the constructor's are one computation to the checker. The stub allows more behaviours
+/// than the real function, never fewer, so every one of them panicking covers the real one.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+#[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+fn n_from_center_angle() {
+    stubs::reset();
+    let c = crate::value_domain::any_triple();
+    kani::assume(!c.is_unit());
+    let _ = Cap::from_center_angle(c, Angle::from_radians(kani::any()));
+    kani::cover!(true, "returns");
+}
+
+/// R-s2::Cap::from_center_angle: in a build without debug assertions, completes without panic
+/// or overflow for every centre that is not unit length and every angle.
+///
+/// Stubs: `pure_is_unit`, as `n_from_center_angle`.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+#[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+fn r_from_center_angle() {
+    stubs::reset();
+    let c = crate::value_domain::any_triple();
+    kani::assume(!c.is_unit());
+    let cap = Cap::from_center_angle(c, Angle::from_radians(kani::any()));
+    kani::cover!(!cap.is_valid(), "an invalid cap");
+}
+
+/// A box cap and a distance outside `expanded`'s domain that its `# Panics` names: negative or
+/// NaN with any cap, or +∞ with a cap that is not empty. Over every box cap and +∞ the first
+/// version of `n_expanded` returned (2026-10-26): the empty cap returns before the sum, as
+/// `o_expanded_empty_infinite` proves.
+fn outside_expanded() -> (Cap, Angle) {
+    let (a, d) = (any_box_cap(), kani::any::<f64>());
+    kani::assume(!(d >= 0.0) || (d == f64::INFINITY && !a.is_empty()));
+    (a, Angle::from_radians(d))
+}
+
+/// N-s2::Cap::expanded: in debug builds, panics for every box cap and every distance that is
+/// negative or NaN, and for every non-empty box cap and +∞.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_expanded() {
+    let (a, d) = outside_expanded();
+    let _ = a.expanded(d);
+    kani::cover!(true, "returns");
+}
+
+/// O-s2::Cap::expanded (outside its domain, returns): the empty cap expanded by +∞ is the empty
+/// cap, without a panic, in every build (its `# Panics`).
+#[kani::proof]
+fn o_expanded_empty_infinite() {
+    let e = Cap::empty().expanded(Angle::from_radians(f64::INFINITY));
+    assert!(e.is_empty());
+    kani::cover!(true, "returns the empty cap");
+}
+
+/// R-s2::Cap::expanded: in a build without debug assertions, completes without panic or
+/// overflow on the same inputs.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_expanded() {
+    let (a, d) = outside_expanded();
+    let e = a.expanded(d);
+    kani::cover!(!a.is_empty() && e.is_full(), "grown to the full cap");
+}

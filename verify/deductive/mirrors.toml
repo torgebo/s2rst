@@ -65,7 +65,7 @@ differences = ["Vec<u8> for the writer", "an indexed loop for iter().fold"]
 [[mirror]]
 restated = "uint_vector::decode_uint_vector_u64"
 library = "core/src/s2/encoded_uint_vector.rs::decode_uint_vector_u64"
-fingerprint = "fnv1a64:d06c4c56b418e48c"
+fingerprint = "fnv1a64:55bf81b139d064b6"
 differences = ["slice and cursor reader", "None for io::Error"]
 
 [[mirror]]
@@ -77,7 +77,7 @@ differences = ["Vec<u8> for the writer", "an indexed loop for iter().fold"]
 [[mirror]]
 restated = "uint_vector::decode_uint_vector_u32"
 library = "core/src/s2/encoded_uint_vector.rs::decode_uint_vector_u32"
-fingerprint = "fnv1a64:dabb4b87f249878e"
+fingerprint = "fnv1a64:6a8eb26f0c49d946"
 differences = ["slice and cursor reader", "None for io::Error"]
 
 [[mirror]]
@@ -113,5 +113,5 @@ differences = ["Vec<u8> strings for &[u8]", "Vec<u8> for the writer"]
 [[mirror]]
 restated = "string_vector::decode_string_vector"
 library = "core/src/s2/encoded_string_vector.rs::decode_string_vector"
-fingerprint = "fnv1a64:478ec6ec2dce7782"
-differences = ["slice and cursor reader: a subslice for Read::take + read_to_end", "None for io::Error", "u64 offsets for the usize casts"]
+fingerprint = "fnv1a64:09e536bd664392e8"
+differences = ["slice and cursor reader: a subslice for Read::take + read_to_end", "None for io::Error"]

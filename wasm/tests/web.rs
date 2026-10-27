@@ -2982,3 +2982,71 @@ fn test_edge_tessellator() {
     let m = EdgeTessellator::mercator(std::f64::consts::PI, &Angle::from_degrees(0.1));
     assert!(!m.tessellate_projected(&a, &b).is_empty());
 }
+
+// ===========================================================================
+// Decoders on a 32-bit target (code review of v0.4.0..74b9bc1, finding 1)
+// ===========================================================================
+//
+// Each decoder compares a decoded 64-bit count or offset before converting it to `usize`, which
+// truncates here. The same inputs are rejected (or decoded as empty) on a 64-bit build; the core
+// unit tests check them there.
+
+fn varint(mut x: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    while x >= 0x80 {
+        out.push((x as u8) | 0x80);
+        x >>= 7;
+    }
+    out.push(x as u8);
+    out
+}
+
+/// A count of 2³² + 1 elements, one byte each, followed by one byte: truncated first, it was 1.
+#[wasm_bindgen_test]
+fn test_uint_vector_count_above_u32_max_is_rejected() {
+    use s2rst::s2::encoded_uint_vector::{decode_uint_vector_u32, decode_uint_vector_u64};
+    let count = (1u64 << 32) + 1;
+    let mut b = varint(count * 8);
+    b.push(7);
+    assert!(decode_uint_vector_u64(&mut b.as_slice()).is_err());
+    let mut b = varint(count * 4);
+    b.push(7);
+    assert!(decode_uint_vector_u32(&mut b.as_slice()).is_err());
+}
+
+/// A count of 2³² + 1 points followed by one point: truncated first, it was 1.
+#[wasm_bindgen_test]
+fn test_point_vector_count_above_u32_max_is_rejected() {
+    use s2rst::s2::encoded_s2point_vector::decode_s2point_vector;
+    let mut b = varint(((1u64 << 32) + 1) << 3);
+    for x in [1.0f64, 0.0, 0.0] {
+        b.extend_from_slice(&x.to_le_bytes());
+    }
+    assert!(decode_s2point_vector(&mut b.as_slice()).is_err());
+}
+
+/// The end offsets 2³² + 1 and 2 over the data `ab`: the first is past the data, so both entries
+/// are empty. Truncated first, the offsets were 1 and 2, and the entries `a` and `b`.
+#[wasm_bindgen_test]
+fn test_string_vector_offset_above_u32_max_is_past_the_data() {
+    use s2rst::s2::encoded_string_vector::decode_string_vector;
+    use s2rst::s2::encoded_uint_vector::encode_uint_vector_u64;
+    let mut b = Vec::new();
+    encode_uint_vector_u64(&[(1u64 << 32) + 1, 2], &mut b).unwrap();
+    b.extend_from_slice(b"ab");
+    let decoded = decode_string_vector(&mut b.as_slice()).unwrap();
+    assert_eq!(decoded, vec![Vec::<u8>::new(), Vec::new()]);
+}
+
+/// A loop count of 2³² + 1 and one vertex: truncated first, it was a one-loop polygon.
+#[wasm_bindgen_test]
+fn test_lax_polygon_loop_count_above_u32_max_is_rejected() {
+    use s2rst::s2::encoded_s2point_vector::{CodingHint, encode_s2point_vector};
+    use s2rst::s2::encoding::S2Decode;
+    use s2rst::s2::lax_polygon::LaxPolygon;
+    let mut b = vec![1u8];
+    b.extend_from_slice(&varint((1u64 << 32) + 1));
+    let p = s2rst::s2::Point::from_coords(1.0, 0.0, 0.0);
+    encode_s2point_vector(&[p], CodingHint::Fast, &mut b).unwrap();
+    assert!(LaxPolygon::decode(&mut b.as_slice()).is_err());
+}

@@ -143,16 +143,17 @@ impl Rect {
 
     /// Creates a rectangle from a center point and size in each dimension.
     ///
-    /// Both components of `size` must be non-negative and not NaN: a negative component
-    /// empties its axis, so one negative component gives an invalid rectangle. An infinite
+    /// Both components of `size` must be non-negative and not NaN. A negative component empties
+    /// its axis unless rounding absorbs half of it (a size of `-5e-324`, or of `-1` at a centre
+    /// of `1e300`), so one negative component usually gives an invalid rectangle. An infinite
     /// centre with an infinite size gives a NaN bound (`∞ − ∞`), as in upstream:
     /// `from_center_size((∞, 0), (∞, 1))` is `[NaN, ∞] × [−0.5, 0.5]`.
     ///
     /// # Panics
     ///
-    /// In debug builds, if the result is invalid (one size component negative and the other
-    /// not), as upstream's checking constructor does (`r2rect.cc:25`). Release builds return
-    /// that invalid rectangle.
+    /// In debug builds, if the result is invalid: exactly one axis comes out empty
+    /// (`center − size / 2 > center + size / 2` on it), as upstream's checking constructor
+    /// does (`r2rect.cc:25`). Release builds return that invalid rectangle.
     pub fn from_center_size(center: Point, size: Point) -> Self {
         let r = Rect {
             x: r1::Interval::new(center.x - 0.5 * size.x, center.x + 0.5 * size.x),

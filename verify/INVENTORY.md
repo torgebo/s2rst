@@ -17,7 +17,9 @@ their whole type, narrowed only by a documented precondition (rustdoc, `debug_as
 upstream `DCHECK`/doc comment).
 
 **Summary**: 48 in scope (75.0 %, SC-002 floor 48), 16 excluded (12 `float-geometry`,
-3 `tool-limit`, 1 `float-geometry: crash-freedom intractable`). `vertex_neighbors` is at risk
+3 `tool-limit`, 1 `float-geometry: crash-freedom intractable`). Since gap 2 of the 2026-10-26
+coverage review, 7 of the 12 float-geometry rows are proven crash-free by the `Cell` harnesses
+that run them (`cl_crash::c_fg_*`, shared): 55 in scope. `vertex_neighbors` is at risk
 under the R15 budget (research R12).
 
 ## 1. Status, domain and crash proof
@@ -28,8 +30,8 @@ under the R15 budget (research R12).
 | 2 | `CellId::sentinel` | constructor | in-scope |  | — | — | `crash::c_sentinel` | proven | 1/1 |
 | 3 | `CellId::from_face` | constructor | in-scope |  | Face | `face ≤ 5` (rustdoc "0–5") | `crash::c_from_face` | proven | 3/3 |
 | 4 | `CellId::from_face_pos_level` | constructor | in-scope |  | Face × U64 × Level | `pos < 2^61` (rustdoc "61-bit") | `crash::c_from_face_pos_level` | proven | 4/4 |
-| 5 | `CellId::from_point` | constructor | excluded | float-geometry |  |  |  |  |  |
-| 6 | `CellId::from_lat_lng` | constructor | excluded | float-geometry |  |  |  |  |  |
+| 5 | `CellId::from_point` | constructor | in-scope (gap 2, 2026-10-27, shared) |  | BoxPoint but the origin | not the zero vector (`# Panics`, gap 1: `cl_crash::n_from_point`) | `cl_crash::c_fg_from_point` (shared, weekly; stub `any_uv_bound`) | proven | 1/1 |
+| 6 | `CellId::from_lat_lng` | constructor | in-scope (gap 2, 2026-10-27, shared) |  | ValidLatLng | — | `cl_crash::c_fg_from_lat_lng` (shared, weekly; `sin_cos_contract`) | proven-under-contract | 1/1 |
 | 7 | `CellId::id` | query | in-scope |  | Any | — | `crash::c_id` | proven | 1/1 |
 | 8 | `CellId::is_valid` | query | in-scope |  | Any | — | `crash::c_is_valid` | proven | 2/2 |
 | 9 | `CellId::face` | query | in-scope |  | Valid | — | `crash::c_face` | proven | 2/2 |
@@ -60,12 +62,12 @@ under the R15 budget (research R12).
 | 34 | `CellId::advance_wrap` | navigation | in-scope |  | Valid × I64 | valid (upstream `DCHECK(is_valid())`) | `crash::c_advance_wrap` | proven | 4/4 |
 | 35 | `CellId::distance_from_begin` | query | in-scope |  | ValidOrEnd | — | `crash::c_distance_from_begin` | proven | 2/2 |
 | 36 | `CellId::get_center_si_ti` | encoding | in-scope |  | Valid | — | `crash::c_get_center_si_ti` | proven | 2/2 |
-| 37 | `CellId::to_point_raw` | encoding | excluded | float-geometry |  |  |  |  |  |
-| 38 | `CellId::to_point` | encoding | excluded | float-geometry |  |  |  |  |  |
+| 37 | `CellId::to_point_raw` | encoding | in-scope (gap 2, 2026-10-27, shared) |  | Valid | — | `cl_crash::c_fg_center` (shared, weekly, through `Cell::center_raw`) | proven | 1/1 |
+| 38 | `CellId::to_point` | encoding | in-scope (gap 2, 2026-10-27, shared) |  | Valid | — | `cl_crash::c_fg_center` (shared, weekly, through `Cell::center`) | proven | 1/1 |
 | 39 | `CellId::to_lat_lng` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 40 | `CellId::center_st` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 41 | `CellId::center_uv` | encoding | excluded | float-geometry |  |  |  |  |  |
-| 42 | `CellId::size_st` | free-fn | excluded | float-geometry |  |  |  |  |  |
+| 42 | `CellId::size_st` | free-fn | in-scope (gap 2, 2026-10-27, shared) |  | Level | — | `cl_crash::c_fg_size_and_ij` (shared, through `Cell::size_st`); a raw level above 30 panics (`crash::n_raw_level`) | proven | 1/1 |
 | 43 | `CellId::bound_st` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 44 | `CellId::bound_uv` | encoding | excluded | float-geometry |  |  |  |  |  |
 | 45 | `CellId::to_face_ij_orientation` | encoding | in-scope |  | Valid | — | `crash::c_to_face_ij_orientation` | proven | 3/3 |
@@ -84,8 +86,8 @@ under the R15 budget (research R12).
 | 58 | `impl Default for CellId` | trait | in-scope |  | — | — | `crash::c_default` | proven | 1/1 |
 | 59 | `impl From<u64> for CellId` | trait | in-scope |  | Any | — | `crash::c_from_u64` | proven | 1/1 |
 | 60 | `impl From<CellId> for u64` | trait | in-scope |  | Any | — | `crash::c_u64_from` | proven | 1/1 |
-| 61 | `impl From<&Point> for CellId` | trait | excluded | float-geometry |  |  |  |  |  |
-| 62 | `impl From<&LatLng> for CellId` | trait | excluded | float-geometry |  |  |  |  |  |
+| 61 | `impl From<&Point> for CellId` | trait | in-scope (gap 2, 2026-10-27, shared) |  | BoxPoint but the origin | as `from_point` | `cl_crash::c_fg_from_point` (shared, weekly) | proven | 1/1 |
+| 62 | `impl From<&LatLng> for CellId` | trait | in-scope (gap 2, 2026-10-27, shared) |  | ValidLatLng | — | `cl_crash::c_fg_from_lat_lng` (shared, weekly; `sin_cos_contract`) | proven-under-contract | 1/1 |
 | 63 | `impl Display for CellId` | trait | excluded | tool-limit: `core::fmt` path over 5 min (research R6) |  |  |  |  |  |
 | 64 | `impl FromStr for CellId` | trait | in-scope |  | Text(L), L ≤ 33 | — | `enc::p_enc_10__b{0..=33}` (shared) | proven-within-bounds (input size: byte length ≤ 33; longer texts are rejected by the length check before any loop (FR-007), exercised by the FR-033 tests and fuzz target) | every member satisfied (34/34) |
 
@@ -145,7 +147,7 @@ recorded once here for rows 4, 15, 16, 21, 22, 23, 24, 42, 49, 50, 55, 56.
 | 54 | `from_debug_string` | P-ENC-09 (P-ENC-08 outside the SC-003 denominator) | P-ENC-09 (`Some` only for a valid cell: the model builds it with `compose`) |  |  |  |
 | 55 | `lsb_for_level` | P-VAL-08 | — | raw level `> 30` | added (8a06089) |  |
 | 56 | `size_ij` | P-VAL-08 | — | raw level `> 30` | added (8a06089) |  |
-| 57 | `from_face_ij` | P-ENC-02, P-ENC-03 | P-ENC-02 (the result is a valid leaf) | debug: `n * 2` overflows for `i` or `j` outside `[0, 2^30)`; C++ wraps silently: defect D-001 (task T056) | added (8a06089) |  |
+| 57 | `from_face_ij` | P-ENC-02, P-ENC-03 | P-ENC-02 (the result is a valid leaf) | debug: `n * 2` overflows for some `i` or `j` outside `[0, 2^30)` (not all: section 3); C++ wraps silently: defect D-001 (task T056) | added (8a06089), corrected 2026-10-26 (section 3) |  |
 | 58 | `Default` | P-VAL-05 | — (returns `none`) | | | |
 | 59 | `From<u64>` | P-VAL-04 | — (any `u64`) | | | |
 | 60 | `From<CellId> for u64` | P-VAL-04 | — | | | |
@@ -154,6 +156,37 @@ recorded once here for rows 4, 15, 16, 21, 22, 23, 24, 42, 49, 50, 55, 56.
 Excluded rows keep their catalogue properties as `not-proven`: rows 46, 53, 63 →
 P-ENC-05, P-ENC-07, P-ENC-08, P-ENC-11, P-ENC-12 (`tool-limit`); row 50 → P-NBR-04
 (`excluded: all_neighbors`). They stay outside the SC-003 denominator (spec SC-003).
+
+## 3. Outside the domain: the documented panics (2026-10-26)
+
+The crash proofs above show that an operation does not panic inside its domain. These show
+the other half of its `# Panics` section, so that the section is exact: for every input
+outside the domain that the section names, the operation panics (`n_*`, a
+`#[kani::should_panic]` harness whose one cover after the call must stay unsatisfied, so no
+input returns; `run-verify.sh` reports it as covers `never`, and `RETURNS` otherwise). A panic
+the section calls debug-only is proven in the debug build, and the release build's behaviour
+on the same inputs separately (`r_*`, `make verify-release`, built without debug assertions:
+no panic and no arithmetic overflow). Every-build panics are proven in both builds. The
+`n_*` harnesses run in the per-change `CellId` leg; `make verify-release` runs the release
+pass.
+
+| Operations | Outside the domain | Build | Harness | Result |
+|------------|--------------------|-------|---------|--------|
+| `impl From<u8> for Level`, and every operation taking `impl Into<Level>`: `from_face_pos_level`, `child_position`, `parent_at_level`, `child_begin_at_level`, `child_end_at_level`, `begin`, `end`, `lsb_for_level`, `size_ij`, `size_st`, `vertex_neighbors`, `all_neighbors` | a raw level above 30 | every | `crash::n_raw_level` | panics (both builds) |
+| `level` | 62 or more trailing zero bits (`0`, `1 << 62`, `1 << 63`, `3 << 62`) | every | `crash::n_level` | panics (both builds) |
+| `child_position` | an invalid id with any level, or a valid cell with a level outside `1..=level` | debug | `crash::n_child_position`; release `crash::r_child_position` | panics in debug builds; returns in release builds |
+| `parent` | a face cell | debug | `crash::n_parent`; release `crash::r_parent` | panics in debug builds; returns in release builds |
+| `children`, `child_begin`, `child_end` | an invalid id or a leaf | debug | `crash::n_children`; release `crash::r_children` | panics in debug builds; returns in release builds, except that `child_end`'s sum wraps for the ids within 5/4 of their lowest set bit of 2^64 (`sentinel` among them), which Kani checks as an overflow, so those ids are outside the release proof |
+| `next_wrap`, `prev_wrap` | an invalid id | debug | `crash::n_wrap`; release `crash::r_wrap` | panics in debug builds; returns in release builds |
+| `vertex_neighbors` | level 30 | every | `crash::n_vertex_neighbors` | panics (both builds) |
+| `common_ancestor_level` | (`none`, `none`) | every | `crash::n_common_ancestor_level` | panics (both builds) |
+| `from_face_ij` | `i` or `j` outside `[0, 2^30)` | debug | none: not every such input panics | the `# Panics` said it panics; the first `n_from_face_ij` returned (36 of 48 sampled inputs return, many as valid cells: `i = 2^30` on face 0 gives face 1's first leaf). The section now says that some such inputs panic and the others give an unspecified id |
+
+Two harness lessons: a symbolic panic condition (`raw > 30`) is not simplified to false, so
+CBMC explores the code after the panic on paths no input takes, and `n_raw_level` needs a small
+unwind bound for the neighbour operations' loops (10 minutes without it, 1.4 s with it); and
+the domain of the invalid ids is `spec::valid_by_marker`, the model's validity without its
+level search, which `tests/spec_vs_cpp.rs` checks against `spec::valid`.
 
 ## Outside FR-002's definition
 

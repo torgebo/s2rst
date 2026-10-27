@@ -230,7 +230,7 @@ fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> 
         } else {
             // General case.
             clipped.contains_center = (header & 4) != 0;
-            let num_edges = (header >> 3) as usize;
+            let num_edges = decoded_count(header >> 3)?;
             clipped.edges = decode_edges(num_edges, &mut r)?;
         }
 
@@ -247,7 +247,7 @@ fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> 
         let num_clipped = if (first_byte & 7) == 3 {
             // Multi-shape header: read varint, extract num_clipped.
             let header = read_uvarint(&mut r)?;
-            let n = (header >> 3) as usize;
+            let n = decoded_count(header >> 3)?;
             if n <= 1 {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -284,7 +284,7 @@ fn decode_cell(data: &[u8], num_shape_ids: usize) -> io::Result<ShapeIndexCell> 
                 clipped.shape_id = ShapeId(add_i32(shape_id_base, shape_delta)?);
             } else if (header & 3) == 1 {
                 // General case.
-                let num_edges = ((header >> 3) + 1) as usize;
+                let num_edges = decoded_count((header >> 3) + 1)?;
                 clipped.contains_center = (header & 4) != 0;
                 let shape_delta = read_uvarint(&mut r)? as i32;
                 clipped.shape_id = ShapeId(add_i32(shape_id_base, shape_delta)?);
@@ -311,6 +311,18 @@ fn add_i32(a: i32, b: i32) -> io::Result<i32> {
         io::Error::new(
             io::ErrorKind::InvalidData,
             "integer overflow in cell decode",
+        )
+    })
+}
+
+/// Converts a count decoded from the input to `usize`. An error where it does not fit, as it
+/// can on a 32-bit target, where an `as` conversion would truncate it to a smaller count and
+/// decode a different cell.
+fn decoded_count(n: u64) -> io::Result<usize> {
+    usize::try_from(n).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "count out of range in cell decode",
         )
     })
 }

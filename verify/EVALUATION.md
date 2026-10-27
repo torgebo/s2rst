@@ -88,7 +88,7 @@ Commit `8a06089` (`docs(s2): document when CellId operations panic`), documentat
 | `next_wrap`, `prev_wrap` | in debug builds, an invalid id | crash harness assumption |
 | `vertex_neighbors` | `level` is 30 or a raw integer above 30; it must be below `self.level()`, as upstream requires | crash harness assumption (upstream `DCHECK_LT`) |
 | `common_ancestor_level` | both ids are `none`; C++ is undefined behaviour there and Go returns level 30 | crash harness assumption; U-002 |
-| `from_face_ij` | in debug builds, `i` or `j` outside `[0, 2^30)` (the `n * 2` overflow) | the `c_from_face_ij` counterexample |
+| `from_face_ij` | in debug builds, some `i` or `j` outside `[0, 2^30)` (the `n * 2` overflow; others return an unspecified id, `INVENTORY.md` section 3) | the `c_from_face_ij` counterexample |
 
 **Gate drift (not caused by this feature):** `make test` fails on this branch for two
 reasons that predate it. Clippy 1.98.1 adds lints that fire 21 times: in 13 files this

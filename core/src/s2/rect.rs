@@ -225,10 +225,9 @@ impl Rect {
     /// # Panics
     ///
     /// In debug builds, panics if the longitude is outside \[-π, π\] or NaN, through
-    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is a rectangle that is not
-    /// valid, as in
-    /// upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then checks the
-    /// longitude with `ABSL_DCHECK`.
+    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is a
+    /// rectangle that is not valid, as in upstream, which only logs an invalid point
+    /// (`ABSL_DLOG_IF`) and then checks the longitude with `ABSL_DCHECK`.
     pub fn from_lat_lng(ll: LatLng) -> Self {
         Rect {
             lat: r1::Interval::from_point(ll.lat.radians()),
@@ -373,9 +372,9 @@ impl Rect {
     /// # Panics
     ///
     /// In debug builds, panics if a longitude is outside \[-π, π\] or NaN, through
-    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is unspecified, as in
-    /// upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then checks the
-    /// longitude with `ABSL_DCHECK`.
+    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is
+    /// unspecified, as in upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then
+    /// checks the longitude with `ABSL_DCHECK`.
     pub fn from_point_pair(a: LatLng, b: LatLng) -> Self {
         Rect {
             lat: r1::Interval::from_point_pair(a.lat.radians(), b.lat.radians()),
@@ -409,10 +408,12 @@ impl Rect {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if the longitude is outside \[-π, π\] or NaN, through
-    /// [`s1::Interval`]'s checks. In release builds the check is skipped and the result is unspecified, as in
-    /// upstream, which only logs an invalid point (`ABSL_DLOG_IF`) and then checks the
-    /// longitude with `ABSL_DCHECK`.
+    /// In debug builds, panics if the longitude is outside \[-π, π\] or NaN and the latitude is
+    /// inside the rectangle's latitudes (excluding their bounds), through [`s1::Interval`]'s
+    /// checks: the latitude is tested first, and a latitude outside answers `false` before the
+    /// longitude is looked at, as in upstream. In release builds the check is skipped and the
+    /// result is unspecified, as in upstream, which only logs an invalid point (`ABSL_DLOG_IF`)
+    /// and then checks the longitude with `ABSL_DCHECK`.
     #[inline]
     pub fn interior_contains_lat_lng(self, ll: LatLng) -> bool {
         self.lat.interior_contains(ll.lat.radians()) && self.lng.interior_contains(ll.lng.radians())
@@ -484,8 +485,9 @@ impl Rect {
     /// # Panics
     ///
     /// In debug builds, panics if the longitude margin is NaN, through
-    /// [`s1::Interval::expanded`]'s check. In release builds the check is skipped and the
-    /// result is a rectangle that is not valid.
+    /// [`s1::Interval::expanded`]'s check, unless the rectangle's longitudes are full, which
+    /// that check returns as they are. In release builds the check is skipped and the result is
+    /// a rectangle that is not valid.
     pub fn expanded(self, margin: LatLng) -> Rect {
         let lat = self.lat.expanded(margin.lat.radians());
         let lng = self.lng.expanded(margin.lng.radians());
@@ -743,6 +745,12 @@ impl Rect {
     /// The rectangle must not be empty, and the point must be valid.
     ///
     /// Corresponds to C++ `S2LatLngRect::GetDistance(S2LatLng)`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the rectangle is empty or the point is not valid. Upstream only
+    /// logs both (`ABSL_DLOG_IF`), and then checks the longitude (`S1Interval::Contains`'s
+    /// `ABSL_DCHECK`). Release builds skip the checks, and the result is then unspecified.
     pub fn get_distance_to_latlng(self, p: LatLng) -> Angle {
         debug_assert!(!self.is_empty());
         debug_assert!(p.is_valid());
@@ -772,6 +780,11 @@ impl Rect {
     /// Both rectangles must not be empty.
     ///
     /// Corresponds to C++ `S2LatLngRect::GetDistance(S2LatLngRect)`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if either rectangle is empty, as upstream's `ABSL_DCHECK`s.
+    /// Release builds skip the checks, and the result is then unspecified.
     pub fn get_distance(self, other: Rect) -> Angle {
         debug_assert!(!self.is_empty());
         debug_assert!(!other.is_empty());

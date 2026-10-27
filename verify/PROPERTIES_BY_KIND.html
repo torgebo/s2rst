@@ -152,9 +152,14 @@ inventories say which harness discharges each operation.</p>
 <td><code>CellId</code></td>
 <td>all 48 in-scope operations, over every input in their domain (the
 three text parsers up to 17 or 33 bytes, beyond which the length check
-rejects before any loop)</td>
+rejects before any loop); since 2026-10-27 also 7 floating-point ones
+(<code>from_point</code>, <code>from_lat_lng</code>,
+<code>to_point</code>, <code>to_point_raw</code>, <code>size_st</code>
+and the two <code>From</code>s), run by the <code>Cell</code>
+harnesses</td>
 <td><code>crash::c_*</code>; the parsers by <code>enc::p_enc_06</code>,
-<code>p_enc_09</code>, <code>p_enc_10</code></td>
+<code>p_enc_09</code>, <code>p_enc_10</code>;
+<code>cl_crash::c_fg_*</code> (shared)</td>
 <td><a href="INVENTORY.md"><code>INVENTORY.md</code></a></td>
 </tr>
 <tr class="even">
@@ -177,10 +182,16 @@ href="decoding/INVENTORY.md"><code>decoding/INVENTORY.md</code></a></td>
 </tr>
 <tr class="even">
 <td><code>Cell</code></td>
-<td>all 21 in-scope operations, over every valid cell (and every edge,
-face, position and level), with no size bound</td>
-<td><code>cl_crash::c_*</code>, and the property harnesses the inventory
-names</td>
+<td>40 of the 52 operations: the 21 integer and stored-bound ones over
+every valid cell (and every edge, face, position and level), with no
+size bound; since 2026-10-27, 19 floating-point ones (vertices, edges,
+centre, areas but the exact one, containment, both bounds,
+<code>from_point</code>, <code>from_lat_lng</code>), 10 per change and 9
+weekly, under contracts and with the abstract u-v bound. The exact area
+and the distances to an edge or a cell run out of memory; the distances
+to a point fail the NaN check off the unit sphere</td>
+<td><code>cl_crash::c_*</code>, <code>cl_crash::c_fg_*</code>, and the
+property harnesses the inventory names</td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
@@ -205,10 +216,15 @@ href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
 <tr class="odd">
 <td><code>s2::Rect</code></td>
-<td>all 34 in-scope operations, over every valid rectangle, every
-latitude–longitude (NaN included) for the operations that screen it, and
-every valid one for those that check it only in debug builds</td>
-<td><code>rl_crash::c_*</code></td>
+<td>45 of the 52 operations: the 34 of spec 005 over every valid
+rectangle, every latitude–longitude (NaN included) for the operations
+that screen it, and every valid one for those that check it only in
+debug builds; since 2026-10-27, 11 floating-point ones (area, point
+containment, both expansions, centroid, cap bound, the cell tests), 6
+per change. The boundary crossing, the rectangle and Hausdorff distances
+time out; the point distance fails the NaN check;
+<code>cell_union_bound</code> is <code>Cap</code>’s tool limit</td>
+<td><code>rl_crash::c_*</code>, <code>rl_crash::c_fg_*</code></td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
@@ -233,35 +249,49 @@ geometric operations; <code>from_coords</code> and
 <code>normalize</code> per change for coordinates up to
 <code>2⁵¹¹</code>, the rest of the finite squared lengths weekly (the
 checker reports <code>1 / ∞</code> as NaN beyond). The five operations
-through <code>atan2</code> are a tool limit</td>
+through <code>atan2</code> are proven under its contract since
+2026-10-27 (weekly)</td>
 <td><code>pt_crash::c_*</code></td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
 <tr class="even">
 <td><code>s1::ChordAngle</code></td>
-<td>28 of the 35 in-scope operations: the constructors over every
+<td>all 35 operations (the 7 through <code>asin</code> under its
+contract since 2026-10-27, per change): the constructors over every
 <code>f64</code>, <code>i32</code> and angle (NaN and the infinities
 included), the accessors, classifications, order, neighbours and
 <code>plus_error</code> over every canonical value, the error bounds,
 trigonometry and arithmetic over every length in [0, 4] (their
-documented domain, so their debug checks never fire). The seven through
-<code>asin</code> (<code>to_angle</code> and what reads it) are a tool
-limit</td>
-<td><code>ca_crash::c_*</code></td>
+documented domain, so their debug checks never fire); the seven through
+<code>asin</code> (<code>to_angle</code> and what reads it) for every
+chord angle</td>
+<td><code>ca_crash::c_*</code>,
+<code>ca_crash::c_fg_conversions</code></td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
 <tr class="odd">
 <td><code>s1::Angle</code></td>
-<td>29 of the 30 in-scope operations, over every <code>f64</code> of
-radians (NaN and infinities included), <code>i32</code> and
-<code>u32</code>, except exactly where an operation makes a new NaN
-(<code>∞ − ∞</code>, <code>0 · ∞</code>, <code>0 / 0</code>) and the
-division by an infinity (a tool limit: the checker reports it as NaN);
-<code>normalized</code> over every angle but ±∞. <code>tan</code> is a
-tool limit</td>
-<td><code>ag_crash::c_*</code></td>
+<td>all 30 operations (<code>tan</code> under a contract since
+2026-10-27), over every <code>f64</code> of radians (NaN and infinities
+included), <code>i32</code> and <code>u32</code>, except exactly where
+an operation makes a new NaN (<code>∞ − ∞</code>, <code>0 · ∞</code>,
+<code>0 / 0</code>) and the division by an infinity (a tool limit: the
+checker reports it as NaN); <code>normalized</code> over every angle but
+±∞; <code>tan</code> over every angle</td>
+<td><code>ag_crash::c_*</code>, <code>ag_crash::c_fg_tan</code></td>
+<td><a
+href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
+<td><code>s2::Cap</code></td>
+<td>39 of the 42 in-scope operations: on the real code or with lemma
+stubs over every box cap, and under the contracts of <code>asin</code>,
+<code>atan2</code> and <code>cos</code> where they reach them;
+<code>union</code> and both <code>cell_union_bound</code>s are tool
+limits</td>
+<td><code>cp_crash::c_*</code></td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
@@ -299,6 +329,83 @@ error on every input.</td>
 <td>—</td>
 <td>not proven: a tool limit from 2 bytes (the 1-byte inputs:
 <code>cd_crash::c_decode_s2point_vector__b1</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="panics-exactly-where-documented">Panics exactly where
+documented</h3>
+<p>The proofs above stop at an operation’s documented domain. These
+prove the rest of each <code># Panics</code> section (2026-10-26): for
+every input outside the domain that the section names, the operation
+panics, so the section is exact. A panic the section calls debug-only is
+also proven absent from a release build on the same inputs: no panic and
+no arithmetic overflow there. Where the proofs found a section claiming
+more panics than the code has, the section was corrected (12
+corrections, and 3 sections added where the code panics undocumented;
+listed in the inventories and in <a
+href="COVERAGE.md"><code>COVERAGE.md</code></a>).</p>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 39%" />
+<col style="width: 26%" />
+<col style="width: 19%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>What is proven</th>
+<th>Harnesses</th>
+<th>Record</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>CellId</code></td>
+<td>21 operations: every raw level above 30 panics in every operation
+that takes a level; <code>level</code> on the ids with no level marker;
+<code>child_position</code>, <code>parent</code>, the child operations
+and the wrapping steps outside their domain (debug builds; release
+builds return); <code>vertex_neighbors</code> at level 30;
+<code>common_ancestor_level(none, none)</code></td>
+<td><code>crash::n_*</code>, <code>crash::r_*</code></td>
+<td><a href="INVENTORY.md"><code>INVENTORY.md</code></a> section 3</td>
+</tr>
+<tr class="even">
+<td><code>CellUnion</code></td>
+<td>11 operations, for unions of one or two ids: the normalising
+constructors on invalid ids outside every valid cell, the cell queries
+on invalid ids, <code>leaf_cells_covered</code> and
+<code>denormalize</code> without a level marker or with a bad
+<code>level_mod</code>, and the three range constructors outside their
+bounds</td>
+<td><code>cu_crash::n_*</code>, <code>cu_crash::r_*</code></td>
+<td><a
+href="cell_union/INVENTORY.md"><code>cell_union/INVENTORY.md</code></a>
+section 3</td>
+</tr>
+<tr class="odd">
+<td>Decoding layer</td>
+<td>the three fixed-width helpers: a length above 8, an input shorter
+than the length</td>
+<td><code>cd_crash::n_*</code></td>
+<td><a
+href="decoding/INVENTORY.md"><code>decoding/INVENTORY.md</code></a>
+section 2</td>
+</tr>
+<tr class="even">
+<td>Value types</td>
+<td>36 operations of <code>Cell</code> (and
+<code>CellId::from_point</code>), both intervals, both rectangles,
+<code>s1::ChordAngle</code> and <code>s2::Cap</code>; and the inputs
+outside a domain that the sections say return (an odd-marker cell id, a
+NaN margin on full longitudes, the empty cap expanded by +∞)</td>
+<td><code>cl_crash</code>, <code>iv_crash</code>, <code>ri_crash</code>,
+<code>rl_crash</code>, <code>ur_crash</code>, <code>ca_crash</code>,
+<code>cp_crash</code>: <code>n_*</code>, <code>r_*</code>,
+<code>o_*</code></td>
+<td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
+section 10</td>
 </tr>
 </tbody>
 </table>
@@ -1830,7 +1937,7 @@ every input.</td>
 vector encoding.</td>
 <td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_01_enc__n*</code>,
 <code>p_uv_03__*</code>, <code>p_uv_mrt_u64__n*</code></a>; Verus</td>
-<td>encodings up to 11 bytes; every size (Verus)</td>
+<td>up to two values; every size (Verus)</td>
 </tr>
 <tr class="odd">
 <td><a href="decoding/PROPERTIES.md">P-UV-02</a></td>
@@ -1862,8 +1969,9 @@ limit)</td>
 <td>Every vector of points round-trips through the uncompressed (FAST)
 format, bit for bit.</td>
 <td><a href="src/cd_pv.rs"><code>cd_pv::p_pv_01_enc__n*</code>,
-<code>p_pv_02__b*</code>, <code>p_pv_mrt__n*</code></a></td>
-<td>the empty vector (the decoder is a tool limit from 2 bytes)</td>
+<code>p_pv_02__*</code>, <code>p_pv_mrt__n*</code></a></td>
+<td>up to two points (the decoder on every input declaring one or two;
+on all inputs a tool limit from 2 bytes)</td>
 </tr>
 <tr class="odd">
 <td><a href="decoding/PROPERTIES.md">P-FX-01</a></td>
@@ -2181,9 +2289,10 @@ P-VAR-02)</td>
 <td><a href="decoding/PROPERTIES.md">P-UV-03</a></td>
 <td>The <code>u64</code> integer vector decoder accepts and returns what
 upstream does, and consumes the same bytes.</td>
-<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_03__b*</code></a>;
+<td><a href="src/cd_uv.rs"><code>cd_uv::p_uv_03__*</code></a>;
 Verus</td>
-<td>inputs up to 11 bytes (9 to 11 weekly); every input (Verus)</td>
+<td>inputs up to 11 bytes (9 to 11 weekly), and those declaring two
+elements; every input (Verus)</td>
 </tr>
 <tr class="odd">
 <td><a href="decoding/PROPERTIES.md">P-UV-04</a></td>
@@ -2212,8 +2321,9 @@ continues.</td>
 <td><a href="decoding/PROPERTIES.md">P-PV-02</a></td>
 <td>The point vector decoder agrees with upstream on the uncompressed
 format, and rejects the unknown format tags 2 to 7.</td>
-<td><a href="src/cd_pv.rs"><code>cd_pv::p_pv_02__b*</code></a></td>
-<td>inputs up to 1 byte; tags 2 to 7 at every length</td>
+<td><a href="src/cd_pv.rs"><code>cd_pv::p_pv_02__*</code></a></td>
+<td>inputs up to 1 byte, and those declaring one or two uncompressed
+points; tags 2 to 7 at every length</td>
 </tr>
 <tr class="odd">
 <td><a href="decoding/PROPERTIES.md">P-FX-06</a></td>

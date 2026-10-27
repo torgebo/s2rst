@@ -3,8 +3,9 @@
 // Written for this crate (not ported from upstream S2).
 
 //! The function contracts of `src/stubs.rs` against the real `asin`, `atan2` and `cos` (spec 008
-//! FR-003, research R5): every special value, and 10⁶ random inputs per function from a fixed
-//! seed, as uniform bit patterns and as uniform values in the function's domain.
+//! FR-003, research R5), and `tan`, `atan`, `sin`, `sin_cos` (gap 2, 2026-10-26): every special value, and
+//! 10⁶ random inputs per function from a fixed seed, as uniform bit patterns and as uniform values
+//! in the function's domain.
 //!
 //! The predicates below restate `asin_contract`, `atan2_contract` and `cos_contract`; a drift
 //! between a predicate and its stub is a review finding (contracts/harness-conventions.md). A
@@ -50,6 +51,58 @@ fn cos_ok(x: f64, r: f64) -> bool {
         return r == 1.0;
     }
     r.abs() <= 1.0 && (x.abs() > FRAC_PI_2 || r >= 6.0e-17)
+}
+
+/// `tan_contract`: NaN for a non-finite argument; ±0 for ±0 (bit for bit); otherwise finite, at
+/// least 0 on (0, `FRAC_PI_2`], at most 0 on [−`FRAC_PI_2`, 0), and at most 1.7·10¹⁶ in magnitude
+/// where |x| ≤ 2.
+fn tan_ok(x: f64, r: f64) -> bool {
+    if !x.is_finite() {
+        return r.is_nan();
+    }
+    if x == 0.0 {
+        return r.to_bits() == x.to_bits();
+    }
+    r.is_finite()
+        && (x.abs() > 2.0 || r.abs() <= 1.7e16)
+        && !(x > 0.0 && x <= FRAC_PI_2 && r < 0.0)
+        && !(x < 0.0 && x >= -FRAC_PI_2 && r > 0.0)
+}
+
+/// `atan_contract`: NaN for NaN; ±0 for ±0 (bit for bit); otherwise in [−π/2, π/2] with the
+/// argument's sign.
+fn atan_ok(x: f64, r: f64) -> bool {
+    if x.is_nan() {
+        return r.is_nan();
+    }
+    if x == 0.0 {
+        return r.to_bits() == x.to_bits();
+    }
+    r.abs() <= FRAC_PI_2 && if x > 0.0 { r >= 0.0 } else { r <= 0.0 }
+}
+
+/// `sin_contract`: NaN for a non-finite argument; ±0 for ±0 (bit for bit); otherwise in
+/// [−1, 1], at least 0 on (0, π] and at most 0 on [−π, 0).
+fn sin_ok(x: f64, r: f64) -> bool {
+    if !x.is_finite() {
+        return r.is_nan();
+    }
+    if x == 0.0 {
+        return r.to_bits() == x.to_bits();
+    }
+    r.abs() <= 1.0 && !(x > 0.0 && x <= PI && r < 0.0) && !(x < 0.0 && x >= -PI && r > 0.0)
+}
+
+/// `sin_cos_contract`: NaN twice for a non-finite argument; (±0, 1) for ±0 (bit for bit);
+/// otherwise both in [−1, 1], the larger in magnitude at least 0.7.
+fn sin_cos_ok(x: f64, (s, c): (f64, f64)) -> bool {
+    if !x.is_finite() {
+        return s.is_nan() && c.is_nan();
+    }
+    if x == 0.0 {
+        return s.to_bits() == x.to_bits() && c == 1.0;
+    }
+    s.abs() <= 1.0 && c.abs() <= 1.0 && (s.abs() >= 0.7 || c.abs() >= 0.7)
 }
 
 /// xorshift64*, fixed seed: no dependency, the same sequence everywhere.
@@ -176,4 +229,98 @@ fn the_bounds_are_tight() {
     assert!(FRAC_PI_2.cos() > 6.0e-17 && FRAC_PI_2.cos() < 6.2e-17);
     assert_eq!(1.0f64.asin(), FRAC_PI_2);
     assert_eq!(0.0f64.atan2(-1.0), PI);
+}
+
+/// The doubles nearest the odd multiples of π/2 in [−2, 2], where `tan` is largest.
+fn near_half_pi() -> Vec<f64> {
+    let mut v = Vec::new();
+    for x in [FRAC_PI_2, -FRAC_PI_2] {
+        let mut y = x;
+        for _ in 0..64 {
+            v.push(y);
+            y = y.next_up();
+        }
+        y = x;
+        for _ in 0..64 {
+            y = y.next_down();
+            v.push(y);
+        }
+    }
+    v
+}
+
+#[test]
+fn tan_satisfies_its_contract() {
+    for x in specials().into_iter().chain(near_half_pi()) {
+        assert!(tan_ok(x, x.tan()), "tan({x:e}) = {:e}", x.tan());
+    }
+    let mut rng = Rng(0xD1B5_4A32_D192_ED03);
+    for i in 0..RANDOM {
+        let x = if i % 2 == 0 {
+            rng.bits()
+        } else {
+            rng.uniform(-2.0, 2.0)
+        };
+        assert!(tan_ok(x, x.tan()), "tan({x:e}) = {:e}", x.tan());
+    }
+}
+
+#[test]
+fn atan_satisfies_its_contract() {
+    for x in specials() {
+        assert!(atan_ok(x, x.atan()), "atan({x:e}) = {:e}", x.atan());
+    }
+    let mut rng = Rng(0x94D0_49BB_1331_11EB);
+    for i in 0..RANDOM {
+        let x = if i % 2 == 0 {
+            rng.bits()
+        } else {
+            rng.uniform(-10.0, 10.0)
+        };
+        assert!(atan_ok(x, x.atan()), "atan({x:e}) = {:e}", x.atan());
+    }
+}
+
+#[test]
+fn sin_cos_satisfies_its_contract() {
+    for x in specials() {
+        assert!(
+            sin_cos_ok(x, x.sin_cos()),
+            "sin_cos({x:e}) = {:?}",
+            x.sin_cos()
+        );
+    }
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+    for i in 0..RANDOM {
+        let x = if i % 2 == 0 {
+            rng.bits()
+        } else {
+            rng.uniform(-4.0, 4.0)
+        };
+        assert!(
+            sin_cos_ok(x, x.sin_cos()),
+            "sin_cos({x:e}) = {:?}",
+            x.sin_cos()
+        );
+    }
+}
+
+#[test]
+fn sin_satisfies_its_contract() {
+    for x in
+        specials()
+            .into_iter()
+            .chain([PI.next_down(), -PI.next_down(), PI.next_up(), -PI.next_up()])
+    {
+        assert!(sin_ok(x, x.sin()), "sin({x:e}) = {:e}", x.sin());
+    }
+    let mut rng = Rng(0x1405_7B7E_F767_814F);
+    for i in 0..RANDOM {
+        let x = if i % 2 == 0 {
+            rng.bits()
+        } else {
+            rng.uniform(-4.0, 4.0)
+        };
+        assert!(sin_ok(x, x.sin()), "sin({x:e}) = {:e}", x.sin());
+    }
 }

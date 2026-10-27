@@ -1,0 +1,16 @@
+Mutant: M-801
+Targets: N-parent
+Expect-Fail: crash::n_parent
+Defect: parent() loses its debug check, so a face cell returns (lsb << 2 sets bit 62) instead of panicking
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -354,7 +354,6 @@
+     /// In debug builds, panics if this is a face cell (`self.is_face()`).
+     #[inline]
+     pub fn parent(self) -> CellId {
+-        debug_assert!(!self.is_face());
+         let nlsb = self.lsb() << 2;
+         CellId((self.0 & nlsb.wrapping_neg()) | nlsb)
+     }

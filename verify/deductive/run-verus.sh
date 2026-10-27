@@ -20,7 +20,8 @@
 #   VERUS_RLIMIT   Verus's per-query resource limit (default 60)
 #
 # Output: one line per module, `<module>  <n> verified, <e> errors  <seconds> s  <MiB> MiB`,
-# then a total. Exit status 0 only if every module verifies with 0 errors.
+# then a total. Exit status 0 only if every module verifies at least one obligation with 0
+# errors.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -116,9 +117,13 @@ for m in "${modules[@]}"; do
     kb=$(sed -nE 's/.*maxrss_kb=([0-9]+).*/\1/p' "$out" | tail -1)
     printf '%-14s %4s verified, %s errors  %6s s  %5s MiB\n' "$m" "${ok:-?}" "${err:-?}" \
         "${t:-?}" "$(( ${kb:-0} / 1024 ))"
-    if [ "$rc" -ne 0 ] || [ -z "$line" ] || [ "${err:-1}" != 0 ]; then
+    # A module that verifies nothing fails too: "0 verified, 0 errors" means a wrong module
+    # name or a module with its proofs gone, not a proof (code review of v0.4.0..74b9bc1).
+    if [ "$rc" -ne 0 ] || [ -z "$line" ] || [ "${err:-1}" != 0 ] || [ "${ok:-0}" -eq 0 ]; then
         status=1
-        if [ -z "$line" ]; then tail -20 "$out" >&2; else grep -E '^error' -A12 "$out" | head -60 >&2 || true; fi
+        if [ -z "$line" ]; then tail -20 "$out" >&2
+        elif [ "${ok:-0}" -eq 0 ]; then echo "run-verus: $m: no obligation verified" >&2
+        else grep -E '^error' -A12 "$out" | head -60 >&2 || true; fi
     fi
     total_ok=$(( total_ok + ${ok:-0} ))
     total_err=$(( total_err + ${err:-0} ))

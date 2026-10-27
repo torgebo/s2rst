@@ -1,0 +1,18 @@
+Mutant: M-805
+Targets: R-s1::ChordAngle::sin2
+Expect-Fail: ca_crash::r_trigonometry
+Debug-Assertions: off
+Defect: sin2's special-operand check is promoted to every build, so a release build panics on the sentinels
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -429,7 +429,7 @@
+     /// formula on the sentinel's length, without meaning: `NEGATIVE` gives −1.25 and `INFINITY` −∞.
+     #[inline]
+     pub fn sin2(self) -> f64 {
+-        debug_assert!(!self.is_special(), "sin2 of a special chord angle");
++        assert!(!self.is_special(), "sin2 of a special chord angle");
+         // sin(2A) = 2 sin(A) cos(A), and length2 = 4 sin²(A), so:
+         // sin²(2A) = 4 sin²(A) (1 - sin²(A)) = length2 * (1 - length2/4)
+         self.0 * (1.0 - 0.25 * self.0)

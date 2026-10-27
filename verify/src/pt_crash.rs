@@ -31,6 +31,7 @@
 )]
 
 use s2rst::r3::Vector;
+use s2rst::s1::Angle;
 #[cfg(feature = "slow")]
 use s2rst::s2::rotate;
 use s2rst::s2::{Point, ortho};
@@ -226,4 +227,31 @@ fn c_rotate() {
     let r = rotate(p, axis, any_finite_angle());
     kani::cover!(point_spec::zero(r), "a zero result");
     kani::cover!(r.x() > 0.5, "a non-zero result");
+}
+
+// ---------------------------------------------------------------------------------------------
+// The tool limits of spec 006 (gap 2 of the 2026-10-26 coverage review): the entries through
+// `atan2`, proven crash-free under its function contract (`stubs::atan2_contract`, spec 008
+// FR-003).
+// ---------------------------------------------------------------------------------------------
+
+/// C-s2::Point::distance, stable_angle, approx_eq, approx_eq_angle, approx_eq_with: complete
+/// without panic, overflow or undefined behaviour for every pair of box points and every angle,
+/// under `atan2`'s contract.
+///
+/// Under contract: `atan2_contract`.
+#[cfg(feature = "slow")]
+#[kani::proof]
+#[kani::stub(f64::atan2, crate::stubs::atan2_contract)]
+fn c_fg_angles() {
+    let (a, b) = (any_box_point(), any_box_point());
+    let e = Angle::from_radians(kani::any());
+    let d = (a.distance(b), a.stable_angle(b));
+    let q = (
+        a.approx_eq(b),
+        a.approx_eq_angle(b, e),
+        a.approx_eq_with(b, e),
+    );
+    kani::cover!(a == b && d.0.radians() == 0.0, "a point and itself");
+    kani::cover!(!q.0, "apart");
 }

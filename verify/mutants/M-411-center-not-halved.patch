@@ -6,9 +6,9 @@ Defect: center() returns the sum of the bounds
 diff --git a/core/src/r1/interval.rs b/core/src/r1/interval.rs
 --- a/core/src/r1/interval.rs
 +++ b/core/src/r1/interval.rs
-@@ -157,7 +157,7 @@
-     /// `[f64::MAX, f64::MAX]` is ∞ in upstream and `f64::MAX` here (`UPSTREAM.md` U-010).
-     /// Every other center is upstream's, bit for bit.
+@@ -158,7 +158,7 @@
+     /// upstream and `f64::MAX` here (`UPSTREAM.md` U-010). Every other center is upstream's,
+     /// bit for bit.
      pub fn center(self) -> f64 {
 -        f64::midpoint(self.lo, self.hi)
 +        self.lo + self.hi

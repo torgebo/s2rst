@@ -119,3 +119,43 @@ fn cap_with_a_negative_radius_decodes_as_negative() {
         assert_eq!(&out[24..32], &(-1.0f64).to_le_bytes(), "{radius}");
     }
 }
+
+/// Code review of v0.4.0..74b9bc1, finding 1 (same shape as the vector decoders): a loop count
+/// of 2³² + 1 is over the limit on every target. On wasm32 it was truncated to 1 before the
+/// check, and the input decoded as a one-loop polygon.
+#[test]
+fn lax_polygon_loop_count_above_u32_max_is_rejected() {
+    let mut b = vec![LAX_POLYGON_VERSION];
+    write_uvarint(&mut b, (1u64 << 32) + 1).unwrap();
+    let p = Point::from_coords(1.0, 0.0, 0.0);
+    encoded_s2point_vector::encode_s2point_vector(&[p], CodingHint::Fast, &mut b).unwrap();
+    let err = LaxPolygon::decode(&mut b.as_slice()).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}
+
+/// Code review of v0.4.0..74b9bc1, finding 1 (same shape): a compressed polyline whose
+/// off-center count is 2³² is rejected on every target. On wasm32 the count was truncated to 0
+/// before the check, and the input decoded as the polyline.
+#[test]
+fn compressed_polyline_off_center_count_above_u32_max_is_rejected() {
+    let vertices: Vec<Point> = [0u8, 1, 2]
+        .iter()
+        .map(|&f| {
+            CellId::from_face(f)
+                .child_begin_at_level(Level::new(10))
+                .to_point()
+        })
+        .collect();
+    let polyline = crate::s2::polyline::Polyline::new(vertices);
+    let mut b = Vec::new();
+    encode_polyline_compressed(&polyline, &mut b).unwrap();
+    assert_eq!(b[0], POLYLINE_COMPRESSED_VERSION);
+    // The last field is the off-center count, here 0 in one byte.
+    assert_eq!(b.pop(), Some(0));
+    let mut good = b.clone();
+    good.push(0);
+    assert!(crate::s2::polyline::Polyline::decode(&mut good.as_slice()).is_ok());
+    write_uvarint(&mut b, 1u64 << 32).unwrap();
+    let err = crate::s2::polyline::Polyline::decode(&mut b.as_slice()).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}

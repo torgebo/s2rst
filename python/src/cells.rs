@@ -24,8 +24,9 @@ fn cell_edge_from_index(k: u8) -> PyResult<s2::CellEdge> {
 
 /// Checks a leaf-cell range against C++ `S2CellUnion::FromBeginEnd`'s `DCHECK`s: both ends
 /// are leaf cells (either may also be the end of the leaves, when `end_allowed`) and
-/// `lo <= hi`. The core checks them only in debug builds, as C++ does; in release builds an
-/// invalid id can make it loop forever, so a bad call raises `ValueError` here instead.
+/// `lo <= hi`. The core checks them in every build and panics (C++ only in debug builds,
+/// because an invalid id can make the tiling loop forever), so a bad call raises `ValueError`
+/// here instead of a `PanicException`.
 fn check_leaf_range(
     lo: s2::CellId,
     hi: s2::CellId,
@@ -658,8 +659,9 @@ impl PyCellUnion {
     /// Replace large cells with smaller cells respecting min_level and level_mod.
     ///
     /// Raises `ValueError` unless `min_level` is in 0..=30 and `level_mod` is 1, 2 or 3.
-    /// The core checks `level_mod` only in debug builds (upstream `DCHECK`); a larger one
-    /// would expand every cell to leaf level, which never finishes for a large cell.
+    /// The core checks `level_mod` in every build and panics (upstream only with a `DCHECK`):
+    /// a larger one would expand every cell to leaf level, which never finishes for a large
+    /// cell.
     /// The arguments are taken as `i64`, not `u8`, so that a value outside 0..=255 raises
     /// `ValueError` as documented rather than pyo3's `OverflowError`.
     fn denormalize(&self, min_level: i64, level_mod: i64) -> PyResult<Self> {

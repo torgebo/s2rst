@@ -7,8 +7,8 @@ Defect: `from_center_area` divides by 2π
 diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
 --- a/core/src/s2/cap.rs
 +++ b/core/src/s2/cap.rs
-@@ -142,7 +142,7 @@
-     /// an area of 4π or more yields a full cap.
+@@ -151,7 +151,7 @@
+     /// `area / 2π` (spec 007 FR-017). Its [`area`](Self::area) is 0 in both.
      #[inline]
      pub fn from_center_area(center: Point, area: f64) -> Self {
 -        Self::from_center_chord_angle(center, ChordAngle::from_length2(area / PI))

@@ -4,15 +4,14 @@ Expect-Fail: cd_uv::p_uv_04__b3
 Defect: decode_uint_vector_u32 divides the header by 8, as for u64, and reads half the declared count
 
 diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
-index 459f2bf..526d75a 100644
 --- a/core/src/s2/encoded_uint_vector.rs
 +++ b/core/src/s2/encoded_uint_vector.rs
-@@ -127,7 +127,7 @@ const MAX_DECODE_COUNT: usize = 50_000_000;
+@@ -129,7 +129,7 @@
  /// width of 1–4 bytes and every value is accepted, as upstream.
  pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
      let size_len = read_uvarint(r)?;
--    let count = (size_len / 4) as usize; // sizeof(u32) == 4
-+    let count = (size_len / 8) as usize; // sizeof(u32) == 4
+-    let count = size_len / 4; // sizeof(u32) == 4
++    let count = size_len / 8; // sizeof(u32) == 4
      if count > MAX_DECODE_COUNT {
          return Err(io::Error::new(
              io::ErrorKind::InvalidData,

@@ -29,6 +29,9 @@ use std::io::ErrorKind;
 #[cfg(feature = "slow")]
 use s2rst::s2::encoded_s2cell_id_vector::encode_s2cell_id_vector;
 use s2rst::s2::encoded_s2point_vector::decode_s2point_vector;
+use s2rst::s2::encoded_uint_vector::{
+    decode_uint_with_length, encode_uint_with_length, get_uint_with_length,
+};
 use s2rst::s2::encoding::{S2Decode, S2Encode};
 use s2rst::s2::{Cap, Cell, CellId};
 
@@ -185,4 +188,45 @@ fn c_encode_s2cell_id_vector__n2() {
     kani::cover!(w[0] >> 3 == 31, "the extended shift code");
     kani::cover!(w[0] >> 3 < 31 && w[0] >> 3 >= 29, "an odd shift of 1 or 3");
     kani::cover!(w[0] & 7 == 7, "base length 7");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the fixed-width helpers' documented panics (gap 1; `crash.rs` explains
+// the `n_*` convention). Each panics in every build, so there is no `r_*` counterpart.
+// ---------------------------------------------------------------------------------------------
+
+/// N-encode_uint_with_length, N-decode_uint_with_length: each panics for every length above 8,
+/// in every build, whatever the value or the input (the slice of the 8-byte buffer comes before
+/// any write or read).
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(10)]
+fn n_uint_with_length() {
+    let len: usize = kani::any();
+    kani::assume(len > 8);
+    if kani::any::<bool>() {
+        let mut w = Vec::with_capacity(8);
+        discard(encode_uint_with_length(&mut w, kani::any(), len));
+    } else {
+        with_bytes::<9>(|d| {
+            let mut r = d;
+            discard(decode_uint_with_length(&mut r, len));
+        });
+    }
+    kani::cover!(true, "returns");
+}
+
+/// N-get_uint_with_length: panics for every length above 8 and for every input shorter than the
+/// length, in every build (inputs of up to 9 bytes).
+#[kani::proof]
+#[kani::should_panic]
+#[kani::unwind(10)]
+fn n_get_uint_with_length() {
+    let d: [u8; 9] = kani::any();
+    let k: usize = kani::any();
+    kani::assume(k <= 9);
+    let len: usize = kani::any();
+    kani::assume(len > 8 || k < len);
+    let _ = get_uint_with_length(&d[..k], len);
+    kani::cover!(true, "returns");
 }

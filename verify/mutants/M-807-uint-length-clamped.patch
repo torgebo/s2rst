@@ -1,0 +1,17 @@
+Mutant: M-807
+Targets: N-encode_uint_with_length
+Expect-Fail: cd_crash::n_uint_with_length
+Defect: encode_uint_with_length clamps the length to 8, so a length above 8 writes 8 bytes instead of panicking
+
+diff --git a/core/src/s2/encoded_uint_vector.rs b/core/src/s2/encoded_uint_vector.rs
+--- a/core/src/s2/encoded_uint_vector.rs
++++ b/core/src/s2/encoded_uint_vector.rs
+@@ -35,7 +35,7 @@
+ /// (`ABSL_DCHECK`, `encoded_uint_vector.h:145`).
+ pub fn encode_uint_with_length(w: &mut dyn Write, value: u64, length: usize) -> io::Result<()> {
+     let bytes = value.to_le_bytes();
+-    w.write_all(&bytes[..length])
++    w.write_all(&bytes[..length.min(8)])
+ }
+ 
+ /// Reads a little-endian unsigned integer of `length` bytes from the start of `data`.

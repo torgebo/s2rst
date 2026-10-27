@@ -228,3 +228,28 @@ fn debug_string_matches_cpp() {
     }
     eprintln!("CELLID_TO_STRING: {} rows", rows.len());
 }
+
+/// `spec::valid_by_marker` is `spec::valid`: on every lowest-set-bit position and face, with
+/// the bits above the marker all clear, all set and in a fixed pattern, and on the C++ vectors'
+/// ids.
+#[test]
+fn valid_by_marker_is_valid() {
+    let mut n = 0;
+    for tz in 0..64u32 {
+        for face in 0..8u64 {
+            for above in [0u64, u64::MAX, 0x5a5a_5a5a_5a5a_5a5a] {
+                let marker = 1u64 << tz;
+                let high = (above << 1) << tz; // bits above the marker
+                let x = (face << 61) | (high & !(7u64 << 61)) | marker;
+                assert_eq!(spec::valid_by_marker(x), spec::valid(x), "{x:#x}");
+                n += 1;
+            }
+        }
+    }
+    assert_eq!(spec::valid_by_marker(0), spec::valid(0));
+    for line in section_lines("CELLID_CHILDREN") {
+        let id = u64f(fields(line)[0]);
+        assert!(spec::valid_by_marker(id) && spec::valid(id));
+    }
+    assert!(n > 1000);
+}

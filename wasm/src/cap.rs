@@ -34,13 +34,15 @@ impl Cap {
         Cap(s2rst::s2::Cap::from_point(p.0))
     }
 
-    /// Create from center and area in steradians.
+    /// Create from center and area in steradians. A negative area gives the empty cap, whose
+    /// height is −0.5.
     #[wasm_bindgen(js_name = "fromCenterArea")]
     pub fn from_center_area(center: &Point, area: f64) -> Cap {
         Cap(s2rst::s2::Cap::from_center_area(center.0, area))
     }
 
-    /// Cap from a center and height (1 − cos(radius)).
+    /// Cap from a center and height (1 − cos(radius)). A negative height gives the empty cap,
+    /// whose height is −0.5.
     #[wasm_bindgen(js_name = "fromCenterHeight")]
     pub fn from_center_height(center: &Point, height: f64) -> Cap {
         Cap(s2rst::s2::Cap::from_center_height(center.0, height))
@@ -74,7 +76,7 @@ impl Cap {
         Angle(self.0.angle_radius())
     }
 
-    /// The height of the cap.
+    /// The height of the cap; −0.5 for every empty cap.
     #[wasm_bindgen(getter)]
     pub fn height(&self) -> f64 {
         self.0.height()

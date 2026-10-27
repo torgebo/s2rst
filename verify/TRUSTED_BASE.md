@@ -448,7 +448,9 @@ equality) are instantiated by P-PTORD-02 and are ready for `ChordAngle` (FR-025)
 The proofs cover the default build. `r3::Vector`'s `dot` and `cross` fuse their products when
 the target has hardware FMA (`cfg!(target_feature = "fma")`); Kani's build has none, so the
 proofs cover the unfused form, as the C++ vectors and the property test of `distance`'s
-symmetry do (K9).
+symmetry do (K9). The verify crate refuses to build with the feature (`compile_error!` in
+`src/lib.rs`), so a `-C target-cpu=native` build cannot pair the unfused restatements with the
+fused library.
 
 ### The reference descriptions
 
@@ -668,3 +670,79 @@ those are box values. The real vertices' computation is spec 006's normalisation
   which the contract does not fix); `union`'s values (C++ vectors: the radius within 10⁻¹² of
   C++'s, and K9's containment counts); the deserialiser (tested, as 004–007's).
 - **Weekly:** listed in `values/PROPERTIES.md` §10.
+
+## The documented panics (2026-10-26)
+
+The `n_*`, `r_*` and `o_*` harnesses of the crash modules (inventories: 001 section 3,
+`cell_union` section 3, decoding section 2, values section 10) trust, beyond the above:
+
+- **`should_panic` and the "returns" cover.** Kani passes a `#[kani::should_panic]` harness when
+  one input panics and every failed check is a panic (`KANI_ISSUES.md`, limits). That every
+  input panics rests on CBMC's reachability of the one cover after the call: unsatisfied means
+  no path reaches it, so no input returns. Unwinding checks stay on, so a loop cut short by the
+  bound fails the harness rather than hiding a path.
+- **The release build** is the dev profile with `debug-assertions = false`
+  (`CARGO_PROFILE_DEV_DEBUG_ASSERTIONS`, set by `run-verify.sh` for `VERIFY_DEBUG_ASSERTIONS=0`).
+  Kani keeps rustc's overflow checks in it (KI-012), so an `r_*` proof says "no panic and no
+  arithmetic overflow", more than a release build does; the inputs where a release build wraps
+  are outside it, named in the inventories. The pass drops CBMC's NaN check (Kani's
+  `--no-overflow-checks`), since Rust computes NaN without a panic; rustc's division-by-zero
+  checks stay.
+- **The complements' domains** are written from the models: invalid cell ids through
+  `spec::valid_by_marker`, `spec::valid` without its level search (`tests/spec_vs_cpp.rs` checks
+  that they agree on every lowest-set-bit position and face, and on the C++ vectors' ids); points
+  outside [−π, π] through `arc_spec::in_range`; the rectangles through `uv_spec` and `rect_spec`'s
+  emptiness. `ur_crash::n_from_center_size` states its domain with the formula of the `# Panics`
+  (`c − s/2 > c + s/2`), the library's own arithmetic.
+- **A lemma stub** in `cp_crash::n_from_center_angle` and `r_from_center_angle` (`pure_is_unit`,
+  as `c_from_center_angle`): it allows more behaviours than the real `is_unit`, so every one of
+  them panicking covers the real one.
+- **Bounds.** The union complements hold for unions of one or two ids, as the crash proofs hold
+  for bounded unions; `get_uint_with_length`'s for inputs of up to 9 bytes. Inputs a domain
+  excludes so that Kani's NaN check does not fire first (infinite latitudes in
+  `s2::Rect::from_center_size`, infinite centres and sizes in `r2::Rect::from_center_size`) are
+  outside the debug proofs.
+- **Not proven, documented:** where not every input outside a domain panics, the `# Panics` now
+  says "may panic" (`from_face_ij`, the union operations on invalid unions, `denormalize` on
+  invalid ids with a marker), and the float-geometry rows' sections (`CellUnion`'s areas and
+  bounds) rest on a native check, not a proof.
+
+## Floating-point geometry (gap 2, 2026-10-26)
+
+The `c_fg_*` harnesses of `cl_crash`, `rl_crash`, `pt_crash`, `ca_crash` and `ag_crash` prove the
+crash freedom of the value types' floating-point entries that specs 004–007 excluded (values
+inventory section 11). Beyond spec 008's base they trust:
+
+- **More function contracts** (`src/stubs.rs`), each checked against the real `libm` by
+  `tests/libm_contracts.rs` (every special value and 10⁶ random inputs): `tan` (finite, the sign
+  on [−π/2, π/2], at most 1.7·10¹⁶ where |x| ≤ 2, checked on the 128 doubles nearest ±π/2),
+  `atan` (in [−π/2, π/2] with the argument's sign), `sin` (in [−1, 1], non-negative on (0, π]
+  and non-positive on [−π, 0)) and `sin_cos` (both in [−1, 1], the larger at least 0.7). The last
+  two replace CBMC's own models where those failed a proof that should pass (`KANI_ISSUES.md`,
+  limits): a crash proof that passes under the loose models stands without them.
+- **The abstract cell and the abstract pair.** Where an entry reads its cell's geometry only
+  through `Cell::vertex` (`approx_area`, `exact_area`, `cap_bound`'s vertices, the distances to
+  an edge and to a cell), the harness stubs `vertex` with any four box points (`fixed_vertex`,
+  spec 008 research R7) or, for two cells, with four for each cell id (`pair_vertex`; one table
+  for both would tie the cells together), and `contains_point` with any answer
+  (`any_contains_point`). Every real cell's vertices are unit points, so among the abstract
+  ones, and a crash proof over the abstraction covers them.
+- **The abstract u-v bound.** The `Cell` harnesses stub `s2::ij_level_to_bound_uv`, which
+  `Cell::from_cell_id` stores as the cell's u-v bound, with any rectangle inside [−1, 1]² with
+  ordered bounds (`any_uv_bound`): the quadratic projection maps [0, 1] onto [−1, 1], increasing,
+  so every real cell's bound is such a rectangle. The cell's face, level, orientation and id
+  stay its own. The projection of a symbolic (i, j) was most of the cost (`KANI_ISSUES.md`,
+  limits), and the per-change proofs of 004 (`cl_crash::c_from_cell_id` and the others) still
+  run it on the real code.
+- **The domains.** Points are `BoxPoint` (`Cell::from_point` without the origin, whose debug
+  panic `n_from_point` proves); rectangles are `ValidRect`; the distance entries with debug
+  preconditions (`Rect::get_distance_to_latlng`, `get_distance`) range over them, and their
+  complements are proven to panic (`n_get_distance_to_latlng`, `n_get_distance`, which stub the
+  code after the checks with any value, `any_segment_distance`: no input reaches it).
+- **The NaN check.** The debug pass keeps Kani's NaN check, so a harness whose path computes a
+  NaN fails, as everywhere in the suite; the domains above avoid the inputs that would (the
+  zero vector, infinite coordinates).
+- **Tiers.** Twelve harnesses (24 entries) prove per change in at most 90 s, ten (19 entries)
+  weekly; those that time out at 60 minutes are listed in `known-timeouts.txt`, those that run out
+  of memory at 8 GiB are in the xlarge tier, and four entries fail the NaN check (the harnesses are
+  removed). All of these rest on the tests as before (`COVERAGE.md`, "Tool limits").

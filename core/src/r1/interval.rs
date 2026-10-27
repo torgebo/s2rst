@@ -152,10 +152,11 @@ impl Interval {
     /// # Deviation from upstream
     ///
     /// For finite bounds beyond `f64::MAX / 2` this returns the true center, through
-    /// [`f64::midpoint`], which halves before it adds. Upstream's `R1Interval::GetCenter`
-    /// computes `0.5 * (lo + hi)`, which overflows there: the center of
-    /// `[f64::MAX, f64::MAX]` is ∞ in upstream and `f64::MAX` here (`UPSTREAM.md` U-010).
-    /// Every other center is upstream's, bit for bit.
+    /// [`f64::midpoint`], which halves the bounds before it adds them when one is that large
+    /// (otherwise it computes `(lo + hi) / 2`). Upstream's `R1Interval::GetCenter` computes
+    /// `0.5 * (lo + hi)`, which overflows there: the center of `[f64::MAX, f64::MAX]` is ∞ in
+    /// upstream and `f64::MAX` here (`UPSTREAM.md` U-010). Every other center is upstream's,
+    /// bit for bit.
     pub fn center(self) -> f64 {
         f64::midpoint(self.lo, self.hi)
     }

@@ -5,12 +5,11 @@ Tier: slow
 Defect: normalize() sorts in decreasing order, so it reverses an already normalised union
 
 diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
-index 4669eb0..21128d1 100644
 --- a/core/src/s2/cell_union.rs
 +++ b/core/src/s2/cell_union.rs
-@@ -163,7 +163,7 @@ impl CellUnion {
-     /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
-     /// valid ids).
+@@ -168,7 +168,7 @@
+     /// valid ids), unless it lies in the leaf range of a valid cell of the input
+     /// ([`CellId::range_min`]..=[`CellId::range_max`]), which drops it as a contained cell.
      pub fn normalize(&mut self) {
 -        self.0.sort_unstable();
 +        self.0.sort_unstable_by(|a, b| b.cmp(a));

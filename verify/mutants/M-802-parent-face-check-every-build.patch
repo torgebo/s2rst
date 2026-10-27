@@ -1,0 +1,18 @@
+Mutant: M-802
+Targets: R-parent
+Expect-Fail: crash::r_parent
+Debug-Assertions: off
+Defect: parent()'s face check is promoted to every build, so a release build panics where its `# Panics` names debug builds only
+
+diff --git a/core/src/s2/cell_id.rs b/core/src/s2/cell_id.rs
+--- a/core/src/s2/cell_id.rs
++++ b/core/src/s2/cell_id.rs
+@@ -354,7 +354,7 @@
+     /// In debug builds, panics if this is a face cell (`self.is_face()`).
+     #[inline]
+     pub fn parent(self) -> CellId {
+-        debug_assert!(!self.is_face());
++        assert!(!self.is_face());
+         let nlsb = self.lsb() << 2;
+         CellId((self.0 & nlsb.wrapping_neg()) | nlsb)
+     }

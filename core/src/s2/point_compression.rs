@@ -437,21 +437,24 @@ pub fn decode_points_compressed(
     }
 
     // Decode off-center points (overwrite with exact xyz).
-    let num_off_center = read_uvarint(r)? as usize;
-    if num_off_center > num_points {
+    // The count and the indices are compared as decoded, in `u64`: a conversion to `usize`
+    // first would truncate on a 32-bit target.
+    let num_off_center = read_uvarint(r)?;
+    if num_off_center > num_points as u64 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "too many off-center points",
         ));
     }
     for _ in 0..num_off_center {
-        let index = read_uvarint(r)? as usize;
-        if index >= num_points {
+        let index = read_uvarint(r)?;
+        if index >= num_points as u64 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "off-center index out of range",
             ));
         }
+        let index = index as usize;
         let mut buf = [0u8; 8];
         r.read_exact(&mut buf)?;
         let x = f64::from_le_bytes(buf);

@@ -950,13 +950,15 @@ impl S2Decode for LaxPolygon {
             ));
         }
 
-        let num_loops = read_uvarint(r)? as usize;
-        if num_loops > MAX_ENCODED_LOOPS as usize {
+        // Compared before the conversion, which truncates on a 32-bit target.
+        let num_loops = read_uvarint(r)?;
+        if num_loops > u64::from(MAX_ENCODED_LOOPS) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "too many loops in LaxPolygon",
             ));
         }
+        let num_loops = num_loops as usize;
 
         let vertices = encoded_s2point_vector::decode_s2point_vector(r)?;
 

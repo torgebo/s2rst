@@ -1,0 +1,16 @@
+Mutant: M-804
+Targets: N-s1::Interval::contains
+Expect-Fail: iv_crash::n_point_operations
+Defect: s1::Interval::contains loses its debug check, so a point outside [−π, π] returns
+
+diff --git a/core/src/s1/interval.rs b/core/src/s1/interval.rs
+--- a/core/src/s1/interval.rs
++++ b/core/src/s1/interval.rs
+@@ -223,7 +223,6 @@
+     /// skipped and the result is unspecified, as in upstream, which checks the same precondition
+     /// with `ABSL_DCHECK`.
+     pub fn contains(self, p: f64) -> bool {
+-        debug_assert!(p.abs() <= PI);
+         let p = if p == -PI { PI } else { p };
+         self.fast_contains(p)
+     }

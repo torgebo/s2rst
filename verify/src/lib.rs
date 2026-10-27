@@ -62,6 +62,17 @@
 
 #![deny(unsafe_code)]
 
+// The proofs and the restatements of upstream's arithmetic (`point_spec`, `cap_spec`) describe
+// the library built without the `fma` target feature, as Kani builds it: with it, `r3::Vector`'s
+// `dot` and `cross` fuse their products (`core/src/r3/vector.rs`), and every "bit for bit
+// upstream's" statement would describe other code (TRUSTED_BASE.md, "The build"; code review of
+// v0.4.0..74b9bc1, finding 8).
+#[cfg(target_feature = "fma")]
+compile_error!(
+    "s2rst-verify describes the library built without the `fma` target feature; build it \
+     without `-C target-cpu=native` or `-C target-feature=+fma`"
+);
+
 pub mod angle_spec;
 pub mod arc_spec;
 pub mod cap_spec;

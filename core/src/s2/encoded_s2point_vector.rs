@@ -217,11 +217,12 @@ fn encode_fast(points: &[Point], w: &mut dyn Write) -> io::Result<()> {
     Ok(())
 }
 
-/// Maximum number of points to decode (safety limit).
-const MAX_DECODE_POINTS: usize = 50_000_000;
+/// Maximum number of points to decode (safety limit). A `u64`, so the decoded count is
+/// compared before any conversion to `usize` (which truncates on a 32-bit target).
+const MAX_DECODE_POINTS: u64 = 50_000_000;
 
 fn decode_uncompressed(size_format: u64, r: &mut dyn Read) -> io::Result<Vec<Point>> {
-    let count = (size_format >> ENCODING_FORMAT_BITS) as usize;
+    let count = size_format >> ENCODING_FORMAT_BITS;
     if count > MAX_DECODE_POINTS {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,

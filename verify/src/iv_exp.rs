@@ -10,9 +10,10 @@
 //!
 //! The weekly member `p_iexp_01_shrink__xinv` found U-011 (2026-10-13): upstream's bounds can
 //! cross when shrinking to almost nothing. P-IEXP-03 states the fix (FR-023) against
-//! `arc_spec::upstream_expanded`. With P-IREL-02 (`contains_interval` is
-//! `arc_spec::contains`), it also gives P-IEXP-01's containment clause: a result is either
-//! upstream's, which the guard has checked for containment, or empty or full. Its two members
+//! `arc_spec::upstream_expanded` and `arc_spec::contains`, so it also gives P-IEXP-01's
+//! containment clause: a result is either upstream's, where that keeps containment, or empty or
+//! full. (The library's guard uses its own `contains_interval`, which P-IREL-02 proves is
+//! `arc_spec::contains`; the statement does not rely on it.) Its two members
 //! timed out at 12 minutes per change (2026-10-13) and at 60 minutes in the weekly tier
 //! (2026-10-14), so P-IEXP-03 is not proven (tool limit); P-IEXP-01's members prove the
 //! containment directly.
@@ -174,6 +175,8 @@ fn p_iexp_02_default() {
 
 /// P-IEXP-03 for one sign of the margin: the expansion is upstream's arithmetic, kept when it
 /// keeps containment, and otherwise the empty interval (shrinking) or the full one (growing).
+/// Containment is the description's, `arc_spec::contains`, not the library's `contains_interval`
+/// (code review of v0.4.0..74b9bc1, finding 9).
 #[cfg_attr(
     not(feature = "slow"),
     allow(dead_code, reason = "only the weekly members use it")
@@ -184,9 +187,9 @@ fn confined(grow: bool) {
     kani::assume(!m.is_nan() && (m >= 0.0) == grow);
     let (e, u) = (x.expanded(m), arc_spec::upstream_expanded(x, m));
     let kept = if grow {
-        u.contains_interval(x)
+        arc_spec::contains(u, x)
     } else {
-        x.contains_interval(u)
+        arc_spec::contains(x, u)
     };
     if kept {
         assert_eq!(bits(e), bits(u));
@@ -206,7 +209,7 @@ fn confined(grow: bool) {
 /// interval when shrinking and the full one when growing.
 ///
 /// For every valid `x` and margin `m < 0`, with `u = arc_spec::upstream_expanded(x, m)`:
-/// `x.expanded(m)` is `u` bit for bit if `x.contains_interval(u)`, and empty otherwise.
+/// `x.expanded(m)` is `u` bit for bit if `arc_spec::contains(x, u)`, and empty otherwise.
 /// Kani's counterexample to P-IEXP-01, where the second case arises, is the regression test
 /// `test_expanded_crossing_bounds_give_empty` in `core/src/s1/interval.rs`.
 ///
@@ -220,7 +223,7 @@ fn p_iexp_03__mneg() {
 /// P-IEXP-03 (exact output): as `p_iexp_03__mneg`, for growing.
 ///
 /// For every valid `x` and margin `m ≥ 0`, with `u = arc_spec::upstream_expanded(x, m)`:
-/// `x.expanded(m)` is `u` bit for bit if `u.contains_interval(x)`, and full otherwise. No
+/// `x.expanded(m)` is `u` bit for bit if `arc_spec::contains(u, x)`, and full otherwise. No
 /// input is known where the second case arises.
 ///
 /// Weekly: it timed out at 12 minutes per change and at 60 minutes weekly (2026-10-14).

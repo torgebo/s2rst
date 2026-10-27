@@ -14,11 +14,13 @@
 # git ignores), copy the caller's verify/ into it (so uncommitted harnesses and patches are
 # tested), apply the patch, and run every `Expect-Fail` harness through run-verify.sh, so
 # the memory guard and the time limit apply. Outcomes:
-#   killed    every expected harness reported FAILED
+#   killed    every expected harness reported FAILED (or RETURNS: a `should_panic` harness,
+#             `n_*`, through which an input outside the domain now returns)
 #   survived  some expected harness still succeeded (the property is vacuous or too weak)
 #   no-verdict  no expected harness succeeded, and one ended in KNOWN-TIMEOUT: its unmutated
 #             run times out too (known-timeouts.txt), so the campaign cannot tell; not an error
-#   error     the patch did not apply, or a harness ended in OOM/TIMEOUT/ERROR or did not run
+#   error     the patch did not apply, a harness ended in OOM/TIMEOUT/ERROR or did not run, or
+#             the headers select no harness and no test (a misspelled `Expect-Fail:`, say)
 # Failed harnesses are not re-run for a counterexample (VERIFY_PLAYBACK=0): the kill is the
 # FAILED status, and the re-run can take as long as the time limit.
 # A `Tier: slow` header (contracts/harness-conventions.md) builds the mutant with
@@ -31,9 +33,13 @@
 # otherwise (a build failure). It is for properties Kani cannot check, such as `normalized`
 # through Kani's wrong `%` and the enumeration of `tests/angle_enumeration.rs`. Expect-Fail may
 # then be empty.
+# A `Debug-Assertions: off` header builds the mutant without debug assertions
+# (VERIFY_DEBUG_ASSERTIONS=0), for the release proofs `r_*` (`make verify-release`).
 # A `Tier: xlarge` header (spec 003) builds with `--features xlarge,slow`, the xlarge time
 # limit (VERIFY_XLARGE_HARNESS_TIMEOUT, default 4h) and a 26G ceiling unless `Memory:` says
 # otherwise. Such a mutant needs a 32 GB machine, so it is skipped unless VERIFY_XLARGE=1.
+# Every id or pattern given must select a mutant, and every patch's `Mutant:` header must
+# name its file's id; otherwise the run fails before it starts.
 # The caller's working tree is never modified, except verify/MUTANTS.md, which is
 # regenerated from the patch headers and the outcomes (earlier outcomes are kept for
 # mutants that were not re-run).
@@ -71,6 +77,41 @@ selected() {   # whether mutant $1 matches one of the filters (all, without filt
     return 1
 }
 
+# The selection, checked before anything runs: a wrong id or pattern would otherwise run no
+# mutant and pass, and a patch without its own id in `Mutant:` would be selected by nothing
+# or, without filters, run in the worktree root (code review of v0.4.0..74b9bc1, finding 5).
+declare -A matched=()
+n_selected=0
+for patch in mutants/M-*.patch; do
+    [ -e "$patch" ] || continue
+    id=$(sed -n 's/^Mutant: *//p' "$patch" | head -n 1)
+    file_id=$(basename "$patch" | grep -oE '^M-[0-9]+' || true)
+    if [ -z "$id" ] || [ "$id" != "$file_id" ]; then
+        echo "run-mutants: $patch: its Mutant: header is '${id}', not its file's id '${file_id}'" >&2
+        exit 2
+    fi
+    case "$(sed -n 's/^Debug-Assertions: *//p' "$patch" | head -n 1)" in
+        ''|off) ;;
+        *) echo "run-mutants: $patch: Debug-Assertions: must be 'off'" >&2; exit 2 ;;
+    esac
+    selected "$id" || continue
+    n_selected=$((n_selected + 1))
+    for f in "${filters[@]}"; do
+        # shellcheck disable=SC2053  # $f is a pattern
+        [[ "$id" == $f ]] && matched[$f]=1
+    done
+done
+for f in "${filters[@]}"; do
+    if [ -z "${matched[$f]:-}" ]; then
+        echo "run-mutants: no mutant matches '$f'" >&2
+        exit 2
+    fi
+done
+if [ "$n_selected" -eq 0 ]; then
+    echo "run-mutants: no mutant selected (verify/mutants/ has no M-*.patch)" >&2
+    exit 2
+fi
+
 declare -A outcome=()
 n_killed=0 n_survived=0 n_error=0 n_noverdict=0
 for patch in mutants/M-*.patch; do
@@ -81,6 +122,8 @@ for patch in mutants/M-*.patch; do
     tier=$(sed -n 's/^Tier: *//p' "$patch" | head -n 1)
     mem=$(sed -n 's/^Memory: *//p' "$patch" | head -n 1)
     mem=${mem:-${VERIFY_MEM_PER_HARNESS:-4G}}
+    debug_assertions=1
+    [ "$(sed -n 's/^Debug-Assertions: *//p' "$patch" | head -n 1)" = off ] && debug_assertions=0
     features=() limit=${VERIFY_HARNESS_TIMEOUT:-12m}
     if [ "$tier" = slow ]; then
         features=(--features slow) limit=${VERIFY_SLOW_HARNESS_TIMEOUT:-30m}
@@ -96,6 +139,7 @@ for patch in mutants/M-*.patch; do
     git -C "$repo" worktree add -q --detach "$wt" HEAD
     rsync -a --delete --exclude target "$verify_dir/" "$wt/verify/"
     result=killed
+    checks=0   # tests and harnesses run: a kill needs one (code review of v0.4.0..74b9bc1, finding 6)
     if ! git -C "$wt" apply "$verify_dir/$patch" 2> "$wt_root/$id.apply.log"; then
         result=error
         echo "run-mutants: $id: patch does not apply" >&2
@@ -104,6 +148,7 @@ for patch in mutants/M-*.patch; do
             [ -n "$t" ] || continue
             tdir=${t%% *} targs=${t#* }
             tlog="$wt_root/$id.test.${tdir//\//_}.log"
+            checks=$((checks + 1))
             set +e
             # shellcheck disable=SC2086  # the arguments are split on purpose
             (cd "$wt/$tdir" && cargo test $targs) > "$tlog" 2>&1
@@ -118,21 +163,27 @@ for patch in mutants/M-*.patch; do
             fi
         done < <(sed -n 's/^Test: *//p' "$patch")
         for h in $expect; do
+            checks=$((checks + 1))
             set +e
             (cd "$wt/verify" && VERIFY_HARNESS_TIMEOUT=$limit VERIFY_MEM_PER_HARNESS=$mem VERIFY_PLAYBACK=0 \
-                ./run-verify.sh "${features[@]}" --exact --harness "$h") \
+                VERIFY_DEBUG_ASSERTIONS=$debug_assertions ./run-verify.sh "${features[@]}" --exact --harness "$h") \
                 > "$wt_root/$id.$h.log" 2>&1
             set -e
             st=$(awk -v h="$h" '$1 == h {print $2}' "$wt_root/$id.$h.log" | head -n 1)
             case "$st" in
-                # A failed check kills the mutant, with or without unsatisfied covers.
-                FAILED*) ;;
+                # A failed check kills the mutant, with or without unsatisfied covers, and so does
+                # an input that returns through a `should_panic` harness.
+                FAILED*|RETURNS*) ;;
                 SUCCESSFUL*) case "$result" in killed|no-verdict) result=survived ;; esac ;;
                 KNOWN-TIMEOUT*) [ "$result" = killed ] && result=no-verdict ;;
                 *) result=error
                    echo "run-mutants: $id: $h ended in '${st:-no result}' (log kept: verify/target/mutant-worktrees/$id.$h.log)" >&2 ;;
             esac
         done
+        if [ "$checks" -eq 0 ]; then
+            result=error
+            echo "run-mutants: $id: its headers select no harness and no test (Expect-Fail:, Test:)" >&2
+        fi
     fi
     git -C "$repo" worktree remove --force "$wt"
     outcome[$id]=$result

@@ -75,8 +75,8 @@ const MAX_LENGTH2: f64 = 4.0;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ChordAngle(f64);
 
-/// Deserialises the squared length, a bare number as the derived `Serialize` writes it, and
-/// returns a canonical value (spec 007 FR-020):
+/// Deserialises the squared length as the derived `Serialize` writes it, a newtype struct
+/// around the number, and returns a canonical value (spec 007 FR-020):
 ///
 /// - a length in `[0, 4]`, −1 or +∞ is returned as read, bit for bit;
 /// - any other negative number, −∞ included, gives [`NEGATIVE`](Self::NEGATIVE), as
@@ -84,24 +84,41 @@ pub struct ChordAngle(f64);
 ///   kept negative lengths, so their JSON for an empty cap can hold one (−1/π for
 ///   `from_center_area(c, -1.0)`);
 /// - in a human-readable format, `null` gives [`INFINITY`](Self::INFINITY): `serde_json`
-///   writes +∞ as `null`;
+///   writes +∞ as `null`, and from 0.5 on no other value. Versions before 0.5 also wrote −∞ and
+///   NaN lengths as `null` (`from_length2` kept them), so such a `null` reads as `INFINITY`
+///   too. No release up to 0.5.0 read `null` back at all;
 /// - anything else (a length above 4, NaN) is an error naming the rule.
 ///
-/// A derived impl would accept any number, a way to build a value no constructor returns
-/// (spec 007 K6).
+/// It reads the wrapper of a format that keeps it, such as RON's `(1.0)`, and a bare number
+/// where the format drops it, as JSON does. A derived impl would accept any number, a way to
+/// build a value no constructor returns (spec 007 K6).
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for ChordAngle {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::{Error, Visitor};
 
-        /// A number, or `null` for +∞ (what `serde_json` writes for it).
-        struct Length2;
+        /// The squared length: a number, or `null` for +∞ in a human-readable format (what
+        /// `serde_json` writes for it), inside the newtype wrapper or bare.
+        struct Length2 {
+            human_readable: bool,
+        }
 
-        impl Visitor<'_> for Length2 {
+        impl<'de> Visitor<'de> for Length2 {
             type Value = f64;
 
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str("a squared chord length, or null for INFINITY")
+            }
+
+            fn visit_newtype_struct<D: serde::Deserializer<'de>>(
+                self,
+                deserializer: D,
+            ) -> Result<f64, D::Error> {
+                if deserializer.is_human_readable() {
+                    deserializer.deserialize_any(self)
+                } else {
+                    <f64 as serde::Deserialize>::deserialize(deserializer)
+                }
             }
 
             fn visit_f64<E: Error>(self, v: f64) -> Result<f64, E> {
@@ -117,19 +134,21 @@ impl<'de> serde::Deserialize<'de> for ChordAngle {
             }
 
             fn visit_unit<E: Error>(self) -> Result<f64, E> {
-                Ok(f64::INFINITY)
+                if self.human_readable {
+                    Ok(f64::INFINITY)
+                } else {
+                    Err(E::invalid_type(serde::de::Unexpected::Unit, &self))
+                }
             }
 
             fn visit_none<E: Error>(self) -> Result<f64, E> {
-                Ok(f64::INFINITY)
+                self.visit_unit()
             }
         }
 
-        let l = if deserializer.is_human_readable() {
-            deserializer.deserialize_any(Length2)?
-        } else {
-            f64::deserialize(deserializer)?
-        };
+        let human_readable = deserializer.is_human_readable();
+        let l =
+            deserializer.deserialize_newtype_struct("ChordAngle", Length2 { human_readable })?;
         if (0.0..=MAX_LENGTH2).contains(&l) || l == -1.0 || l == f64::INFINITY {
             Ok(ChordAngle(l))
         } else if l < 0.0 {

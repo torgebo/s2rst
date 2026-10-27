@@ -6,8 +6,8 @@ Defect: stub: `pure_add` without the facts `a + 0 = a` and `0 + b = b` (P-CAARI-
 diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs
 --- a/verify/src/stubs.rs
 +++ b/verify/src/stubs.rs
-@@ -225,12 +225,6 @@
- /// the right one when the left is zero (L-CP-08), otherwise any length in [0, 4] at least each operand (L-CP-05), one per ordered pair.
+@@ -309,12 +309,6 @@
+ /// otherwise any length in [0, 4] at least each operand (L-CP-05), one per ordered pair.
  pub fn pure_add(a: ChordAngle, b: ChordAngle) -> ChordAngle {
      let (la, lb) = (a.length2(), b.length2());
 -    if lb == 0.0 {

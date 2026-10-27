@@ -38,8 +38,9 @@ fn k2_inputs_reserve_at_most_two_mib() {
     let u64_header = leb128(50_000_000 * 8);
     let mut cell_ids = vec![0x00];
     cell_ids.extend_from_slice(&u64_header);
-    // One end offset of 499,999,999 (the largest the library accepts), and no data.
-    let strings = s2rst_verify::wire_spec::enc_uint_vector(&[499_999_999], 8);
+    // One end offset of 500,000,000 (the largest the library accepts: it rejects a data length
+    // above it), and no data. It was 499,999,999, one below (code review of v0.4.0..74b9bc1).
+    let strings = s2rst_verify::wire_spec::enc_uint_vector(&[500_000_000], 8);
     type Decode = fn(&[u8]) -> bool;
     let cases: [(&str, Vec<u8>, Decode); 5] = [
         ("uint_vector_u64", u64_header.clone(), |b| {

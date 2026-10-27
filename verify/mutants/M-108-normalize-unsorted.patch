@@ -5,12 +5,11 @@ Tier: slow
 Defect: normalize() does not sort, so its result depends on the input order
 
 diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
-index 4669eb0..34c3d66 100644
 --- a/core/src/s2/cell_union.rs
 +++ b/core/src/s2/cell_union.rs
-@@ -163,7 +163,6 @@ impl CellUnion {
-     /// In debug builds, panics if an id is not a valid cell (C++ `Normalize` requires
-     /// valid ids).
+@@ -168,7 +168,6 @@
+     /// valid ids), unless it lies in the leaf range of a valid cell of the input
+     /// ([`CellId::range_min`]..=[`CellId::range_max`]), which drops it as a contained cell.
      pub fn normalize(&mut self) {
 -        self.0.sort_unstable();
          let mut output: Vec<CellId> = Vec::with_capacity(self.0.len());

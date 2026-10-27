@@ -60,13 +60,15 @@ impl PyCap {
         PyCap(s2::Cap::from_point(p.0))
     }
 
-    /// Create from center point and height (between 0 and 2).
+    /// Create from center point and height (between 0 and 2). A negative height gives the
+    /// empty cap, whose height is -0.5.
     #[classmethod]
     fn from_center_height(_cls: &Bound<'_, PyType>, center: &PyS2Point, height: f64) -> Self {
         PyCap(s2::Cap::from_center_height(center.0, height))
     }
 
-    /// Create from center point and area (in steradians).
+    /// Create from center point and area (in steradians). A negative area gives the empty
+    /// cap, whose height is -0.5.
     #[classmethod]
     fn from_center_area(_cls: &Bound<'_, PyType>, center: &PyS2Point, area: f64) -> Self {
         PyCap(s2::Cap::from_center_area(center.0, area))
@@ -102,7 +104,8 @@ impl PyCap {
         PyAngle(self.0.angle_radius())
     }
 
-    /// Height of the cap (distance from the center plane to the base plane).
+    /// Height of the cap (distance from the center plane to the base plane); -0.5 for every
+    /// empty cap.
     fn height(&self) -> f64 {
         self.0.height()
     }

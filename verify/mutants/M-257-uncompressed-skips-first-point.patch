@@ -1,0 +1,17 @@
+Mutant: M-257
+Targets: P-PV-02
+Expect-Fail: cd_pv::p_pv_02__n1_b26, cd_pv::p_pv_02__n2_b50
+Defect: decode_s2point_vector's uncompressed branch skips the first point (1..count), so n points decode as n − 1 and 24 bytes too few are consumed; the 0- and 1-byte members hold no point and cannot see it
+
+diff --git a/core/src/s2/encoded_s2point_vector.rs b/core/src/s2/encoded_s2point_vector.rs
+--- a/core/src/s2/encoded_s2point_vector.rs
++++ b/core/src/s2/encoded_s2point_vector.rs
+@@ -234,7 +234,7 @@
+     // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
+     // (research R7). The regrowth's cost is measured in `verify/decoding/EVALUATION.md`.
+     let mut points = Vec::new();
+-    for _ in 0..count {
++    for _ in 1..count {
+         let mut buf = [0u8; 24];
+         r.read_exact(&mut buf)?;
+         points.push(read_point_from_bytes(&buf, 0));

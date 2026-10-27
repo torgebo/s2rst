@@ -96,6 +96,13 @@ do not state it (FR-003). Each one gets a `# Panics` section in the documentatio
 (research R14, `panics_doc`). That commit covers every public function, excluded ones too
 (Constitution II).
 
+**Corrected 2026-10-26** by the proofs of section 3: an invalid id that lies in a valid input
+cell's leaf range is dropped without a panic (rows 2, 9, 20, 32); an invalid union is not
+checked, so its panics are "may panic" (rows 10–14, 21, 23, 38–40); the area and bound rows
+panic only for an id without a level marker or on face 6 or 7 (rows 27, 28, 35–37);
+`from_min_max` accepts `min == max.next()` (row 17); and `denormalize` may panic on the other
+invalid ids (row 29). The table keeps what the T030 commit documented.
+
 | # | name | properties | result_validity (FR-004) | undocumented_panic | panics_doc | upstream_findings |
 |---|------|------------|--------------------------|--------------------|------------|-------------------|
 | 1 | `CellUnion::new` | P-UACC-01 | the empty union (P-UACC-01) |  | — (cannot panic) |  |
@@ -140,6 +147,27 @@ do not state it (FR-003). Each one gets a `# Panics` section in the documentatio
 | 40 | `Region::contains_point` | — | — (returns no union) | excluded row: in debug builds, an invalid union | added (T030, on the impl) |  |
 | 41 | `impl S2Encode for CellUnion` | P-UENC-01, P-UENC-02 | — (returns no union) |  | — (cannot panic) |  |
 | 42 | `impl S2Decode for CellUnion` | P-UENC-02, P-UENC-03, P-UENC-04 | a valid union: P-UENC-03 (exactly the encodings of valid unions are accepted, FR-017) |  | — (cannot panic) | U-003 |
+
+## 3. Outside the domain: the documented panics (2026-10-26)
+
+The other half of each `# Panics` section, as in 001's `INVENTORY.md` section 3: for every input
+outside the domain that the section names, the operation panics (`n_*`, `#[kani::should_panic]`
+with one cover after the call that must stay unsatisfied), and where the panic is debug-only,
+the release build returns on the same inputs (`r_*`, `make verify-release`). Like the crash
+proofs, they hold for concrete union lengths. They run in the per-change union leg, and the
+every-build ones and the `r_*` ones in the release pass.
+
+| Operations | Outside the domain | Build | Harness | Result |
+|------------|--------------------|-------|---------|--------|
+| `from_cell_ids`, `normalize`, `FromIterator` | one invalid id | debug | `cu_crash::n_from_cell_ids__n1`; release `cu_crash::r_from_cell_ids__n1` | panics in debug builds; returns, keeping the id, in release builds |
+| `from_cell_ids` | two ids, with an invalid one outside the leaf range of every valid one | debug | `cu_crash::n_from_cell_ids__n2` | panics. Over every pair with an invalid id the first version returned: an invalid id in a valid cell's leaf range is dropped as a contained cell. The `# Panics` of the three, and of `union`, now names that exception |
+| `contains_cell_id`, `intersects_cell_id`, `intersection_with_cell_id` | an invalid id, with any sequence of two ids as the union | debug | `cu_crash::n_cell_queries__n2`; release `cu_crash::r_cell_queries__n2` | panics in debug builds (the check comes before the union is read); returns in release builds for every valid union of two cells and every invalid id but `none`, whose `range_min` wraps (an overflow Kani checks in every build) |
+| `contains_cell_id` | an invalid union of two ids, with a valid cell | debug | none: the first `n_contains_cell_id_invalid_union__n2` returned | the `# Panics` said "or if this union is not valid": no check reads the union, so an unsorted union of valid cells, for one, returns. The section, and those of `contains_point`, `contains_union`, `intersects_union`, `intersection`, `difference` and the `Region` methods, now say that the result is unspecified and may be a panic |
+| `leaf_cells_covered` (and `average_based_area` through it) | two ids, one without a level marker | every | `cu_crash::n_leaf_cells_covered__n2` | panics (both builds) |
+| `denormalize` | a `level_mod` outside 1–3 with any two ids, or a first id without a level marker | every | `cu_crash::n_denormalize__n2` | panics (both builds). A later id without a marker panics once the loop reaches it, after the earlier cells' descendants, which no bound covers. The `# Panics` also said "in debug builds, also if an id is not a valid cell": a native check (2026-10-26) found invalid ids with a level marker kept (a face-6 leaf), so it now says "may panic" |
+| `from_begin_end`, `from_range` (tool-limit rows) | a bound that is neither a leaf nor `end(30)`, or `begin > end` | every | `cu_crash::n_from_begin_end` | panics (both builds), before the tiling loop |
+| `from_min_max` (tool-limit row) | `max` not a valid leaf, `min` neither a valid leaf nor `max.next()`, or `min > max.next()` | every | `cu_crash::n_from_min_max` | panics (both builds). The `# Panics` said "a bound that is not a valid leaf, or `min > max`": the first version returned, for `min == max.next()` (the next leaf, or `end(30)` after the last), which gives the empty union, as upstream's `FromMinMax` does through `FromBeginEnd`. The section now says so |
+| `approx_area`, `exact_area`, the `Region` bounds (float-geometry rows) | an invalid id | every | none (floating point); a native check, 2026-10-26 | the `# Panics` said "panics if an id is not a valid cell": they panic exactly where building the id's `Cell` does (no level marker, face 6 or 7), and odd-marker ids give an unspecified result. The sections now say so |
 
 ## Outside FR-002's definition
 

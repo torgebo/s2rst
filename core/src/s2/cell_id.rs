@@ -242,6 +242,12 @@ impl CellId {
     }
 
     /// Returns the leaf cell containing the given point.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `p` is the zero vector, which no face contains (the face
+    /// projection's check), and may panic for a point with a NaN coordinate: `(1, NaN, 0)`
+    /// panics, `(NaN, 1, 0)` does not. Release builds return an unspecified leaf for those.
     #[inline]
     pub fn from_point(p: &Point) -> Self {
         let (f, u, v) = xyz_to_face_uv(&p.0);
@@ -251,6 +257,11 @@ impl CellId {
     }
 
     /// Returns the leaf cell containing the given latitude-longitude.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, may panic if the latitude or the longitude is not finite: its point has
+    /// NaN coordinates, as for [`CellId::from_point`].
     #[inline]
     pub fn from_lat_lng(ll: &LatLng) -> Self {
         Self::from_point(&ll.to_point())
@@ -967,8 +978,10 @@ pub fn size_ij(level: impl Into<Level>) -> i32 {
 ///
 /// # Panics
 ///
-/// In debug builds, panics on arithmetic overflow if `i` or `j` is outside `[0, 2^30)`, the
-/// range upstream documents for leaf coordinates. Release builds return an unspecified id.
+/// `i` and `j` must be in `[0, 2^30)`, the range upstream documents for leaf coordinates. In
+/// debug builds, some coordinates outside it panic on arithmetic overflow (`i = -1` on face 0,
+/// for example); the others, and every one in release builds, give an unspecified id, often a
+/// valid cell (`i = 2^30` on face 0 gives face 1's first leaf).
 #[inline]
 pub fn from_face_ij(f: Face, i: i32, j: i32) -> CellId {
     let fb = f.as_u8();
@@ -1099,6 +1112,9 @@ impl From<CellId> for u64 {
     }
 }
 
+/// # Panics
+///
+/// As [`CellId::from_point`].
 impl From<&Point> for CellId {
     #[inline]
     fn from(p: &Point) -> Self {
@@ -1106,6 +1122,9 @@ impl From<&Point> for CellId {
     }
 }
 
+/// # Panics
+///
+/// As [`CellId::from_lat_lng`].
 impl From<&LatLng> for CellId {
     #[inline]
     fn from(ll: &LatLng) -> Self {
@@ -1962,8 +1981,8 @@ mod tests {
             );
         }
 
-        // Large positive wrap: more than the total number of cells at a given level.
-        // At level 0, there are 6 cells. 13 steps = 2*6 + 1, so advance_wrap(13) == advance_wrap(1).
+        // Large positive wrap: more than the total number of cells at a given level. At level 0,
+        // there are 6 cells. 13 steps = 2*6 + 1, so advance_wrap(13) == advance_wrap(1).
         assert_eq!(
             CellId::from_face(0).advance_wrap(13),
             CellId::from_face(0).advance_wrap(1),

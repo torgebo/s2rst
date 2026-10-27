@@ -80,6 +80,17 @@ proves it and the inputs it holds for. The records below give the exact statemen
   operation completes without a panic, an arithmetic overflow or undefined behaviour, for
   every input in its documented domain. The inventory lists all 64 public operations: their
   scope, domain, preconditions, harness and status, and any panic the proofs exposed.
+- **The documented panics** (`INVENTORY.md` section 3, and the other inventories' last
+  sections): for every input outside an operation's domain that its `# Panics` section names,
+  the operation panics, and a debug-only panic is absent from a release build on the same inputs
+  (no panic, no overflow), so the section is exact. 71 operations of the four suites, with 12
+  sections corrected where the proofs found them claiming more panics than the code has, and 3
+  added; [`COVERAGE.md`](COVERAGE.md) records the review behind it. See
+  "Panics exactly where documented" in [`PROPERTIES_BY_KIND.md`](PROPERTIES_BY_KIND.md).
+- **The floating-point geometry** of the value types (values inventory section 11): 43 of the 62
+  entries specs 004–007 excluded are proven crash-free since 2026-10-27, 24 per change and 19
+  weekly, under function contracts and with the abstract u-v bound; the rest are measured tool
+  limits ([`COVERAGE.md`](COVERAGE.md)).
 - **Functional properties** ([`PROPERTIES.md`](PROPERTIES.md)): a 49-entry catalogue
   (encoding round trips, hierarchy, ranges, traversal, common ancestors, text formats,
   neighbours), each stated against the independent reference model `src/spec.rs` and
@@ -93,8 +104,10 @@ proves it and the inputs it holds for. The records below give the exact statemen
 The `CellUnion` records follow the same pattern: crash-freedom of the 27 in-scope operations
 and a 27-entry property catalogue stated against `src/union_spec.rs`, the model of the leaf
 cells a union covers. The mutants of every suite share `mutants/` and `MUTANTS.md` (ids
-`M-0NN` for `CellId`, `M-1NN` for `CellUnion`, `M-2NN` for the decoding layer, `M-3NN` for the
-value types).
+`M-0NN` for `CellId`, `M-1NN` for `CellUnion`, `M-2NN` for the decoding layer, `M-3NN` to `M-7NN`
+for the value types, `M-8NN` for the documented panics, which remove a guard, so that an `n_*`
+harness returns, or promote a debug check to every build, which fails an `r_*` harness built
+without debug assertions: header `Debug-Assertions: off`).
 
 ## Running
 
@@ -116,17 +129,23 @@ From the repository root:
 | `make verify-values [P=cell\|interval\|real\|rect\|uvrect\|point\|chord\|angle]` | The value-type suite alone (specs 004–007): the models' sanity tests (including the exhaustive `uv_projection` check, about 40 s), then the `cl_*` (`Cell`), `iv_*` (`s1::Interval`), `ri_*` (`r1::Interval`), `rl_*` (`s2::Rect`), `ur_*` (`r2::Rect`), `pt_*` (`s2::Point`), `ca_*` (`s1::ChordAngle`) and `ag_*` (`s1::Angle`) harnesses, whole or one part; without `P` and with `P=angle`, also the E-form enumeration (`tests/angle_enumeration.rs`, release mode). CI runs the eight parts as legs, `values-cell` … `values-angle` |
 | `make verify-deductive [MUTANTS=1]` | The Verus track (spec 003): Verus on the restated codecs, then their link tests; with `MUTANTS=1`, the `V-NNN` mutants instead. Needs Verus 0.2026.09.20.aef82ed (`VERUS=<path>`) and Rust 1.98.1. See [`deductive/README.md`](deductive/README.md) |
 | `make verify-deductive-bless` | Rewrites the drift guard's fingerprints after a reviewed change to a mirrored library function |
+| `make verify-release` | The documented panics' release pass: built without debug assertions (`VERIFY_DEBUG_ASSERTIONS=0`, its own target directory), the `n_*` harnesses whose panic is in every build, the `r_*` harnesses (a debug-only check skipped leaves no panic or overflow) and the `o_*` ones (inputs outside a domain that return). CI runs it as the `release` leg |
 | `make verify-harness H=crash::c_parent` | One harness, by its full name, slow-tier ones included (set `VERIFY_HARNESS_TIMEOUT=30m` for those) |
 | `make verify-slow [F=<0-5\|vertex\|union\|decoding\|values>] [P=…]` | The weekly slow tier: the proofs over the per-change budget (`--features slow`), whole or one part. It runs one harness at a time with 60 minutes each, so it fits a 4-core workstation (the whole tier took 12.9 hours on 2026-10-09); CI sets `VERIFY_JOBS` and the 30-minute budget itself. `F=union` runs the whole `CellUnion` suite with its slow-tier members (the larger property members and the 25-byte decode crash proof), at an 8 GB ceiling. `F=decoding` runs the whole decoding suite with its slow-tier members (the cell-id vector encoder at one and two ids) at an 8 GB ceiling, or with `P=<vectors\|links\|codecs>` one part of it, as `make verify-decoding` does (CI runs the three as separate legs, one harness at a time). `F=values` runs the value-type suite with its slow-tier members (the deeper levels of the `Cell` bound families, the intervals' and the rectangle's expansion containment, the u-v rectangle's centre and exact constructors, the point's unit length, orthogonal directions and `rotate`), at an 8 GB ceiling, or `P=cell\|interval\|real\|rect\|uvrect\|point` one part |
-| `make verify-xlarge [H=cd_xlarge::<fn>]` | The xlarge tier (spec 003): the decoding members over the weekly budget, the tool limits of T029 (`--features xlarge`, module `cd_xlarge`). For a separate machine with 32 GB of memory: one harness at a time, a 26G ceiling (`XLARGE_MEM`), 4 hours each. It refuses to start unless the ceiling plus 2 GiB is available. No CI job runs it |
-| `make verify-mutants [M="M-001 M-016"]` | The mutant campaign, or the listed mutants; `M='M-5*'` selects by pattern (`M-0NN` are spec 001's, … `M-5NN` spec 006's; CI runs one leg per spec). Each runs in a throwaway git worktree, so your tree is never modified. Outcomes: `killed`, `survived`, `no-verdict` (an expected harness times out unmutated too, so it is listed in `known-timeouts.txt`) and `error`. Set `VERIFY_SLOW_HARNESS_TIMEOUT=60m` for the value types' weekly-tier mutants |
+| `make verify-xlarge [H=cd_xlarge::<fn>]` | The xlarge tier (spec 003): the decoding members over the weekly budget, the tool limits of T029 (`--features xlarge`, module `cd_xlarge`), and since 2026-10-27 five `Cell` float-geometry crash proofs that run out of memory at 8 GiB (`COVERAGE.md`). For a separate machine with 32 GB of memory: one harness at a time, a 26G ceiling (`XLARGE_MEM`), 4 hours each. It refuses to start unless the ceiling plus 2 GiB is available. No CI job runs it |
+| `make verify-mutants [M="M-001 M-016"]` | The mutant campaign, or the listed mutants; `M='M-5*'` selects by pattern (`M-0NN` are spec 001's, … `M-5NN` spec 006's; CI runs one leg per spec). Each runs in a throwaway git worktree, so your tree is never modified. Outcomes: `killed`, `survived`, `no-verdict` (an expected harness times out unmutated too, so it is listed in `known-timeouts.txt`) and `error`, also for a mutant whose headers select no harness and no test. An id or pattern that selects no mutant fails before anything runs. Set `VERIFY_SLOW_HARNESS_TIMEOUT=60m` for the value types' weekly-tier mutants |
 
 Each run prints one line per harness: name, status (`SUCCESSFUL`, `FAILED`, `OOM`,
-`TIMEOUT`, `ERROR`, `KNOWN-DEFECT D-NNN` or `KNOWN-TIMEOUT`), covers satisfied and time. While the run goes
+`TIMEOUT`, `ERROR`, `KNOWN-DEFECT D-NNN`, `KNOWN-TIMEOUT` or, for a `should_panic` harness
+through which an input returns, `RETURNS`), covers satisfied (`never` for a `should_panic`
+harness whose "returns" cover is unsatisfied, as it must be) and time. While the run goes
 on, it prints a timestamped line as each harness finishes, with the counts done and failing
 so far; after it, the sorted report, where an `ERROR` re-run alone may turn out `OOM`. A
 `FAILED` harness is followed by a concrete-playback unit test with the inputs of a
-counterexample. Logs are in `verify/target/run-verify/` (`progress.log`, the progress lines,
+counterexample. A selection that holds no harness, or a `--harness` filter (`H=`, `P=`) that
+selects none, fails right after the build, before anything runs. A filter naming a whole
+module (`<module>::`) need only name a module of `src/`, since a part's module may hold weekly
+members only. Logs are in `verify/target/run-verify/` (`progress.log`, the progress lines,
 for `tail -f` from another terminal; `results.tsv`; `kani.log`).
 
 ### The memory guard
@@ -179,7 +198,8 @@ Makefile targets or `run-verify.sh`.
 
 A property that fails on a real defect gets a `D-NNN` in `EVALUATION.md` and a separate fix
 (FR-010). Until the fix lands, list the harness in `known-defects.txt`, so that runs report
-it as `KNOWN-DEFECT` rather than `FAILED`.
+it as `KNOWN-DEFECT` rather than `FAILED`. Only a failed check is excused: a listed harness
+that ends in `ERROR`, `OOM`, `TIMEOUT` or `NOT-RUN` still fails the run.
 
 A weekly member that times out at 60 minutes is a tool limit: the catalogue records it as
 `not-proven (tool limit)`, and `known-timeouts.txt` lists it, so that runs report it as
@@ -220,11 +240,12 @@ remove the line.
 | Path | Contents |
 |------|----------|
 | `PROPERTIES_BY_KIND.md` | Every property in plain language, by kind of guarantee: the place to start |
+| `COVERAGE.md` | The crash-freedom coverage review of 2026-10-26: the documented panics and the floating-point geometry |
 | `PROPERTIES_BY_KIND.html`, `PROPERTIES.html` | Rendered copies of those two pages; after editing a page, re-render it with `pandoc -f markdown -t html <page>.md -o <page>.html` |
 | `tests/property_kinds.rs` | Keeps that page, the harness docs' kind tags and the catalogues in step |
 | `src/spec.rs` | The reference model |
 | `src/domain.rs` | Input generators (`any_valid`, `any_valid_on_face`, `with_text`, …) |
-| `src/crash.rs` | Crash-freedom harnesses (`c_*`) |
+| `src/crash.rs` | Crash-freedom harnesses (`c_*`), and the documented panics (`n_*`, `r_*`; the conventions are at the head of their section) |
 | `src/{val,hier,range,trav,anc,enc,nbr}.rs` | Property harnesses (`p_*`); `nbr` is slow-tier only |
 | `tests/spec_vs_cpp.rs` | The model's sanity tests against the committed C++ vectors |
 | `src/union_spec.rs`, `src/union_spec_tests.rs` | The `CellUnion` model (the leaf cells a union covers) and its unit tests |

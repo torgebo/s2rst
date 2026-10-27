@@ -200,3 +200,96 @@ fn c_approx_eq() {
     kani::cover!(d && a.is_empty() && !b.is_empty(), "empty and tiny");
     kani::cover!(!w, "not approximately equal");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Outside the domain: the documented panics (gap 1; `crash.rs` explains the `n_*` and `r_*`
+// conventions).
+// ---------------------------------------------------------------------------------------------
+
+/// Two arbitrary `f64` coordinates, NaN and the infinities included.
+fn any_xy() -> Point {
+    Point {
+        x: kani::any(),
+        y: kani::any(),
+    }
+}
+
+/// Whether an interval is empty (`lo > hi`; false for a NaN bound, as `r1::Interval::is_empty`).
+fn empty(x: r1::Interval) -> bool {
+    x.lo > x.hi
+}
+
+/// N-r2::Rect::new, N-from_points: in debug builds, each panics for every pair of intervals
+/// (corners) of which exactly one axis is empty, NaN bounds included.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_constructors() {
+    let b = any_uv_bounds();
+    kani::assume(empty(b.x) != empty(b.y));
+    if kani::any::<bool>() {
+        let _ = Rect::new(b.x, b.y);
+    } else {
+        let _ = Rect::from_points(b.lo(), b.hi());
+    }
+    kani::cover!(true, "returns");
+}
+
+/// R-r2::Rect::new, R-from_points: in a build without debug assertions, each completes without
+/// panic or overflow on the same inputs, and returns the invalid rectangle.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_constructors() {
+    let b = any_uv_bounds();
+    kani::assume(empty(b.x) != empty(b.y));
+    let (n, p) = (Rect::new(b.x, b.y), Rect::from_points(b.lo(), b.hi()));
+    assert!(!n.is_valid() && !p.is_valid());
+    kani::cover!(empty(b.x), "the x axis empty");
+}
+
+/// A finite centre and size of which exactly one axis comes out empty, `c − s/2 > c + s/2` on
+/// it, the result `from_center_size`'s `# Panics` names. Finite, because an infinite centre and
+/// size give `∞ − ∞`, which Kani reports as a failure (NaN) before the check. The doc's first
+/// version said "one size component negative and the other not": over those inputs this
+/// harness returned (2026-10-26), for a negative size that rounding absorbs (`-5e-324`).
+fn outside_center_size() -> (Point, Point) {
+    let (c, s) = (any_xy(), any_xy());
+    kani::assume(c.x.is_finite() && c.y.is_finite() && s.x.is_finite() && s.y.is_finite());
+    let axis_empty = |c: f64, s: f64| c - 0.5 * s > c + 0.5 * s;
+    kani::assume(axis_empty(c.x, s.x) != axis_empty(c.y, s.y));
+    (c, s)
+}
+
+/// N-r2::Rect::from_center_size: in debug builds, panics for every finite centre and size of
+/// which exactly one axis comes out empty.
+#[cfg(debug_assertions)]
+#[kani::proof]
+#[kani::should_panic]
+fn n_from_center_size() {
+    let (c, s) = outside_center_size();
+    let _ = Rect::from_center_size(c, s);
+    kani::cover!(true, "returns");
+}
+
+/// R-r2::Rect::from_center_size: in a build without debug assertions, completes without panic or
+/// overflow on the same inputs, and returns the invalid rectangle.
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+fn r_from_center_size() {
+    let (c, s) = outside_center_size();
+    let r = Rect::from_center_size(c, s);
+    assert!(!r.is_valid());
+    kani::cover!(s.x < 0.0, "a negative x size");
+}
+
+/// N-r2::Rect::project: panics, in every build, for every rectangle with an empty axis or a NaN
+/// bound and every point (`r1::Interval::project` on each axis).
+#[kani::proof]
+#[kani::should_panic]
+fn n_project() {
+    let b = any_uv_bounds();
+    let nan = |x: r1::Interval| x.lo.is_nan() || x.hi.is_nan();
+    kani::assume(empty(b.x) || empty(b.y) || nan(b.x) || nan(b.y));
+    let _ = b.project(any_xy());
+    kani::cover!(true, "returns");
+}

@@ -20,11 +20,9 @@
 use s2rst::s2::encoded_uint_vector::{encode_uint_vector_u32, encode_uint_vector_u64};
 
 use crate::cd_crash::continued;
-#[cfg(feature = "slow")]
-use crate::codec::check_agreement_on;
 use crate::codec::{
-    Codec, ENCODING_MAX, U32Vec, U64Vec, check_agreement, check_encoder, check_model_round_trip,
-    same_bytes,
+    Codec, ENCODING_MAX, U32Vec, U64Vec, check_agreement, check_agreement_on, check_encoder,
+    check_model_round_trip, same_bytes,
 };
 use crate::wire_domain::{any_u32s, any_u64s};
 use crate::wire_spec::enc_varint;
@@ -302,6 +300,27 @@ fn p_uv_03__h2_b18() {
             "sixteen elements after a two-byte header"
         );
         kani::cover!(!accepted, "more elements declared than the input holds");
+    });
+}
+
+/// P-UV-03 (exact input): the `u64` vector decoder agrees with upstream on the encodings of two
+/// elements of any width.
+///
+/// On every 18-byte input whose header byte declares two elements (`16 | (w − 1)`, any width
+/// `w`): the library and the reference agree. The `__b<L>` members stop at 11 bytes, so two
+/// elements of 6 to 8 bytes (13 to 17 bytes), which P-UV-01's encoder and model legs reach at
+/// `n = 2`, had no decoder leg (code review of v0.4.0..74b9bc1, finding 10).
+#[kani::proof]
+#[kani::unwind(19)]
+fn p_uv_03__n2_b18() {
+    let mut b: [u8; 18] = kani::any();
+    kani::assume(b[0] >> 3 == 2);
+    check_agreement_on::<U64Vec, 18>(&b, |b, accepted| {
+        kani::cover!(accepted && b[0] & 7 == 7, "two eight-byte elements");
+        kani::cover!(
+            accepted && b[0] & 7 == 0,
+            "two one-byte elements, 15 bytes left over"
+        );
     });
 }
 
