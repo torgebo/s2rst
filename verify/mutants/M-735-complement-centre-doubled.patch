@@ -1,0 +1,17 @@
+Mutant: M-735
+Targets: P-CPCMP-02
+Expect-Fail: cp_cmp::p_cpcmp_02
+Defect: the complement's centre is `−2c` (not unit length)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -290,7 +290,7 @@
+         // Upstream's radius, `FromLength2(4 − r²)`. (`STRAIGHT − radius` squared a square root
+         // and differed in the last bits; spec 008 K4, FR-019.)
+         Cap::from_center_chord_angle(
+-            -self.center,
++            -(self.center + self.center),
+             ChordAngle::from_length2(4.0 - self.radius.length2()),
+         )
+     }

@@ -1,0 +1,12 @@
+K1 angle_radius=0.11785113019775795 level=1 cells=4
+K2 cap (4°, 0°) radius 58°: Contains(face 0)=1
+K2 Contains(face 0) true in 38 of 65
+K3 MayIntersect(face 0)=0; covering 8 cells, 0 on face 0
+K4 l2=0.10000000000000001 complement l2=3.8999999999999999
+K4 l2=0.5 complement l2=3.5
+K4 l2=1 complement l2=3
+K4 l2=1.7 complement l2=2.2999999999999998
+K4 l2=2.8999999999999999 complement l2=1.1000000000000001
+K4 l2=3.2999999999999998 complement l2=0.70000000000000018
+K5 rect lng=[1.7353292519943296e-16, 1.7553292519943294e-16] contains centre=1
+K6 centres 5.02e-15 rad apart: ApproxEquals=1

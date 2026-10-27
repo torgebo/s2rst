@@ -1,0 +1,17 @@
+K1 angle_radius=1.1785113019775795e-1 library level=2 upstream level=1
+K1 angle_radius=5.8925565098878974e-2 library level=3 upstream level=2
+K1 angle_radius=2.9462782549439487e-2 library level=4 upstream level=3
+K1 radii whose covering level differs: 180 of 1856
+K2 contains_cell(face 0) true in 30 of 65 (library)
+K2 contains_cell(face 0) library != upstream: 8 of 65; first Some((4, 58.0, false, true)) (dlat°, radius°, library, upstream)
+K3 cap at (0°, 50°) radius 2° vs face 0: library intersects_cell=true upstream MayIntersect=false
+K3 its covering (max 8 cells): 8 cells, 0 on face 0 (the cap is on face 1 only)
+K4 complement radius differs from upstream: 472249 of 1000000
+K4 l2=0.10000000000000001 complement l2=3.89999999999999991
+K4 l2=0.50000000000000000 complement l2=3.50000000000000000
+K4 l2=1.00000000000000000 complement l2=2.99999999999999956
+K4 l2=1.69999999999999996 complement l2=2.29999999999999982
+K4 l2=2.89999999999999991 complement l2=1.10000000000000009
+K4 l2=3.29999999999999982 complement l2=0.70000000000000018
+K5 cap at lng 1e-14°, radius 1e-18 rad: rect lng = [0e0, 0e0], centre lng = 1.7453292519943295e-16, contains centre: false
+K6 centres 5.020e-15 rad apart: approx_eq=false approx_eq_with(1e-14)=false

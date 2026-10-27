@@ -1,0 +1,17 @@
+Mutant: M-706
+Targets: P-CPCLS-01
+Expect-Fail: cp_cls::p_cpcls_01
+Defect: `is_valid` does not check the centre's length
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -211,7 +211,7 @@
+     /// Reports whether the cap is valid.
+     #[inline]
+     pub fn is_valid(self) -> bool {
+-        self.center.is_unit() && self.radius.length2() <= 4.0
++        self.radius.length2() <= 4.0
+     }
+ 
+     /// Reports whether the cap is empty (contains no points).

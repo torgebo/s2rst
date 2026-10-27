@@ -4,9 +4,10 @@
 
 //! The reference descriptions of spec 004 (`s2rst_verify::arc_spec`, `s2rst_verify::cell_spec`),
 //! spec 005 (`s2rst_verify::real_spec`, `s2rst_verify::rect_spec`) and spec 006
-//! (`s2rst_verify::uv_spec`, `s2rst_verify::point_spec`) and spec 007
-//! (`s2rst_verify::chord_spec`, `s2rst_verify::angle_spec`) against every row of the committed
-//! C++ oracle vectors (FR-007, FR-021; spec 004 research R10, specs 005–007 research R9).
+//! (`s2rst_verify::uv_spec`, `s2rst_verify::point_spec`), spec 007
+//! (`s2rst_verify::chord_spec`, `s2rst_verify::angle_spec`) and spec 008
+//! (`s2rst_verify::cap_spec`, against `cpp_cap_vectors.csv`) against every row of the committed
+//! C++ oracle vectors (FR-007, FR-021; spec 004 research R10, specs 005–008 research R9).
 //!
 //! The Kani proofs show the library agrees with the descriptions; this test shows the
 //! descriptions agree with C++. Together: C++ ⇔ description ⇔ library. The description of an
@@ -19,16 +20,23 @@ use s2rst::s1::Interval;
 use s2rst::s2::{Point, Rect};
 use s2rst::{r1, r2};
 use s2rst_verify::{
-    angle_spec, arc_spec, cell_spec, chord_spec, point_spec, real_spec, rect_spec, spec, uv_spec,
+    angle_spec, arc_spec, cap_spec, cell_spec, chord_spec, point_spec, real_spec, rect_spec, spec,
+    uv_spec,
 };
 
 const CSV: &str = include_str!("../../core/tests/data/cpp_values_vectors.csv");
+const CAP_CSV: &str = include_str!("../../core/tests/data/cpp_cap_vectors.csv");
 
 /// The rows of one `# SECTION`, split at commas.
 fn section(name: &str) -> Vec<Vec<&'static str>> {
+    section_of(CSV, name)
+}
+
+/// The rows of one `# SECTION` of `csv`, split at commas.
+fn section_of(csv: &'static str, name: &str) -> Vec<Vec<&'static str>> {
     let mut rows = Vec::new();
     let mut inside = false;
-    for line in CSV.lines() {
+    for line in csv.lines() {
         if let Some(h) = line.strip_prefix("# ") {
             inside = h == name;
             continue;
@@ -589,4 +597,110 @@ fn angle_description_matches_cpp() {
     }
     eprintln!("ANGLE: {n} rows, {saturate} out of the int32 range, {ties} exact ties");
     assert!(n >= 1000 && ties >= 9, "{n} rows, {ties} ties");
+}
+
+/// The cap a `CAP_*` row describes: centre `c`, radius `FromLength2(l)` (−1 for the empty cap).
+fn cap_of(c: &[&str], l: &str) -> s2rst::s2::Cap {
+    s2rst::s2::Cap::from_center_chord_angle(triple(c), s2rst::s1::ChordAngle::from_length2(f(l)))
+}
+
+/// The cap description against `CAP_OPS` and `CAP_SPECIAL` (spec 008 T008): membership,
+/// interior membership, the classifications, and every restatement bit for bit (data-model §1).
+/// The description reads only the row's centre and radius; `ChordAngle` sums in the `AddCap`
+/// check are 007's verified ones.
+#[test]
+fn cap_description_matches_cpp() {
+    use s2rst::s1::ChordAngle;
+    let mut n = 0;
+    for name in ["CAP_OPS", "CAP_SPECIAL"] {
+        for row in section_of(CAP_CSV, name) {
+            // cx,cy,cz,l,px,py,pz,bx,by,bz,bl,d,h,a,ang,results,note
+            let a = cap_of(&row[0..3], row[3]);
+            let p = triple(&row[4..7]);
+            let b_cap = cap_of(&row[7..10], row[10]);
+            let r: Vec<&str> = row[15].split(';').collect();
+            let l = a.chord_radius().length2();
+            let ctx = row.join(",");
+            assert_eq!(cap_spec::valid(a), b(r[0]), "valid: {ctx}");
+            assert_eq!(cap_spec::empty(a), b(r[1]), "empty: {ctx}");
+            assert_eq!(cap_spec::full(a), b(r[2]), "full: {ctx}");
+            assert!(
+                same_bits(cap_spec::upstream_height(l), f(r[3])),
+                "height: {ctx}"
+            );
+            assert!(
+                same_bits(cap_spec::upstream_area(l), f(r[4])),
+                "area: {ctx}"
+            );
+            assert!(
+                same_point_bits(cap_spec::upstream_centroid(a.center(), l), &r[5..8]),
+                "centroid: {ctx}"
+            );
+            assert_eq!(cap_spec::member(a, p), b(r[8]), "member: {ctx}");
+            assert_eq!(
+                cap_spec::interior_member(a, p),
+                b(r[9]),
+                "interior member: {ctx}"
+            );
+            if !cap_spec::empty(a) && !cap_spec::full(a) {
+                assert!(
+                    same_bits(cap_spec::upstream_complement_length2(l), f(r[16])),
+                    "complement: {ctx}"
+                );
+            }
+            if !cap_spec::empty(a) && !cap_spec::empty(b_cap) {
+                let d = (ChordAngle::from_length2(cap_spec::chord2(a.center(), b_cap.center()))
+                    + b_cap.chord_radius())
+                .length2();
+                let up = (d + cap_spec::upstream_add_cap_margin(d)).clamp(0.0, 4.0);
+                assert!(same_bits(l.max(up), f(r[26])), "add_cap margin: {ctx}");
+            }
+            assert!(
+                same_bits(cap_spec::upstream_from_height(f(row[12])), f(r[33])),
+                "from_height: {ctx}"
+            );
+            assert!(
+                same_bits(cap_spec::upstream_from_area(f(row[13])), f(r[34])),
+                "from_area: {ctx}"
+            );
+            n += 1;
+        }
+    }
+    eprintln!("CAP_OPS + CAP_SPECIAL: {n} rows");
+}
+
+/// The covering level against `CAP_BOUNDS` (spec 008 T008): `upstream_level` of the angle
+/// radius (upstream's `GetRadius()`, `2 · asin(√l / 2)`) is the level of every id of
+/// `GetCellUnionBound`, or the six faces when it is below 0.
+#[test]
+fn cap_level_matches_cpp() {
+    let mut n = 0;
+    for row in section_of(CAP_CSV, "CAP_BOUNDS") {
+        // cx,cy,cz,l,results,note
+        let l = f(row[3]);
+        let r: Vec<&str> = row[4].split(';').collect();
+        let ids: Vec<u64> = r[4]
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .map(|h| u64::from_str_radix(h, 16).unwrap())
+            .collect();
+        // Upstream's `GetRadius()`: −1 radian for the empty cap, which upstream's covering, and
+        // the library's since K8, does not treat apart (level 29, four cells).
+        let radius = if l < 0.0 {
+            -1.0
+        } else {
+            2.0 * (0.5 * l.sqrt()).asin()
+        };
+        let level = cap_spec::upstream_level(radius);
+        if level < 0 {
+            assert_eq!(ids.len(), 6, "six faces: {}", row.join(","));
+        } else {
+            for id in ids {
+                let id_level = 30 - (id.trailing_zeros() / 2) as i32;
+                assert_eq!(id_level, level, "level: {}", row.join(","));
+            }
+        }
+        n += 1;
+    }
+    eprintln!("CAP_BOUNDS: {n} rows");
 }

@@ -47,6 +47,12 @@ pub trait Region: std::fmt::Debug {
 
     /// Returns a small set of cells that cover this region. The output is
     /// not sorted.
+    ///
+    /// The set may hold cells the region does not touch, and it is not empty for an
+    /// empty region: implementations that use [`Cap::cell_union_bound`] of their cap
+    /// bound return, for an empty region, the empty cap's four level-29 cells around
+    /// (1, 0, 0), as upstream does (spec 008 K8). Test the region for emptiness first
+    /// where that matters.
     fn cell_union_bound(&self) -> Vec<CellId>;
 
     /// Reports whether this region completely contains the given cell.
@@ -74,16 +80,18 @@ impl Region for Cap {
         Cap::cell_union_bound(*self)
     }
 
+    /// Upstream's `S2Cap::Contains(const S2Cell&)`: the cell's four vertices, then its edges
+    /// against the cap's complement (spec 008 FR-018). The answers match C++'s on every row of
+    /// the reference vectors; `RegionCoverer`'s coverings of caps still differ from C++'s on a
+    /// few of them, in the coverer itself (spec 008 K10).
     fn contains_cell(&self, cell: &Cell) -> bool {
-        // A cap contains a cell if it contains the cell's bounding cap.
-        // This is conservative: it may return false even if the cell is contained.
-        self.contains(cell.cap_bound())
+        self.contains_cell_upstream(cell)
     }
 
+    /// Upstream's `S2Cap::MayIntersect(const S2Cell&)`: the cell's four vertices, then its
+    /// edges (spec 008 FR-018).
     fn intersects_cell(&self, cell: &Cell) -> bool {
-        // A cap intersects a cell if it intersects the cell's bounding cap.
-        // This is conservative for the negative case.
-        self.intersects(cell.cap_bound())
+        self.may_intersect_cell(cell)
     }
 
     fn contains_point(&self, p: &Point) -> bool {

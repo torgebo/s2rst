@@ -1,0 +1,17 @@
+Mutant: M-732
+Targets: L-CP-08
+Expect-Fail: cp_lem::l_cp_08
+Defect: `ZERO + b` is `ZERO`
+
+diff --git a/core/src/s1/chord_angle.rs b/core/src/s1/chord_angle.rs
+--- a/core/src/s1/chord_angle.rs
++++ b/core/src/s1/chord_angle.rs
+@@ -438,7 +438,7 @@
+         let a2 = self.0;
+         let b2 = rhs.0;
+ 
+-        if b2 == 0.0 {
++        if b2 == 0.0 || a2 == 0.0 {
+             return self;
+         }
+         if a2 + b2 >= MAX_LENGTH2 {

@@ -1,0 +1,17 @@
+Mutant: M-713
+Targets: P-CPREL-02
+Expect-Fail: cp_rel::p_cprel_02
+Defect: `intersects` is strict (touching caps do not intersect)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -261,7 +261,7 @@
+         if self.is_empty() || other.is_empty() {
+             return false;
+         }
+-        self.radius + other.radius >= self.center.chord_angle(other.center)
++        self.radius + other.radius > self.center.chord_angle(other.center)
+     }
+ 
+     /// Reports whether the interior of this cap intersects the other cap.

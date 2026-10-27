@@ -1,0 +1,17 @@
+Mutant: M-714
+Targets: P-CPREL-02
+Expect-Fail: cp_rel::p_cprel_02
+Defect: `interior_intersects` gives a point cap an interior
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -267,7 +267,7 @@
+     /// Reports whether the interior of this cap intersects the other cap.
+     pub fn interior_intersects(self, other: Cap) -> bool {
+         // Make sure this cap has an interior and the other cap is non-empty.
+-        if self.radius <= ChordAngle::ZERO || other.is_empty() {
++        if self.radius < ChordAngle::ZERO || other.is_empty() {
+             return false;
+         }
+         self.radius + other.radius > self.center.chord_angle(other.center)

@@ -942,7 +942,7 @@ These tasks record upstream findings so that they are not lost. They need the us
     - the tie `e6` of an angle with degrees × 10⁶ = 2.5: 2 on x86-64, 3 with the generic
       `Round`.
   - The library: saturation (FR-023) and ties to even (FR-022).
-- [ ] T062 Kani's `%` on `f64`: report the mis-model to the Kani project (research R0, Finding 1), with `probe/r0_harnesses.rs`'s `r0_frem_concrete` and `r0_frem_which` as the reproducer. Needs the user's approval: it publishes the probe.
+- [X] T062 Kani's `%` on `f64`: report the mis-model to the Kani project (research R0, Finding 1), with `probe/r0_harnesses.rs`'s `r0_frem_concrete` and `r0_frem_which` as the reproducer. Needs the user's approval: it publishes the probe. **Done 2026-10-25:** at the user's choice Kani bugs are recorded, not filed; this is KI-002 in `KANI_ISSUES.md` (reproducer re-run that day).
 
 ---
 

@@ -1,0 +1,16 @@
+Mutant: M-722
+Targets: P-CPBND-04
+Expect-Fail: cp_bnd::p_cpbnd_04
+Defect: `rect_bound` does not clamp the latitude at the north pole
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -419,7 +419,6 @@
+             all_longitudes = true;
+         }
+         if lat.hi >= FRAC_PI_2 {
+-            lat.hi = FRAC_PI_2;
+             all_longitudes = true;
+         }
+ 

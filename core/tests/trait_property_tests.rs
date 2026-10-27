@@ -152,6 +152,25 @@ mod generators {
         Cap::from_center_angle(safe_point(lat_i, lng_i), radius)
     }
 
+    /// A cap from arbitrary `f64`s, not whole degrees (spec 008 FR-011): a latitude, a longitude
+    /// (degrees) and a radius (radians), each folded into range, so that inputs like spec 008's
+    /// K5 cap (longitude 1e-14°, radius 1e-18 rad) are reachable. Non-finite inputs become 0.
+    pub fn cap_f64(lat: f64, lng: f64, r: f64) -> Cap {
+        let fin = |x: f64| if x.is_finite() { x } else { 0.0 };
+        let (lat, lng, r) = (fin(lat), fin(lng), fin(r));
+        let lat = if lat.abs() <= 90.0 { lat } else { lat % 90.0 };
+        let lng = if lng.abs() <= 180.0 { lng } else { lng % 180.0 };
+        let r = if r.abs() <= std::f64::consts::PI {
+            r.abs()
+        } else {
+            r.abs() % std::f64::consts::PI
+        };
+        Cap::from_center_angle(
+            LatLng::from_degrees(lat, lng).to_point(),
+            Angle::from_radians(r),
+        )
+    }
+
     /// Small cap (≤ 10°) for numerical stability in sensitive tests.
     pub fn small_cap(lat_i: i32, lng_i: i32, radius_i: u8) -> Cap {
         let radius = Angle::from_degrees((radius_i % 100) as f64 / 10.0);
@@ -392,6 +411,12 @@ mod prop {
         } else {
             !r.contains_point(&c.center())
         }
+    }
+
+    /// A cell the region does not intersect has no vertex the region contains. The Kani twin is
+    /// `verify/src/laws.rs` (`laws::region::no_intersect_no_vertex`, spec 008 P-CPREG-02).
+    pub fn region_no_intersect_no_vertex<R: Region>(r: &R, c: &Cell) -> bool {
+        r.intersects_cell(c) || (0..4).all(|k| !r.contains_point(&c.vertex(k)))
     }
 
     /// `cell_union_bound()` covers the region's bounding cap center if non-empty.
@@ -695,6 +720,77 @@ fn region_cap_contains_implies_intersects(
     let cap = generators::cap(c_lat, c_lng, r_i);
     let cell = generators::cell(ce_lat, ce_lng, lvl);
     prop::region_contains_implies_intersects(&cap, &cell)
+}
+
+/// Spec 008 FR-011: the cap generators from arbitrary `f64`s.
+#[quickcheck]
+fn region_cap_f64_cap_contains(lat: f64, lng: f64, r: f64, p_lat: i32, p_lng: i32) -> bool {
+    let cap = generators::cap_f64(lat, lng, r);
+    let p = generators::safe_point(p_lat, p_lng);
+    prop::region_cap_bound_contains_point(&cap, p)
+}
+
+#[quickcheck]
+fn region_cap_f64_rect_contains(lat: f64, lng: f64, r: f64) -> bool {
+    let cap = generators::cap_f64(lat, lng, r);
+    // The centre and points near it, where a rounded bound shows first (K5).
+    prop::region_rect_bound_contains_point(&cap, cap.center())
+}
+
+#[quickcheck]
+fn region_cap_f64_contains_implies_intersects(
+    lat: f64,
+    lng: f64,
+    r: f64,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let cap = generators::cap_f64(lat, lng, r);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_contains_implies_intersects(&cap, &cell)
+}
+
+#[quickcheck]
+fn region_cap_no_intersect_no_vertex(
+    c_lat: i32,
+    c_lng: i32,
+    r_i: u16,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let cap = generators::cap(c_lat, c_lng, r_i);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_no_intersect_no_vertex(&cap, &cell)
+}
+
+// No `Cell` instance of `region_no_intersect_no_vertex`: it is not a law for cells. A cell's
+// `intersects_cell` compares ids, so two face cells sharing an edge do not intersect, while its
+// closed region contains the neighbour's shared vertices (quickcheck: face 0 against the face
+// at (45°, 0°)). Upstream's `S2Cell::MayIntersect` and `Contains(S2Point)` behave the same.
+
+#[quickcheck]
+fn region_rect_no_intersect_no_vertex(
+    lat0: i32,
+    lng0: i32,
+    lat1: i32,
+    lng1: i32,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let rect = generators::rect(lat0, lng0, lat1, lng1);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_no_intersect_no_vertex(&rect, &cell)
+}
+
+/// Spec 008 K5 (FR-020, FR-011): the bounding rectangle of a cap at longitude 1e-14° with radius
+/// 1e-18 rad contains the cap's centre (it was `[0, 0]` before the fix).
+#[test]
+fn region_cap_rect_contains_k5() {
+    let cap = generators::cap_f64(0.0, 1e-14, 1e-18);
+    assert!(prop::region_rect_bound_contains_point(&cap, cap.center()));
 }
 
 #[quickcheck]

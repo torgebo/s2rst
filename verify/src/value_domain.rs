@@ -3,7 +3,8 @@
 // Written for this crate (not ported from upstream S2).
 
 //! Input-domain generators for the value-type harnesses (spec 004 data-model §2, spec 005
-//! data-model §2, spec 006 data-model §2, spec 007 data-model §2; contracts/harness-conventions.md).
+//! data-model §2, spec 006 data-model §2, spec 007 data-model §2, spec 008 data-model §2;
+//! contracts/harness-conventions.md).
 //!
 //! Every domain is built from the reference descriptions, never from the implementation's own
 //! `is_valid`: cells from 001's model decompositions, intervals from [`arc_spec::valid`]. A
@@ -14,7 +15,7 @@
 use s2rst::r1;
 use s2rst::r2;
 use s2rst::s1::{Angle, ChordAngle, Interval};
-use s2rst::s2::{Cell, CellEdge, LatLng, Point, Rect};
+use s2rst::s2::{Cap, Cell, CellEdge, LatLng, Point, Rect};
 
 use crate::arc_spec;
 use crate::chord_spec;
@@ -279,4 +280,47 @@ pub fn any_chord_length() -> ChordAngle {
 /// validity rule (spec 007 data-model §2).
 pub fn any_angle() -> Angle {
     Angle::from_radians(kani::any())
+}
+
+/// `CapRadius`: a valid cap's radius, `NEGATIVE` or a length in [0, 4] (spec 008 data-model §2).
+fn any_cap_radius() -> ChordAngle {
+    let x: f64 = kani::any();
+    kani::assume(x == chord_spec::NEGATIVE || (0.0..=chord_spec::STRAIGHT).contains(&x));
+    ChordAngle::from_length2(x)
+}
+
+/// `BoxCap`: a centre in the box [−1, 1]³ (`BoxPoint`) and a valid cap's radius. Every valid cap
+/// is one (a centre outside the box is not unit length), and the laws whose meaning does not need
+/// unit length are stated over all of them (spec 008 research R4).
+pub fn any_box_cap() -> Cap {
+    Cap::from_center_chord_angle(any_box_point(), any_cap_radius())
+}
+
+/// `NonEmptyCap`: a `BoxCap` whose radius is a length in [0, 4].
+pub fn any_nonempty_cap() -> Cap {
+    Cap::from_center_chord_angle(any_box_point(), any_chord_length())
+}
+
+/// `ValidCap`: a `BoxCap` with a unit centre. Assuming `is_unit` on the real code costs a
+/// symbolic squared length and timed out in spec 008's R0, so **a harness using this domain
+/// stubs `Point::is_unit` with `stubs::pure_is_unit`** (research R4, R6).
+pub fn any_valid_cap() -> Cap {
+    let c = any_box_cap();
+    kani::assume(c.center().is_unit());
+    c
+}
+
+/// `FiniteNonNegAngle`: a finite angle of at least 0 radians, `expanded`'s domain.
+pub fn any_finite_nonneg_angle() -> Angle {
+    let a: f64 = kani::any();
+    kani::assume(a.is_finite() && a >= 0.0);
+    Angle::from_radians(a)
+}
+
+/// `LngSum`: |x| ≤ 3π/2, the domain of `rect_bound`'s longitude reduction (spec 008 FR-020): a
+/// longitude in [−π, π] plus or minus an `asin` result in [0, π/2].
+pub fn any_lng_sum() -> f64 {
+    let x: f64 = kani::any();
+    kani::assume(x.abs() <= 1.5 * std::f64::consts::PI);
+    x
 }

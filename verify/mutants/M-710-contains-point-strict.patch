@@ -1,0 +1,17 @@
+Mutant: M-710
+Targets: P-CPMEM-01
+Expect-Fail: cp_mem::p_cpmem_01
+Defect: `contains_point` is strict (the boundary is outside)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -236,7 +236,7 @@
+     /// sphere.
+     #[inline]
+     pub fn contains_point(self, p: Point) -> bool {
+-        self.center.chord_angle(p) <= self.radius
++        self.center.chord_angle(p) < self.radius
+     }
+ 
+     /// Reports whether the point is within the interior of this cap (i.e.

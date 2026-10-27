@@ -1,0 +1,19 @@
+Mutant: M-728
+Targets: P-CPMEM-01
+Expect-Fail: 
+Test: verify --lib cap_spec
+Test: verify --test values_spec_vs_cpp
+Defect: description: `cap_spec::member` is strict
+
+diff --git a/verify/src/cap_spec.rs b/verify/src/cap_spec.rs
+--- a/verify/src/cap_spec.rs
++++ b/verify/src/cap_spec.rs
+@@ -56,7 +56,7 @@
+ /// The cap contains `p`: the full cap every point, the empty cap none, otherwise the squared
+ /// chord from the centre is at most the radius's.
+ pub fn member(cap: Cap, p: Point) -> bool {
+-    full(cap) || (!empty(cap) && chord2(cap.center(), p) <= radius2(cap))
++    full(cap) || (!empty(cap) && chord2(cap.center(), p) < radius2(cap))
+ }
+ 
+ /// The cap's interior contains `p`: the full cap every point, otherwise the squared chord is

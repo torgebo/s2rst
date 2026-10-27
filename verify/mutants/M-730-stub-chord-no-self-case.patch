@@ -1,0 +1,18 @@
+Mutant: M-730
+Targets: P-CPGRO-01
+Expect-Fail: cp_gro::p_cpgro_01
+Defect: stub: `pure_chord` without the fact `chord(p, p) = 0` (L-CP-01): the law needs it
+
+diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs
+--- a/verify/src/stubs.rs
++++ b/verify/src/stubs.rs
+@@ -201,9 +201,6 @@
+ /// [0, 4] (L-CP-02), one per ordered pair.
+ pub fn pure_chord(a: Point, b: Point) -> ChordAngle {
+     let (ka, kb) = (bits3(a), bits3(b));
+-    if same3(ka, kb) {
+-        return ChordAngle::ZERO;
+-    }
+     let v = CHORD
+         .lock()
+         .unwrap()

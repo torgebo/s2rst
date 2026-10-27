@@ -1,0 +1,20 @@
+Mutant: M-741
+Targets: P-CPMEA-01
+Expect-Fail: cp_mea::p_cpmea_01__area
+Tier: slow
+Test: core --lib s2::cap::cap_tests::area_of_a_negative_zero_radius_is_positive_zero
+Defect: D-009 back: `0.0_f64.max(h)`, whose sign for a height of −0 Rust leaves open (−0 unoptimised)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+index a03b531..c0e5495 100644
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -206,7 +206,7 @@ impl Cap {
+         // Upstream's `std::max(0.0, height)`, which gives +0 for a height of −0;
+         // `0.0_f64.max(h)` leaves that sign unspecified (spec 008 D-009).
+         let h = self.height();
+-        2.0 * PI * if 0.0 < h { h } else { 0.0 }
++        2.0 * PI * 0.0_f64.max(h)
+     }
+ 
+     // --- Predicates ---

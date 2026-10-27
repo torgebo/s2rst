@@ -104,5 +104,8 @@ pub mod r3;
 pub mod s1;
 pub mod s2;
 
+#[cfg(test)]
+mod test_util;
+
 #[cfg(feature = "geo-types")]
 pub mod geo_types_interop;

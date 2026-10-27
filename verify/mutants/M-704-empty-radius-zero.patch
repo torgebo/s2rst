@@ -1,0 +1,17 @@
+Mutant: M-704
+Targets: P-CPCON-01
+Expect-Fail: cp_con::p_cpcon_01
+Defect: `empty()` has radius `ZERO` (a point cap)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -154,7 +154,7 @@
+                 y: 0.0,
+                 z: 0.0,
+             }),
+-            ChordAngle::NEGATIVE,
++            ChordAngle::ZERO,
+         )
+     }
+ 

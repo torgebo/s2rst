@@ -1,0 +1,18 @@
+Mutant: M-727
+Targets: P-CPREG-01, P-CPREG-02
+Expect-Fail: 
+Test: core --test cpp_cap_diff cap_cell_tests_match_cpp
+Defect: upstream's edge test skips the wrong half-spaces (the Kani laws abstract it, and the unit tests do not reach it; the C++ vectors do)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -539,7 +539,7 @@
+         for (k, &edge_id) in CellEdge::ALL.iter().enumerate() {
+             let edge = cell.edge_raw(edge_id).vector();
+             let dot = center.dot(edge);
+-            if dot > 0.0 {
++            if dot < 0.0 {
+                 // The center is in the interior half-space defined by the edge. We don't need
+                 // to consider these edges, since if the cap intersects this edge then it also
+                 // intersects the edge on the opposite side of the cell (because we know the

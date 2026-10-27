@@ -13,9 +13,9 @@ href="decoding/PROPERTIES.md"><code>decoding/PROPERTIES.md</code></a>
 href="values/PROPERTIES.md"><code>values/PROPERTIES.md</code></a> (the
 value types: <code>Cell</code>, <code>s1::Interval</code>,
 <code>r1::Interval</code>, <code>s2::Rect</code>, <code>r2::Rect</code>,
-<code>s2::Point</code>, <code>s1::ChordAngle</code> and
-<code>s1::Angle</code>). The operation inventories carry the
-crash-freedom proofs.</p>
+<code>s2::Point</code>, <code>s1::ChordAngle</code>,
+<code>s1::Angle</code> and <code>s2::Cap</code>). The operation
+inventories carry the crash-freedom proofs.</p>
 <table>
 <colgroup>
 <col style="width: 16%" />
@@ -39,7 +39,7 @@ undefined behaviour or a hang, whatever its input</td>
 <tr class="even">
 <td><a href="#correct-result">Correct result</a></td>
 <td>an operation returns what the model says it should</td>
-<td>132</td>
+<td>146</td>
 </tr>
 <tr class="odd">
 <td><a href="#round-trip">Round trip</a></td>
@@ -50,7 +50,7 @@ undefined behaviour or a hang, whatever its input</td>
 <td><a href="#exact-output">Exact output</a></td>
 <td>an encoder or printer writes exactly the bytes or text the format
 prescribes</td>
-<td>19</td>
+<td>22</td>
 </tr>
 <tr class="odd">
 <td><a href="#exact-input">Exact input</a></td>
@@ -61,13 +61,13 @@ what they say, consumes exactly them and rejects the rest</td>
 <tr class="even">
 <td><a href="#validity">Validity</a></td>
 <td>a validity check answers exactly, and results are well formed</td>
-<td>12</td>
+<td>14</td>
 </tr>
 <tr class="odd">
 <td><a href="#laws">Laws</a></td>
 <td>operations relate to each other as they must: symmetry, idempotence,
 order independence, partition, consistency</td>
-<td>30</td>
+<td>39</td>
 </tr>
 <tr class="even">
 <td><a href="#model-checks">Model checks</a></td>
@@ -849,6 +849,15 @@ is v low, right is u high, top is v high, left is u low.</td>
 <td><a href="src/cl_bnd.rs"><code>cl_bnd::p_cbnd_03</code></a></td>
 <td>every valid cell and edge</td>
 </tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CCAP-01</a></td>
+<td>The cell’s bounding cap contains the cell’s centre and four vertices
+(spec 008, from <code>Cap</code>’s <code>add_point</code> law).</td>
+<td><a href="src/cl_cnt.rs"><code>cl_cnt::p_ccap_01</code></a>
+(weekly)</td>
+<td>every valid cell, by composition (stubs: the vertices, the centre’s
+normalisation, the distance)</td>
+</tr>
 </tbody>
 </table>
 <h3
@@ -1470,9 +1479,8 @@ vector for a normalizable point.</td>
 the chord angle is symmetric and at most a straight angle; the
 approximate equalities are reflexive.</td>
 <td><a href="src/pt_dst.rs"><code>pt_dst::p_ptdst_01__*</code></a></td>
-<td>every pair in the box, every finite tolerance <code>≥ 0</code>,
-except the chord angle’s symmetry, which times out at 60 minutes in the
-weekly tier</td>
+<td>every pair in the box, every finite tolerance <code>≥ 0</code>; the
+chord angle’s symmetry by composition (spec 008’s L-CP-03, L-CP-04)</td>
 </tr>
 </tbody>
 </table>
@@ -1618,6 +1626,129 @@ integer.</td>
 <td>not proven: Kani’s <code>%</code> on <code>f64</code> is wrong (spec
 007 research R0); the C++ vectors and an exact big-integer property test
 check it</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="s2cap-construction-classifications-membership-growth-complement-bounds-and-equality"><code>s2::Cap</code>:
+construction, classifications, membership, growth, complement, bounds
+and equality</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPCON-01</a></td>
+<td>The constructors keep their arguments or apply upstream’s formulas
+(a negative length becomes <code>NEGATIVE</code>, option B);
+<code>empty()</code> and <code>full()</code> are upstream’s.</td>
+<td><a href="src/cp_con.rs"><code>cp_con::p_cpcon_01</code></a>, <a
+href="src/cp_con.rs"><code>cp_con::p_cpcon_01__area</code></a>
+(weekly)</td>
+<td>every box point and <code>f64</code>; <code>from_center_area</code>
+not proven (timeout at 60 minutes)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPCON-02</a></td>
+<td><code>from_center_angle</code> clamps the angle to π, makes a
+negative angle empty, and never fails its validity check on a unit
+centre.</td>
+<td><a href="src/cp_con.rs"><code>cp_con::p_cpcon_02</code></a></td>
+<td>every unit centre and non-NaN angle, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPCLS-01</a></td>
+<td><code>is_valid</code>, <code>is_empty</code> and
+<code>is_full</code> are upstream’s, and a cap is never both empty and
+full.</td>
+<td><a href="src/cp_cls.rs"><code>cp_cls::p_cpcls_01</code></a></td>
+<td>every box cap, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPMEM-01</a></td>
+<td>A cap contains a point exactly when upstream’s test says so; its
+interior is the strict test, inside it; a point cap contains its
+point.</td>
+<td><a href="src/cp_mem.rs"><code>cp_mem::p_cpmem_01</code></a></td>
+<td>every box cap and point, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPGRO-01</a></td>
+<td>After <code>add_point(p)</code> the cap contains <code>p</code>, and
+it did not shrink.</td>
+<td><a href="src/cp_gro.rs"><code>cp_gro::p_cpgro_01</code></a></td>
+<td>every box cap and point, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPGRO-02</a></td>
+<td>After <code>add_cap(b)</code> the cap contains <code>b</code>, and
+it did not shrink.</td>
+<td><a href="src/cp_gro.rs"><code>cp_gro::p_cpgro_02</code></a></td>
+<td>every pair of box caps, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPGRO-03</a></td>
+<td>Expanding a cap keeps it inside the result; an empty cap stays
+empty.</td>
+<td><a href="src/cp_gro.rs"><code>cp_gro::p_cpgro_03</code></a>, <a
+href="src/cp_gro.rs"><code>cp_gro::p_cpgro_03__real</code></a>
+(weekly)</td>
+<td>every box cap, every finite distance <code>≥ 0</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPCMP-03</a></td>
+<td>Taking the complement twice gives the cap back where
+<code>4 − r²</code> is exact (every r² ≥ 2), within 2⁻⁵¹ elsewhere.</td>
+<td><a href="src/cp_cmp.rs"><code>cp_cmp::p_cpcmp_03</code></a></td>
+<td>every box cap neither empty nor full, r² ≥ 2⁻⁵¹</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPBND-01</a></td>
+<td>The bounding cap is the cap itself, and the <code>Region</code>
+methods are the inherent ones.</td>
+<td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_01</code></a></td>
+<td>every box cap and point, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPBND-02</a></td>
+<td>The covering’s level is upstream’s and keeps the cells at least
+twice as wide as the radius.</td>
+<td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_02</code></a></td>
+<td>every finite radius</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPBND-03</a></td>
+<td>The covering has at most six cells.</td>
+<td><a
+href="src/cp_crash.rs"><code>cp_crash::c_cell_union_bound</code></a>
+(weekly)</td>
+<td>not proven: timeout at 60 minutes; the C++ vectors check the
+covering</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPEQ-02</a></td>
+<td>Approximate equality is upstream’s <code>ApproxEquals</code>, with
+the tolerance for the centres too.</td>
+<td><a href="src/cp_eq.rs"><code>cp_eq::p_cpeq_02</code></a></td>
+<td>every pair of box caps and every tolerance, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPDES-01</a></td>
+<td>Deserialisation accepts exactly the valid caps.</td>
+<td>—</td>
+<td>not proven: tested (<code>cap_tests</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -1940,6 +2071,31 @@ bit.</td>
 and subtraction per change, the products weekly; the quotients not
 proven (timeout at 60 minutes)</td>
 </tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPMEA-01</a></td>
+<td>A cap’s height, area and centroid are upstream’s formulas, bit for
+bit, and the area is never negative.</td>
+<td><a href="src/cp_mea.rs"><code>cp_mea::p_cpmea_01</code></a>, <a
+href="src/cp_mea.rs"><code>cp_mea::p_cpmea_01__area</code></a> (weekly),
+<a href="src/cp_mea.rs"><code>cp_mea::p_cpmea_01__centroid</code></a>
+(weekly)</td>
+<td>every box cap: the height, the area’s sign and the area bit for bit
+(weekly, since D-009’s fix); the centroid times out at 60 minutes</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPCMP-01</a></td>
+<td>A cap’s complement is upstream’s: the opposite centre and radius
+<code>4 − r²</code>, bit for bit.</td>
+<td><a href="src/cp_cmp.rs"><code>cp_cmp::p_cpcmp_01</code></a></td>
+<td>every box cap</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPBND-05</a></td>
+<td><code>rect_bound</code>’s longitude reduction changes a value by
+exactly 0 or ±2π and lands in [−π, π].</td>
+<td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_05</code></a></td>
+<td>every |x| ≤ 3π/2 (a drift-guarded copy)</td>
+</tr>
 </tbody>
 </table>
 <h2 id="exact-input">Exact input</h2>
@@ -2211,6 +2367,20 @@ length in [0, 4], or +∞ (option B).</td>
 <td>every input of the constructors, every canonical value, every pair
 of lengths</td>
 </tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPCMP-02</a></td>
+<td>The complement of a valid cap is valid.</td>
+<td><a href="src/cp_cmp.rs"><code>cp_cmp::p_cpcmp_02</code></a></td>
+<td>every valid cap, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPBND-04</a></td>
+<td>A cap’s bounding rectangle is valid, and empty exactly for the empty
+cap.</td>
+<td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_04</code></a></td>
+<td>every box cap, under the <code>asin</code>, <code>atan2</code>,
+<code>cos</code> contracts</td>
+</tr>
 </tbody>
 </table>
 <h2 id="laws">Laws</h2>
@@ -2473,6 +2643,71 @@ reals’ order.</td>
 equality.</td>
 <td><a href="src/ag_val.rs"><code>ag_val::p_agval_02</code></a></td>
 <td>every three angles without NaN</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPREL-01</a></td>
+<td><code>contains</code> is reflexive; the full cap contains every cap
+and every cap the empty one.</td>
+<td><a href="src/cp_rel.rs"><code>cp_rel::p_cprel_01</code></a></td>
+<td>every box cap</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPREL-02</a></td>
+<td>Containing a non-empty cap implies intersecting it, and so does the
+interiors’ intersecting; the empty cap intersects nothing, and a cap
+without interior intersects no interior.</td>
+<td><a href="src/cp_rel.rs"><code>cp_rel::p_cprel_02</code></a></td>
+<td>every pair of box caps, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPREL-03</a></td>
+<td>Two caps intersect both ways or neither.</td>
+<td><a href="src/cp_rel.rs"><code>cp_rel::p_cprel_03</code></a></td>
+<td>every pair of box caps, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPEQ-01</a></td>
+<td>The generic equality laws hold for <code>Cap</code>; empty caps are
+all equal, and full caps.</td>
+<td><a href="src/cp_eq.rs"><code>cp_eq::p_cpeq_01</code></a></td>
+<td>every triple of box caps</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPREG-01</a></td>
+<td>The generic <code>Region</code> law holds for <code>Cap</code> with
+upstream’s cell tests: containing a cell implies intersecting it.</td>
+<td><a
+href="src/cp_reg.rs"><code>cp_reg::p_cpreg_01__abstract</code></a>, <a
+href="src/cp_reg.rs"><code>cp_reg::p_cpreg_01__real</code></a>
+(weekly)</td>
+<td>every box cap and abstract cell, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPREG-02</a></td>
+<td>A cell the cap does not intersect has no vertex the cap
+contains.</td>
+<td><a href="src/cp_reg.rs"><code>cp_reg::p_cpreg_02</code></a></td>
+<td>every box cap and abstract cell, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPREG-03</a></td>
+<td>The bounding cap contains every point the cap contains.</td>
+<td><a href="src/cp_reg.rs"><code>cp_reg::p_cpreg_03</code></a></td>
+<td>every box cap and point, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CPREG-04</a></td>
+<td>Every cell the cap contains lies in its covering.</td>
+<td>—</td>
+<td>not proven: the covering’s level needs <code>asin</code>’s value,
+not its range</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CPCOD-01</a></td>
+<td>Every valid cap round-trips through its encoding under its own
+equality.</td>
+<td><a href="src/cp_eq.rs"><code>cp_eq::p_cpcod_01</code></a></td>
+<td>every valid cap, by composition</td>
 </tr>
 </tbody>
 </table>

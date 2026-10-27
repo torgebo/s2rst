@@ -1,0 +1,17 @@
+Mutant: M-707
+Targets: P-CPMEA-01
+Expect-Fail: cp_mea::p_cpmea_01
+Defect: `height` is a quarter of the length²
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -197,7 +197,7 @@
+     /// point to the cutoff plane.
+     #[inline]
+     pub fn height(self) -> f64 {
+-        0.5 * self.radius.length2()
++        0.25 * self.radius.length2()
+     }
+ 
+     /// Returns the surface area of the cap on the unit sphere.

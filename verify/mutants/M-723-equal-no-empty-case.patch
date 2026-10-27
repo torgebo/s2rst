@@ -1,0 +1,16 @@
+Mutant: M-723
+Targets: P-CPEQ-01
+Expect-Fail: cp_eq::p_cpeq_01
+Defect: `equal` without the empty-cap case
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -568,7 +568,6 @@
+     /// special cases where empty and full caps can have different centers.
+     pub fn equal(self, other: Cap) -> bool {
+         (self.radius == other.radius && self.center == other.center)
+-            || (self.is_empty() && other.is_empty())
+             || (self.is_full() && other.is_full())
+     }
+ 

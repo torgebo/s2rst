@@ -1,0 +1,17 @@
+Mutant: M-736
+Targets: P-CPCMP-03
+Expect-Fail: cp_cmp::p_cpcmp_03
+Defect: the complement subtracts the chord length, not its square
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -291,7 +291,7 @@
+         // and differed in the last bits; spec 008 K4, FR-019.)
+         Cap::from_center_chord_angle(
+             -self.center,
+-            ChordAngle::from_length2(4.0 - self.radius.length2()),
++            ChordAngle::from_length2(4.0 - self.radius.length2().sqrt()),
+         )
+     }
+ 

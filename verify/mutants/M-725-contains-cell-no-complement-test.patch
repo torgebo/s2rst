@@ -1,0 +1,18 @@
+Mutant: M-725
+Targets: P-CPREG-01
+Expect-Fail: 
+Test: core --test cpp_cap_diff cap_cell_tests_match_cpp
+Defect: `Region::contains_cell` without the complement's edge test (contains ⇒ intersects still holds, and the unit tests do not reach it; the C++ vectors do)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -494,7 +494,7 @@
+         if !vertices.iter().all(|&v| self.contains_point(v)) {
+             return false;
+         }
+-        !self.complement().intersects_cell_edges(cell, &vertices)
++        true
+     }
+ 
+     /// Reports whether the cap may intersect the cell: upstream's `S2Cap::MayIntersect`. True if

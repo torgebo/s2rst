@@ -1,8 +1,9 @@
 # Upstream issues
 
 Undefined or wrong behaviour in the upstream S2 libraries, found while porting and formally
-verifying s2rst (specs 001–007 under `specs/`). None has been reported upstream yet; each
-numbered entry has a follow-up task that records that decision.
+verifying s2rst (specs 001–008 under `specs/`). None has been reported upstream yet; each
+numbered entry has a follow-up task that records that decision. Bugs in the verification tools
+(Kani and CBMC) are in `KANI_ISSUES.md`.
 
 All line references were re-checked on 2026-10-07 against the pinned upstream sources:
 - **C++:** [google/s2geometry](https://github.com/google/s2geometry) at `v0.14.0-40-g37a4501`
@@ -29,6 +30,7 @@ because running it is undefined behaviour or needs a debug build.
 | [U-012](#u-012-robustcrossprod-overflows-for-unit-points) | C++ `S2::RobustCrossProd` (`EnsureNormalizable`) | `RobustCrossProd(−b, b)` is `(NaN, ∞, NaN)` for the unit point `b = (2⁻¹⁰⁷⁴, 0, 1)`: the scaling factor overflows below `2⁻¹⁰²³` | wrong results (antipodal points with a coordinate below 2⁻¹⁰²³) | the scaled vector, a documented deviation | 006 T057 |
 | [U-013](#u-013-pointcross-breaks-its-documented-sign-laws) | Go `Point.PointCross` | the documented laws (2)–(4) fail for distinct parallel points, not only for `p == ±op`: `(1, 0, 0)` and `(1 + 2ε, 0, 0)`, both unit | wrong documentation | the same behaviour, the true exception documented | 006 T058 |
 | [U-014](#u-014-s1angle-e5e6e7-outside-the-int32-range) | C++ `S1Angle::e5`/`e6`/`e7`, `S1ChordAngle::e5`/`e6`/`e7` | outside the `int32` range, release builds return −2147483648 (+∞ and large positive angles come back negative) and debug builds fail a check, also for `S1ChordAngle::Infinity()`, a valid value; ties round to even on x86-64 and away from zero elsewhere | wrong results (angles beyond ±214.7° for E7, the `Infinity()` sentinel) | saturates, ties to even, documented | 007 T061 |
+| [U-015](#u-015-s2capunion-does-not-always-enclose-both-caps) | C++ `S2Cap::Union` | the result does not contain both caps on 337 of 1,089 random and special reference rows, by rounding (one ulp of the radius in the example), though its comment says it "encloses" them | a union used as a bound can miss points of one cap by an ulp | adds the conversion errors to the radius (7 rows of 1,089 still miss), documented as a deviation; `add_cap` for guaranteed containment | 008 T060 |
 
 ## U-001: `S2CellId::level()` on id 0
 
@@ -419,6 +421,33 @@ inline int32_t S1ChordAngle::e5() const { return ToAngle().e5(); }
   0 for NaN, a documented deviation (FR-023). `ChordAngle::INFINITY.e5()` is `i32::MAX`.
   The C++ vectors mark these rows `deviation:eform-saturate`. Candidate, not reported.
 - **Follow-up:** `specs/007-formal-verify-chord-angle-angle/tasks.md` T061.
+
+## U-015: `S2Cap::Union` does not always enclose both caps
+
+[`s2cap.cc:121–141`](https://github.com/google/s2geometry/blob/37a4501d5daea8da8bb2aa159b23ea5c61083a72/src/s2/s2cap.cc#L121-L141),
+with its comment in `s2cap.h`: "Return the smallest cap which encloses this cap and 'other'."
+
+```cpp
+S1Angle result_radius = 0.5 * (distance + this_radius + other_radius);
+S2Point result_center = S2::GetPointOnLine(center(), other.center(),
+                                           0.5 * (distance - this_radius + other_radius));
+return S2Cap(result_center, result_radius);
+```
+
+- **Inputs** (from `core/tests/data/cpp_cap_vectors.csv`, `CAP_OPS`): `a` centred at
+  (0.9441294862385324, 0.0042567807093452726, 0.3295472546281599) with length² 2.334711958929947e-07,
+  `b` centred at (−0.7407004247752106, 0.6718065679323608, −0.006230250457628594) with length²
+  0.011072219812086694.
+- **Upstream (observed, Release, x86-64):** the union's length² is 1.321982643415236; containing
+  both caps needs 1.3219826434152362, one ulp more, so `Union(a, b).Contains(b)` is false. Over the
+  reference vectors, 337 of 1,089 unions miss part of a cap this way: the conversion through
+  `S1Angle` (`asin`) and back, and the interpolated centre, round, and nothing absorbs it.
+- **s2rst:** `Cap::union` adds the chord angle's conversion and point errors to the radius, a
+  documented deviation; 7 of the 1,089 rows still miss, all with a single-point or nearly
+  single-point cap (spec 008 K9). `Cap::add_cap`, which keeps the centre and rounds up, contains
+  the other cap by construction (proven, spec 008 P-CPGRO-02). Candidate, not reported.
+- **Follow-up:** `specs/008-formal-verify-cap/tasks.md` T060; the spec-008 part of
+  `verify/values/EVALUATION.md` ("Upstream findings").
 
 ## Upstream behaviours s2rst does not follow
 

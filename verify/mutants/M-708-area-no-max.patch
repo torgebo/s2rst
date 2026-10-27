@@ -1,0 +1,18 @@
+Mutant: M-708
+Targets: P-CPMEA-01
+Expect-Fail: cp_mea::p_cpmea_01
+Defect: `area` without upstream's `max(0, h)`: the empty cap's is negative
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+index a03b531..2df5422 100644
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -206,7 +206,7 @@ impl Cap {
+         // Upstream's `std::max(0.0, height)`, which gives +0 for a height of −0;
+         // `0.0_f64.max(h)` leaves that sign unspecified (spec 008 D-009).
+         let h = self.height();
+-        2.0 * PI * if 0.0 < h { h } else { 0.0 }
++        2.0 * PI * h
+     }
+ 
+     // --- Predicates ---

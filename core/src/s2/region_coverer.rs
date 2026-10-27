@@ -162,7 +162,10 @@ impl RegionCoverer {
     /// Returns a fast (but less tight) covering.
     ///
     /// Starts with the region's `cell_union_bound()` and normalizes it
-    /// to satisfy the covering parameters.
+    /// to satisfy the covering parameters. So, as upstream's `GetFastCovering`, the
+    /// covering of an empty `Cap`, `Rect` or `CellUnion` is not empty but the empty
+    /// cap's four level-29 cells around (1, 0, 0) (see [`Region::cell_union_bound`]);
+    /// [`covering`](Self::covering) returns none.
     pub fn fast_covering(&self, region: &dyn Region) -> CellUnion {
         let c = Coverer::new(self);
         let ids = region.cell_union_bound();

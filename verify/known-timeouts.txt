@@ -18,7 +18,6 @@ pt_cls::p_ptcls_03__normalize P-PTCLS-03
 pt_cls::p_ptcls_03__normalize_band P-PTCLS-03
 pt_cls::p_ptcls_03__ortho P-PTCLS-03
 pt_crash::c_from_coords_normalize__band C-s2::Point::from_coords
-pt_dst::p_ptdst_01__symmetric P-PTDST-01
 pt_ort::p_ptort_03__swap P-PTORT-03
 pt_ort::p_ptort_03__neg_p P-PTORT-03
 pt_ort::p_ptort_03__neg_q P-PTORT-03
@@ -26,3 +25,8 @@ ca_ari::p_caari_03__sin2 P-CAARI-03
 ca_ari::p_caari_03__sin P-CAARI-03
 ag_ari::p_agari_01__div P-AGARI-01
 ag_ari::p_agari_01__ratio P-AGARI-01
+cp_con::p_cpcon_01__area P-CPCON-01
+cp_mea::p_cpmea_01__centroid P-CPMEA-01
+cp_lem::l_cp_06a L-CP-06
+cp_crash::c_cell_tests__real C-s2::Cap::contains_cell
+cp_crash::c_cell_union_bound C-s2::Cap::cell_union_bound

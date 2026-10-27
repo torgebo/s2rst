@@ -1,0 +1,18 @@
+Mutant: M-716
+Targets: P-CPGRO-02
+Expect-Fail: 
+Test: core --test cpp_cap_diff cap_ops_match_cpp
+Defect: `add_cap` without upstream's round-up (P-CPGRO-02's purity stubs do not need it; the C++ vectors do)
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -382,7 +382,7 @@
+         // We round up the distance to ensure that the cap is actually
+         // contained.
+         let dist = self.center.chord_angle(other.center) + other.radius;
+-        let new_rad = dist.plus_error((2.0 * f64::EPSILON + 2.02 * f64::EPSILON) * dist.length2());
++        let new_rad = dist;
+         if new_rad > self.radius {
+             Cap::from_center_chord_angle(self.center, new_rad)
+         } else {

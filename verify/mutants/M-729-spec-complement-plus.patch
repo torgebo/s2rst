@@ -1,0 +1,17 @@
+Mutant: M-729
+Targets: P-CPCMP-01
+Expect-Fail: cp_cmp::p_cpcmp_01
+Defect: description: `upstream_complement_length2` is `4 + l`
+
+diff --git a/verify/src/cap_spec.rs b/verify/src/cap_spec.rs
+--- a/verify/src/cap_spec.rs
++++ b/verify/src/cap_spec.rs
+@@ -117,7 +117,7 @@
+ 
+ /// `S2Cap::Complement()`'s radius for a cap neither empty nor full: `FromLength2(4 − l)`.
+ pub fn upstream_complement_length2(l: f64) -> f64 {
+-    from_length2(4.0 - l)
++    from_length2(4.0 + l)
+ }
+ 
+ /// `S2Cap::AddCap`'s round-up: `(2 ε + kRelativeSumError) · d²`, `kRelativeSumError = 2.02 ε`
