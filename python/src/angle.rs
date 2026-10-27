@@ -208,6 +208,19 @@ impl PyAngle {
 #[derive(Clone, Copy)]
 pub struct PyChordAngle(pub(crate) s1::ChordAngle);
 
+/// Returns `ca`, or raises `ValueError` if it is `NEGATIVE` or `INFINITY`. The core's
+/// trigonometry and arithmetic require a non-special chord angle and check it only in debug
+/// builds (upstream `ABSL_DCHECK`): a debug build would panic, and a release build returns a
+/// meaningless number.
+fn non_special(ca: s1::ChordAngle, op: &str) -> PyResult<s1::ChordAngle> {
+    if ca.is_special() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "{op} needs a chord angle other than NEGATIVE and INFINITY, got {ca}"
+        )));
+    }
+    Ok(ca)
+}
+
 #[pymethods]
 impl PyChordAngle {
     fn __copy__(&self) -> Self {
@@ -309,28 +322,38 @@ impl PyChordAngle {
         PyChordAngle(self.0.predecessor())
     }
 
-    fn sin(&self) -> f64 {
-        self.0.sin()
+    /// Raises `ValueError` for `NEGATIVE` and `INFINITY`.
+    fn sin(&self) -> PyResult<f64> {
+        Ok(non_special(self.0, "sin")?.sin())
     }
 
-    fn sin2(&self) -> f64 {
-        self.0.sin2()
+    /// Raises `ValueError` for `NEGATIVE` and `INFINITY`.
+    fn sin2(&self) -> PyResult<f64> {
+        Ok(non_special(self.0, "sin2")?.sin2())
     }
 
-    fn cos(&self) -> f64 {
-        self.0.cos()
+    /// Raises `ValueError` for `NEGATIVE` and `INFINITY`.
+    fn cos(&self) -> PyResult<f64> {
+        Ok(non_special(self.0, "cos")?.cos())
     }
 
-    fn tan(&self) -> f64 {
-        self.0.tan()
+    /// Raises `ValueError` for `NEGATIVE` and `INFINITY`.
+    fn tan(&self) -> PyResult<f64> {
+        Ok(non_special(self.0, "tan")?.tan())
     }
 
-    fn __add__(&self, other: &PyChordAngle) -> Self {
-        PyChordAngle(self.0 + other.0)
+    /// Raises `ValueError` if either operand is `NEGATIVE` or `INFINITY`.
+    fn __add__(&self, other: &PyChordAngle) -> PyResult<Self> {
+        Ok(PyChordAngle(
+            non_special(self.0, "+")? + non_special(other.0, "+")?,
+        ))
     }
 
-    fn __sub__(&self, other: &PyChordAngle) -> Self {
-        PyChordAngle(self.0 - other.0)
+    /// Raises `ValueError` if either operand is `NEGATIVE` or `INFINITY`.
+    fn __sub__(&self, other: &PyChordAngle) -> PyResult<Self> {
+        Ok(PyChordAngle(
+            non_special(self.0, "-")? - non_special(other.0, "-")?,
+        ))
     }
 
     fn __eq__(&self, other: &PyChordAngle) -> bool {

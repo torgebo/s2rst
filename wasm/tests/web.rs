@@ -191,23 +191,38 @@ fn test_chord_angle_successor_predecessor() {
 #[wasm_bindgen_test]
 fn test_chord_angle_trig() {
     let ca = ChordAngle::from_degrees(90.0);
-    assert!((ca.sin() - 1.0).abs() < 1e-6);
-    assert!((ca.sin2() - 1.0).abs() < 1e-6);
-    assert!(ca.cos().abs() < 1e-6);
+    assert!((ca.sin().unwrap() - 1.0).abs() < 1e-6);
+    assert!((ca.sin2().unwrap() - 1.0).abs() < 1e-6);
+    assert!(ca.cos().unwrap().abs() < 1e-6);
 
     let ca60 = ChordAngle::from_degrees(60.0);
-    assert!(ca60.tan() > 0.0);
+    assert!(ca60.tan().unwrap() > 0.0);
 }
 
 #[wasm_bindgen_test]
 fn test_chord_angle_arithmetic() {
     let a = ChordAngle::from_degrees(30.0);
     let b = ChordAngle::from_degrees(20.0);
-    let sum = a.add(&b);
+    let sum = a.add(&b).unwrap();
     assert!(sum.degrees() > 49.0 && sum.degrees() < 51.0);
 
-    let diff = a.sub(&b);
+    let diff = a.sub(&b).unwrap();
     assert!(diff.degrees() > 9.0 && diff.degrees() < 11.0);
+}
+
+#[wasm_bindgen_test]
+fn test_chord_angle_special_rejected() {
+    let right = ChordAngle::from_degrees(90.0);
+    for special in [ChordAngle::infinity_val(), ChordAngle::negative()] {
+        assert!(special.sin().is_err());
+        assert!(special.sin2().is_err());
+        assert!(special.cos().is_err());
+        assert!(special.tan().is_err());
+        assert!(special.add(&right).is_err());
+        assert!(right.add(&special).is_err());
+        assert!(special.sub(&right).is_err());
+        assert!(right.sub(&special).is_err());
+    }
 }
 
 #[wasm_bindgen_test]
@@ -1106,9 +1121,18 @@ fn test_rect_from_point_pair() {
 fn test_rect_from_center_size() {
     let center = LatLng::from_degrees(0.0, 0.0);
     let size = LatLng::from_degrees(20.0, 20.0);
-    let r = Rect::from_center_size(&center, &size);
+    let r = Rect::from_center_size(&center, &size).unwrap();
     assert!(r.is_valid());
     assert!(!r.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn test_rect_from_center_size_rejects_bad_longitudes() {
+    let size = LatLng::from_degrees(20.0, 20.0);
+    assert!(Rect::from_center_size(&LatLng::from_degrees(0.0, 200.0), &size).is_err());
+    assert!(Rect::from_center_size(&LatLng::from_degrees(0.0, f64::NAN), &size).is_err());
+    let center = LatLng::from_degrees(0.0, 0.0);
+    assert!(Rect::from_center_size(&center, &LatLng::from_degrees(20.0, f64::NAN)).is_err());
 }
 
 #[wasm_bindgen_test]

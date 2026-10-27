@@ -800,8 +800,8 @@ impl From<CellId> for Cell {
 /// The identifier must be a valid cell, and the face, level and orientation must be those it
 /// gives, exactly. Each stored u-v bound may differ from the identifier's by at most one ulp,
 /// because text formats such as `serde_json` without its `float_roundtrip` feature parse
-/// floating-point numbers to within one ulp: an honest JSON round trip moved a bound in
-/// 375,836 of 1,598,279 cells (spec 004 research R6). The result is
+/// floating-point numbers to within one ulp: an honest JSON round trip moved a bound in about
+/// a quarter of the cells tried (spec 004 research R6). The result is
 /// [`Cell::from_cell_id`] of the identifier, so a consistent cell deserialises unchanged, bit
 /// for bit. Anything else is an error naming the field, as the binary decoder rejects an
 /// invalid identifier (spec 003 `DEV_VALID_ID`) and `CellUnion`'s `Deserialize` an invalid

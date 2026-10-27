@@ -141,6 +141,7 @@ A single CBMC run can take tens of gigabytes and take a workstation down with it
 | `VERIFY_HARNESS_TIMEOUT` | `12m` (`60m` for `make verify-slow`, `4h` for `make verify-xlarge`) | Time limit per harness. Over it, the harness is `TIMEOUT`. Use `8m` on a workstation as the CI proxy |
 | `VERIFY_PLAYBACK_MEM` | 3 × the ceiling, at most available memory − 2 GiB | Ceiling for the concrete-playback re-run of a failed harness, which runs alone after the main run |
 | `VERIFY_RUN_DIR` | `target/run-verify` | Log directory. Give concurrent runs separate ones, and separate `CARGO_TARGET_DIR`s |
+| `VERIFY_BATCH` | 32 per 4 GiB of the ceiling | Harnesses per Kani driver. The driver keeps about 20 MB for every harness it has run, under the same ceiling ([KI-010](../KANI_ISSUES.md#ki-010-the-driver-keeps-memory-for-every-harness-it-has-run)), so the run goes in batches. A harness that no driver reached is `NOT-RUN` |
 
 On Linux, a `systemd-run --user --scope` cgroup also caps the run as a whole below the
 available memory. **Never run `cargo kani` on these harnesses without a cap.** Use the

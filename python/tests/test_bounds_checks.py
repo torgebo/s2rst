@@ -12,6 +12,8 @@ Tests are grouped by item number (A1, A2, …) so it's
 clear which fix each test exercises.
 """
 
+import math
+
 import pytest
 
 import s2rst
@@ -335,15 +337,18 @@ def test_a12_denormalize_valid_arguments_work():
 
 def test_a12_denormalize_rejects_bad_level_mod():
     cu = s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(0)])
-    for level_mod in (0, 4, 200):
+    # 256 and -1 used to raise OverflowError (the binding took u8), not the documented
+    # ValueError.
+    for level_mod in (0, 4, 200, 256, -1, 2**40):
         with pytest.raises(ValueError):
             cu.denormalize(0, level_mod)
 
 
 def test_a12_denormalize_rejects_bad_min_level():
     cu = s2rst.CellUnion.from_cell_ids([s2rst.CellId.from_face(0)])
-    with pytest.raises(ValueError):
-        cu.denormalize(31, 1)
+    for min_level in (31, 256, -1, 2**40):
+        with pytest.raises(ValueError):
+            cu.denormalize(min_level, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -387,3 +392,38 @@ def test_a13_from_min_max_rejects_bad_arguments():
     ]:
         with pytest.raises(ValueError):
             s2rst.CellUnion.from_min_max(lo, hi)
+
+
+# ---------------------------------------------------------------------------
+# A14: R2Rect.from_center_size and Rect.from_center_size argument checks (the
+# core checks them only in debug builds: a PanicException there, an invalid
+# rectangle in release builds)
+# ---------------------------------------------------------------------------
+
+
+def test_a14_r2_rect_from_center_size_valid_arguments_work():
+    c = s2rst.R2Point(0, 0)
+    assert s2rst.R2Rect.from_center_size(c, s2rst.R2Point(2, 4)).is_valid()
+    # Both components negative: both axes empty, the empty rectangle.
+    assert s2rst.R2Rect.from_center_size(c, s2rst.R2Point(-1, -1)).is_empty()
+
+
+def test_a14_r2_rect_from_center_size_rejects_one_negative_component():
+    c = s2rst.R2Point(0, 0)
+    with pytest.raises(ValueError):
+        s2rst.R2Rect.from_center_size(c, s2rst.R2Point(-1, 1))
+    with pytest.raises(ValueError):
+        s2rst.R2Rect.from_center_size(c, s2rst.R2Point(1, -1))
+
+
+def test_a14_rect_from_center_size_rejects_bad_longitudes():
+    size = s2rst.LatLng.from_degrees(20, 20)
+    assert s2rst.Rect.from_center_size(s2rst.LatLng.from_degrees(0, 0), size).is_valid()
+    with pytest.raises(ValueError):
+        s2rst.Rect.from_center_size(s2rst.LatLng.from_degrees(0, 200), size)
+    with pytest.raises(ValueError):
+        s2rst.Rect.from_center_size(s2rst.LatLng.from_degrees(0, math.nan), size)
+    with pytest.raises(ValueError):
+        s2rst.Rect.from_center_size(
+            s2rst.LatLng.from_degrees(0, 0), s2rst.LatLng.from_degrees(20, math.nan)
+        )

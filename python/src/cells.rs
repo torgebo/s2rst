@@ -660,17 +660,25 @@ impl PyCellUnion {
     /// Raises `ValueError` unless `min_level` is in 0..=30 and `level_mod` is 1, 2 or 3.
     /// The core checks `level_mod` only in debug builds (upstream `DCHECK`); a larger one
     /// would expand every cell to leaf level, which never finishes for a large cell.
-    fn denormalize(&self, min_level: u8, level_mod: u8) -> PyResult<Self> {
-        let min_level = s2::Level::try_new(min_level).ok_or_else(|| {
-            pyo3::exceptions::PyValueError::new_err(format!(
-                "min_level must be in 0..=30, got {min_level}"
-            ))
-        })?;
-        if !(1..=3).contains(&level_mod) {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "level_mod must be 1, 2 or 3, got {level_mod}"
-            )));
-        }
+    /// The arguments are taken as `i64`, not `u8`, so that a value outside 0..=255 raises
+    /// `ValueError` as documented rather than pyo3's `OverflowError`.
+    fn denormalize(&self, min_level: i64, level_mod: i64) -> PyResult<Self> {
+        let min_level = u8::try_from(min_level)
+            .ok()
+            .and_then(s2::Level::try_new)
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "min_level must be in 0..=30, got {min_level}"
+                ))
+            })?;
+        let level_mod = u8::try_from(level_mod)
+            .ok()
+            .filter(|m| (1..=3).contains(m))
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "level_mod must be 1, 2 or 3, got {level_mod}"
+                ))
+            })?;
         Ok(PyCellUnion(self.0.denormalize(min_level, level_mod)))
     }
 

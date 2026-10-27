@@ -161,3 +161,37 @@ fn decode_error_messages_unchanged() {
         "cell ids are not a valid cell union: unsorted or overlapping"
     );
 }
+
+/// Code review of v0.4.0..v0.5.0, finding 5: the guards that keep `from_begin_end` from
+/// looping forever and `denormalize` from expanding into billions of cells held only in debug
+/// builds (and in the Python and WASM bindings). They now hold in every build: run with
+/// `--release` too.
+#[test]
+#[should_panic(expected = "from_begin_end: begin is neither a leaf cell")]
+fn from_begin_end_rejects_id_zero_in_every_build() {
+    drop(CellUnion::from_begin_end(
+        CellId(0),
+        CellId::from_face(1u8).child_begin_at_level(30),
+    ));
+}
+
+#[test]
+#[should_panic(expected = "from_begin_end: begin is after end")]
+fn from_begin_end_rejects_reversed_range_in_every_build() {
+    let a = CellId::from_face(1u8).child_begin_at_level(30);
+    drop(CellUnion::from_begin_end(a.next(), a));
+}
+
+#[test]
+#[should_panic(expected = "from_min_max: max_id is not a valid leaf cell")]
+fn from_min_max_rejects_invalid_max_in_every_build() {
+    let a = CellId::from_face(1u8).child_begin_at_level(30);
+    drop(CellUnion::from_min_max(a, CellId(0)));
+}
+
+#[test]
+#[should_panic(expected = "denormalize: level_mod must be 1, 2 or 3")]
+fn denormalize_rejects_large_level_mod_in_every_build() {
+    let u = CellUnion::from_cell_ids(vec![CellId::from_face(0u8)]);
+    drop(u.denormalize(Level::new(0), 200));
+}

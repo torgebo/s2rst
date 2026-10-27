@@ -181,7 +181,7 @@ impl Polyline {
     ///
     /// Panics if the polyline has no vertices.
     pub fn project(&self, point: Point) -> (Point, usize) {
-        assert_ne!(self.vertices, Vec::<Point>::new());
+        assert!(!self.vertices.is_empty());
         if self.vertices.len() == 1 {
             return (self.vertices[0], 1);
         }
@@ -223,7 +223,7 @@ impl Polyline {
     ///
     /// Panics if the polyline has no vertices.
     pub fn interpolate(&self, fraction: f64) -> (Point, usize) {
-        assert_ne!(self.vertices, Vec::<Point>::new());
+        assert!(!self.vertices.is_empty());
         if fraction <= 0.0 {
             return (self.vertices[0], 1);
         }

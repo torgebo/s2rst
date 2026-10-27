@@ -104,8 +104,7 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `begin` or `end` is neither a leaf cell nor
-    /// `CellId::end(30)`, or if `begin > end`.
+    /// If `begin` or `end` is neither a leaf cell nor `CellId::end(30)`, or if `begin > end`.
     #[deprecated(
         note = "use `from_begin_end`, the same constructor under its C++ name (`FromBeginEnd`)"
     )]
@@ -293,10 +292,12 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `min_id` or `max_id` is not a valid leaf cell, or if
-    /// `min_id > max_id`.
+    /// If `min_id` or `max_id` is not a valid leaf cell, or if `min_id > max_id`.
     pub fn from_min_max(min_id: CellId, max_id: CellId) -> Self {
-        debug_assert!(max_id.is_valid());
+        assert!(
+            max_id.is_valid() && max_id.is_leaf(),
+            "from_min_max: max_id is not a valid leaf cell"
+        );
         CellUnion::from_begin_end(min_id, max_id.next())
     }
 
@@ -305,15 +306,22 @@ impl CellUnion {
     ///
     /// # Panics
     ///
-    /// In debug builds, panics if `begin` or `end` is neither a leaf cell nor
-    /// `CellId::end(30)`, or if `begin > end` (C++ `FromBeginEnd` requires them).
+    /// If `begin` or `end` is neither a leaf cell nor `CellId::end(30)`, or if `begin > end`.
+    /// C++ `FromBeginEnd` requires them with `DCHECK`s only; here they are checked in every
+    /// build, because the tiling loop never ends for some invalid ids (`CellId(0)`, for
+    /// example) where a debug build would have panicked.
     pub fn from_begin_end(begin: CellId, end: CellId) -> Self {
         let leaf_end = CellId::end(crate::s2::coords::MAX_CELL_LEVEL);
-        debug_assert!(begin.is_leaf());
-        debug_assert!(end.is_leaf());
-        debug_assert!(begin.is_valid() || begin == leaf_end);
-        debug_assert!(end.is_valid() || end == leaf_end);
-        debug_assert!(begin <= end);
+        let in_range = |id: CellId| (id.is_valid() && id.is_leaf()) || id == leaf_end;
+        assert!(
+            in_range(begin),
+            "from_begin_end: begin is neither a leaf cell nor the end of the leaves"
+        );
+        assert!(
+            in_range(end),
+            "from_begin_end: end is neither a leaf cell nor the end of the leaves"
+        );
+        assert!(begin <= end, "from_begin_end: begin is after end");
         let mut ids = Vec::new();
         let mut id = begin.maximum_tile(end);
         while id != end {
@@ -488,16 +496,19 @@ impl CellUnion {
     /// Each cell is replaced, in order, by all of its descendants at the new level: at least
     /// `min_level`, rounded up to a multiple of `level_mod` above `min_level`, but never past
     /// 30, as C++ `S2CellUnion::Denormalize` does. A cell already at a suitable level is kept.
-    /// `level_mod` must be 1, 2 or 3 (upstream `DCHECK`). Release builds do not check it: as in
-    /// C++, a larger one rounds levels up to 30, and a large cell then expands into billions
-    /// of leaf cells.
+    /// `level_mod` must be 1, 2 or 3. Upstream checks it with a `DCHECK` only; here it is
+    /// checked in every build, because a larger one rounds levels up to 30, and a large cell
+    /// then expands into billions of leaf cells.
     ///
     /// # Panics
     ///
-    /// Panics if an id has no level marker (through [`CellId::level`]). In debug builds,
-    /// also panics if `level_mod` is not 1, 2 or 3, or if an id is not a valid cell.
+    /// If `level_mod` is not 1, 2 or 3, or if an id has no level marker (through
+    /// [`CellId::level`]). In debug builds, also if an id is not a valid cell.
     pub fn denormalize(&self, min_level: Level, level_mod: u8) -> CellUnion {
-        debug_assert!((1..=3).contains(&level_mod));
+        assert!(
+            (1..=3).contains(&level_mod),
+            "denormalize: level_mod must be 1, 2 or 3"
+        );
         let mut result = Vec::new();
         for &id in &self.0 {
             let level = id.level();

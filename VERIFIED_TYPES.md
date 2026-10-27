@@ -163,7 +163,8 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 - **Changed first (option B, FR-017 to FR-023):** every chord angle is canonical (−1, a length
   in [0, 4], or +∞), so the type keeps its own invariant, a first among the value types; NaN gives
   `STRAIGHT` as upstream; the arithmetic checks special operands in debug builds; deserialisation
-  rejects non-canonical values; `normalized` is the exact remainder; the E-forms round ties to
+  returns only canonical values (since the v0.4.0..v0.5.0 review, any negative reads as `NEGATIVE`
+  and JSON `null` as `INFINITY`; a length above 4 or NaN is an error); `normalized` is the exact remainder; the E-forms round ties to
   even and saturate. Kani found D-008 (`max_angle_error`, fixed).
 - **Proven:** crash freedom of every in-scope operation; 13 of `ChordAngle`'s 14 catalogue
   entries per change (construction, the canonical-value invariant, classifications, the total

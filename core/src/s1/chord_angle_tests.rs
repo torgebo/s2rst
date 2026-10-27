@@ -131,8 +131,10 @@ fn sin2_of_infinity_panics_in_debug_builds() {
     let _ = ChordAngle::INFINITY.sin2();
 }
 
-/// FR-020: deserialisation accepts the canonical values and rejects every other, naming the
-/// rule. NaN goes through serde's own `f64` deserialiser, which carries it (JSON has no NaN).
+/// FR-020: deserialisation returns canonical values: the canonical ones as read, any other
+/// negative as `NEGATIVE` (as `from_length2` and the binary decoders), and an error naming the
+/// rule for the rest. NaN goes through serde's own `f64` deserialiser, which carries it (JSON
+/// has no NaN).
 #[cfg(feature = "serde")]
 mod serde_canonical {
     use super::*;
@@ -145,18 +147,38 @@ mod serde_canonical {
     }
 
     #[test]
-    fn non_canonical_values_are_rejected() {
-        for x in [
-            5.0,
-            -5.0,
-            -0.5,
-            f64::NAN,
-            f64::NEG_INFINITY,
-            4.000_000_000_000_001,
-        ] {
-            let e = deserialize(x).expect_err("not canonical");
-            assert!(e.contains("canonical"), "{x}: {e}");
+    fn lengths_above_four_and_nan_are_rejected() {
+        for x in [5.0, f64::NAN, 4.000_000_000_000_001] {
+            let e = deserialize(x).expect_err("not a length");
+            assert!(e.contains("not a chord angle length"), "{x}: {e}");
         }
+    }
+
+    /// Code review of v0.4.0..v0.5.0, finding 3: v0.4.0 kept negative lengths, so its JSON for
+    /// an empty cap can hold one; the binary decoder already maps them to `NEGATIVE`.
+    #[test]
+    fn negative_lengths_read_as_negative() {
+        for x in [-5.0, -0.5, -1.0 / std::f64::consts::PI, f64::NEG_INFINITY] {
+            let c = deserialize(x).unwrap_or_else(|e| panic!("{x}: {e}"));
+            assert_eq!(c.length2().to_bits(), (-1.0f64).to_bits(), "{x}");
+        }
+        // `Cap::from_center_area(c, -1.0)` as v0.4.0 wrote it: today's empty cap with v0.4.0's
+        // radius, −1/π.
+        let today = serde_json::to_string(&crate::s2::Cap::empty()).unwrap();
+        let json = today.replace("-1.0", "-0.3183098861837907");
+        assert_ne!(json, today);
+        let cap: crate::s2::Cap = serde_json::from_str(&json).unwrap();
+        assert!(cap.is_empty());
+        assert_eq!(cap.chord_radius(), ChordAngle::NEGATIVE);
+    }
+
+    /// Code review of v0.4.0..v0.5.0, finding 4: `serde_json` writes +∞ as `null`.
+    #[test]
+    fn infinity_round_trips_through_json() {
+        let text = serde_json::to_string(&ChordAngle::INFINITY).unwrap();
+        assert_eq!(text, "null");
+        let back: ChordAngle = serde_json::from_str(&text).unwrap();
+        assert!(back.is_infinity());
     }
 
     #[test]
@@ -170,6 +192,7 @@ mod serde_canonical {
             ChordAngle::ZERO,
             ChordAngle::RIGHT,
             ChordAngle::STRAIGHT,
+            ChordAngle::INFINITY,
         ] {
             let text = serde_json::to_string(&c).unwrap();
             let back: ChordAngle = serde_json::from_str(&text).unwrap();

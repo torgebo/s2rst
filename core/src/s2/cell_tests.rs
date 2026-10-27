@@ -78,7 +78,8 @@ mod serde_tests {
 
     /// Every cell to `max_level` on all faces, then `random` pseudo-random deeper cells, through
     /// JSON text and back: each comes back with exactly its own fields, bit for bit. Before
-    /// FR-018, `serde_json`'s default float parsing moved a bound by one ulp in 23.5% of cells.
+    /// FR-018, `serde_json`'s default float parsing moved a bound by one ulp in about a quarter
+    /// of the cells (spec 004 research R6).
     fn round_trip(max_level: u8, random: usize) {
         let check = |c: Cell| {
             let back: Cell = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();

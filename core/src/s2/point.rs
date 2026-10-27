@@ -167,11 +167,11 @@ impl Point {
 
     /// Returns the chord angle between this point and `other`.
     /// Both points must be unit length (upstream's `ABSL_DCHECK`). For any points in the box
-    /// `[−1, 1]³` the squared length is computed without overflow and clamped to at most 4, as
-    /// upstream's `std::min(4.0, …)`.
+    /// `[−1, 1]³` the squared length is computed without overflow, and `from_length2` clamps it
+    /// to 4, as upstream's `std::min(4.0, …)`.
     #[inline]
     pub fn chord_angle(self, other: Point) -> ChordAngle {
-        ChordAngle::from_length2((self.0 - other.0).norm2().min(4.0))
+        ChordAngle::from_length2((self.0 - other.0).norm2())
     }
 
     /// Returns a stable angle between this point and `other`, using

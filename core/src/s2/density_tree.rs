@@ -1313,32 +1313,16 @@ impl S2DensityTree {
 
 // ─── Header decoding ───────────────────────────────────────────────────
 
-/// Decodes a varint starting at `data[pos]`. Returns `(value, next_pos)`.
+/// Decodes a varint starting at `data[pos]`. Returns `(value, next_pos)`, or `None` if the
+/// input ends inside the varint or its tenth byte is above 1.
+///
+/// Delegates to the formally verified [`read_uvarint`](crate::s2::encoding::read_uvarint)
+/// (spec 003), so a change there reaches this decoder too.
 #[inline]
-fn decode_varint_at(data: &[u8], mut pos: usize) -> Option<(u64, usize)> {
-    let mut result: u64 = 0;
-    let mut shift = 0u32;
-    loop {
-        if pos >= data.len() {
-            return None;
-        }
-        let b = data[pos];
-        pos += 1;
-        // The tenth byte carries bit 63 only: upstream rejects anything above 1 as "too long
-        // to be a varint64" (`util/coding/varint.cc`, `Parse64WithLimit`), and so does this
-        // decoder, instead of dropping the extra bits (spec 003 D-003).
-        if shift == 63 && b > 1 {
-            return None;
-        }
-        result |= u64::from(b & 0x7F) << shift;
-        if b < 0x80 {
-            return Some((result, pos));
-        }
-        shift += 7;
-        if shift >= 64 {
-            return None;
-        }
-    }
+fn decode_varint_at(data: &[u8], pos: usize) -> Option<(u64, usize)> {
+    let mut rest = data.get(pos..)?;
+    let value = crate::s2::encoding::read_uvarint(&mut rest).ok()?;
+    Some((value, data.len() - rest.len()))
 }
 
 /// Adds two `i64` offsets from untrusted decoded tree data, returning `Err` on

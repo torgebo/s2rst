@@ -26,6 +26,8 @@ again. The reproducers are harnesses in a library crate with
 | [KI-007](#ki-007-sqrt-is-not-a-function) | `sqrt` gives two results for one input | false alarm | 006; re-run 2026-10-25 | no harness compares two `sqrt` results | — |
 | [KI-008](#ki-008-misaligned-cast-when-dropping-an-ioerror) | "misaligned pointer to reference cast" when some `io::Error`s are dropped | false alarm | 003, from the record | decoding harnesses forget the error | — |
 | [KI-009](#ki-009-an-out-of-memory-kill-reads-as-a-failure) | a harness killed for memory reports `FAILED` with "0 of N failed" | misleading report | 001, from the record | `run-verify.sh` re-runs it alone and reports `OOM` | — |
+| [KI-010](#ki-010-the-driver-keeps-memory-for-every-harness-it-has-run) | the driver's memory grows with every harness until it runs out | crash (driver) | 003, 008 | `run-verify.sh` runs batches of 32 | — |
+| [KI-011](#ki-011---verbose-panics-the-compiler) | `--verbose` panics `kani-compiler` | crash (compiler) | 008 | not used | — |
 
 ## KI-001: `<` and `<=` on symbolic bools
 
@@ -232,6 +234,40 @@ fn sqrt_deterministic() {
 - **Expected:** a verdict that says the run did not finish.
 - **Workaround:** `verify/run-verify.sh` re-runs such a harness alone and reports `OOM`.
 - **Records:** `verify/EVALUATION.md` ("Kani issues met").
+
+## KI-010: the driver keeps memory for every harness it has run
+
+- **Observed** (2026-10-25, `make verify`, 829 harnesses, 7 jobs): `kani-driver`'s resident
+  memory grows with each finished harness and is not given back until it exits: 98 MB after 11
+  harnesses, 1.5 GB after 52, 2.3 GB after 127, about 18 MB each (sampled from
+  `/proc/<pid>/status` every 5 s). The driver runs under the same `ulimit -v` as the harnesses
+  (4 GiB), so the run died after 515 harnesses:
+
+  ```text
+  memory allocation of 49283072 bytes failed
+  thread 'main' panicked at .../kani-verifier-0.68.0/src/lib.rs:159:38:
+  No exit code?
+  ```
+
+  The 7 harnesses in flight read as errors, and the 307 not yet started were missing from the
+  report. Spec 003 met the same crash after about 150 harnesses with 4 jobs.
+- **Expected:** a driver whose memory does not depend on how many harnesses it has run.
+- **Workaround:** `verify/run-verify.sh` takes the harness list from the build's metadata and
+  runs it in batches (`VERIFY_BATCH`, 32 at the 4 GiB ceiling), one driver each. A listed
+  harness that no driver reached is reported `NOT-RUN`. With batches of 64, the whole suite
+  ran (829 of 829 successful, 59 minutes with 7 jobs), but the largest driver peaked at 3.6 GB
+  of address space, hence 32. Each batch compiles the code its harnesses reach: the 13 batches
+  took 101 s and 2.6 GB of `verify/target/kani` in all.
+- **Records:** `verify/decoding/EVALUATION.md` (spec 003's crash).
+
+## KI-011: `--verbose` panics the compiler
+
+- **Observed** (2026-10-25, the `verify/` crate, not reduced): `cargo kani --only-codegen -Z
+  stubbing --verbose` fails with "thread 'rustc' panicked at
+  kani-compiler/src/kani_middle/analysis.rs:29:45" and "Kani unexpectedly panicked during
+  compilation". The same build without `--verbose` succeeds.
+- **Expected:** the same build, with more output.
+- **Workaround:** `--verbose` is not used.
 
 ## Limits that are not bugs
 

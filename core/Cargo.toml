@@ -318,6 +318,9 @@ missing_fields_in_debug = "allow"
 unnecessary_wraps = "allow"
 iter_not_returning_iterator = "allow"
 struct_field_names = "allow"
+# `assert!(!v.is_empty())` states the precondition; the `assert_ne!(v, Vec::new())` this lint
+# asks for reads worse and only adds the (empty) value to the message.
+assert_is_empty = "allow"
 
 
 undocumented_unsafe_blocks = "warn"

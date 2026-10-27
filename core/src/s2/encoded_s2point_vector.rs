@@ -231,7 +231,7 @@ fn decode_uncompressed(size_format: u64, r: &mut dyn Read) -> io::Result<Vec<Poi
     // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
     // declaring a huge count must not reserve memory for it). Not even a capped reservation:
     // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
-    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    // (research R7). The regrowth's cost is measured in `verify/decoding/EVALUATION.md`.
     let mut points = Vec::new();
     for _ in 0..count {
         let mut buf = [0u8; 24];
@@ -398,7 +398,7 @@ fn decode_cell_ids_raw(byte0: u8, byte1: u8, r: &mut dyn Read) -> io::Result<Vec
     // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
     // declaring a huge count must not reserve memory for it). Not even a capped reservation:
     // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
-    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    // (research R7). The regrowth's cost is measured in `verify/decoding/EVALUATION.md`.
     let mut points = Vec::new();
 
     for (bi, block) in block_data.iter().enumerate() {

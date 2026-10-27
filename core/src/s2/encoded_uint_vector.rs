@@ -138,7 +138,7 @@ pub fn decode_uint_vector_u32(r: &mut dyn Read) -> io::Result<Vec<u32>> {
     // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
     // declaring a huge count must not reserve memory for it). Not even a capped reservation:
     // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
-    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    // (research R7). The regrowth's cost is measured in `verify/decoding/EVALUATION.md`.
     let mut result = Vec::new();
     for _ in 0..count {
         result.push(decode_uint_with_length(r, len)? as u32);
@@ -167,7 +167,7 @@ pub fn decode_uint_vector_u64(r: &mut dyn Read) -> io::Result<Vec<u64>> {
     // Grow on demand: never reserve from a decoded count (spec 003 FR-019; a short input
     // declaring a huge count must not reserve memory for it). Not even a capped reservation:
     // any reservation sized from decoded data keeps the decoder out of the Kani proofs' reach
-    // (research R7). The regrowth costs within 3 % in the benchmarks (decoding/EVALUATION.md).
+    // (research R7). The regrowth's cost is measured in `verify/decoding/EVALUATION.md`.
     let mut result = Vec::new();
     for _ in 0..count {
         result.push(decode_uint_with_length(r, len)?);

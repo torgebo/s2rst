@@ -256,7 +256,9 @@ what is proven:
   (`c_decode_cap__b32`, `__b33`).
 - **The Kani driver ran out of address space** in one run of about 150 harnesses with 4
   jobs ("memory allocation of 2097088 bytes failed", then "No exit code?"). It runs under the
-  same `ulimit -v` as the harnesses. Large runs now use 3 jobs.
+  same `ulimit -v` as the harnesses. Large runs now use 3 jobs. (Spec 008 found the cause, the
+  driver's memory growing with every harness run, and `run-verify.sh` now runs batches:
+  KANI_ISSUES.md KI-010.)
 - **The disk filled up** (`verify/target/kani` reached 32 GB over builds of three feature
   sets). Deleting the cache freed it; the memory note on this was updated.
 

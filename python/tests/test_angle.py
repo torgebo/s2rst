@@ -177,3 +177,21 @@ class TestChordAngle:
     def test_repr(self):
         ca = s2rst.ChordAngle.from_degrees(45.0)
         assert "45" in repr(ca)
+
+
+@pytest.mark.parametrize("special", ["INFINITY", "NEGATIVE"])
+def test_chord_angle_special_trig_and_arithmetic_raise_value_error(special):
+    # The core checks these only in debug builds: a PanicException there, a meaningless
+    # number in release builds.
+    ca = getattr(s2rst.ChordAngle, special)
+    right = s2rst.ChordAngle.RIGHT
+    for op in (ca.sin, ca.sin2, ca.cos, ca.tan):
+        with pytest.raises(ValueError):
+            op()
+    for a, b in ((ca, right), (right, ca)):
+        with pytest.raises(ValueError):
+            a + b
+        with pytest.raises(ValueError):
+            a - b
+    assert right.sin() == pytest.approx(1.0)
+    assert (right + right).length2 == 4.0
