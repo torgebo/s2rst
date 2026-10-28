@@ -39,3 +39,15 @@ which the library does not have, differs from `MayIntersect` on 158 of 20,000 ra
 (C++); and outside the probe, `GetDistance(a, b)` and `GetDistance(b, a)` differ bit for bit on
 15,613 of 200,000 random valid pairs, since the formula multiplies the two cosines in argument
 order (the same formula in both).
+
+## After the fixes (2026-10-28, at `85b056e`)
+
+The same programs on the library after FR-017 to FR-019: `compare.after.txt`,
+`rust/survey_rust_stderr.after.txt`, `rust/capbound_results.after.txt`.
+
+- Every section matches C++ bit for bit but G (spec SC-007): N, NL, S and DS now agree (K1, K3).
+- G differs on 66 of 20,000 rows, the rectangles whose upstream bound missed one of the 114
+  points: the library's widened bound contains them (FR-019). The library's G misses are 0 of
+  129,595.
+- R0's sweep (`capbound 1000000`): the library's bound misses 0 of 74,647,924 contained points;
+  upstream's, recomputed by the probe, 10,507,883.

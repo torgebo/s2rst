@@ -173,7 +173,9 @@ fn main() {
         let caps: Vec<Cap> = cands.iter().map(|&(_, d, e)| widened(r, d, e)).collect();
         let caps_m: Vec<Cap> = caps.clone();
         let lib = r.cap_bound();
-        assert_eq!(lib.chord_radius().length2().to_bits(), caps[0].chord_radius().length2().to_bits());
+        // Before FR-019 the library's bound was candidate 0 (upstream's), after it candidate 2.
+        let lib_is = |i: usize| lib.chord_radius().length2().to_bits() == caps[i].chord_radius().length2().to_bits();
+        assert!(lib_is(0) || lib_is(2));
         let _ = cap_bound_with(r, &upstream, 0.0);
         let pole = lib.center().x() == 0.0 && lib.center().y() == 0.0;
         let mut pts: Vec<LatLng> = Vec::new();

@@ -1,0 +1,5 @@
+LV from_point invalid for 0 of 200000 random finite vectors; specials valid: true
+G cap_bound misses 0 of 129595 contained points
+G misses by (pole cap, candidate 0=lo/lo 1=hi/hi 2=lat.lo 3=lat.hi 4=lng.lo 5=lng.hi 6=inside): {}; largest excess 0.0 ε of the cap's length²
+V vertices contained in a cell MayIntersect rejects: 0
+Angle::normalized(-π) = 3.141592653589793, LatLng::normalized lng for -π = -3.141592653589793

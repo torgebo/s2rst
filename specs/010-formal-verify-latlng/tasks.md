@@ -131,28 +131,28 @@ affected harness. Never change upstream code, never file upstream.
 
 **Independent test**: `make test`; each fix's test fails on the commit before it.
 
-- [ ] T011 [US4] Create `core/src/s2/latlng_tests.rs`, wired into `latlng.rs` with
+- [X] T011 [US4] Create `core/src/s2/latlng_tests.rs`, wired into `latlng.rs` with
   `#[cfg(test)] #[path = "latlng_tests.rs"] mod latlng_tests;`.
-- [ ] T012 [US4] FR-017 (K1): `remainder_2pi` and `reduce_fmod` in `core/src/s1/angle.rs`,
+- [X] T012 [US4] FR-017 (K1): `remainder_2pi` and `reduce_fmod` in `core/src/s1/angle.rs`,
   `Angle::normalized` and `LatLng::normalized` through it (research R3). Tests first in
   `latlng_tests.rs` (R10's values, the exact-remainder property, validity for every finite
   input) and `angle_tests.rs` (`remainder_2pi` itself, ties ±π to ±7π); red, then green.
   Commit.
-- [ ] T013 [US4] FR-018 (K3): `get_distance` clamps before the root; the survey's pair returns
+- [X] T013 [US4] FR-018 (K3): `get_distance` clamps before the root; the survey's pair returns
   NaN. Red, then green. Commit.
-- [ ] T014 [US4] FR-019 (K4, U-016): `Rect::cap_bound` widened after upstream's choice (research
+- [X] T014 [US4] FR-019 (K4, U-016): `Rect::cap_bound` widened after upstream's choice (research
   R0); tests in `core/src/s2/rect_tests.rs`: R0's worst cases, the survey's 114 points, a
   native sweep of 20,000 rectangles with R0's families and points, the centre upstream's. U-016
   in `UPSTREAM.md` (both caps, the inputs, the margins). Red, then green; record any test
   pinning a covering that changes. Commit.
-- [ ] T015 [P] [US4] Document the domains in `core/src/s2/latlng.rs` (`to_point`'s finite
+- [X] T015 [P] [US4] Document the domains in `core/src/s2/latlng.rs` (`to_point`'s finite
   precondition, `get_distance`'s NaN outside its domain, `normalized`'s ties and zeros; spec
   SC-010).
-- [ ] T016 [US4] Add `core/tests/cpp_latlng_diff.rs` over the seven sections (research R9;
+- [X] T016 [US4] Add `core/tests/cpp_latlng_diff.rs` over the seven sections (research R9;
   depends on T007, T012–T014).
-- [ ] T017 [P] [US4] FR-011: rectangles near the poles and boundary points in the `Region`
+- [X] T017 [P] [US4] FR-011: rectangles near the poles and boundary points in the `Region`
   twins of `core/tests/trait_property_tests.rs`, and the probe's cases as fixed examples.
-- [ ] T018 [US4] Run `make test`, then the probe again (quickstart §2; spec SC-007, SC-009).
+- [X] T018 [US4] Run `make test`, then the probe again (quickstart §2; spec SC-007, SC-009).
   Commit the vectors and tests.
 
 ## Phase 4: User Story 1 — Proven crash freedom (Priority: P1)
