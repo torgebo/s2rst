@@ -123,7 +123,7 @@ Never change upstream code, never file upstream.
   `region::covering_contains_points::<R, MAX>` (FR-010; research R6), each doc comment naming
   its instances and quickcheck twins; `no_intersect_no_vertex`'s comment names `CellUnion` as
   a region it does not hold for.
-- [ ] T007 [P] Add `tools/refgen-cpp/generate_region.cc` (a `CMakeLists.txt` target, a README
+- [X] T007 [P] Add `tools/refgen-cpp/generate_region.cc` (a `CMakeLists.txt` target, a README
   step) and generate `core/tests/data/cpp_region_vectors.csv` (research R9; seven sections).
 - [ ] T008 [P] Extend `verify/tests/libm_contracts.rs`: `sqrt_between`'s clause (specials and
   10⁶ random inputs), `pure_leaf`'s basis (`CellId::from_point` a valid leaf for the 1,331
@@ -143,34 +143,34 @@ without it.
 
 **Independent test**: `make test`; each fix's test fails on the commit before it.
 
-- [ ] T011 [US4] Create `core/src/s2/point_region_tests.rs`, wired into `point_region.rs` with
+- [X] T011 [US4] Create `core/src/s2/point_region_tests.rs`, wired into `point_region.rs` with
   `#[cfg(test)] #[path = "point_region_tests.rs"] mod point_region_tests;`.
-- [ ] T012 [US4] FR-017 (K1): `POLE_MIN_LAT = 0.615_479_708_670_387_3` in `core/src/s2/cell.rs`
+- [X] T012 [US4] FR-017 (K1): `POLE_MIN_LAT = 0.615_479_708_670_387_3` in `core/src/s2/cell.rs`
   with a comment (upstream computes `asin(sqrt(1./3))`; research R3). Tests first: the polar face
   cells' latitude bits are upstream's (`0x3fe3b2028082e8d0`), and the constant equals
   `(1.0f64 / 3.0).sqrt().asin()`; red, then green. Run the Python and wasm suites. Commit.
-- [ ] T013 [US4] FR-018 (K2): `approx_area` and `exact_area` fold from `0.0` in
+- [X] T013 [US4] FR-018 (K2): `approx_area` and `exact_area` fold from `0.0` in
   `core/src/s2/cell_union.rs`; test in `cell_union_tests.rs`: the empty union's areas are +0 bit
   for bit. Red, then green. Commit.
-- [ ] T014 [US4] FR-019 (K3): `PointRegion::new`'s precondition (a unit point, upstream's
+- [X] T014 [US4] FR-019 (K3): `PointRegion::new`'s precondition (a unit point, upstream's
   `DCHECK`) and each method's behaviour outside it documented; a hand-written `Deserialize`
   rejecting a point that is not unit length (`Point::is_unit`, as `Cap`'s in
   `core/src/s2/cap.rs:645`); tests in `point_region_tests.rs`: (3, 4, 0), the zero vector and
   NaN rejected, a unit point round-trips. Red, then green. Commit.
-- [ ] T015 [US4] FR-019 (K4): document each debug-build panic exactly (spec K4): in
+- [X] T015 [US4] FR-019 (K4): document each debug-build panic exactly (spec K4): in
   `CellUnion::expand_by_radius`, `Cell::contains_point`, `CellId::from_point` (two or more
   infinite coordinates), `s1::Interval::from_point`, `Rect::from_lat_lng`, and on
   `PointRegion`'s `rect_bound`, `intersects_cell`, `cell_union_bound` and `CellUnion`'s
   `contains_point`; a `#[should_panic]` debug test for each (`#[cfg(debug_assertions)]`).
   Commit.
-- [ ] T016 [US4] Add `core/tests/cpp_region_diff.rs` over the seven sections, and
+- [X] T016 [US4] Add `core/tests/cpp_region_diff.rs` over the seven sections, and
   `cell_union_tests::vertex_law_does_not_hold` pinning one of the probe's counterexamples
   (research R9; depends on T007, T012–T015).
-- [ ] T017 [P] [US4] FR-010, FR-013: the twins of the two new laws in
+- [X] T017 [P] [US4] FR-010, FR-013: the twins of the two new laws in
   `core/tests/trait_property_tests.rs` for `Cap`, `Rect`, `Cell`, `CellUnion` and
   `PointRegion`; `PointRegion`s at cell vertices, face boundaries and the poles; unions with the
   polar faces, opposite faces and clustered cells.
-- [ ] T018 [US4] Run `make test`, then the probe again (quickstart §2; spec SC-007, SC-009).
+- [X] T018 [US4] Run `make test`, then the probe again (quickstart §2; spec SC-007, SC-009).
   Commit the vectors and tests.
 
 ## Phase 4: User Story 1 — Proven crash freedom (Priority: P1)

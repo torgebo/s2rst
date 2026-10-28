@@ -177,6 +177,13 @@ which the checker does not treat as one value per input (KI-007), and its crash 
 | The bounding rectangle contains every contained point (new, FR-010) | P-PRREG-05, Kani (pure `from_point`) | P-UREG-05, not proven, as P-UREG-04 with `Cell::rect_bound` |
 | The covering contains every contained point (new, FR-010) | P-PRREG-06, weekly (452.8 s) | P-UREG-06, not proven, as P-UREG-02 |
 
+**Measured in implementation (T017):** the covering law in its leaf form ("some id of the
+covering contains `CellId::from_point(p)`") fails for `Cell` at its vertices: the closed cell
+contains them, and their leaves lie in a neighbour (cell `14` and its vertex 1). The law is
+stated in the leaf form, which `PointRegion` and `CellUnion` satisfy by construction, with the
+closed form (`Cell::contains_point` of some covering cell) for a closed region's boundary; the
+twins check both.
+
 The two new laws go in `laws::region` with doc comments naming their instances, and gain
 quickcheck twins for `Cap`, `Rect`, `Cell`, `CellUnion` and `PointRegion` in
 `core/tests/trait_property_tests.rs` (FR-010, FR-013).

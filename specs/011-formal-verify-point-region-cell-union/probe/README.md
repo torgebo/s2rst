@@ -57,3 +57,10 @@ Findings:
   release builds, all 1,001,331 tried (the 1,331 special triples and 10⁶ random ones); in debug
   builds 443 of the specials panic, 112 of them without a NaN or a zero vector: every one has
   two or more infinite coordinates (K4). `rust/src/bin/inf.rs`: the backtrace of one.
+
+## After the fixes (2026-10-28, after FR-017 and FR-018)
+
+`compare.after.txt`, `rust/survey_rust_stderr.after.txt`: 0 differences in every section
+(spec SC-007): `UR`, `US` and `CF` now agree. `rust/src/bin/twin.rs` is the covering law's
+counterexample for `Cell` (research R6), `rust/src/bin/vertex.rs` the vertex law's for
+`CellUnion`, and `rust/src/bin/panics.rs` the check of K4's conditions.

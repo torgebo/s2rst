@@ -336,7 +336,13 @@ proven, which `Region` laws hold for each, and what next?"
 - **FR-010**: The generic laws MUST gain the two `Region` invariants `CORE_TRAITS.md` states
   without a law: **the bounding rectangle contains every contained point**, and **the covering
   bound contains every contained point**. Each MUST be stated once, generically, with a
-  quickcheck twin for every `Region` implementor the existing twins cover.
+  quickcheck twin for every `Region` implementor the existing twins cover. *Found in
+  implementation (T017): the covering law, stated as "some id of the covering contains the
+  point's leaf", holds for regions whose point test is by leaf (`PointRegion`, `CellUnion`) and
+  for interior points, but not at the boundary of a closed region: a `Cell` contains its own
+  vertices, whose leaves lie in a neighbour. There the closed form holds (some cell of the
+  covering contains the point), and the law's documentation says so, as the vertex law's does
+  for `Cell`.*
 - **FR-011**: Every generic `Region` law MUST be instantiated for `PointRegion` over every unit
   point and every valid cell: containment implies intersection; the covering bound covers every
   contained cell; the vertex law; the bounding cap, the bounding rectangle and the covering each

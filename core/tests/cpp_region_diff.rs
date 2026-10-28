@@ -70,12 +70,7 @@ fn ids_s(ids: &[CellId]) -> String {
 
 fn cap_s(c: Cap) -> [String; 4] {
     let p = c.center();
-    [
-        d(p.x()),
-        d(p.y()),
-        d(p.z()),
-        d(c.chord_radius().length2()),
-    ]
+    [d(p.x()), d(p.y()), d(p.z()), d(c.chord_radius().length2())]
 }
 
 fn rect_s(r: Rect) -> [String; 4] {
@@ -97,7 +92,11 @@ fn point_region_bounds_match_cpp() {
         let pr = PointRegion::new(point(&r[0..3]));
         assert_eq!(cap_s(pr.cap_bound()), r[3..7], "cap_bound {r:?}");
         assert_eq!(rect_s(pr.rect_bound()), r[7..11], "rect_bound {r:?}");
-        assert_eq!(ids_s(&pr.cell_union_bound()), r[11], "cell_union_bound {r:?}");
+        assert_eq!(
+            ids_s(&pr.cell_union_bound()),
+            r[11],
+            "cell_union_bound {r:?}"
+        );
     }
     assert!(rows.len() > 2000);
 }
@@ -119,7 +118,12 @@ fn cell_union_bounds_match_cpp() {
         let u = union(r[0]);
         assert_eq!(cap_s(u.cap_bound()), r[1..5], "cap_bound {}", r[0]);
         assert_eq!(rect_s(u.rect_bound()), r[5..9], "rect_bound {}", r[0]);
-        assert_eq!(ids_s(&u.cell_union_bound()), r[9], "cell_union_bound {}", r[0]);
+        assert_eq!(
+            ids_s(&u.cell_union_bound()),
+            r[9],
+            "cell_union_bound {}",
+            r[0]
+        );
     }
 }
 
@@ -127,7 +131,12 @@ fn cell_union_bounds_match_cpp() {
 fn cell_union_areas_match_cpp() {
     for r in section("CELLUNION_AREA") {
         let u = union(r[0]);
-        assert_eq!(d(u.average_based_area()), r[1], "average_based_area {}", r[0]);
+        assert_eq!(
+            d(u.average_based_area()),
+            r[1],
+            "average_based_area {}",
+            r[0]
+        );
         assert_eq!(d(u.approx_area()), r[2], "approx_area {}", r[0]);
         assert_eq!(d(u.exact_area()), r[3], "exact_area {}", r[0]);
     }
@@ -139,7 +148,11 @@ fn cell_union_contains_point_matches_cpp() {
         let u = union(r[0]);
         let p = point(&r[1..4]);
         assert_eq!(b(u.contains_point(p)), r[4], "contains_point {r:?}");
-        assert_eq!(b(Region::contains_point(&u, &p)), r[4], "Region::contains_point {r:?}");
+        assert_eq!(
+            b(Region::contains_point(&u, &p)),
+            r[4],
+            "Region::contains_point {r:?}"
+        );
     }
 }
 
@@ -149,7 +162,13 @@ fn cell_union_expand_by_radius_matches_cpp() {
         let mut u = union(r[0]);
         let diff: u8 = r[2].parse().unwrap();
         u.expand_by_radius(Angle::from_radians(f(r[1])), diff);
-        assert_eq!(ids_s(u.cell_ids()), r[3], "expand_by_radius {}, {}, {diff}", r[0], r[1]);
+        assert_eq!(
+            ids_s(u.cell_ids()),
+            r[3],
+            "expand_by_radius {}, {}, {diff}",
+            r[0],
+            r[1]
+        );
     }
 }
 
