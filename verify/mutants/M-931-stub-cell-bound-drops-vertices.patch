@@ -1,0 +1,21 @@
+Mutant: M-931
+Targets: P-LREG-02
+Expect-Fail: rl_reg::p_lreg_02
+Defect: stub mutant: `cell_rect_bound_contract` drops the vertex clause
+
+diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs
+--- a/verify/src/stubs.rs
++++ b/verify/src/stubs.rs
+@@ -726,11 +726,7 @@
+         let r = any_valid_rect();
+         for k in CellVertex::ALL {
+             let ll = pure_from_point(fixed_vertex(c, k));
+-            kani::assume(crate::rect_spec::member(
+-                r,
+-                ll.lat.radians(),
+-                ll.lng.radians(),
+-            ));
++            let _ = ll;
+         }
+         r
+     })

@@ -1376,3 +1376,166 @@ outside each documented domain (does the operation panic exactly as its `# Panic
 62 floating-point entries specs 004–007 excluded. Both are recorded in
 [`../COVERAGE.md`](../COVERAGE.md): sections 10 and 11 of `INVENTORY.md` carry the per-entry
 results, and 12 `# Panics` sections were corrected (none in behaviour).
+
+## Summary (spec 010)
+
+Spec 010 verified `s2::LatLng`, the next value type on spec 008's list, together with the
+list's first item, the generic `Region` laws for `s2::Rect`, since every one of them goes
+through `LatLng`'s conversions. A survey against running C++ (`specs/010-formal-verify-latlng/
+probe/`) found K1–K5 first; the planning probe R0 widened K4.
+
+- **Crash freedom:** 31 in-scope entries of 33. The 26 Kani entries are proven over every pair of
+  `f64` (NaN and the infinities included) but where an operation makes a new NaN, `get_distance`
+  over its documented domain and, outside it, every pair without an infinity: 9 harnesses, 35.5 s,
+  every cover satisfied. The four `geo-types` conversions by composition, `Deserialize` tested.
+- **Meaning:** all 19 counted catalogue entries of §11 are proven (SC-003: 100%), 10 directly
+  (two of them weekly) and 9 by composition or under contract; P-LLDST-04 (the distance's
+  symmetry within a tolerance) and P-LLDES-01 (serde) are not counted.
+- **`Rect` as a `Region`:** two of the four laws proven under contract (P-LREG-01 with the lemma
+  L-LL-01, P-LREG-02 with a tested contract on `Cell::rect_bound`), and P-LMEM-03 (the point test
+  receives a valid `LatLng`). The bounding-cap and covering laws need the functions' values.
+- **Library changes:** FR-017 (the exact remainder, shared with `Angle::normalized`), FR-018 (the
+  clamp before the root) and FR-019 (the widened bounding cap), each its own commit with a test
+  that failed before; new C++ vectors (FR-021) match every row but FR-019's radii.
+- **Upstream finding:** U-016, upstream's `GetCapBound` misses contained points; recorded in
+  `UPSTREAM.md`, not reported.
+- **Non-vacuity:** all 36 mutants `M-901` … `M-936` are killed (2026-10-28, about 40 minutes).
+
+## Restatements, drift guards and the checker's products (spec 010)
+
+The first draft stated the four "exact output" entries (`latitude`, `to_point`, `get_distance`,
+the scalings) and the constructors as the library's result against a restatement computed again
+in the harness, with pure contracts so both calls of `sin`, `cos`, `atan2` and `sqrt` saw one
+value. All five timed out at 12 minutes (2026-10-28): CBMC does not see that two copies of the
+same float products are one value, as spec 008's identical restatements found
+(`from_center_area`'s quotient). The final statements prove the parts without a product in Kani
+(the longitude, `to_point`'s `z`, the sum and difference: 12 s to 84 s) and tie the products to
+the restatements through drift guards that compare the source text
+(`latlng_spec_tests::conversions_are_the_restatements`, `scalings_are_angle_products`), with one
+lemma where the texts differ (L-LL-02: `x.min(1.0)` is upstream's `std::min(1.0, x)`); the
+constructors run with `Angle`'s uninterpreted. The C++ vectors check the restatements bit for
+bit, so the chain is C++ ⇔ restatement (vectors) ⇔ library (guard, Kani for the rest).
+
+Two more checker findings, replayed before they were believed:
+
+- **CBMC's built-in `sqrt` of a negative argument** fails the NaN check ("NaN on division" inside
+  `<builtin-library-sqrt>`), where IEEE-754 defines the NaN: `o_get_distance` proves under
+  `sqrt_contract`.
+- **A stub table needs its slots' unwinding:** `Table::get` loops over ten slots, so the `rl_reg`
+  harnesses need `#[kani::unwind(11)]` (the first run's "unwinding assertion loop 1").
+
+## Effort log (spec 010)
+
+| Date | Work |
+|------|------|
+| 2026-10-27 | Survey (`probe/`: 132,043 cases on C++ and the library), spec, clarifications |
+| 2026-10-28 | R0 (the cap-bound probe, 74.6 million points), plan and tasks; FR-017 to FR-019 with their tests; the C++ generator and diff test; the quickcheck twins; the description, stubs and contract tests; three Kani rounds (28, 10 harnesses); the mutants; the records |
+
+## Exclusions and tool limits (spec 010)
+
+- **Excluded:** `Display` and `to_string_in_degrees`' formatting (`core::fmt`, as every type's).
+- **Outside the checker:** `Deserialize` (tested), the `geo-types` conversions (by composition:
+  the verification crate does not enable the feature for four one-line functions).
+- **Not proven:** P-LLDST-04 and P-LREG-03 (the functions' values), P-LREG-04 (as P-CPREG-04).
+
+## Upstream findings (FR-022) (spec 010)
+
+- **U-016**, `S2LatLngRect::GetCapBound` (`s2latlng_rect.cc:298–332`): the bound misses points the
+  rectangle contains, by up to an ulp of π/2 in angle, in pole caps (the north pole as a rectangle
+  and a point one ulp past it) and in caps around the centre (a point a few ulps inside a vertex):
+  114 of the survey's 129,595 contained points, 993 of the vectors' 5,552, 10,507,883 of R0's
+  74,647,924. The library widens the chosen cap (FR-019), a documented deviation. Follow-up:
+  T014; not reported upstream (the maintainer's call).
+
+## Defects found (spec 010)
+
+None beyond the survey's K1, K3 and K4, which FR-017 to FR-019 fixed. No D-010.
+
+## Measurements (spec 010)
+
+Per change (`make verify-values P=latlng` and `rl_reg` in `P=rect`), from the runs of 2026-10-28
+on the workstation (4 jobs):
+
+| Harness | Time | Harness | Time |
+|---------|------|---------|------|
+| `ll_crash::c_construction` | 0.3 s | `ll_nrm::p_llnrm_01` | 1.5 s |
+| `ll_crash::c_e_forms` | 0.3 s | `ll_nrm::p_llnrm_03` | 20.3 s |
+| `ll_crash::c_from_point` | 10.7 s | `ll_val::p_llval_01` | 0.4 s |
+| `ll_crash::c_to_point` | 0.4 s | `ll_dst::p_lldst_02` | 9.2 s |
+| `ll_crash::c_normalized` | 0.9 s | `ll_dst::p_lldst_03` | 8.1 s |
+| `ll_crash::c_get_distance` | 14.7 s | `ll_ari::p_llari_01__add` | 67.8 s |
+| `ll_crash::o_get_distance` | 7.2 s | `ll_ari::p_llari_01__sub` | 84.1 s |
+| `ll_crash::c_approx_eq` | 0.4 s | `ll_eq::p_lleq_01` | 1.3 s |
+| `ll_crash::c_arithmetic` | 0.6 s | `ll_lem::l_ll_01` | 125.9 s |
+| `ll_con::p_llcon_01` | 28.5 s | `ll_lem::l_ll_02` | 0.0 s |
+| `ll_fp::p_llfp_01` | 36.9 s | `rl_reg::p_lreg_01` | 35.0 s |
+| `ll_fp::p_llfp_02` | 2.6 s | `rl_reg::p_lreg_02` | 305.5 s |
+| `ll_tp::p_lltp_01` | 12.0 s | `rl_reg::p_lmem_03` | 18.6 s |
+| `ll_tp::p_lltp_02` | 1.5 s | | |
+
+Weekly: `ll_apx::p_llapx_01` 466.6 s, `ll_apx::p_llapx_02` 483.7 s (the `values-latlng` slow leg).
+{{final}}
+
+## Non-vacuity (spec 010)
+
+`make verify-mutants M='M-9*'` (2026-10-28): **36 killed, 0 survived**. Every proven entry of §11
+and every `Rect` law instance has at least one: 24 are killed by Kani harnesses (three in the
+weekly tier), 12 by ordinary tests through `Test:` headers. Those are the drift guards'
+mutants (the latitude, `to_point`'s products, the haversine, the scalings, a restatement's
+swapped sine and cosine), and the three that revert FR-017, FR-018 and FR-019, killed by
+`latlng_tests`, `rect_tests` and `cpp_latlng_diff`. Six patch the description or the stubs: four
+`latlng_spec` mutants (M-911, M-912 on the reduction's copy; M-928 and M-929 on `valid` and
+`upstream_to_point`), and two stub mutants (M-930: `any_cell_bound` without L-LL-01's
+non-emptiness fails P-LREG-01; M-931: `cell_rect_bound_contract` without its vertex clause
+fails P-LREG-02), which show the laws depend on the facts the stubs carry. Every crash harness
+satisfies its covers.
+
+## What next (spec 010)
+
+- **`LatLng`'s values** through `atan2`, `sin_cos` and `asin` stay with the C++ vectors, as every
+  type's since 008; the drift guards make the formulas' text the restatements', and no proof
+  can say more without the functions' values.
+- **The remaining `Region` implementors:** `PointRegion` (a cap of radius zero: `Cap`'s proofs
+  nearly apply), `CellUnion`'s float methods (`cap_bound`, `rect_bound` through `Cell`'s), and
+  `Cell`'s own `cap_bound`, `rect_bound` and `contains_point`. `Loop`, `Polygon` and `Polyline`
+  need edge geometry over symbolic vertex lists: research first.
+
+## Comparison with 004–008 (spec 010)
+
+`LatLng` is the smallest type since `Angle`, and most of it proved in seconds. What 010 adds is
+methodical: pure contracts, a contract on a library function, and drift guards for formulas the
+checker cannot compare with themselves. As in 008, the survey against running C++ found the
+defects (three of the library's, one of upstream's), and the planning probe, a native sweep with
+adversarial points, found that the defect was larger than the survey had shown.
+
+## Limitations (spec 010)
+
+- **Trust:** the contracts (tested against libm), the C library's determinism, the
+  `Cell::rect_bound` contract (tested on every cell to level 5 and 10⁶ random cells), IEEE
+  `fmod`'s exactness, and the drift guards' premise that identical Rust expressions compute
+  identical values (no contraction). All in `TRUSTED_BASE.md`.
+- **The widening (FR-019)** is measured, not proven: R0's margins doubled and quadrupled, with an
+  analytic reason in the rustdoc. A point the sweep does not reach could in principle need more.
+- **`Rect`'s laws** run per change in the `values-rect` leg; `p_lreg_02` takes 5 minutes.
+
+## Recommendations (FR-016) (spec 010)
+
+Ranked:
+
+1. **`PointRegion`** next for the `Region` laws (it is a cap), then **`CellUnion`'s float
+   bounds**; and `Cell`'s remaining float methods.
+2. **The two missing upstream operations (FR-020):** `S2LatLng::Encode`/`Init` (a 16-byte codec,
+   the last value type with an upstream codec and none here) and
+   `S2LatLngRect::Intersects(const S2Cell&)` (the exact cell test, which differs from
+   `MayIntersect` on 158 of 20,000 random pairs; the library has the edge helpers privately).
+3. **The other two inexact remainders:** `s1::Interval`'s private `ieee_remainder`
+   (`core/src/s1/interval.rs:594`, spec 008's T058) and the projections' `remainder`
+   (`core/src/s2/projections.rs:68`), both `x − round(x / y) · y`; `s1::angle::remainder_2pi`
+   is the exact reduction to use (spec 010 FR-017).
+4. **Validity as a bounded type** for `LatLng` (spec 009's pattern): an API change, so a spec of its
+   own.
+5. **U-016 upstream:** the maintainer decides whether to report it.
+
+## Success criteria (SC-001 … SC-013) (spec 010)
+
+{{sc}}

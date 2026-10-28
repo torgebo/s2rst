@@ -1,0 +1,19 @@
+Mutant: M-923
+Targets: P-LLARI-01
+Expect-Fail: 
+Test: verify --lib latlng_spec::latlng_spec_tests::scalings_are_angle_products
+Test: core --test cpp_latlng_diff
+Defect: `f64 * LatLng` scales only the latitude
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -282,7 +282,7 @@
+     fn mul(self, rhs: LatLng) -> LatLng {
+         LatLng {
+             lat: rhs.lat * self,
+-            lng: rhs.lng * self,
++            lng: rhs.lng,
+         }
+     }
+ }

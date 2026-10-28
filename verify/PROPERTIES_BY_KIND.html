@@ -14,8 +14,9 @@ href="values/PROPERTIES.md"><code>values/PROPERTIES.md</code></a> (the
 value types: <code>Cell</code>, <code>s1::Interval</code>,
 <code>r1::Interval</code>, <code>s2::Rect</code>, <code>r2::Rect</code>,
 <code>s2::Point</code>, <code>s1::ChordAngle</code>,
-<code>s1::Angle</code> and <code>s2::Cap</code>). The operation
-inventories carry the crash-freedom proofs.</p>
+<code>s1::Angle</code>, <code>s2::Cap</code> and
+<code>s2::LatLng</code>). The operation inventories carry the
+crash-freedom proofs.</p>
 <table>
 <colgroup>
 <col style="width: 16%" />
@@ -39,7 +40,7 @@ undefined behaviour or a hang, whatever its input</td>
 <tr class="even">
 <td><a href="#correct-result">Correct result</a></td>
 <td>an operation returns what the model says it should</td>
-<td>146</td>
+<td>156</td>
 </tr>
 <tr class="odd">
 <td><a href="#round-trip">Round trip</a></td>
@@ -50,7 +51,7 @@ undefined behaviour or a hang, whatever its input</td>
 <td><a href="#exact-output">Exact output</a></td>
 <td>an encoder or printer writes exactly the bytes or text the format
 prescribes</td>
-<td>22</td>
+<td>28</td>
 </tr>
 <tr class="odd">
 <td><a href="#exact-input">Exact input</a></td>
@@ -61,13 +62,13 @@ what they say, consumes exactly them and rejects the rest</td>
 <tr class="even">
 <td><a href="#validity">Validity</a></td>
 <td>a validity check answers exactly, and results are well formed</td>
-<td>14</td>
+<td>16</td>
 </tr>
 <tr class="odd">
 <td><a href="#laws">Laws</a></td>
 <td>operations relate to each other as they must: symmetry, idempotence,
 order independence, partition, consistency</td>
-<td>39</td>
+<td>47</td>
 </tr>
 <tr class="even">
 <td><a href="#model-checks">Model checks</a></td>
@@ -294,6 +295,23 @@ limits</td>
 <td><code>cp_crash::c_*</code></td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
+</tr>
+<tr class="odd">
+<td><code>s2::LatLng</code></td>
+<td>30 of the 31 in-scope operations (<code>to_string_in_degrees</code>’
+formatting and <code>Display</code> out): the 26 Kani entries over every
+pair of <code>f64</code> (NaN and the infinities included) but where an
+operation makes a new NaN (<code>∞ − ∞</code>, <code>0 · ∞</code>),
+<code>get_distance</code> over valid pairs (its documented domain) and,
+outside it, every pair without an infinity; the conversions and the
+distance under the contracts of <code>atan2</code>,
+<code>sin_cos</code>, <code>sin</code>, <code>cos</code>,
+<code>asin</code> (and <code>sqrt</code> outside the distance’s domain);
+the four <code>geo-types</code> conversions by composition</td>
+<td><code>ll_crash::c_*</code>,
+<code>ll_crash::o_get_distance</code></td>
+<td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
+section 12</td>
 </tr>
 </tbody>
 </table>
@@ -1392,6 +1410,14 @@ the rectangle itself.</td>
 <td><a href="src/rl_eq.rs"><code>rl_eq::p_leq_02</code></a></td>
 <td>every valid rectangle</td>
 </tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LMEM-03</a></td>
+<td>The rectangle’s point test is <code>contains_lat_lng</code> of the
+point’s <code>LatLng</code>, which is valid for every point without NaN,
+so P-LMEM-01 describes it.</td>
+<td><a href="src/rl_reg.rs"><code>rl_reg::p_lmem_03</code></a></td>
+<td>every valid rectangle and triple, by composition (P-LLFP-02)</td>
+</tr>
 </tbody>
 </table>
 <h3
@@ -1883,6 +1909,95 @@ the tolerance for the centres too.</td>
 </tr>
 </tbody>
 </table>
+<h3
+id="s2latlng-construction-conversions-normalisation-validity-distance-and-approximate-equality"><code>s2::LatLng</code>:
+construction, conversions, normalisation, validity, distance and
+approximate equality</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLCON-01</a></td>
+<td><code>new</code> and <code>from_radians</code> keep their arguments;
+the other constructors are the pairs of <code>Angle</code>’s;
+<code>invalid()</code> and the default are upstream’s.</td>
+<td><a href="src/ll_con.rs"><code>ll_con::p_llcon_01</code></a></td>
+<td>every <code>f64</code>, <code>i32</code> and <code>u32</code> pair,
+by composition (<code>Angle</code>’s constructors uninterpreted)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLTP-02</a></td>
+<td>For finite coordinates <code>to_point</code> gives finite
+coordinates in [−1, 1]; a non-finite coordinate gives NaN where it
+reaches.</td>
+<td><a href="src/ll_tp.rs"><code>ll_tp::p_lltp_02</code></a></td>
+<td>every pair of <code>f64</code>, under the <code>sin_cos</code>
+contract</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLNRM-01</a></td>
+<td><code>normalized</code> clamps the latitude as upstream does, and
+gives <code>invalid()</code> for a non-finite input.</td>
+<td><a href="src/ll_nrm.rs"><code>ll_nrm::p_llnrm_01</code></a></td>
+<td>every pair of <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLVAL-01</a></td>
+<td><code>is_valid</code> is upstream’s predicate; the default is
+valid.</td>
+<td><a href="src/ll_val.rs"><code>ll_val::p_llval_01</code></a></td>
+<td>every pair of <code>f64</code></td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDST-02</a></td>
+<td>The distance between valid <code>LatLng</code>s is a number in [0,
+π].</td>
+<td><a href="src/ll_dst.rs"><code>ll_dst::p_lldst_02</code></a></td>
+<td>every valid pair, under the contracts</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLDST-03</a></td>
+<td>The distance from a valid <code>LatLng</code> to itself is +0.</td>
+<td><a href="src/ll_dst.rs"><code>ll_dst::p_lldst_03</code></a></td>
+<td>every valid <code>LatLng</code>, under the contracts</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLAPX-01</a></td>
+<td>Approximate equality is upstream’s: both coordinates within the
+margin, inclusively; the default margin is 10⁻¹⁵.</td>
+<td><a href="src/ll_apx.rs"><code>ll_apx::p_llapx_01</code></a>
+(weekly)</td>
+<td>every two pairs without <code>∞ − ∞</code>, every margin</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLGEO-01</a></td>
+<td>The <code>geo-types</code> conversions are degrees, x the longitude
+and y the latitude.</td>
+<td>—</td>
+<td>every pair, by composition from <code>Angle</code>’s conversions
+(the crate does not build <code>geo-types</code> for the checker)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDES-01</a></td>
+<td>Deserialisation accepts every pair and round-trips.</td>
+<td>—</td>
+<td>not proven: tested (<code>latlng_tests</code>)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="round-trip">Round trip</h2>
 <p>Converting a value one way and back gives the original value,
 consuming exactly what was written. For the vector codecs Kani proves it
@@ -2228,6 +2343,59 @@ exactly 0 or ±2π and lands in [−π, π].</td>
 <td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_05</code></a></td>
 <td>every |x| ≤ 3π/2 (a drift-guarded copy)</td>
 </tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLFP-01</a></td>
+<td><code>latitude</code> and <code>longitude</code> are upstream’s
+formulas, <code>+ 0.0</code> included; <code>from_point</code> is the
+pair.</td>
+<td><a href="src/ll_fp.rs"><code>ll_fp::p_llfp_01</code></a>; the drift
+guard <code>latlng_spec_tests</code></td>
+<td>every triple: the longitude under the <code>atan2</code> contract,
+the latitude by composition (the guard)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLTP-01</a></td>
+<td><code>to_point</code> is upstream’s formula.</td>
+<td><a href="src/ll_tp.rs"><code>ll_tp::p_lltp_01</code></a>; the drift
+guard <code>latlng_spec_tests</code></td>
+<td>every pair: <code>z</code> under the <code>sin_cos</code> contract,
+the products by composition (the guard)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLNRM-02</a></td>
+<td><code>normalized</code>’s longitude is upstream’s
+<code>remainder(lng, 2π)</code>, exactly: ties to even, a zero’s sign
+kept.</td>
+<td>—</td>
+<td>every finite input, by composition (P-LLNRM-03 and IEEE
+<code>fmod</code>); tested against the exact remainder</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLNRM-03</a></td>
+<td>The reduction’s correction step lands in [−π, π], moves its input by
+exactly 0 or ±2π, and breaks ties by the quotient’s parity.</td>
+<td><a href="src/ll_nrm.rs"><code>ll_nrm::p_llnrm_03</code></a></td>
+<td>every <code>|r| &lt; 2π</code>, on a drift-guarded copy</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDST-01</a></td>
+<td><code>get_distance</code> is upstream’s haversine, with the clamp
+before the root.</td>
+<td>the drift guard <code>latlng_spec_tests</code>, with the lemma
+L-LL-02 (<code>ll_lem::l_ll_02</code>)</td>
+<td>every pair without <code>∞ − ∞</code>, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLARI-01</a></td>
+<td><code>+</code>, <code>−</code> and the scalings act on each
+coordinate, as upstream’s; <code>k * ll</code> is
+<code>ll * k</code>.</td>
+<td><a href="src/ll_ari.rs"><code>ll_ari::p_llari_01__add</code></a>, <a
+href="src/ll_ari.rs"><code>ll_ari::p_llari_01__sub</code></a>; the drift
+guard <code>latlng_spec_tests</code></td>
+<td>every pair without <code>∞ − ∞</code>; the scalings by
+composition</td>
+</tr>
 </tbody>
 </table>
 <h2 id="exact-input">Exact input</h2>
@@ -2514,6 +2682,21 @@ cap.</td>
 <td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_04</code></a></td>
 <td>every box cap, under the <code>asin</code>, <code>atan2</code>,
 <code>cos</code> contracts</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLFP-02</a></td>
+<td><code>from_point</code> gives a valid <code>LatLng</code> exactly
+for the points without a NaN coordinate, the zero vector and the
+infinities included.</td>
+<td><a href="src/ll_fp.rs"><code>ll_fp::p_llfp_02</code></a></td>
+<td>every triple, under the <code>atan2</code> contract</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLNRM-04</a></td>
+<td><code>normalized</code> returns a valid <code>LatLng</code> for
+every finite input.</td>
+<td>—</td>
+<td>every finite pair, by composition (P-LLNRM-01, -02)</td>
 </tr>
 </tbody>
 </table>
@@ -2842,6 +3025,65 @@ not its range</td>
 equality.</td>
 <td><a href="src/cp_eq.rs"><code>cp_eq::p_cpcod_01</code></a></td>
 <td>every valid cap, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLNRM-05</a></td>
+<td><code>normalized</code> leaves a valid <code>LatLng</code>
+unchanged, bit for bit.</td>
+<td>—</td>
+<td>every valid pair, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDST-04</a></td>
+<td>The distance is symmetric within 10⁻¹⁴ rad.</td>
+<td>—</td>
+<td>not proven: it needs the functions’ values (the formula is not
+symmetric bit for bit, upstream’s neither)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLAPX-02</a></td>
+<td>Approximate equality is symmetric, and reflexive for finite
+coordinates and a non-negative margin.</td>
+<td><a href="src/ll_apx.rs"><code>ll_apx::p_llapx_02</code></a>
+(weekly)</td>
+<td>every two pairs without <code>∞ − ∞</code>, every margin</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLEQ-01</a></td>
+<td><code>==</code> compares the coordinates, and is an equivalence
+without NaN.</td>
+<td><a href="src/ll_eq.rs"><code>ll_eq::p_lleq_01</code></a></td>
+<td>every three pairs</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LREG-01</a></td>
+<td>The generic <code>Region</code> law holds for <code>Rect</code>:
+containing a cell implies intersecting it.</td>
+<td><a href="src/rl_reg.rs"><code>rl_reg::p_lreg_01</code></a></td>
+<td>every valid rectangle and cell, under contract (L-LL-01)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LREG-02</a></td>
+<td>A cell the rectangle does not intersect has no vertex the rectangle
+contains.</td>
+<td><a href="src/rl_reg.rs"><code>rl_reg::p_lreg_02</code></a></td>
+<td>every valid rectangle and abstract cell, under the
+<code>Cell::rect_bound</code> contract</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LREG-03</a></td>
+<td>The rectangle’s bounding cap contains every point the rectangle
+contains (after FR-019’s widening).</td>
+<td>—</td>
+<td>not proven: it needs <code>atan2</code>’s and <code>sin_cos</code>’s
+values; tested natively, by the quickcheck twin and the C++ rows</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LREG-04</a></td>
+<td>Every cell the rectangle contains lies in its covering.</td>
+<td>—</td>
+<td>not proven: the covering’s level needs <code>asin</code>’s value, as
+P-CPREG-04</td>
 </tr>
 </tbody>
 </table>

@@ -98,31 +98,31 @@ affected harness. Never change upstream code, never file upstream.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Add the `ll_*` modules, `rl_reg` and `latlng_spec` to `verify/src/lib.rs`, and the
+- [X] T001 Add the `ll_*` modules, `rl_reg` and `latlng_spec` to `verify/src/lib.rs`, and the
   `ll_*` part to `verify/Cargo.toml`'s `values` comment (contracts/harness-conventions.md).
-- [ ] T002 [P] Extend `make verify-values` with `P=latlng` in `Makefile` (its comment, the
+- [X] T002 [P] Extend `make verify-values` with `P=latlng` in `Makefile` (its comment, the
   `VALUES_HARNESSES` chain, the default list, the target's help text).
-- [ ] T003 [P] Add the record sections: `verify/values/INVENTORY.md` §12 and
+- [X] T003 [P] Add the record sections: `verify/values/INVENTORY.md` §12 and
   `verify/values/PROPERTIES.md` §11 headers, filled in by T020 and T031.
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T004 Write `verify/src/latlng_spec.rs` and `verify/src/latlng_spec_tests.rs`: the
+- [X] T004 Write `verify/src/latlng_spec.rs` and `verify/src/latlng_spec_tests.rs`: the
   description and restatements (data-model §1), unit tests at the special values, and the drift
   guard of `reduce_fmod_copy` (after T012 lands the function it copies).
-- [ ] T005 Extend `verify/src/stubs.rs`: the pure contracts, `sqrt_contract`, `pure_sqrt`,
+- [X] T005 Extend `verify/src/stubs.rs`: the pure contracts, `sqrt_contract`, `pure_sqrt`,
   `pure_from_point`, `any_cell_bound`, `cell_rect_bound_contract` (data-model §3; research R5,
   R6).
-- [ ] T006 [P] Extend `verify/src/value_domain.rs` with `any_lat_lng_bits` and
+- [X] T006 [P] Extend `verify/src/value_domain.rs` with `any_lat_lng_bits` and
   `any_finite_lat_lng` (data-model §2).
-- [ ] T007 [P] Add `tools/refgen-cpp/generate_latlng.cc` (a `CMakeLists.txt` target, a README
+- [X] T007 [P] Add `tools/refgen-cpp/generate_latlng.cc` (a `CMakeLists.txt` target, a README
   step) and generate `core/tests/data/cpp_latlng_vectors.csv` (research R9).
-- [ ] T008 Extend `verify/tests/values_spec_vs_cpp.rs` with the `LATLNG_*` sections against
+- [X] T008 Extend `verify/tests/values_spec_vs_cpp.rs` with the `LATLNG_*` sections against
   `latlng_spec`'s restatements (depends on T004, T007).
-- [ ] T009 [P] Extend `verify/tests/libm_contracts.rs`: `sqrt_contract` (specials and 10⁶
+- [X] T009 [P] Extend `verify/tests/libm_contracts.rs`: `sqrt_contract` (specials and 10⁶
   random inputs), and the `Cell::rect_bound` contract on every cell to level 5 and 10⁶ random
   cells (research R6).
-- [ ] T010 Write `verify/src/ll_lem.rs` (L-LL-01) and measure it first (`make verify-harness
+- [X] T010 Write `verify/src/ll_lem.rs` (L-LL-01) and measure it first (`make verify-harness
   H=ll_lem::l_ll_01`).
 
 ## Phase 3: User Story 4 — Parity restored (Priority: P2)
@@ -162,10 +162,10 @@ affected harness. Never change upstream code, never file upstream.
 **Independent test**: `make verify-values P=latlng` reports every `ll_crash` harness
 `SUCCESSFUL` with its covers satisfied.
 
-- [ ] T019 [US1] Write `verify/src/ll_crash.rs` (data-model §5 rows 1–9; `o_get_distance` for
+- [X] T019 [US1] Write `verify/src/ll_crash.rs` (data-model §5 rows 1–9; `o_get_distance` for
   the pairs outside the documented domain).
-- [ ] T020 [US1] Run the crash suite and fill `verify/values/INVENTORY.md` §12.
-- [ ] T021 [US1] Record any undocumented precondition a proof needed (spec FR-004; SC-010).
+- [X] T020 [US1] Run the crash suite and fill `verify/values/INVENTORY.md` §12.
+- [X] T021 [US1] Record any undocumented precondition a proof needed (spec FR-004; SC-010).
 
 ## Phase 5: User Story 2 — Proven meaning (Priority: P1)
 
@@ -174,18 +174,18 @@ affected harness. Never change upstream code, never file upstream.
 **Independent test**: every entry proven, by composition or under contract, or not proven with
 a reason; each proven one killed by a mutant.
 
-- [ ] T022 [P] [US2] P-LLCON-01 in `verify/src/ll_con.rs`.
-- [ ] T023 [P] [US2] P-LLFP-01, -02 in `verify/src/ll_fp.rs`.
-- [ ] T024 [P] [US2] P-LLTP-01, -02 in `verify/src/ll_tp.rs`.
-- [ ] T025 [P] [US2] P-LLNRM-01, -03 in `verify/src/ll_nrm.rs`; the compositions P-LLNRM-02,
+- [X] T022 [P] [US2] P-LLCON-01 in `verify/src/ll_con.rs`.
+- [X] T023 [P] [US2] P-LLFP-01, -02 in `verify/src/ll_fp.rs`.
+- [X] T024 [P] [US2] P-LLTP-01, -02 in `verify/src/ll_tp.rs`.
+- [X] T025 [P] [US2] P-LLNRM-01, -03 in `verify/src/ll_nrm.rs`; the compositions P-LLNRM-02,
   -04, -05 written down in the module's documentation.
-- [ ] T026 [P] [US2] P-LLVAL-01 in `verify/src/ll_val.rs`.
-- [ ] T027 [P] [US2] P-LLDST-01 to -03 in `verify/src/ll_dst.rs`.
-- [ ] T028 [P] [US2] P-LLAPX-01, -02 in `verify/src/ll_apx.rs`.
-- [ ] T029 [P] [US2] P-LLARI-01 in `verify/src/ll_ari.rs`; P-LLEQ-01 in `verify/src/ll_eq.rs`.
-- [ ] T030 [US2] P-LLGEO-01 and P-LLDES-01: the composition argument and the tests they rest on
+- [X] T026 [P] [US2] P-LLVAL-01 in `verify/src/ll_val.rs`.
+- [X] T027 [P] [US2] P-LLDST-01 to -03 in `verify/src/ll_dst.rs`.
+- [X] T028 [P] [US2] P-LLAPX-01, -02 in `verify/src/ll_apx.rs`.
+- [X] T029 [P] [US2] P-LLARI-01 in `verify/src/ll_ari.rs`; P-LLEQ-01 in `verify/src/ll_eq.rs`.
+- [X] T030 [US2] P-LLGEO-01 and P-LLDES-01: the composition argument and the tests they rest on
   (`latlng_tests::serde_round_trip`; the `geo_types_interop` tests).
-- [ ] T031 [US2] Run the part and fill `verify/values/PROPERTIES.md` §11 (spec SC-003).
+- [X] T031 [US2] Run the part and fill `verify/values/PROPERTIES.md` §11 (spec SC-003).
 
 ## Phase 6: User Story 3 — The `Region` laws for `Rect` (Priority: P2)
 
@@ -194,21 +194,21 @@ a reason; each proven one killed by a mutant.
 **Independent test**: `make verify-values P=rect` runs `rl_reg`'s harnesses; each fails on its
 mutant.
 
-- [ ] T032 [US3] Write `verify/src/rl_reg.rs`: P-LREG-01, P-LREG-02, P-LMEM-03 (research R6).
-- [ ] T033 [US3] Run them and record P-LREG-01 to -04 and P-LMEM-03 in
+- [X] T032 [US3] Write `verify/src/rl_reg.rs`: P-LREG-01, P-LREG-02, P-LMEM-03 (research R6).
+- [X] T033 [US3] Run them and record P-LREG-01 to -04 and P-LMEM-03 in
   `verify/values/PROPERTIES.md` §5 (replacing its closing note on the `region` laws).
-- [ ] T034 [US3] Write the mutants `verify/mutants/M-901…` (data-model §7) and run them
+- [X] T034 [US3] Write the mutants `verify/mutants/M-901…` (data-model §7) and run them
   (`make verify-mutants M='M-9*'`); record them in `verify/MUTANTS.md`.
 
 ## Phase 7: User Story 5 — CI, records and evaluation (Priority: P3)
 
-- [ ] T035 [US5] Extend `.github/workflows/verify.yml`: `values-latlng` in the `verify`
+- [X] T035 [US5] Extend `.github/workflows/verify.yml`: `values-latlng` in the `verify`
   matrix, `cpp_latlng_vectors.csv` in the path filters, series `9` in `mutants`
   (contracts/verify-commands.md).
-- [ ] T036 [P] [US5] Extend `verify/TRUSTED_BASE.md`: the pure contracts, `sqrt_contract`, the
+- [X] T036 [P] [US5] Extend `verify/TRUSTED_BASE.md`: the pure contracts, `sqrt_contract`, the
   `Cell::rect_bound` contract, IEEE `fmod`'s exactness.
-- [ ] T037 [P] [US5] `verify/PROPERTIES_BY_KIND.md` and its HTML render (spec SC-011).
-- [ ] T038 [P] [US5] `VERIFIED_TYPES.md`: §2.11 for `LatLng`, §3's `Region` row gains `Rect`,
+- [X] T037 [P] [US5] `verify/PROPERTIES_BY_KIND.md` and its HTML render (spec SC-011).
+- [X] T038 [P] [US5] `VERIFIED_TYPES.md`: §2.11 for `LatLng`, §3's `Region` row gains `Rect`,
   the missing upstream operations (FR-020); `CORE_TRAITS.md`'s `Region` invariants name
   `Rect`'s instances; `verify/COVERAGE.md`.
 - [ ] T039 [US5] Write the spec-010 part of `verify/values/EVALUATION.md` (spec FR-016,

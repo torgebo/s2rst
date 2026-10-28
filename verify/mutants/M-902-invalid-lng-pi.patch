@@ -1,0 +1,17 @@
+Mutant: M-902
+Targets: P-LLCON-01
+Expect-Fail: ll_con::p_llcon_01
+Defect: `invalid()` is `(π, π)`, a valid pair
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -131,7 +131,7 @@
+     /// Returns a `LatLng` for which `is_valid()` will return false.
+     #[inline]
+     pub fn invalid() -> Self {
+-        LatLng::from_radians(PI, 2.0 * PI)
++        LatLng::from_radians(PI, PI)
+     }
+ 
+     /// Computes the latitude of a direction vector (not necessarily unit length).

@@ -552,3 +552,42 @@ measurements and the tool limits are in `verify/COVERAGE.md`; what the proofs tr
 
 `expanded_by_distance` counts as weekly: its shrinking branch proves per change, its growing one
 weekly. `Display` (9 rows) stays out (gap 3).
+
+## 12. `s2::LatLng` (33 entries)
+
+Spec 010 (`specs/010-formal-verify-latlng/data-model.md` §5). The 19 inherent operations; the
+operators `Add`, `Sub`, `Mul<LatLng> for f64`, `Mul<f64> for LatLng`; `Default`, `Display`,
+`PartialEq`; `From<Point> for LatLng` and `From<LatLng> for Point`; the derived `Deserialize`;
+the four `geo-types` conversions (an optional integration). The derived `Clone`, `Copy`, `Debug`
+and `Serialize` are not entries. A `LatLng` has no validity invariant, so most domains are every
+pair of `f64` (`AnyLatLng2`), narrowed only where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`)
+or by a documented precondition.
+
+Statuses as section 9's. The rows group the entries.
+
+**Summary** (T020, 2026-10-28): 31 in scope, 2 excluded (`Display`, and
+`to_string_in_degrees`' formatting). 26 entries have Kani crash proofs over their whole
+documented domains, every one `SUCCESSFUL` with its covers satisfied: 5 rows on the real code
+and 3 under the function contracts (`atan2`, `sin_cos`, `sin`, `cos`, `asin`; `sqrt` too outside
+`get_distance`'s domain), 9 harnesses, 35.5 s of harness time (`make verify-values P=latlng`).
+The four `geo-types` conversions are crash-free by composition, `Deserialize` is tested. No
+undocumented precondition was needed: `to_point`'s finite coordinates and `get_distance`'s
+normalised inputs were documented already, and the proofs show what happens outside them (NaN,
+no panic; FR-004, SC-010). `o_get_distance` first failed on CBMC's built-in `sqrt`, which
+computes the NaN of a negative argument through a division its NaN check reports; under
+`sqrt_contract` it proves.
+
+| # | entries | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|---------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `s2::LatLng::new`, `from_radians`, `from_degrees`, `invalid`, `is_valid`, `Default`, `PartialEq` | in scope |  | `AnyF64²` |  | `ll_crash::c_construction` (0.3 s) | proven |
+| 2 | `s2::LatLng::from_e5`, `from_e6`, `from_e7`, `from_unsigned_e6`, `from_unsigned_e7` | in scope |  | `AnyI32²`, `AnyU32²` |  | `ll_crash::c_e_forms` (0.3 s) | proven |
+| 3 | `s2::LatLng::latitude`, `longitude`, `from_point`, `From<Point> for LatLng` | in scope (under contract) |  | `AnyTriple` |  | `ll_crash::c_from_point` (10.7 s; `atan2_contract`) | proven-under-contract |
+| 4 | `s2::LatLng::to_point`, `From<LatLng> for Point` | in scope (under contract) |  | `AnyLatLng2` | finite coordinates for a meaningful result (upstream's debug check; documented): outside it the coordinates are NaN, no panic | `ll_crash::c_to_point` (0.4 s; `sin_cos_contract`) | proven-under-contract |
+| 5 | `s2::LatLng::normalized` | in scope |  | `AnyLatLng2` |  | `ll_crash::c_normalized` (0.9 s; independent of `%`'s value) | proven |
+| 6 | `s2::LatLng::get_distance` | in scope (under contract) |  | `ValidLatLng²`; outside it every pair without an infinite coordinate (`o_get_distance`) | both normalised (documented; upstream logs) | `ll_crash::c_get_distance` (14.7 s; `sin_contract`, `cos_contract`, `asin_contract`), `ll_crash::o_get_distance` (7.2 s; also `sqrt_contract`) | proven-under-contract |
+| 7 | `s2::LatLng::approx_eq`, `approx_eq_with` | in scope |  | `AnyLatLng2²` without `∞ − ∞` × `AnyF64` |  | `ll_crash::c_approx_eq` (0.4 s) | proven |
+| 8 | `Add`, `Sub`, `Mul<LatLng> for f64`, `Mul<f64> for LatLng` | in scope |  | `AnyLatLng2²` without `∞ − ∞`; every factor without `0 · ∞` |  | `ll_crash::c_arithmetic` (0.6 s) | proven |
+| 9 | `s2::LatLng::to_string_in_degrees` | excluded | `core::fmt` is too slow for Kani, as every type's text; its normalisation is row 5's, and the `LATLNG_STR` rows check the string |  |  |  | — |
+| 10 | `Display for LatLng` | excluded | `core::fmt` |  |  |  | — |
+| 11 | `Deserialize for LatLng` (derived) | in scope (tested) |  | every serialised `LatLng` |  | `latlng_tests::prop_serde_accepts_every_pair` (not a Kani entry) | tested |
+| 12 | `From<Coord> for LatLng`, `From<LatLng> for Coord`, `From<geo_types::Point> for LatLng`, `From<LatLng> for geo_types::Point` | in scope (by composition) |  | every `f64` pair |  | each is one `from_degrees` or two `degrees` calls (`geo_types_interop.rs:114–155`), crash-free for every `f64` by `ag_crash::c_construction_and_accessors` (spec 007); the verification crate does not enable `geo-types` | proven-by-composition |

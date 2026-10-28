@@ -1,0 +1,19 @@
+Mutant: M-916
+Targets: P-LLDST-01
+Expect-Fail: 
+Test: verify --lib latlng_spec::latlng_spec_tests::conversions_are_the_restatements
+Test: core --test cpp_latlng_diff
+Defect: `get_distance` omits the factor 2
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -224,7 +224,7 @@
+         let x = dlat * dlat + dlng * dlng * lat1.cos() * lat2.cos();
+         // Upstream's `sqrt(min(1.0, x))`: clamping after the root would turn a negative `x`
+         // (NaN) into 1 (spec 010 FR-018).
+-        Angle::from_radians(2.0 * x.min(1.0).sqrt().asin())
++        Angle::from_radians(x.min(1.0).sqrt().asin())
+     }
+ 
+     /// Reports whether the coordinates of two `LatLngs` are close, within the

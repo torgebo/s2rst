@@ -7,8 +7,8 @@ implementation steps.
 State on branch `003-next-specs/1` at commit `537e7fd` (2026-10-07), with the six value types
 of specs 004–006 added on 2026-10-14 (sections 2.4–2.6) and spec 007's two on 2026-10-18
 (section 2.7; the counts in section 1 and the tables of sections 3 and 4 include them), and
-spec 008's `Cap` on 2026-10-25 (section 2.9), and spec 009's bounded types on 2026-10-27 (section
-2.10). Sources: the inventories (`verify/INVENTORY.md`,
+spec 008's `Cap` on 2026-10-25 (section 2.9), spec 009's bounded types on 2026-10-27 (section
+2.10), and spec 010's `LatLng`, with `Rect`'s `Region` laws, on 2026-10-28 (section 2.11). Sources: the inventories (`verify/INVENTORY.md`,
 `verify/cell_union/INVENTORY.md`, `verify/decoding/INVENTORY.md`, `verify/values/INVENTORY.md`),
 their property catalogues and evaluations, and `cargo kani list` on the current tree.
 
@@ -24,13 +24,13 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 |---|---|
 | Crate size | 113,700 non-test lines in 127 files; `s2/` alone is 105,200, of which `builder/` 18,300 and `boolean_operation/` 6,300 |
 | Public items | 196 structs, 35 enums, 13 trait definitions (9 names; `Target` and `DistanceTarget` are defined in several query modules) |
-| Code the proofs exercise | about 6,500 lines (5.7 %): `cell_id.rs`, `cell_union.rs`, the four vector codec files, and the codec impls in `encoding.rs`; and the value types' files, about 9,400 lines with their tests' files left out (`s2/cell.rs`, `s1/interval.rs`, `r1/interval.rs`, `s2/rect.rs`, `r2/rect.rs`, `s2/point.rs`, `s1/chord_angle.rs`, `s1/angle.rs`, `s2/cap.rs`). Not every line of those files is proven (section 2) |
-| Types with their own proof suite | `CellId` (spec 001), `CellUnion` (spec 002), the decoding layer (spec 003), `Cell` and `s1::Interval` (spec 004, section 2.4), `r1::Interval` and `s2::Rect` (spec 005, section 2.5), `r2::Rect` and `s2::Point` (spec 006, section 2.6), `s1::ChordAngle` and `s1::Angle` (spec 007, section 2.7), `s2::Cap` (spec 008, section 2.9) |
+| Code the proofs exercise | about 6,500 lines (5.7 %): `cell_id.rs`, `cell_union.rs`, the four vector codec files, and the codec impls in `encoding.rs`; and the value types' files, about 9,400 lines with their tests' files left out (`s2/cell.rs`, `s1/interval.rs`, `r1/interval.rs`, `s2/rect.rs`, `r2/rect.rs`, `s2/point.rs`, `s1/chord_angle.rs`, `s1/angle.rs`, `s2/cap.rs`, `s2/latlng.rs`). Not every line of those files is proven (section 2) |
+| Types with their own proof suite | `CellId` (spec 001), `CellUnion` (spec 002), the decoding layer (spec 003), `Cell` and `s1::Interval` (spec 004, section 2.4), `r1::Interval` and `s2::Rect` (spec 005, section 2.5), `r2::Rect` and `s2::Point` (spec 006, section 2.6), `s1::ChordAngle` and `s1::Angle` (spec 007, section 2.7), `s2::Cap` (spec 008, section 2.9), `s2::LatLng` (spec 010, section 2.11) |
 | Types reached only through other proofs | `Level`, `Face` (section 2.8) |
-| Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for 2 methods of 1 implementor (`CellUnion`) and the generic laws for `Cell` and `Cap` (three of `Cap`'s four, with lemma stubs); the codec round trip under `Cap`'s own equality; the equality laws for the nine value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
-| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`); 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
+| Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for 2 methods of 1 implementor (`CellUnion`) and the generic laws for `Cell`, `Cap` (three of four, with lemma stubs) and `Rect` (two of four, under contract, spec 010); the codec round trip under `Cap`'s own equality; the equality laws for the ten value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
+| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45), plus 27 from spec 010 (24 `ll_*`, 3 `rl_reg`); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`), plus 2 from spec 010; 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
 | Verus | 5 restated codecs, 132 obligations, 17 s |
-| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007 and 41 `M-7NN` for spec 008, all killed |
+| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008 and 36 `M-9NN` for spec 010, all killed |
 
 ## 2. Types with proofs
 
@@ -245,12 +245,48 @@ outside it:
 Non-vacuity: M-803 and M-806 (re-pointed to `Level::new` and `LevelMod::new`), and M-809, M-810
 and M-811 (each `try_from` accepting one value too many). The proofs take under a second each.
 
+### 2.11 `s2::LatLng`, and `s2::Rect` as a `Region` (spec 010)
+
+- **Scope:** 31 of 33 `LatLng` entries (the 19 inherent operations, the four operators,
+  `Default`, `PartialEq`, both `From<Point>` conversions, `Deserialize`, the four `geo-types`
+  conversions; `Display` and `to_string_in_degrees`' formatting excluded), and the four generic
+  `Region` laws for `Rect`.
+- **Changed first (K1, K3, K4; FR-017 to FR-019), each with a test that failed before:**
+  `normalized` reduces the longitude with upstream's exact `remainder(lng, 2π)`, shared with
+  `Angle::normalized` (`s1::angle::remainder_2pi`; it returned −4.0 for 10¹⁶); `get_distance`
+  clamps before the root (NaN where upstream gives NaN); `Rect::cap_bound` widens upstream's cap
+  by 10⁻¹⁵ rad and 8ε of its length², since upstream's misses contained points next to the
+  boundary (U-016). New C++ vectors (`cpp_latlng_vectors.csv`, seven sections) match every row
+  but the widened radii.
+- **Proven:** crash freedom of the 26 Kani entries over every pair of `f64` (the distance over
+  its documented domain, and outside it every finite pair), 9 harnesses in 35.5 s; all 19 counted
+  catalogue entries: validity, the clamp, the exact reduction's step, `from_point`'s validity for
+  every point without NaN, the distance's range and zero, the arithmetic, equality, and
+  approximate equality (weekly), plus five by composition (the restatements through drift guards,
+  the constructors with `Angle`'s uninterpreted, `normalized`'s remainder through IEEE `fmod`).
+  For `Rect`: containment implies intersection (P-LREG-01) and the vertex law (P-LREG-02), and
+  its point test receives a valid `LatLng` (P-LMEM-03).
+- **New methods.** *Pure contracts*: one contract value per input, so a restatement that calls
+  `sin`, `cos`, `atan2` or `sqrt` again gets the library's value. *A contract on a library
+  function*: `Cell::rect_bound` contains its vertices' `LatLng`s, tested on every cell to level 5
+  and 10⁶ random cells. *Drift guards for formulas*: a restatement compared with the library's
+  text, where a second copy of its float products times out.
+- **Not proven:** the distance's symmetry within a tolerance (needs the functions' values);
+  `Rect`'s bounding-cap and covering laws (P-LREG-03, -04: the values of `atan2`, `sin_cos` and
+  `asin`); the C++ vectors, the native boundary sweep and the quickcheck twins check them.
+- **Missing upstream operations (FR-020, follow-ups):** `S2LatLng::Encode`/`Init` (a 16-byte
+  codec) and `S2LatLngRect::Intersects(const S2Cell&)` (the exact cell test; the library's
+  `intersects_cell` is upstream's `MayIntersect`).
+- **Records:** `verify/values/INVENTORY.md` §12, `PROPERTIES.md` §11 and `Rect`'s rows in §5,
+  the spec-010 part of `EVALUATION.md`, `TRUSTED_BASE.md`, `MUTANTS.md` (`M-901` … `M-936`),
+  `UPSTREAM.md` (U-016).
+
 ## 3. Traits
 
 | Trait | Implementors | With proofs | Without |
 |-------|--------------|-------------|---------|
 | `S2Encode` / `S2Decode` | 12 | `CellId`, `Point`, `Cap`, `Rect`, `Cell` (003), with `Cap`'s round trip also under its own equality (008); `CellUnion` (002) | `Polyline`, `Loop`, `Polygon`, `LaxPolyline`, `LaxPolygon`, `PointVector` |
-| `Region` | 12 | `CellUnion::contains_cell` and `intersects_cell`, within size bounds (002); for `Cell`, the generic laws and `contains_cell`, `intersects_cell` and `cell_union_bound` (004); for `Rect`, `rect_bound` (005); for `Cap`, three of the four generic laws (containment implies intersection, no vertex of a non-intersected cell, the bounding cap) with lemma stubs, the crash freedom of five of the six methods (`cell_union_bound`'s, under contract, times out weekly) and `Cell::cap_bound` containing the cell's vertices (008) | `Cap`'s covering law (needs `asin`'s value); `CellUnion`'s float methods (`cap_bound`, `rect_bound`, `cell_union_bound`, `contains_point`); `Cell`'s `cap_bound`, `rect_bound` and `contains_point`; `Rect`'s other five; and every method of `Loop`, `Polygon`, `Polyline`, `PointRegion`, `RegionUnion`, `RegionIntersection`, `ShapeIndexRegion`, `ShapeIndexBufferedRegion` |
+| `Region` | 12 | `CellUnion::contains_cell` and `intersects_cell`, within size bounds (002); for `Cell`, the generic laws and `contains_cell`, `intersects_cell` and `cell_union_bound` (004); for `Rect`, `rect_bound` (005), and containment implies intersection and the vertex law under contract, and the point test's `LatLng` (010); for `Cap`, three of the four generic laws (containment implies intersection, no vertex of a non-intersected cell, the bounding cap) with lemma stubs, the crash freedom of five of the six methods (`cell_union_bound`'s, under contract, times out weekly) and `Cell::cap_bound` containing the cell's vertices (008) | `Cap`'s and `Rect`'s covering laws (need `asin`'s value); `Rect`'s bounding-cap law (needs `atan2`'s and `sin_cos`'s values; widened against U-016 and tested); `CellUnion`'s float methods (`cap_bound`, `rect_bound`, `cell_union_bound`, `contains_point`); `Cell`'s `cap_bound`, `rect_bound` and `contains_point`; and every method of `Loop`, `Polygon`, `Polyline`, `PointRegion`, `RegionUnion`, `RegionIntersection`, `ShapeIndexRegion`, `ShapeIndexBufferedRegion` |
 | `Shape` | 13 | none | all (the other branch has pilots, section 6, step 4) |
 | `Target` / `DistanceTarget` | 5 | none | `PointTarget`, `EdgeTarget`, `CellTarget`, `CellUnionTarget`, `ShapeIndexTarget` |
 | `Projection` | 2 | none | `PlateCarreeProjection`, `MercatorProjection` |
@@ -258,7 +294,7 @@ and M-811 (each `try_from` accepting one value too many). The proofs take under 
 | `Layer` | 15 | none | every builder layer |
 | Standard traits on `CellId` | | `Default`, `From<u64>`, `From<CellId> for u64`, `FromStr` | `Display`, `From<&Point>`, `From<&LatLng>` |
 | Standard traits on `CellUnion` | | `Deref`, `FromIterator`, both `IntoIterator` | `Display` |
-| Standard traits on the value types (004–008) | | `PartialEq` (the equivalence laws, and upstream's meaning where it differs from field equality, as `Cap`'s empty and full caps whatever their centres), `Default`, `From` conversions; `Point`'s `PartialOrd` (a total order without NaN) | `Display` |
+| Standard traits on the value types (004–010) | | `PartialEq` (the equivalence laws, and upstream's meaning where it differs from field equality, as `Cap`'s empty and full caps whatever their centres), `Default`, `From` conversions; `Point`'s `PartialOrd` (a total order without NaN) | `Display` |
 
 The decoding layer states its contract once, generically, over a `Codec` trait in
 `verify/src/codec.rs`, and instantiates it per codec. That is the pattern to reuse for the
@@ -271,7 +307,7 @@ Line counts are non-test lines. "Evidence" lists what checks the code today.
 | Group | Main types | Lines | Evidence today | Fit for proof |
 |-------|------------|-------|----------------|---------------|
 | Value types in `r1`–`r3`, `s1` | `r2::Point`, `Vector`, `PreciseVector`, `ExactFloat`, `Matrix3x3` (`s1::Interval`, `r1::Interval`, `r2::Rect`, `ChordAngle`, `Angle`: sections 2.4–2.7) | 6,600 (7,400 before spec 007 moved its 800) | property tests (`angle`, `chord`, `s1interval`, `r2`, `r3`); Kani pilots on the other branch | good: comparisons, additions and laws prove in seconds; asserting on products of floats does not finish (section 6, step 3) |
-| Value types in `s2` | `LatLng`, `Cap`, `Metric`, `PaddedCell`, `coords`, earth units, projections, and the floating-point geometry of `Cell` and `Rect` (their other operations, and `Point`: sections 2.4–2.6) | 11,500 | C++ cross-validation (`CELL_AREA`, `CELL_VERTICES`, `LATLNG_*`, `POINT_DISTANCE`, `RECT_OPERATIONS`); property tests | mixed: integer and ordering parts are cheap, geometry needs float bounds |
+| Value types in `s2` | `Metric`, `PaddedCell`, `coords`, earth units, projections, and the floating-point geometry of `Cell` and `Rect` (their other operations, and `Point`: sections 2.4–2.6) | 11,500 | C++ cross-validation (`CELL_AREA`, `CELL_VERTICES`, `LATLNG_*`, `POINT_DISTANCE`, `RECT_OPERATIONS`); property tests | mixed: integer and ordering parts are cheap, geometry needs float bounds |
 | Shapes and measures | `Loop`, `Polygon`, `Polyline`, the `Lax*` shapes, `PointVector`, `EdgeVectorShape`, `WrappedShape`, measures, centroids | 16,400 | unit and property tests; C++ boolean-operation vectors; fuzzed decoders | `Shape` laws at small sizes (piloted); `Loop` construction runs out of memory at 3 symbolic vertices |
 | Predicates and edges | `predicates`, `edge_crossings`, `EdgeCrosser`, `edge_distances`, the clippers, `EdgeTessellator`, `RobustCellClipper` | 9,200 | C++ cross-validation (crossings, distances); unit tests | needs certified floating-point error bounds, a different method |
 | Indexes, queries, regions | `ShapeIndex`, `CellIndex`, `S2PointIndex`, the closest/furthest/crossing/contains queries, `ValidationQuery`, `RegionCoverer`, the region adaptors | 23,700 | integration tests (`shape_index_queries`, `region_covering`) | poor: large state; rely on tests and differential checks |
@@ -426,7 +462,8 @@ breaking change for the maintainer. *(2026-10-18):* spec 007 added `ChordAngle` 
 maintainer chose option B, which makes it the first value type to keep its own invariant) and
 `Angle` (section 2.7). `coords` has no spec yet; `LatLng` and `Cap` are ranked in spec 007's
 evaluation. *(2026-10-25):* spec 008 added `Cap` (section 2.9); its evaluation ranks `LatLng`
-next as a value type, now with an `atan2` contract.
+next as a value type, now with an `atan2` contract. *(2026-10-28):* spec 010 added `LatLng` and
+`Rect`'s `Region` laws (section 2.11).
 
 ### Step 4: trait laws
 

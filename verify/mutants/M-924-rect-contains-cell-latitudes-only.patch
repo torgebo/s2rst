@@ -1,0 +1,17 @@
+Mutant: M-924
+Targets: P-LREG-01
+Expect-Fail: rl_reg::p_lreg_01
+Defect: `Region for Rect::contains_cell` tests only the latitudes
+
+diff --git a/core/src/s2/region.rs b/core/src/s2/region.rs
+--- a/core/src/s2/region.rs
++++ b/core/src/s2/region.rs
+@@ -115,7 +115,7 @@
+     }
+ 
+     fn contains_cell(&self, cell: &Cell) -> bool {
+-        self.contains(cell.rect_bound())
++        self.lat.contains_interval(cell.rect_bound().lat)
+     }
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {

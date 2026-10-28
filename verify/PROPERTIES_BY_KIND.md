@@ -7,18 +7,18 @@ mutants: [`PROPERTIES.md`](PROPERTIES.md) (`CellId`),
 [`cell_union/PROPERTIES.md`](cell_union/PROPERTIES.md) (`CellUnion`),
 [`decoding/PROPERTIES.md`](decoding/PROPERTIES.md) (the decoding layer) and
 [`values/PROPERTIES.md`](values/PROPERTIES.md) (the value types: `Cell`, `s1::Interval`,
-`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle` and `s2::Cap`). The operation
+`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle`, `s2::Cap` and `s2::LatLng`). The operation
 inventories carry the crash-freedom proofs.
 
 | Kind | It guarantees that… | Entries |
 |------|---------------------|---------|
 | [Never crashes](#never-crashes) | an operation finishes without a panic, an arithmetic overflow, undefined behaviour or a hang, whatever its input | every in-scope operation, plus 2 |
-| [Correct result](#correct-result) | an operation returns what the model says it should | 146 |
+| [Correct result](#correct-result) | an operation returns what the model says it should | 156 |
 | [Round trip](#round-trip) | converting a value there and back gives the original | 17 |
-| [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 22 |
+| [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 28 |
 | [Exact input](#exact-input) | a decoder or parser accepts exactly the well-formed inputs, returns what they say, consumes exactly them and rejects the rest | 17 |
-| [Validity](#validity) | a validity check answers exactly, and results are well formed | 14 |
-| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 39 |
+| [Validity](#validity) | a validity check answers exactly, and results are well formed | 16 |
+| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 47 |
 | [Model checks](#model-checks) | the models and restated copies that the proofs compare against are themselves right | 5, plus the links |
 
 ## Browsing the code by kind
@@ -81,6 +81,7 @@ inventories say which harness discharges each operation.
 | `s1::ChordAngle` | all 35 operations (the 7 through `asin` under its contract since 2026-10-27, per change): the constructors over every `f64`, `i32` and angle (NaN and the infinities included), the accessors, classifications, order, neighbours and `plus_error` over every canonical value, the error bounds, trigonometry and arithmetic over every length in [0, 4] (their documented domain, so their debug checks never fire); the seven through `asin` (`to_angle` and what reads it) for every chord angle | `ca_crash::c_*`, `ca_crash::c_fg_conversions` | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s1::Angle` | all 30 operations (`tan` under a contract since 2026-10-27), over every `f64` of radians (NaN and infinities included), `i32` and `u32`, except exactly where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`, `0 / 0`) and the division by an infinity (a tool limit: the checker reports it as NaN); `normalized` over every angle but ±∞; `tan` over every angle | `ag_crash::c_*`, `ag_crash::c_fg_tan` | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s2::Cap` | 39 of the 42 in-scope operations: on the real code or with lemma stubs over every box cap, and under the contracts of `asin`, `atan2` and `cos` where they reach them; `union` and both `cell_union_bound`s are tool limits | `cp_crash::c_*` | [`values/INVENTORY.md`](values/INVENTORY.md) |
+| `s2::LatLng` | 30 of the 31 in-scope operations (`to_string_in_degrees`' formatting and `Display` out): the 26 Kani entries over every pair of `f64` (NaN and the infinities included) but where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`), `get_distance` over valid pairs (its documented domain) and, outside it, every pair without an infinity; the conversions and the distance under the contracts of `atan2`, `sin_cos`, `sin`, `cos`, `asin` (and `sqrt` outside the distance's domain); the four `geo-types` conversions by composition | `ll_crash::c_*`, `ll_crash::o_get_distance` | [`values/INVENTORY.md`](values/INVENTORY.md) section 12 |
 
 Two catalogue entries are crash-freedom statements in their own right:
 
@@ -262,6 +263,7 @@ The operation returns exactly what the model computes for the same input.
 | [P-LBND-01](values/PROPERTIES.md) | The corners, the vertices in upstream's order, the centre and the size are the corresponding combinations of the intervals' bounds, centres and lengths. | [`rl_bnd::p_lbnd_01`](src/rl_bnd.rs) | every valid rectangle (weekly) |
 | [P-LEXP-01](values/PROPERTIES.md) | Expanding keeps a valid rectangle; growing contains the original and shrinking is contained in it; a rectangle from a centre and a non-negative size contains the centre. | [`rl_exp::p_lexp_01_center_size`](src/rl_exp.rs), [`rl_exp::p_lexp_01__mpos`](src/rl_exp.rs), [`rl_exp::p_lexp_01__mneg`](src/rl_exp.rs) | every valid rectangle and margin (validity: `rl_val::p_lval_02__expanded`; containment weekly) |
 | [P-LEQ-02](values/PROPERTIES.md) | The rectangle's bound, inherent and through the region interface, is the rectangle itself. | [`rl_eq::p_leq_02`](src/rl_eq.rs) | every valid rectangle |
+| [P-LMEM-03](values/PROPERTIES.md) | The rectangle's point test is `contains_lat_lng` of the point's `LatLng`, which is valid for every point without NaN, so P-LMEM-01 describes it. | [`rl_reg::p_lmem_03`](src/rl_reg.rs) | every valid rectangle and triple, by composition (P-LLFP-02) |
 
 
 ### `r2::Rect`: validity, corners, membership, relations, set operations, measures and expansion
@@ -337,6 +339,20 @@ The operation returns exactly what the model computes for the same input.
 | [P-CPEQ-02](values/PROPERTIES.md) | Approximate equality is upstream's `ApproxEquals`, with the tolerance for the centres too. | [`cp_eq::p_cpeq_02`](src/cp_eq.rs) | every pair of box caps and every tolerance, by composition |
 | [P-CPDES-01](values/PROPERTIES.md) | Deserialisation accepts exactly the valid caps. | — | not proven: tested (`cap_tests`) |
 
+### `s2::LatLng`: construction, conversions, normalisation, validity, distance and approximate equality
+
+| ID | What is guaranteed | Proved by | Holds for |
+|----|--------------------|-----------|-----------|
+| [P-LLCON-01](values/PROPERTIES.md) | `new` and `from_radians` keep their arguments; the other constructors are the pairs of `Angle`'s; `invalid()` and the default are upstream's. | [`ll_con::p_llcon_01`](src/ll_con.rs) | every `f64`, `i32` and `u32` pair, by composition (`Angle`'s constructors uninterpreted) |
+| [P-LLTP-02](values/PROPERTIES.md) | For finite coordinates `to_point` gives finite coordinates in [−1, 1]; a non-finite coordinate gives NaN where it reaches. | [`ll_tp::p_lltp_02`](src/ll_tp.rs) | every pair of `f64`, under the `sin_cos` contract |
+| [P-LLNRM-01](values/PROPERTIES.md) | `normalized` clamps the latitude as upstream does, and gives `invalid()` for a non-finite input. | [`ll_nrm::p_llnrm_01`](src/ll_nrm.rs) | every pair of `f64` |
+| [P-LLVAL-01](values/PROPERTIES.md) | `is_valid` is upstream's predicate; the default is valid. | [`ll_val::p_llval_01`](src/ll_val.rs) | every pair of `f64` |
+| [P-LLDST-02](values/PROPERTIES.md) | The distance between valid `LatLng`s is a number in [0, π]. | [`ll_dst::p_lldst_02`](src/ll_dst.rs) | every valid pair, under the contracts |
+| [P-LLDST-03](values/PROPERTIES.md) | The distance from a valid `LatLng` to itself is +0. | [`ll_dst::p_lldst_03`](src/ll_dst.rs) | every valid `LatLng`, under the contracts |
+| [P-LLAPX-01](values/PROPERTIES.md) | Approximate equality is upstream's: both coordinates within the margin, inclusively; the default margin is 10⁻¹⁵. | [`ll_apx::p_llapx_01`](src/ll_apx.rs) (weekly) | every two pairs without `∞ − ∞`, every margin |
+| [P-LLGEO-01](values/PROPERTIES.md) | The `geo-types` conversions are degrees, x the longitude and y the latitude. | — | every pair, by composition from `Angle`'s conversions (the crate does not build `geo-types` for the checker) |
+| [P-LLDES-01](values/PROPERTIES.md) | Deserialisation accepts every pair and round-trips. | — | not proven: tested (`latlng_tests`) |
+
 ## Round trip
 
 Converting a value one way and back gives the original value, consuming exactly what was
@@ -393,6 +409,13 @@ so other S2 implementations read it.
 | [P-CPMEA-01](values/PROPERTIES.md) | A cap's height, area and centroid are upstream's formulas, bit for bit, and the area is never negative. | [`cp_mea::p_cpmea_01`](src/cp_mea.rs), [`cp_mea::p_cpmea_01__area`](src/cp_mea.rs) (weekly), [`cp_mea::p_cpmea_01__centroid`](src/cp_mea.rs) (weekly) | every box cap: the height, the area's sign and the area bit for bit (weekly, since D-009's fix); the centroid times out at 60 minutes |
 | [P-CPCMP-01](values/PROPERTIES.md) | A cap's complement is upstream's: the opposite centre and radius `4 − r²`, bit for bit. | [`cp_cmp::p_cpcmp_01`](src/cp_cmp.rs) | every box cap |
 | [P-CPBND-05](values/PROPERTIES.md) | `rect_bound`'s longitude reduction changes a value by exactly 0 or ±2π and lands in [−π, π]. | [`cp_bnd::p_cpbnd_05`](src/cp_bnd.rs) | every \|x\| ≤ 3π/2 (a drift-guarded copy) |
+| [P-LLFP-01](values/PROPERTIES.md) | `latitude` and `longitude` are upstream's formulas, `+ 0.0` included; `from_point` is the pair. | [`ll_fp::p_llfp_01`](src/ll_fp.rs); the drift guard `latlng_spec_tests` | every triple: the longitude under the `atan2` contract, the latitude by composition (the guard) |
+| [P-LLTP-01](values/PROPERTIES.md) | `to_point` is upstream's formula. | [`ll_tp::p_lltp_01`](src/ll_tp.rs); the drift guard `latlng_spec_tests` | every pair: `z` under the `sin_cos` contract, the products by composition (the guard) |
+| [P-LLNRM-02](values/PROPERTIES.md) | `normalized`'s longitude is upstream's `remainder(lng, 2π)`, exactly: ties to even, a zero's sign kept. | — | every finite input, by composition (P-LLNRM-03 and IEEE `fmod`); tested against the exact remainder |
+| [P-LLNRM-03](values/PROPERTIES.md) | The reduction's correction step lands in [−π, π], moves its input by exactly 0 or ±2π, and breaks ties by the quotient's parity. | [`ll_nrm::p_llnrm_03`](src/ll_nrm.rs) | every `|r| < 2π`, on a drift-guarded copy |
+| [P-LLDST-01](values/PROPERTIES.md) | `get_distance` is upstream's haversine, with the clamp before the root. | the drift guard `latlng_spec_tests`, with the lemma L-LL-02 (`ll_lem::l_ll_02`) | every pair without `∞ − ∞`, by composition |
+| [P-LLARI-01](values/PROPERTIES.md) | `+`, `−` and the scalings act on each coordinate, as upstream's; `k * ll` is `ll * k`. | [`ll_ari::p_llari_01__add`](src/ll_ari.rs), [`ll_ari::p_llari_01__sub`](src/ll_ari.rs); the drift guard `latlng_spec_tests` | every pair without `∞ − ∞`; the scalings by composition |
+
 ## Exact input
 
 The decoder or parser accepts exactly the well-formed inputs, returns the value they encode,
@@ -440,6 +463,9 @@ A validity check answers exactly, and an operation returns well-formed values.
 | [P-CAVAL-02](values/PROPERTIES.md) | Every way to build a chord angle gives a canonical value: −1, a length in [0, 4], or +∞ (option B). | [`ca_val::p_caval_02__*`](src/ca_val.rs) | every input of the constructors, every canonical value, every pair of lengths |
 | [P-CPCMP-02](values/PROPERTIES.md) | The complement of a valid cap is valid. | [`cp_cmp::p_cpcmp_02`](src/cp_cmp.rs) | every valid cap, by composition |
 | [P-CPBND-04](values/PROPERTIES.md) | A cap's bounding rectangle is valid, and empty exactly for the empty cap. | [`cp_bnd::p_cpbnd_04`](src/cp_bnd.rs) | every box cap, under the `asin`, `atan2`, `cos` contracts |
+| [P-LLFP-02](values/PROPERTIES.md) | `from_point` gives a valid `LatLng` exactly for the points without a NaN coordinate, the zero vector and the infinities included. | [`ll_fp::p_llfp_02`](src/ll_fp.rs) | every triple, under the `atan2` contract |
+| [P-LLNRM-04](values/PROPERTIES.md) | `normalized` returns a valid `LatLng` for every finite input. | — | every finite pair, by composition (P-LLNRM-01, -02) |
+
 ## Laws
 
 Relations that must hold between operations, or between an operation's arguments.
@@ -485,6 +511,15 @@ Relations that must hold between operations, or between an operation's arguments
 | [P-CPREG-03](values/PROPERTIES.md) | The bounding cap contains every point the cap contains. | [`cp_reg::p_cpreg_03`](src/cp_reg.rs) | every box cap and point, by composition |
 | [P-CPREG-04](values/PROPERTIES.md) | Every cell the cap contains lies in its covering. | — | not proven: the covering's level needs `asin`'s value, not its range |
 | [P-CPCOD-01](values/PROPERTIES.md) | Every valid cap round-trips through its encoding under its own equality. | [`cp_eq::p_cpcod_01`](src/cp_eq.rs) | every valid cap, by composition |
+| [P-LLNRM-05](values/PROPERTIES.md) | `normalized` leaves a valid `LatLng` unchanged, bit for bit. | — | every valid pair, by composition |
+| [P-LLDST-04](values/PROPERTIES.md) | The distance is symmetric within 10⁻¹⁴ rad. | — | not proven: it needs the functions' values (the formula is not symmetric bit for bit, upstream's neither) |
+| [P-LLAPX-02](values/PROPERTIES.md) | Approximate equality is symmetric, and reflexive for finite coordinates and a non-negative margin. | [`ll_apx::p_llapx_02`](src/ll_apx.rs) (weekly) | every two pairs without `∞ − ∞`, every margin |
+| [P-LLEQ-01](values/PROPERTIES.md) | `==` compares the coordinates, and is an equivalence without NaN. | [`ll_eq::p_lleq_01`](src/ll_eq.rs) | every three pairs |
+| [P-LREG-01](values/PROPERTIES.md) | The generic `Region` law holds for `Rect`: containing a cell implies intersecting it. | [`rl_reg::p_lreg_01`](src/rl_reg.rs) | every valid rectangle and cell, under contract (L-LL-01) |
+| [P-LREG-02](values/PROPERTIES.md) | A cell the rectangle does not intersect has no vertex the rectangle contains. | [`rl_reg::p_lreg_02`](src/rl_reg.rs) | every valid rectangle and abstract cell, under the `Cell::rect_bound` contract |
+| [P-LREG-03](values/PROPERTIES.md) | The rectangle's bounding cap contains every point the rectangle contains (after FR-019's widening). | — | not proven: it needs `atan2`'s and `sin_cos`'s values; tested natively, by the quickcheck twin and the C++ rows |
+| [P-LREG-04](values/PROPERTIES.md) | Every cell the rectangle contains lies in its covering. | — | not proven: the covering's level needs `asin`'s value, as P-CPREG-04 |
+
 ## Model checks
 
 The other proofs compare the library with the models (and Verus proves restated copies), so

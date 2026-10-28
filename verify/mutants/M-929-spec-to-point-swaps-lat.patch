@@ -1,0 +1,19 @@
+Mutant: M-929
+Targets: P-LLTP-01
+Expect-Fail: 
+Test: verify --lib latlng_spec::latlng_spec_tests::conversions_are_the_restatements
+Test: verify --test values_spec_vs_cpp latlng
+Defect: spec mutant: `upstream_to_point` swaps the latitude's sine and cosine
+
+diff --git a/verify/src/latlng_spec.rs b/verify/src/latlng_spec.rs
+--- a/verify/src/latlng_spec.rs
++++ b/verify/src/latlng_spec.rs
+@@ -69,7 +69,7 @@
+ /// and the longitude θ (`s2latlng.cc:68–76`). Written with the library's names, so that
+ /// `latlng_spec_tests`' drift guard can compare the two texts (P-LLTP-01).
+ pub fn upstream_to_point(lat: f64, lng: f64) -> (f64, f64, f64) {
+-    let (sin_lat, cos_lat) = lat.sin_cos();
++    let (cos_lat, sin_lat) = lat.sin_cos();
+     let (sin_lng, cos_lng) = lng.sin_cos();
+     (cos_lng * cos_lat, sin_lng * cos_lat, sin_lat)
+ }

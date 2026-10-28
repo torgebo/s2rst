@@ -1,0 +1,19 @@
+Mutant: M-905
+Targets: P-LLFP-01
+Expect-Fail: 
+Test: verify --lib latlng_spec::latlng_spec_tests::conversions_are_the_restatements
+Test: core --test cpp_latlng_diff
+Defect: `latitude` sums `x·x + x·y`
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -140,7 +140,7 @@
+     /// negative zeros are converted to positive zeros for consistent results.
+     #[inline]
+     pub fn latitude(p: Point) -> Angle {
+-        Angle::from_radians((p.z() + 0.0).atan2((p.x() * p.x() + p.y() * p.y()).sqrt()))
++        Angle::from_radians((p.z() + 0.0).atan2((p.x() * p.x() + p.x() * p.y()).sqrt()))
+     }
+ 
+     /// Computes the longitude of a direction vector (not necessarily unit length).

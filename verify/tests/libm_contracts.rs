@@ -3,7 +3,8 @@
 // Written for this crate (not ported from upstream S2).
 
 //! The function contracts of `src/stubs.rs` against the real `asin`, `atan2` and `cos` (spec 008
-//! FR-003, research R5), and `tan`, `atan`, `sin`, `sin_cos` (gap 2, 2026-10-26): every special value, and
+//! FR-003, research R5), `tan`, `atan`, `sin`, `sin_cos` (gap 2, 2026-10-26), and `sqrt` and the
+//! library's `Cell::rect_bound` (spec 010 research R5, R6): every special value, and
 //! 10⁶ random inputs per function from a fixed seed, as uniform bit patterns and as uniform values
 //! in the function's domain.
 //!
@@ -322,5 +323,74 @@ fn sin_satisfies_its_contract() {
             rng.uniform(-4.0, 4.0)
         };
         assert!(sin_ok(x, x.sin()), "sin({x:e}) = {:e}", x.sin());
+    }
+}
+
+/// `sqrt_contract` (spec 010 research R5): NaN for NaN and for `x < 0`; `x` itself for ±0 (bit
+/// for bit) and +∞; otherwise positive and finite, at most 1 when `x ≤ 1`, at least 1 when
+/// `x ≥ 1`.
+fn sqrt_ok(x: f64, r: f64) -> bool {
+    if x.is_nan() || x < 0.0 {
+        return r.is_nan();
+    }
+    if x == 0.0 || x == f64::INFINITY {
+        return r.to_bits() == x.to_bits();
+    }
+    r > 0.0 && r.is_finite() && (x > 1.0 || r <= 1.0) && (x < 1.0 || r >= 1.0)
+}
+
+#[test]
+fn sqrt_satisfies_its_contract() {
+    for x in
+        specials()
+            .into_iter()
+            .chain([1.0f64.next_up(), 1.0f64.next_down(), f64::MAX.next_down()])
+    {
+        assert!(sqrt_ok(x, x.sqrt()), "sqrt({x:e}) = {:e}", x.sqrt());
+    }
+    let mut rng = Rng(0x5851_F42D_4C95_7F2D);
+    for i in 0..RANDOM {
+        let x = if i % 2 == 0 {
+            rng.bits()
+        } else {
+            rng.uniform(0.0, 4.0)
+        };
+        assert!(sqrt_ok(x, x.sqrt()), "sqrt({x:e}) = {:e}", x.sqrt());
+    }
+}
+
+/// `cell_rect_bound_contract` (spec 010 research R6): a cell's bound is valid and contains the
+/// `LatLng` of each of its four vertices, with the real `rect_bound`, `vertex`, `from_point` and
+/// `contains_lat_lng`.
+fn cell_bound_ok(cell: s2rst::s2::Cell) -> bool {
+    let r = cell.rect_bound();
+    r.is_valid()
+        && s2rst::s2::CellVertex::ALL
+            .into_iter()
+            .all(|k| r.contains_lat_lng(s2rst::s2::LatLng::from_point(cell.vertex(k))))
+}
+
+#[test]
+fn cell_rect_bound_satisfies_its_contract() {
+    use s2rst::s2::{Cell, CellId, Face, Level};
+    // Every cell to level 5: 8,190 cells.
+    let mut n = 0;
+    for level in 0..=5u8 {
+        let level = Level::try_from(level).unwrap();
+        let mut id = CellId::begin(level);
+        while id != CellId::end(level) {
+            assert!(cell_bound_ok(Cell::from(id)), "{id:?}");
+            id = id.next();
+            n += 1;
+        }
+    }
+    assert_eq!(n, 8_190);
+    // 10⁶ random cells, every level as likely as any other.
+    let mut rng = Rng(0xD1B5_4A32_D192_ED03);
+    for _ in 0..RANDOM {
+        let face = Face::ALL[(rng.next() % 6) as usize];
+        let level = Level::try_from((rng.next() % 31) as u8).unwrap();
+        let id = CellId::from_face_pos_level(face, rng.next() & ((1 << 61) - 1), level);
+        assert!(cell_bound_ok(Cell::from(id)), "{id:?}");
     }
 }

@@ -1,0 +1,19 @@
+Mutant: M-901
+Targets: P-LLCON-01
+Expect-Fail: ll_con::p_llcon_01
+Defect: `from_degrees` swaps the coordinates
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -78,8 +78,8 @@
+     #[inline]
+     pub fn from_degrees(lat_degrees: f64, lng_degrees: f64) -> Self {
+         LatLng {
+-            lat: Angle::from_degrees(lat_degrees),
+-            lng: Angle::from_degrees(lng_degrees),
++            lat: Angle::from_degrees(lng_degrees),
++            lng: Angle::from_degrees(lat_degrees),
+         }
+     }
+ 

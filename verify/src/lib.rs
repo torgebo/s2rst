@@ -6,7 +6,8 @@
 //! (spec 002), the decoding layer (spec 003) and the value types `s2rst::s2::Cell` and
 //! `s2rst::s1::Interval` (spec 004), `s2rst::r1::Interval` and `s2rst::s2::Rect` (spec 005),
 //! `s2rst::r2::Rect` and `s2rst::s2::Point` (spec 006), `s2rst::s1::ChordAngle` and
-//! `s2rst::s1::Angle` (spec 007), and `s2rst::s2::Cap` (spec 008).
+//! `s2rst::s1::Angle` (spec 007), `s2rst::s2::Cap` (spec 008), and `s2rst::s2::LatLng` with
+//! `s2rst::s2::Rect` as a `Region` (spec 010).
 //!
 //! - [`spec`] is the reference model of the S2 cell hierarchy, written from upstream
 //!   `s2cell_id.h` / `s2coords.h` and independent of `core/src/s2/cell_id.rs` (FR-006). It is
@@ -49,6 +50,11 @@
 //!   `cos`, and the lemma stubs, each resting on lemmas proven on the real code (spec 008
 //!   FR-003, FR-003a; research R5, R6); `tests/libm_contracts.rs` checks the contracts against
 //!   the real functions.
+//! - [`latlng_spec`] describes a latitude–longitude as a pair of angles, valid in the principal
+//!   ranges, with upstream's conversions restated apart and a copy of the exact reduction's
+//!   correction step (spec 010). The `ll_*` (`s2::LatLng`) modules are its harnesses, and
+//!   `rl_reg` instantiates the `Region` laws for `s2::Rect`; `stubs` gains pure contracts (one
+//!   contract value per input) and a contract on `Cell::rect_bound` (spec 010 research R5, R6).
 //!
 //! Every property harness's doc comment starts with its catalogue id and its kind, then a
 //! plain-language statement, then the exact one: `P-HIER-01 (correct result): …`. The kinds
@@ -78,6 +84,7 @@ pub mod arc_spec;
 pub mod cap_spec;
 pub mod cell_spec;
 pub mod chord_spec;
+pub mod latlng_spec;
 pub mod point_spec;
 pub mod real_spec;
 pub mod rect_spec;
@@ -220,6 +227,8 @@ mod rl_exp;
 #[cfg(all(kani, feature = "values"))]
 mod rl_mem;
 #[cfg(all(kani, feature = "values"))]
+mod rl_reg;
+#[cfg(all(kani, feature = "values"))]
 mod rl_rel;
 #[cfg(all(kani, feature = "values"))]
 mod rl_set;
@@ -310,3 +319,27 @@ mod cp_mem;
 mod cp_reg;
 #[cfg(all(kani, feature = "values"))]
 mod cp_rel;
+
+// Weekly, as `rl_bnd`: both harnesses take about eight minutes (spec 010, 2026-10-28).
+#[cfg(all(kani, feature = "values", feature = "slow"))]
+mod ll_apx;
+#[cfg(all(kani, feature = "values"))]
+mod ll_ari;
+#[cfg(all(kani, feature = "values"))]
+mod ll_con;
+#[cfg(all(kani, feature = "values"))]
+mod ll_crash;
+#[cfg(all(kani, feature = "values"))]
+mod ll_dst;
+#[cfg(all(kani, feature = "values"))]
+mod ll_eq;
+#[cfg(all(kani, feature = "values"))]
+mod ll_fp;
+#[cfg(all(kani, feature = "values"))]
+mod ll_lem;
+#[cfg(all(kani, feature = "values"))]
+mod ll_nrm;
+#[cfg(all(kani, feature = "values"))]
+mod ll_tp;
+#[cfg(all(kani, feature = "values"))]
+mod ll_val;

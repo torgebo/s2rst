@@ -288,3 +288,27 @@ its law). FR-017 to FR-019's fixes get a reverting mutant each, killed by their 
   `CellUnion`'s bounds), the next type, the codec and `Intersects(S2Cell)` (FR-020), the two
   other inexact remainders (`s1::Interval`'s `ieee_remainder`, 008's T058, and the
   projections' `remainder`), and making validity a bounded type (spec Assumptions).
+
+## R13: Measured in implementation (2026-10-28)
+
+What the Kani runs changed in the design (records: `verify/values/PROPERTIES.md` §11, the spec-010
+part of `verify/values/EVALUATION.md`):
+
+- **Restatements that recompute float products time out**, pure contracts or not: `p_llcon_01`
+  (`Angle`'s constructors computed twice), `p_llfp_01` (`x² + y²`), `p_lltp_01` (the two
+  products), `p_lldst_01` (the haversine), `p_llari_01` (the scalings): 12-minute timeouts, as
+  spec 008's identical restatements. The final statements prove the product-free parts in Kani
+  (the longitude, `z`, the sum and difference), run the constructors with `Angle`'s
+  uninterpreted (`pure_angle_from_*`), and tie the products to the restatements through drift
+  guards on the source text, with L-LL-02 where the texts differ (`x.min(1.0)` against
+  `std::min(1.0, x)`). Those entries are `proven-by-composition`; data-model §4.1's expected
+  statuses changed accordingly.
+- **P-LMEM-03** uses `pure_from_point` (P-LLFP-02) instead of recomputing the point's `LatLng`
+  under pure contracts (12-minute timeout).
+- **P-LLAPX-01, -02** prove in 466.6 s and 483.7 s: weekly (`values-latlng` slow leg).
+- **CBMC's built-in `sqrt`** of a negative argument fails the NaN check: `o_get_distance` uses
+  `sqrt_contract`.
+- **The stub tables** need `#[kani::unwind(11)]` in the `rl_reg` harnesses (ten slots).
+- **Mutants:** M-935 (a hand-written `PartialEq` comparing the latitudes) and M-936 (the distance
+  doubled) were added for P-LLEQ-01 and P-LLDST-02; the formula mutants are killed by the drift
+  guards and the C++ diff test (`Test:` headers).

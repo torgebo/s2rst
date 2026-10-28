@@ -1,0 +1,16 @@
+Mutant: M-930
+Targets: P-LREG-01
+Expect-Fail: rl_reg::p_lreg_01
+Defect: stub mutant: `any_cell_bound` drops L-LL-01's non-emptiness, so an empty bound is contained and not intersected
+
+diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs
+--- a/verify/src/stubs.rs
++++ b/verify/src/stubs.rs
+@@ -710,7 +710,6 @@
+ pub fn any_cell_bound(c: Cell) -> s2rst::s2::Rect {
+     cell_bound(c, || {
+         let r = any_valid_rect();
+-        kani::assume(!crate::rect_spec::empty(r));
+         r
+     })
+ }
