@@ -638,10 +638,33 @@ impl Rect {
     // --- Region-like methods ---
 
     /// Returns a bounding cap for this rectangle.
+    ///
+    /// **Deviation from upstream** (`UPSTREAM.md` U-016): upstream's `GetCapBound` does not
+    /// always contain the points the rectangle contains. The rectangle tests a point through
+    /// its latitude and longitude (`contains_point` calls [`LatLng::from_point`]), whose
+    /// `atan2` puts the latitude within about an ulp of π/2 (2.2·10⁻¹⁶ rad) of the point's
+    /// near the poles, so a contained point can lie that far outside the rectangle's true
+    /// region. Upstream's pole cap allows only a relative `2ε` of its angle, and the cap
+    /// around the centre is built from the vertices alone: the north pole as a rectangle
+    /// misses a point one ulp past the pole, and a cap around the centre a point a few ulps
+    /// inside a vertex (spec 010 research R0: 10,507,883 of 74,647,924 adversarial contained
+    /// points missed, in C++ as here). The library computes and chooses upstream's cap, so
+    /// the centre is upstream's bit for bit, then widens it by `10⁻¹⁵` rad (four times the
+    /// `2.5·10⁻¹⁶` that sufficed in R0) and by `8ε` of its squared chord length, for the
+    /// rounding of the two chord distances near a full cap (twice the `4ε` that sufficed).
+    /// With it R0 found no contained point outside the bound.
     pub fn cap_bound(self) -> Cap {
         if self.is_empty() {
             return Cap::empty();
         }
+        let widen = |cap: Cap| {
+            let cap = cap.expanded(Angle::from_radians(1e-15));
+            let radius = cap.chord_radius();
+            Cap::from_center_chord_angle(
+                cap.center(),
+                radius.plus_error(8.0 * f64::EPSILON * radius.length2()),
+            )
+        };
 
         let (pole_z, pole_angle) = if self.lat.hi + self.lat.lo < 0.0 {
             (-1.0, FRAC_PI_2 + self.lat.hi)
@@ -669,10 +692,10 @@ impl Rect {
                 mid_cap = mid_cap.add_point(self.vertex(v).to_point());
             }
             if mid_cap.height() < pole_cap.height() {
-                return mid_cap;
+                return widen(mid_cap);
             }
         }
-        pole_cap
+        widen(pole_cap)
     }
 
     /// Returns itself as the bounding rectangle.
