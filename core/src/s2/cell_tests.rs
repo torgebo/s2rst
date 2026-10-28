@@ -204,3 +204,31 @@ mod bounded_index_tests {
         }
     }
 }
+
+/// Spec 011 FR-017 (K1): the polar face cells' rectangle bounds are upstream's bit for bit.
+/// Upstream computes the latitude of a polar face's corners, `asin(sqrt(1./3))`; the library
+/// wrote Go's 15-digit literal, 2 ulps below it, so the bounds of faces 2 and 5 (and every
+/// union's bound that contains them) were 2 ulps wider than upstream's.
+mod pole_min_lat_tests {
+    use super::super::*;
+
+    #[test]
+    fn pole_min_lat_is_upstreams_computed_value() {
+        assert_eq!(
+            POLE_MIN_LAT.to_bits(),
+            (1.0f64 / 3.0).sqrt().asin().to_bits()
+        );
+    }
+
+    #[test]
+    fn polar_face_rect_bounds_are_upstreams() {
+        // `S2Cell(S2CellId::FromFace(f)).GetRectBound()` on upstream v0.14.0-40 (spec 011
+        // probe, section CF): the latitude bound nearest the equator.
+        let north = Cell::from_cell_id(CellId::from_face(Face::F2)).rect_bound();
+        let south = Cell::from_cell_id(CellId::from_face(Face::F5)).rect_bound();
+        assert_eq!(north.lat.lo.to_bits(), 0x3fe3_b202_8082_e8d0);
+        assert_eq!(south.lat.hi.to_bits(), 0xbfe3_b202_8082_e8d0);
+        assert_eq!(north.lat.hi, FRAC_PI_2);
+        assert_eq!(south.lat.lo, -FRAC_PI_2);
+    }
+}
