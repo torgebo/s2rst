@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(probe010 CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(s2 CONFIG REQUIRED)
+add_executable(survey survey.cc)
+target_link_libraries(survey PRIVATE s2::s2)
