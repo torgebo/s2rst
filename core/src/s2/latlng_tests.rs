@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 Torgeir Børresen <tb@starkad.no>
 // Written for this crate (not ported from upstream S2).
 
-//! Regression tests for `LatLng`'s survey findings (spec 010 FR-017): `normalized` reduces the
-//! longitude with upstream's exact `remainder(lng, 2π)`. The expected values are upstream's,
-//! from the survey probe (`specs/010-formal-verify-latlng/probe/cpp/survey_cpp.txt`, sections
-//! N and S).
+//! Regression tests for `LatLng`'s survey findings (spec 010 FR-017, FR-018): `normalized`
+//! reduces the longitude with upstream's exact `remainder(lng, 2π)`, and `get_distance` clamps
+//! before the square root. The expected values are upstream's, from the survey probe
+//! (`specs/010-formal-verify-latlng/probe/cpp/survey_cpp.txt`, sections N, DS and S).
 
 use super::*;
 use quickcheck_macros::quickcheck;
@@ -104,6 +104,31 @@ fn prop_normalized_keeps_valid_input(lat: f64, lng: f64) -> bool {
     }
     let n = ll.normalized();
     n.lat.radians().to_bits() == lat.to_bits() && n.lng.radians().to_bits() == lng.to_bits()
+}
+
+/// FR-018 (K3): one point written twice with an out-of-range latitude makes the haversine
+/// term negative after rounding; upstream's `sqrt(min(1, x))` gives NaN there (section DS,
+/// row 5), where clamping after the root gave π.
+#[test]
+fn get_distance_clamps_before_the_root() {
+    let a = LatLng::from_radians(3.124_793_493_547_795, 0.0);
+    let b = LatLng::from_radians(0.016_799_160_041_997_9, PI);
+    assert!(a.get_distance(b).radians().is_nan());
+}
+
+/// The other out-of-range rows of section DS are upstream's too.
+#[test]
+fn get_distance_out_of_range_matches_cpp() {
+    for ((a1, a2), (b1, b2), want) in [
+        ((2.0, 0.0), (0.0, 0.0), 0x4000_0000_0000_0000_u64),
+        ((2.0, 0.0), (0.0, 1.0), 0x3ffc_c2e3_a649_5132),
+        ((-2.0, 0.5), (1.0, 2.0), 0x4003_bcb6_c9d0_667d),
+        ((f64::NAN, 0.0), (0.0, 0.0), 0x4009_21fb_5444_2d18),
+        ((0.0, 4.0), (0.0, -4.0), 0x3ffb_7812_aeef_4b9e),
+    ] {
+        let d = LatLng::from_radians(a1, a2).get_distance(LatLng::from_radians(b1, b2));
+        assert_eq!(d.radians().to_bits(), want, "({a1}, {a2}) to ({b1}, {b2})");
+    }
 }
 
 /// `Deserialize` is derived, with no validity check: every finite pair, valid or not, is

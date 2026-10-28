@@ -206,7 +206,9 @@ impl LatLng {
     /// slightly faster. It is less accurate for distances approaching 180°
     /// (about 8 digits of precision vs 15 for the Point-based approach).
     ///
-    /// Both `LatLngs` must be normalized.
+    /// Both `LatLngs` must be normalized. Outside that domain the result is upstream's: a
+    /// latitude beyond ±π/2 can make the haversine term negative after rounding, and then the
+    /// distance is NaN.
     pub fn get_distance(self, other: LatLng) -> Angle {
         let lat1 = self.lat.radians();
         let lat2 = other.lat.radians();
@@ -215,7 +217,9 @@ impl LatLng {
         let dlat = (0.5 * (lat2 - lat1)).sin();
         let dlng = (0.5 * (lng2 - lng1)).sin();
         let x = dlat * dlat + dlng * dlng * lat1.cos() * lat2.cos();
-        Angle::from_radians(2.0 * x.sqrt().min(1.0).asin())
+        // Upstream's `sqrt(min(1.0, x))`: clamping after the root would turn a negative `x`
+        // (NaN) into 1 (spec 010 FR-018).
+        Angle::from_radians(2.0 * x.min(1.0).sqrt().asin())
     }
 
     /// Reports whether the coordinates of two `LatLngs` are close, within the
