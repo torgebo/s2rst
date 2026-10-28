@@ -199,3 +199,27 @@ fn denormalize_cannot_be_handed_a_large_level_mod() {
     let u = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
     drop(u.denormalize(Level::new(0), LevelMod::new(200)));
 }
+
+/// Spec 011 FR-018 (K2): the empty union's approximate and exact areas are +0, as upstream's
+/// sums from `double area = 0`; `Iterator::sum` of no `f64`s is −0.
+#[test]
+fn empty_union_areas_are_positive_zero() {
+    let u = CellUnion::new();
+    assert_eq!(u.approx_area().to_bits(), 0);
+    assert_eq!(u.exact_area().to_bits(), 0);
+    assert_eq!(u.average_based_area().to_bits(), 0);
+}
+
+/// FR-018 keeps a non-empty union's sums: the cells' areas added in order.
+#[test]
+fn union_areas_sum_in_order() {
+    let ids = vec![cell_at(3), cell_at(7).next(), CellId::from_face(Face::F4)];
+    let u = CellUnion::from_cell_ids(ids);
+    let (mut approx, mut exact) = (0.0, 0.0);
+    for &id in u.cell_ids() {
+        approx += Cell::from_cell_id(id).approx_area();
+        exact += Cell::from_cell_id(id).exact_area();
+    }
+    assert_eq!(u.approx_area().to_bits(), approx.to_bits());
+    assert_eq!(u.exact_area().to_bits(), exact.to_bits());
+}

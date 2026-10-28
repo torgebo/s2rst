@@ -483,7 +483,7 @@ impl CellUnion {
     }
 
     /// Returns the approximate area of this cell union, using `Cell::approx_area()`
-    /// for each cell.
+    /// for each cell: their sum in order, +0 for the empty union, as upstream's `ApproxArea`.
     ///
     /// # Panics
     ///
@@ -491,14 +491,15 @@ impl CellUnion {
     /// building its `Cell` panics ([`Cell::from_cell_id`]). The other invalid ids give an
     /// unspecified area.
     pub fn approx_area(&self) -> f64 {
+        // From +0, as upstream's `double area = 0`: `Iterator::sum` of no `f64`s is −0 (spec 011
+        // FR-018).
         self.0
             .iter()
-            .map(|&id| Cell::from_cell_id(id).approx_area())
-            .sum()
+            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).approx_area())
     }
 
     /// Returns the exact area of this cell union, using `Cell::exact_area()`
-    /// for each cell.
+    /// for each cell: their sum in order, +0 for the empty union, as upstream's `ExactArea`.
     ///
     /// # Panics
     ///
@@ -506,10 +507,11 @@ impl CellUnion {
     /// building its `Cell` panics ([`Cell::from_cell_id`]). The other invalid ids give an
     /// unspecified area.
     pub fn exact_area(&self) -> f64 {
+        // From +0, as upstream's `double area = 0`: `Iterator::sum` of no `f64`s is −0 (spec 011
+        // FR-018).
         self.0
             .iter()
-            .map(|&id| Cell::from_cell_id(id).exact_area())
-            .sum()
+            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).exact_area())
     }
 
     /// Replaces large cells with smaller cells at `min_level` and ensures
