@@ -15,14 +15,25 @@
 use crate::s2::{Cap, Cell, CellId, LatLng, Point, Rect, Region};
 
 /// A region that contains a single point.
+///
+/// With the `serde` feature, deserialisation rejects a point that is not unit length
+/// ([`Point::is_unit`]), as upstream's `S2PointRegion::Decode` does (spec 011 FR-019).
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PointRegion {
     point: Point,
 }
 
 impl PointRegion {
     /// Creates a new region containing the given point.
+    ///
+    /// The point should be unit length: upstream's constructor requires it (a debug-build
+    /// check), and the `Region` contract's laws hold for unit points. The library does not
+    /// check it. Any other point is kept as given, and each method answers for that vector: the
+    /// bounds are those of [`Cap::from_point`], [`LatLng::from_point`] and their coverings, the
+    /// cell test is [`Cell::contains_point`]'s, and [`Region::contains_point`] compares the
+    /// coordinates with `==` (so `(0, 0, 1)` and `(-0, -0, 1)` are one point, and a point with
+    /// a NaN coordinate contains nothing, itself included).
     pub fn new(point: Point) -> Self {
         PointRegion { point }
     }
@@ -30,6 +41,28 @@ impl PointRegion {
     /// Returns the contained point.
     pub fn point(&self) -> Point {
         self.point
+    }
+}
+
+/// Rejects a point that is not unit length, as upstream's `S2PointRegion::Decode`
+/// (`S2::IsUnitLength`) and `Cap`'s deserialiser do (spec 011 FR-019); the derived impl would
+/// accept any three numbers.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for PointRegion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "PointRegion")]
+        struct Fields {
+            point: Point,
+        }
+
+        let f = Fields::deserialize(deserializer)?;
+        if !f.point.is_unit() {
+            return Err(D::Error::custom("point region's point is not unit length"));
+        }
+        Ok(PointRegion { point: f.point })
     }
 }
 
@@ -59,6 +92,10 @@ impl Region for PointRegion {
         self.point == *p
     }
 }
+
+#[cfg(test)]
+#[path = "point_region_tests.rs"]
+mod point_region_tests;
 
 #[cfg(test)]
 mod tests {
