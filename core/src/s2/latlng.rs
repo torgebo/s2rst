@@ -152,6 +152,9 @@ impl LatLng {
     }
 
     /// Creates a `LatLng` from a direction vector (not necessarily unit length).
+    ///
+    /// The result is valid for every point without a NaN coordinate, the zero vector (0, 0)
+    /// and infinite coordinates included; a NaN coordinate makes it invalid.
     pub fn from_point(p: Point) -> Self {
         LatLng {
             lat: Self::latitude(p),
@@ -188,7 +191,9 @@ impl LatLng {
     /// Converts this `LatLng` to the equivalent unit-length `S2Point`.
     ///
     /// The maximum error in the result is 1.5 * `f64::EPSILON`.
-    /// Requires latitude and longitude to be finite.
+    /// Requires latitude and longitude to be finite (upstream checks it in debug builds); a
+    /// non-finite coordinate gives NaN coordinates, without a panic. Values outside the valid
+    /// range are wrapped around the sphere.
     pub fn to_point(self) -> Point {
         let (sin_lat, cos_lat) = self.lat.sin_cos();
         let (sin_lng, cos_lng) = self.lng.sin_cos();

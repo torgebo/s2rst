@@ -147,3 +147,40 @@ fn prop_serde_accepts_every_pair(lat_bits: u64, lng_bits: u64) -> bool {
     let back: LatLng = serde_json::from_value(serde_json::to_value(ll).unwrap()).unwrap();
     back.lat.radians().to_bits() == lat.to_bits() && back.lng.radians().to_bits() == lng.to_bits()
 }
+
+/// `from_point` is valid for every point without a NaN coordinate, infinities and the zero
+/// vector included, and invalid with one (P-LLFP-02, here on the real `atan2`).
+#[quickcheck]
+fn prop_from_point_valid_without_nan(x: u64, y: u64, z: u64) -> bool {
+    let v = Vector {
+        x: f64::from_bits(x),
+        y: f64::from_bits(y),
+        z: f64::from_bits(z),
+    };
+    let nan = v.x.is_nan() || v.y.is_nan() || v.z.is_nan();
+    LatLng::from_point(Point(v)).is_valid() != nan
+}
+
+#[test]
+fn from_point_valid_at_the_special_vectors() {
+    let (inf, sub) = (f64::INFINITY, f64::from_bits(1));
+    for (x, y, z) in [
+        (0.0, 0.0, 0.0),
+        (-0.0, -0.0, -0.0),
+        (inf, inf, inf),
+        (-inf, 0.0, inf),
+        (-inf, -inf, -inf),
+        (sub, -sub, sub),
+        (-1.0, -0.0, 0.0),
+        (f64::MAX, f64::MAX, -f64::MAX),
+    ] {
+        let ll = LatLng::from_point(Point(Vector { x, y, z }));
+        assert!(ll.is_valid(), "({x}, {y}, {z}) gives {ll:?}");
+    }
+    let ll = LatLng::from_point(Point(Vector {
+        x: 0.0,
+        y: 0.0,
+        z: f64::NAN,
+    }));
+    assert!(!ll.is_valid());
+}
