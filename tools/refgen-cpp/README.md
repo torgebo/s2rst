@@ -270,3 +270,32 @@ exists: `cmake --install /home/t/sources/s2geometry/build --prefix /tmp/s2-insta
 
 `Union` differs from the library by design: the library adds an error margin so that the union
 contains both caps (`cap.rs`, a documented deviation); the diff test checks containment there.
+
+## LatLng and rectangle-region oracle (`generate_latlng`)
+
+`generate_latlng` writes
+[`core/tests/data/cpp_latlng_vectors.csv`](../../core/tests/data/cpp_latlng_vectors.csv)
+(3.7 MB), which [`core/tests/cpp_latlng_diff.rs`](../../core/tests/cpp_latlng_diff.rs) diffs
+`s2::LatLng` and `s2::Rect`'s region methods against and
+[`verify/tests/values_spec_vs_cpp.rs`](../../verify/tests/values_spec_vs_cpp.rs) checks
+`verify/src/latlng_spec.rs`'s restatements against (spec 010, FR-021, research R9).
+
+```sh
+cmake --build build --target generate_latlng
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_latlng > ../../core/tests/data/cpp_latlng_vectors.csv
+```
+
+| Section | Rows | Library operations checked | Oracle |
+|---------|------|----------------------------|--------|
+| `LATLNG_CTOR` | 1,884: random and special doubles, random and edge integers | `from_radians`, `from_degrees`, `from_e5`/`e6`/`e7`, `from_unsigned_e6`/`e7`, `invalid`, `Default` | `S2LatLng::FromRadians`, … |
+| `LATLNG_POINT` | 6,014: the special coordinates (±0, subnormals, huge, ±∞, NaN) crossed, random unit points, random points over 600 decades, points near the poles and the antimeridian | `latitude`, `longitude`, `from_point`, `From<Point>` | `Latitude`, `Longitude` |
+| `LATLNG_NORM` | 3,032: the survey's special longitudes, the ties ±π to ±7π, out-of-range and non-finite latitudes, random longitudes at six scales | `normalized` | `Normalized` |
+| `LATLNG_OPS` | 2,759: random valid pairs, close pairs, the survey's out-of-range pairs, the poles | `to_point`, `get_distance`, `approx_eq`, `approx_eq_with`, `+`, `−`, both scalings, `is_valid`, `==` | the same, by name |
+| `LATLNG_STR` | 309 | `to_string_in_degrees` | `ToStringInDegrees` |
+| `RECT_REGION` | 10,000: random rectangles and those of spec 010's R0 families, against cells of levels 0–12 | `Region::contains_cell`, `Region::intersects_cell` | `Contains(S2Cell)`, `MayIntersect` |
+| `RECT_CAPBOUND` | 6,004: R0's worst cases, the empty and full rectangles, 1,000 rectangles with six points on and next to their boundaries each | `cap_bound`, `contains_point` | `GetCapBound`, `Contains(S2Point)` |
+
+`RECT_CAPBOUND`'s radii are the one deviation: the library widens upstream's cap (spec 010
+FR-019, `UPSTREAM.md` U-016); the diff test checks the centre bit for bit and the radius
+against upstream's widened by the documented rule, and pins upstream's misses (993 of the 5,552
+contained points), where the library's bound has none.
