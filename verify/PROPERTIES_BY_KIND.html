@@ -1415,7 +1415,7 @@ the rectangle itself.</td>
 <td>The rectangle’s point test is <code>contains_lat_lng</code> of the
 point’s <code>LatLng</code>, which is valid for every point without NaN,
 so P-LMEM-01 describes it.</td>
-<td><a href="src/rl_reg.rs"><code>rl_reg::p_lmem_03</code></a></td>
+<td><a href="src/ll_reg.rs"><code>ll_reg::p_lmem_03</code></a></td>
 <td>every valid rectangle and triple, by composition (P-LLFP-02)</td>
 </tr>
 </tbody>
@@ -3059,14 +3059,14 @@ without NaN.</td>
 <td><a href="values/PROPERTIES.md">P-LREG-01</a></td>
 <td>The generic <code>Region</code> law holds for <code>Rect</code>:
 containing a cell implies intersecting it.</td>
-<td><a href="src/rl_reg.rs"><code>rl_reg::p_lreg_01</code></a></td>
+<td><a href="src/ll_reg.rs"><code>ll_reg::p_lreg_01</code></a></td>
 <td>every valid rectangle and cell, under contract (L-LL-01)</td>
 </tr>
 <tr class="odd">
 <td><a href="values/PROPERTIES.md">P-LREG-02</a></td>
 <td>A cell the rectangle does not intersect has no vertex the rectangle
 contains.</td>
-<td><a href="src/rl_reg.rs"><code>rl_reg::p_lreg_02</code></a></td>
+<td><a href="src/ll_reg.rs"><code>ll_reg::p_lreg_02</code></a></td>
 <td>every valid rectangle and abstract cell, under the
 <code>Cell::rect_bound</code> contract</td>
 </tr>

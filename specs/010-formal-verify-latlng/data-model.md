@@ -90,11 +90,11 @@ P-LLDES-01 (outside the checker). The bar is 18.
 
 | ID | Kind | Statement | Domain | Harness | Expected status |
 |----|------|-----------|--------|---------|-----------------|
-| P-LREG-01 | law | containing a cell implies intersecting it (`laws::region::contains_implies_intersects`) | `ValidRect` × every valid cell | `rl_reg::p_lreg_01` (stub `any_cell_bound`, L-LL-01) | proven-under-contract |
-| P-LREG-02 | law | a cell the rectangle does not intersect has no vertex it contains (`laws::region::no_intersect_no_vertex`) | `ValidRect` × the abstract cell | `rl_reg::p_lreg_02` (stubs `fixed_vertex`, `pure_from_point`, `cell_rect_bound_contract`) | proven-under-contract |
+| P-LREG-01 | law | containing a cell implies intersecting it (`laws::region::contains_implies_intersects`) | `ValidRect` × every valid cell | `ll_reg::p_lreg_01` (stub `any_cell_bound`, L-LL-01) | proven-under-contract |
+| P-LREG-02 | law | a cell the rectangle does not intersect has no vertex it contains (`laws::region::no_intersect_no_vertex`) | `ValidRect` × the abstract cell | `ll_reg::p_lreg_02` (stubs `fixed_vertex`, `pure_from_point`, `cell_rect_bound_contract`) | proven-under-contract |
 | P-LREG-03 | law | the bounding cap contains every contained point (`laws::region::cap_bound_contains_points`, FR-019's bound) | `ValidRect` × every point | — | not-proven (needs `atan2`'s and `sin_cos`'s values); `rect_tests::cap_bound_contains_boundary_points`, the quickcheck twin, `RECT_CAPBOUND` |
 | P-LREG-04 | law | every contained cell is covered (`laws::region::covering_covers`) | `ValidRect` × every valid cell | — | not-proven (needs `asin`'s value, as P-CPREG-04) |
-| P-LMEM-03 | correct result | `contains_point(p)` is `contains_lat_lng` of `from_point(p)`, a valid `LatLng` for every point without NaN (FR-012) | `ValidRect` × `NoNanTriple` | `rl_reg::p_lmem_03` (stub `pure_from_point`) | proven-under-contract |
+| P-LMEM-03 | correct result | `contains_point(p)` is `contains_lat_lng` of `from_point(p)`, a valid `LatLng` for every point without NaN (FR-012) | `ValidRect` × `NoNanTriple` | `ll_reg::p_lmem_03` (stub `pure_from_point`) | proven-under-contract |
 
 ## 5. The operation inventory (`verify/values/INVENTORY.md` §12)
 

@@ -1,6 +1,6 @@
 Mutant: M-926
 Targets: P-LREG-01, P-LREG-02
-Expect-Fail: rl_reg::p_lreg_01, rl_reg::p_lreg_02
+Expect-Fail: ll_reg::p_lreg_01, ll_reg::p_lreg_02
 Defect: `Region for Rect::intersects_cell` is interior intersection, which misses a bound that only touches
 
 diff --git a/core/src/s2/region.rs b/core/src/s2/region.rs

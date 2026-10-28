@@ -10,7 +10,7 @@
 | `stubs.rs` (extended) | The pure contracts, `sqrt_contract`, `pure_from_point`, `any_cell_bound`, `cell_rect_bound_contract` (data-model §3) | `cfg(kani)` |
 | `value_domain.rs` (extended) | `any_lat_lng_bits`, `any_finite_lat_lng` | `cfg(all(kani, feature = "values"))` |
 | `ll_crash.rs`; `ll_con.rs`, `ll_fp.rs`, `ll_tp.rs`, `ll_nrm.rs`, `ll_val.rs`, `ll_dst.rs`, `ll_apx.rs`, `ll_ari.rs`, `ll_eq.rs`, `ll_lem.rs` | `LatLng` harnesses: `ll_<area>::p_ll<area>_<nn>`, crash `ll_crash::c_<op>`, the lemma `ll_lem::l_ll_01` | same as `value_domain` |
-| `rl_reg.rs` | `Rect`'s law instances `p_lreg_<nn>` and the composition `p_lmem_03` | same |
+| `ll_reg.rs` | `Rect`'s law instances `p_lreg_<nn>` and the composition `p_lmem_03` | same |
 | `verify/tests/libm_contracts.rs` (extended) | `sqrt_contract`, and the `Cell::rect_bound` contract on real cells | `cargo test` |
 
 - **Catalogue ids:** `P-LLCON`, `P-LLFP`, `P-LLTP`, `P-LLNRM`, `P-LLVAL`, `P-LLDST`, `P-LLAPX`,

@@ -345,16 +345,17 @@ Each mutant injects one defect into `core/`; every listed harness must fail on i
 | M-921 | `approx_eq_with` compares `self.lng − other.lat`, which is not symmetric | P-LLAPX-02 | `ll_apx::p_llapx_02` | killed |
 | M-922 | `Sub` adds the longitudes | P-LLARI-01 | `ll_ari::p_llari_01__sub` | killed |
 | M-923 | `f64 * LatLng` scales only the latitude | P-LLARI-01 | `` | killed |
-| M-924 | `Region for Rect::contains_cell` tests only the latitudes | P-LREG-01 | `rl_reg::p_lreg_01` | killed |
-| M-925 | `Region for Rect::intersects_cell` is containment | P-LREG-02 | `rl_reg::p_lreg_02` | killed |
-| M-926 | `Region for Rect::intersects_cell` is interior intersection, which misses a bound that only touches | P-LREG-01, P-LREG-02 | `rl_reg::p_lreg_01, rl_reg::p_lreg_02` | killed |
-| M-927 | `Rect::contains_point` tests the point's `LatLng` with its coordinates swapped | P-LMEM-03, P-LREG-02 | `rl_reg::p_lmem_03, rl_reg::p_lreg_02` | killed |
+| M-924 | `Region for Rect::contains_cell` tests only the latitudes | P-LREG-01 | `ll_reg::p_lreg_01` | killed |
+| M-925 | `Region for Rect::intersects_cell` is containment | P-LREG-02 | `ll_reg::p_lreg_02` | killed |
+| M-926 | `Region for Rect::intersects_cell` is interior intersection, which misses a bound that only touches | P-LREG-01, P-LREG-02 | `ll_reg::p_lreg_01, ll_reg::p_lreg_02` | killed |
+| M-927 | `Rect::contains_point` tests the point's `LatLng` with its coordinates swapped | P-LMEM-03, P-LREG-02 | `ll_reg::p_lmem_03, ll_reg::p_lreg_02` | killed |
 | M-928 | spec mutant: `latlng_spec::valid` excludes the latitude −π/2 | P-LLVAL-01 | `ll_val::p_llval_01` | killed |
 | M-929 | spec mutant: `upstream_to_point` swaps the latitude's sine and cosine | P-LLTP-01 | `` | killed |
-| M-930 | stub mutant: `any_cell_bound` drops L-LL-01's non-emptiness, so an empty bound is contained and not intersected | P-LREG-01 | `rl_reg::p_lreg_01` | killed |
-| M-931 | stub mutant: `cell_rect_bound_contract` drops the vertex clause | P-LREG-02 | `rl_reg::p_lreg_02` | killed |
+| M-930 | stub mutant: `any_cell_bound` drops L-LL-01's non-emptiness, so an empty bound is contained and not intersected | P-LREG-01 | `ll_reg::p_lreg_01` | killed |
+| M-931 | stub mutant: `cell_rect_bound_contract` drops the vertex clause | P-LREG-02 | `ll_reg::p_lreg_02` | killed |
 | M-932 | FR-017 reverted: the remainder rounds the quotient (K1) | P-LLNRM-02 | `` | killed |
 | M-933 | FR-018 reverted: `get_distance` clamps after the root (K3) | P-LLDST-01 | `` | killed |
 | M-934 | FR-019 reverted: `cap_bound` without the widening (K4, U-016) | P-LREG-03 | `` | killed |
 | M-935 | `==` compares the latitudes only (a hand-written `PartialEq` in place of the derived one) | P-LLEQ-01 | `ll_eq::p_lleq_01` | killed |
 | M-936 | `get_distance` doubles the result, which leaves [0, π] | P-LLDST-02 | `ll_dst::p_lldst_02` | killed |
+| M-937 | `From<LatLng> for Coord` puts the latitude in x | P-LLGEO-01 | `` | killed |

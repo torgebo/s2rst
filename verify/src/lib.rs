@@ -53,7 +53,7 @@
 //! - [`latlng_spec`] describes a latitude–longitude as a pair of angles, valid in the principal
 //!   ranges, with upstream's conversions restated apart and a copy of the exact reduction's
 //!   correction step (spec 010). The `ll_*` (`s2::LatLng`) modules are its harnesses, and
-//!   `rl_reg` instantiates the `Region` laws for `s2::Rect`; `stubs` gains pure contracts (one
+//!   `ll_reg` instantiates the `Region` laws for `s2::Rect`; `stubs` gains pure contracts (one
 //!   contract value per input) and a contract on `Cell::rect_bound` (spec 010 research R5, R6).
 //!
 //! Every property harness's doc comment starts with its catalogue id and its kind, then a
@@ -227,8 +227,6 @@ mod rl_exp;
 #[cfg(all(kani, feature = "values"))]
 mod rl_mem;
 #[cfg(all(kani, feature = "values"))]
-mod rl_reg;
-#[cfg(all(kani, feature = "values"))]
 mod rl_rel;
 #[cfg(all(kani, feature = "values"))]
 mod rl_set;
@@ -339,6 +337,9 @@ mod ll_fp;
 mod ll_lem;
 #[cfg(all(kani, feature = "values"))]
 mod ll_nrm;
+// `Rect`'s `Region` laws (spec 010): in the `LatLng` part, whose conversions they go through.
+#[cfg(all(kani, feature = "values"))]
+mod ll_reg;
 #[cfg(all(kani, feature = "values"))]
 mod ll_tp;
 #[cfg(all(kani, feature = "values"))]

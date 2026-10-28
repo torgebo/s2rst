@@ -1399,7 +1399,7 @@ probe/`) found K1–K5 first; the planning probe R0 widened K4.
   that failed before; new C++ vectors (FR-021) match every row but FR-019's radii.
 - **Upstream finding:** U-016, upstream's `GetCapBound` misses contained points; recorded in
   `UPSTREAM.md`, not reported.
-- **Non-vacuity:** all 36 mutants `M-901` … `M-936` are killed (2026-10-28, about 40 minutes).
+- **Non-vacuity:** all 37 mutants `M-901` … `M-937` are killed (2026-10-28).
 
 ## Restatements, drift guards and the checker's products (spec 010)
 
@@ -1421,7 +1421,7 @@ Two more checker findings, replayed before they were believed:
 - **CBMC's built-in `sqrt` of a negative argument** fails the NaN check ("NaN on division" inside
   `<builtin-library-sqrt>`), where IEEE-754 defines the NaN: `o_get_distance` proves under
   `sqrt_contract`.
-- **A stub table needs its slots' unwinding:** `Table::get` loops over ten slots, so the `rl_reg`
+- **A stub table needs its slots' unwinding:** `Table::get` loops over ten slots, so the `ll_reg`
   harnesses need `#[kani::unwind(11)]` (the first run's "unwinding assertion loop 1").
 
 ## Effort log (spec 010)
@@ -1453,7 +1453,7 @@ None beyond the survey's K1, K3 and K4, which FR-017 to FR-019 fixed. No D-010.
 
 ## Measurements (spec 010)
 
-Per change (`make verify-values P=latlng` and `rl_reg` in `P=rect`), from the runs of 2026-10-28
+Per change (`make verify-values P=latlng`, `Rect`'s laws in `ll_reg` included), from the runs of 2026-10-28
 on the workstation (4 jobs):
 
 | Harness | Time | Harness | Time |
@@ -1468,19 +1468,37 @@ on the workstation (4 jobs):
 | `ll_crash::c_approx_eq` | 0.4 s | `ll_eq::p_lleq_01` | 1.3 s |
 | `ll_crash::c_arithmetic` | 0.6 s | `ll_lem::l_ll_01` | 125.9 s |
 | `ll_con::p_llcon_01` | 28.5 s | `ll_lem::l_ll_02` | 0.0 s |
-| `ll_fp::p_llfp_01` | 36.9 s | `rl_reg::p_lreg_01` | 35.0 s |
-| `ll_fp::p_llfp_02` | 2.6 s | `rl_reg::p_lreg_02` | 305.5 s |
-| `ll_tp::p_lltp_01` | 12.0 s | `rl_reg::p_lmem_03` | 18.6 s |
+| `ll_fp::p_llfp_01` | 36.9 s | `ll_reg::p_lreg_01` | 35.0 s |
+| `ll_fp::p_llfp_02` | 2.6 s | `ll_reg::p_lreg_02` | 305.5 s |
+| `ll_tp::p_lltp_01` | 12.0 s | `ll_reg::p_lmem_03` | 18.6 s |
 | `ll_tp::p_lltp_02` | 1.5 s | | |
 
-Weekly: `ll_apx::p_llapx_01` 466.6 s, `ll_apx::p_llapx_02` 483.7 s (the `values-latlng` slow leg).
-{{final}}
+Weekly: `ll_apx::p_llapx_01` 268.6 s, `ll_apx::p_llapx_02` 206.5 s, one at a time in the
+`values-latlng` slow leg (466.6 s and 483.7 s beside other harnesses with 4 jobs).
+## Final run (spec 010)
+
+2026-10-28, on the workstation, one run at a time (quickstart §1–5):
+
+- `make verify-values P=latlng`: 6 min 12 s, every `ll_*` harness and `ll_reg`'s three `SUCCESSFUL`,
+  every cover satisfied (crate tests included).
+- `make verify-values P=rect`: 6 min 55 s, `Rect`'s 48 harnesses unchanged and
+  `SUCCESSFUL`. (With `Rect`'s laws in its part, as first planned, the leg took 11 min 8 s,
+  over SC-006's 10 minutes, so they moved to `ll_reg` in the `LatLng` part.)
+- `make verify-release`: 42 of 42 `SUCCESSFUL` (4 min 21 s), `o_get_distance` included.
+- Weekly: `make verify-slow F=values P=ll_apx::`: both `SUCCESSFUL` (268.6 s and 206.5 s, one
+  at a time).
+- `make verify-mutants M='M-9*'`: 36 of 36 killed; M-937 (P-LLGEO-01) added after, killed alone.
+- `make test`: passed (the core suite, `cpp_latlng_diff`, the Python and wasm suites,
+  documentation with warnings as errors, `cargo-deny`).
+- `cargo test` in `verify/`: passed (the description's and the drift guards' tests, the
+  contracts, `LATLNG_*` against `latlng_spec`, the index by kind).
 
 ## Non-vacuity (spec 010)
 
-`make verify-mutants M='M-9*'` (2026-10-28): **36 killed, 0 survived**. Every proven entry of §11
-and every `Rect` law instance has at least one: 24 are killed by Kani harnesses (three in the
-weekly tier), 12 by ordinary tests through `Test:` headers. Those are the drift guards'
+`make verify-mutants M='M-9*'` (2026-10-28): **36 killed, 0 survived**, about 40 minutes; M-937
+(P-LLGEO-01, added after) killed alone. Every proven entry of §11 and every `Rect` law instance
+has at least one: 24 are killed by Kani harnesses (three in the weekly tier), 13 by ordinary
+tests through `Test:` headers (M-937 by `geo_types_interop`'s round trip). Those are the drift guards'
 mutants (the latitude, `to_point`'s products, the haversine, the scalings, a restatement's
 swapped sine and cosine), and the three that revert FR-017, FR-018 and FR-019, killed by
 `latlng_tests`, `rect_tests` and `cpp_latlng_diff`. Six patch the description or the stubs: four
@@ -1516,7 +1534,7 @@ adversarial points, found that the defect was larger than the survey had shown.
   identical values (no contraction). All in `TRUSTED_BASE.md`.
 - **The widening (FR-019)** is measured, not proven: R0's margins doubled and quadrupled, with an
   analytic reason in the rustdoc. A point the sweep does not reach could in principle need more.
-- **`Rect`'s laws** run per change in the `values-rect` leg; `p_lreg_02` takes 5 minutes.
+- **`Rect`'s laws** run per change in the `values-latlng` leg (`ll_reg`); `p_lreg_02` takes 5 minutes.
 
 ## Recommendations (FR-016) (spec 010)
 
@@ -1538,4 +1556,18 @@ Ranked:
 
 ## Success criteria (SC-001 … SC-013) (spec 010)
 
-{{sc}}
+| Criterion | Outcome | Evidence |
+|-----------|---------|----------|
+| SC-001 crash freedom over the whole domain | met | The 26 Kani entries over every pair of `f64` (no size bound), the conversions and the distance under the stated contracts (INVENTORY §12). |
+| SC-002 every in-scope entry | met | 26 crash proofs, 4 by composition (`geo-types`), 1 tested (`Deserialize`); 2 excluded with a reason (`core::fmt`). The contracts pass against the real functions (`libm_contracts`, `sqrt` and `Cell::rect_bound` added). |
+| SC-003 at least 90% of the counted entries | met (100%) | 19 of 19 counted entries of §11; P-LLDST-04 (needs the functions' values) and P-LLDES-01 (serde) are not counted. |
+| SC-004 `Rect`'s `Region` laws | met | P-LREG-01 and P-LREG-02 proven under contract; P-LREG-03 and -04 with written reasons. After FR-019 no contained point lies outside the bound: 0 of the survey's 129,595, 0 of the vectors' 5,552, 0 of R0's 74,647,924. |
+| SC-005 non-vacuity | met | 37 mutants, all killed; every proven entry of §11 and every proven law instance has one; every crash harness satisfies its covers. |
+| SC-006 per change under 10 minutes on CI | met on the workstation | `P=latlng` 6 min 12 s, `P=rect` 6 min 55 s, 4 jobs. Not measured on a hosted runner: that needs a push (T043). |
+| SC-007 regression tests red then green; probe differences | met | FR-017, FR-018 and FR-019's tests failed before their commits (`1750689`, `441e165`, `3996974`). The probe after the fixes: 0 differences but G, where 66 rows differ by the widened caps alone, and 0 library misses (`probe/compare.after.txt`). |
+| SC-008 the C++ vectors | met | `cpp_latlng_diff`: every row matches; the deviation rows are exactly `RECT_CAPBOUND`'s radii, which `Rect::cap_bound`'s rustdoc documents. |
+| SC-009 API and behaviour otherwise unchanged; the gate | met | No public signature changed; `make test` passed before and after each change. |
+| SC-010 panics documented | met | No `LatLng` operation panics; `to_point` and `get_distance` document their behaviour outside their domains. |
+| SC-011 the index by kind | met | `tests/property_kinds.rs` passes: every catalogue entry once, the code's tags matching. |
+| SC-012 upstream findings | met | U-016 has a follow-up (T014), an entry in `UPSTREAM.md` and here. |
+| SC-013 the evaluation answers | met | How much of `LatLng` is proven: "Summary"; which `Region` laws hold for `Rect`: the same and §5; what next: "Recommendations". |

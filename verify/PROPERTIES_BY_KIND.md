@@ -263,7 +263,7 @@ The operation returns exactly what the model computes for the same input.
 | [P-LBND-01](values/PROPERTIES.md) | The corners, the vertices in upstream's order, the centre and the size are the corresponding combinations of the intervals' bounds, centres and lengths. | [`rl_bnd::p_lbnd_01`](src/rl_bnd.rs) | every valid rectangle (weekly) |
 | [P-LEXP-01](values/PROPERTIES.md) | Expanding keeps a valid rectangle; growing contains the original and shrinking is contained in it; a rectangle from a centre and a non-negative size contains the centre. | [`rl_exp::p_lexp_01_center_size`](src/rl_exp.rs), [`rl_exp::p_lexp_01__mpos`](src/rl_exp.rs), [`rl_exp::p_lexp_01__mneg`](src/rl_exp.rs) | every valid rectangle and margin (validity: `rl_val::p_lval_02__expanded`; containment weekly) |
 | [P-LEQ-02](values/PROPERTIES.md) | The rectangle's bound, inherent and through the region interface, is the rectangle itself. | [`rl_eq::p_leq_02`](src/rl_eq.rs) | every valid rectangle |
-| [P-LMEM-03](values/PROPERTIES.md) | The rectangle's point test is `contains_lat_lng` of the point's `LatLng`, which is valid for every point without NaN, so P-LMEM-01 describes it. | [`rl_reg::p_lmem_03`](src/rl_reg.rs) | every valid rectangle and triple, by composition (P-LLFP-02) |
+| [P-LMEM-03](values/PROPERTIES.md) | The rectangle's point test is `contains_lat_lng` of the point's `LatLng`, which is valid for every point without NaN, so P-LMEM-01 describes it. | [`ll_reg::p_lmem_03`](src/ll_reg.rs) | every valid rectangle and triple, by composition (P-LLFP-02) |
 
 
 ### `r2::Rect`: validity, corners, membership, relations, set operations, measures and expansion
@@ -515,8 +515,8 @@ Relations that must hold between operations, or between an operation's arguments
 | [P-LLDST-04](values/PROPERTIES.md) | The distance is symmetric within 10⁻¹⁴ rad. | — | not proven: it needs the functions' values (the formula is not symmetric bit for bit, upstream's neither) |
 | [P-LLAPX-02](values/PROPERTIES.md) | Approximate equality is symmetric, and reflexive for finite coordinates and a non-negative margin. | [`ll_apx::p_llapx_02`](src/ll_apx.rs) (weekly) | every two pairs without `∞ − ∞`, every margin |
 | [P-LLEQ-01](values/PROPERTIES.md) | `==` compares the coordinates, and is an equivalence without NaN. | [`ll_eq::p_lleq_01`](src/ll_eq.rs) | every three pairs |
-| [P-LREG-01](values/PROPERTIES.md) | The generic `Region` law holds for `Rect`: containing a cell implies intersecting it. | [`rl_reg::p_lreg_01`](src/rl_reg.rs) | every valid rectangle and cell, under contract (L-LL-01) |
-| [P-LREG-02](values/PROPERTIES.md) | A cell the rectangle does not intersect has no vertex the rectangle contains. | [`rl_reg::p_lreg_02`](src/rl_reg.rs) | every valid rectangle and abstract cell, under the `Cell::rect_bound` contract |
+| [P-LREG-01](values/PROPERTIES.md) | The generic `Region` law holds for `Rect`: containing a cell implies intersecting it. | [`ll_reg::p_lreg_01`](src/ll_reg.rs) | every valid rectangle and cell, under contract (L-LL-01) |
+| [P-LREG-02](values/PROPERTIES.md) | A cell the rectangle does not intersect has no vertex the rectangle contains. | [`ll_reg::p_lreg_02`](src/ll_reg.rs) | every valid rectangle and abstract cell, under the `Cell::rect_bound` contract |
 | [P-LREG-03](values/PROPERTIES.md) | The rectangle's bounding cap contains every point the rectangle contains (after FR-019's widening). | — | not proven: it needs `atan2`'s and `sin_cos`'s values; tested natively, by the quickcheck twin and the C++ rows |
 | [P-LREG-04](values/PROPERTIES.md) | Every cell the rectangle contains lies in its covering. | — | not proven: the covering's level needs `asin`'s value, as P-CPREG-04 |
 

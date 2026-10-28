@@ -28,9 +28,9 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 | Types with their own proof suite | `CellId` (spec 001), `CellUnion` (spec 002), the decoding layer (spec 003), `Cell` and `s1::Interval` (spec 004, section 2.4), `r1::Interval` and `s2::Rect` (spec 005, section 2.5), `r2::Rect` and `s2::Point` (spec 006, section 2.6), `s1::ChordAngle` and `s1::Angle` (spec 007, section 2.7), `s2::Cap` (spec 008, section 2.9), `s2::LatLng` (spec 010, section 2.11) |
 | Types reached only through other proofs | `Level`, `Face` (section 2.8) |
 | Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for 2 methods of 1 implementor (`CellUnion`) and the generic laws for `Cell`, `Cap` (three of four, with lemma stubs) and `Rect` (two of four, under contract, spec 010); the codec round trip under `Cap`'s own equality; the equality laws for the ten value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
-| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45), plus 27 from spec 010 (24 `ll_*`, 3 `rl_reg`); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`), plus 2 from spec 010; 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
+| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45), plus 27 from spec 010 (24 `ll_*`, 3 `ll_reg`); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`), plus 2 from spec 010; 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
 | Verus | 5 restated codecs, 132 obligations, 17 s |
-| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008 and 36 `M-9NN` for spec 010, all killed |
+| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008 and 37 `M-9NN` for spec 010, all killed |
 
 ## 2. Types with proofs
 
@@ -278,7 +278,7 @@ and M-811 (each `try_from` accepting one value too many). The proofs take under 
   codec) and `S2LatLngRect::Intersects(const S2Cell&)` (the exact cell test; the library's
   `intersects_cell` is upstream's `MayIntersect`).
 - **Records:** `verify/values/INVENTORY.md` §12, `PROPERTIES.md` §11 and `Rect`'s rows in §5,
-  the spec-010 part of `EVALUATION.md`, `TRUSTED_BASE.md`, `MUTANTS.md` (`M-901` … `M-936`),
+  the spec-010 part of `EVALUATION.md`, `TRUSTED_BASE.md`, `MUTANTS.md` (`M-901` … `M-937`),
   `UPSTREAM.md` (U-016).
 
 ## 3. Traits

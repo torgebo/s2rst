@@ -16,7 +16,7 @@ run replaces them with measured ones.
 make test
 ```
 
-Expected: passes. It includes `latlng_tests` (FR-017, FR-018), `rect_tests` (FR-019, the
+Measured: passes (2026-10-28). It includes `latlng_tests` (FR-017, FR-018), `rect_tests` (FR-019, the
 boundary sweep), `angle_tests` (the shared remainder), `cpp_latlng_diff` (every row; the
 `RECT_CAPBOUND` radii as the documented deviation) and the trait property tests.
 
@@ -35,10 +35,10 @@ cargo run --release -q --manifest-path specs/010-formal-verify-latlng/probe/rust
   --bin capbound 100000
 ```
 
-Expected: 0 differences in every section but G, whose differences are the widened radii only
-(the probe prints the bound's membership bits, so G's rows match where upstream's cap already
-contained the point); the library's G misses are 0; `capbound` reports 0 misses for the
-library's bound. (The C++ output is regenerated as in `probe/README.md`.)
+Measured (`probe/compare.after.txt`): 0 differences in every section but G, whose 66 differing
+rows are the rectangles where upstream's cap missed a point and the widened bound contains it;
+the library's G misses are 0 of 129,595; `capbound 1000000` reports 0 misses of 74,647,924 for
+the library's bound. (The C++ output is regenerated as in `probe/README.md`.)
 
 ## 3. The proofs
 
@@ -47,8 +47,10 @@ make verify-values P=latlng
 make verify-values P=rect
 ```
 
-Expected: every `ll_*` harness and `rl_reg`'s three `SUCCESSFUL`, every cover satisfied, in
-under 10 minutes each with 4 jobs (SC-006); `rect`'s existing harnesses unchanged.
+Measured (2026-10-28, 4 jobs, build and crate tests included): `P=latlng` 27 of 27
+`SUCCESSFUL` in 6 min 12 s, `ll_reg`'s three among them (`p_lreg_02` the longest, 293.4 s);
+`P=rect` 48 of 48 in 6 min 55 s, unchanged. Weekly: `make verify-slow F=values P=ll_apx::`, both
+`SUCCESSFUL` (268.6 s, 206.5 s). The release pass, `make verify-release`: 42 of 42.
 
 ## 4. Non-vacuity
 
@@ -56,7 +58,7 @@ under 10 minutes each with 4 jobs (SC-006); `rect`'s existing harnesses unchange
 make verify-mutants M='M-9*'
 ```
 
-Expected: every `M-9NN` killed (`verify/MUTANTS.md`).
+Measured: 37 of 37 killed (`verify/MUTANTS.md`).
 
 ## 5. Records
 
@@ -64,6 +66,6 @@ Expected: every `M-9NN` killed (`verify/MUTANTS.md`).
 cd verify && cargo test --test property_kinds
 ```
 
-Expected: passes: every catalogue entry appears once in `PROPERTIES_BY_KIND.md` (SC-011).
+Measured: passes: every catalogue entry appears once in `PROPERTIES_BY_KIND.md` (SC-011).
 Then read `verify/values/EVALUATION.md`'s spec-010 part and check that it answers SC-013's
 three questions.

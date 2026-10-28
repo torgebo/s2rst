@@ -1,13 +1,15 @@
 # Feature Specification: Formal Verification of `LatLng`, and `s2::Rect` as a `Region`
 
-**Feature Branch**: not created yet (`009-bounded-types/2` is checked out; no branch hook is
-configured)
+**Feature Branch**: `tb/010-frm/1`
 
 **Created**: 2026-10-27
 
-**Status**: Draft; clarified 2026-10-27 by the maintainer: `s2::Rect` as a `Region` is in scope
-(FR-001a); U-016 is fixed by widening the pole cap, a documented deviation (FR-019); the two
-missing upstream operations are follow-ups (FR-020).
+**Status**: Implemented 2026-10-28; clarified 2026-10-27 by the maintainer: `s2::Rect` as a
+`Region` is in scope (FR-001a); U-016 is fixed by widening the pole cap, a documented deviation
+(FR-019; the planning probe found the cap around the centre missing points too, so both are
+widened); the two missing upstream operations are follow-ups (FR-020). Every success criterion
+is met on the workstation; SC-006 on a hosted runner needs a push (tasks T043). Evaluation: the
+spec-010 part of `verify/values/EVALUATION.md`.
 
 **Input**: User description: "Continue with formally verifying the next type on the list"
 

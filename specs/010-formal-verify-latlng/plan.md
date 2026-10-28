@@ -48,7 +48,7 @@ out of the verification crate (research R8).
 **Storage**: N/A. Markdown, Rust and CSV rows.
 
 **Testing**:
-- `make verify-values P=latlng` (new part `ll_*`) and `P=rect` (gains `rl_reg`);
+- `make verify-values P=latlng` (new part `ll_*`, with `Rect`'s laws in `ll_reg`);
   `make verify-slow F=values P=…` for the weekly members, if any;
 - `cargo test` in `verify/`: `latlng_spec_tests`, `values_spec_vs_cpp` (the `LATLNG_*`
   sections), `libm_contracts` (the `Cell::rect_bound` contract), `property_kinds`;
@@ -138,7 +138,7 @@ specs/010-formal-verify-latlng/
 ├── quickstart.md        # Phase 1: end-to-end validation guide
 ├── contracts/
 │   ├── verify-commands.md        # P=latlng; CI leg values-latlng; mutants series 9
-│   └── harness-conventions.md    # ll_* modules, rl_reg, the new stubs, M-9NN
+│   └── harness-conventions.md    # ll_* modules, ll_reg, the new stubs, M-9NN
 ├── probe/               # survey (cpp/, rust/), R0's capbound probe and results, README
 └── checklists/requirements.md
 ```
@@ -148,7 +148,7 @@ specs/010-formal-verify-latlng/
 ```text
 verify/src/{latlng_spec,latlng_spec_tests}.rs                         # NEW
 verify/src/ll_{crash,con,fp,tp,nrm,val,dst,apx,ari,eq,lem}.rs          # NEW
-verify/src/rl_reg.rs                                                   # NEW (Rect's Region laws)
+verify/src/ll_reg.rs                                                   # NEW (Rect's Region laws)
 verify/src/{lib,value_domain,stubs}.rs; verify/tests/{values_spec_vs_cpp,libm_contracts}.rs
 verify/values/{INVENTORY,PROPERTIES,EVALUATION}.md
 verify/{PROPERTIES_BY_KIND.md,PROPERTIES_BY_KIND.html,TRUSTED_BASE,MUTANTS,COVERAGE}.md
@@ -164,7 +164,7 @@ VERIFIED_TYPES.md, CORE_TRAITS.md, UPSTREAM.md, Makefile (P=latlng)
 ```
 
 **Structure Decision**: the proofs join 004's `values` suite with `ll_` modules (research R2);
-`Rect`'s law instances join `Rect`'s part as `rl_reg`, so they run in the `values-rect` leg
+`Rect`'s law instances are `ll_reg`, in the `LatLng` part, so they run in the `values-latlng` leg
 with `Rect`'s other proofs. The new stubs go in `stubs.rs`, as 008's. Changes outside
 `verify/` are separate commits.
 

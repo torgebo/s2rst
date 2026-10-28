@@ -5,7 +5,7 @@ The 001–008 contracts still apply. This file lists only what changes.
 ## `make verify-values [P=…|latlng]` (extended)
 
 - `P=latlng` selects the `ll_*` modules, each passed as `--harness <module>::`.
-- `P=rect` gains `rl_reg` through the existing `rl_*` pattern.
+- `P=latlng` includes `ll_reg`, `Rect`'s `Region` laws (moved from `Rect`'s part at the final run: with them the `P=rect` leg took 11 min 8 s, over SC-006's 10 minutes).
 - Without `P`, the target runs all ten parts.
 - The description's sanity tests and the contract tests (`cargo test` in `verify/`) cover
   `latlng_spec`, the `LATLNG_*` rows and the `Cell::rect_bound` contract.

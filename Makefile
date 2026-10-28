@@ -227,8 +227,8 @@ verify-decoding: verify-kani-check ## Run the decoding-layer proofs only (spec 0
 # (iv_*) (spec 004); P=real the r1::Interval ones (ri_*), P=rect the s2::Rect ones (rl_*)
 # (spec 005); P=uvrect the r2::Rect ones (ur_*), P=point the s2::Point ones (pt_*) (spec 006);
 # P=chord the s1::ChordAngle ones (ca_*), P=angle the s1::Angle ones (ag_*) (spec 007); P=cap the
-# s2::Cap ones (cp_*) (spec 008); P=latlng the s2::LatLng ones (ll_*) (spec 010, which adds
-# rl_reg, the rectangle's Region laws, to P=rect). Without P, all ten; CI runs each as a leg. Without P and with P=angle, the E-form round trips are also
+# s2::Cap ones (cp_*) (spec 008); P=latlng the s2::LatLng ones (ll_*) (spec 010; its ll_reg holds
+# the rectangle's Region laws, which go through LatLng). Without P, all ten; CI runs each as a leg. Without P and with P=angle, the E-form round trips are also
 # proven by enumerating every i32 in release mode (verify/tests/angle_enumeration.rs, about
 # 70 s; spec 007 research R12). A part selects its modules by name
 # (`--harness ri_exp::`): Kani matches a filter anywhere in a harness's name, so a bare prefix

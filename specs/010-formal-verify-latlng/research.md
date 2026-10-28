@@ -90,7 +90,7 @@ U-016 is the only wrong upstream behaviour met (spec FR-022).
 
 | Item | Value |
 |------|-------|
-| Modules | `ll_crash`, `ll_con`, `ll_fp` (from a point), `ll_tp` (to a point), `ll_nrm`, `ll_val`, `ll_dst`, `ll_apx`, `ll_ari`, `ll_eq`, `ll_lem`; `rl_reg` in `Rect`'s part |
+| Modules | `ll_crash`, `ll_con`, `ll_fp` (from a point), `ll_tp` (to a point), `ll_nrm`, `ll_val`, `ll_dst`, `ll_apx`, `ll_ari`, `ll_eq`, `ll_lem`; `ll_reg` in `Rect`'s part |
 | Shared verification code | `verify/src/latlng_spec.rs` (R4), new stubs in `verify/src/stubs.rs` (R5, R6) |
 | Catalogue ids | `P-LLCON`, `P-LLFP`, `P-LLTP`, `P-LLNRM`, `P-LLVAL`, `P-LLDST`, `P-LLAPX`, `P-LLARI`, `P-LLEQ`, `P-LLGEO`, `P-LLDES`; `Rect`'s `P-LREG`; lemmas `L-LL-NN` |
 | `make` | `make verify-values P=latlng` |
@@ -99,7 +99,7 @@ U-016 is the only wrong upstream behaviour met (spec FR-022).
 
 - No module name in `verify/src/` ends in `ll_<x>` or contains `ll_crash::` and the like
   (checked 2026-10-28), so `--harness ll_crash::` selects only the new modules.
-- `rl_reg` matches `P=rect`'s `values_part` pattern (`rl_*`), so `Rect`'s leg runs it.
+- `ll_reg` (first `rl_reg`, in `Rect`'s part) holds `Rect`'s law instances in the `LatLng` part: in `P=rect` they took that leg to 11 min 8 s at the final run (R13).
 
 ## R3: The shared exact reduction (FR-017)
 
@@ -213,7 +213,7 @@ proof would fail on a behaviour the real code does not have).
 | `FiniteLatLng` | both coordinates finite | `to_point`'s finiteness, `normalized`'s validity |
 | `AnyTriple`, `NoNanTriple` | 006's, and 006's without NaN | `latitude`, `longitude`, `from_point` |
 | `AnyF64`, `AnyI32²`, `AnyU32²` | 004's, 007's | scalings, E-forms |
-| `ValidRect`, the abstract cell | 005's, 008's | `rl_reg` |
+| `ValidRect`, the abstract cell | 005's, 008's | `ll_reg` |
 
 ## R8: Entries outside the checker (`geo-types`, serde, formatting)
 
@@ -308,7 +308,9 @@ part of `verify/values/EVALUATION.md`):
 - **P-LLAPX-01, -02** prove in 466.6 s and 483.7 s: weekly (`values-latlng` slow leg).
 - **CBMC's built-in `sqrt`** of a negative argument fails the NaN check: `o_get_distance` uses
   `sqrt_contract`.
-- **The stub tables** need `#[kani::unwind(11)]` in the `rl_reg` harnesses (ten slots).
+- **The stub tables** need `#[kani::unwind(11)]` in the `ll_reg` harnesses (ten slots).
+- **`rl_reg` became `ll_reg`:** in `Rect`'s part the `P=rect` leg took 11 min 8 s (`p_lreg_02`,
+  314.4 s, last); in the `LatLng` part both legs stay under 10 minutes.
 - **Mutants:** M-935 (a hand-written `PartialEq` comparing the latitudes) and M-936 (the distance
   doubled) were added for P-LLEQ-01 and P-LLDST-02; the formula mutants are killed by the drift
   guards and the C++ diff test (`Test:` headers).

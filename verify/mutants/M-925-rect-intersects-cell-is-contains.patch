@@ -1,6 +1,6 @@
 Mutant: M-925
 Targets: P-LREG-02
-Expect-Fail: rl_reg::p_lreg_02
+Expect-Fail: ll_reg::p_lreg_02
 Defect: `Region for Rect::intersects_cell` is containment
 
 diff --git a/core/src/s2/region.rs b/core/src/s2/region.rs

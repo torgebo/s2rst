@@ -98,7 +98,7 @@ affected harness. Never change upstream code, never file upstream.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [X] T001 Add the `ll_*` modules, `rl_reg` and `latlng_spec` to `verify/src/lib.rs`, and the
+- [X] T001 Add the `ll_*` modules, `ll_reg` and `latlng_spec` to `verify/src/lib.rs`, and the
   `ll_*` part to `verify/Cargo.toml`'s `values` comment (contracts/harness-conventions.md).
 - [X] T002 [P] Extend `make verify-values` with `P=latlng` in `Makefile` (its comment, the
   `VALUES_HARNESSES` chain, the default list, the target's help text).
@@ -191,10 +191,10 @@ a reason; each proven one killed by a mutant.
 
 **Goal**: P-LREG-01 to -04 and P-LMEM-03 (data-model §4.2).
 
-**Independent test**: `make verify-values P=rect` runs `rl_reg`'s harnesses; each fails on its
+**Independent test**: `make verify-values P=latlng` runs `ll_reg`'s harnesses; each fails on its
 mutant.
 
-- [X] T032 [US3] Write `verify/src/rl_reg.rs`: P-LREG-01, P-LREG-02, P-LMEM-03 (research R6).
+- [X] T032 [US3] Write `verify/src/ll_reg.rs`: P-LREG-01, P-LREG-02, P-LMEM-03 (research R6).
 - [X] T033 [US3] Run them and record P-LREG-01 to -04 and P-LMEM-03 in
   `verify/values/PROPERTIES.md` §5 (replacing its closing note on the `region` laws).
 - [X] T034 [US3] Write the mutants `verify/mutants/M-901…` (data-model §7) and run them
@@ -211,14 +211,14 @@ mutant.
 - [X] T038 [P] [US5] `VERIFIED_TYPES.md`: §2.11 for `LatLng`, §3's `Region` row gains `Rect`,
   the missing upstream operations (FR-020); `CORE_TRAITS.md`'s `Region` invariants name
   `Rect`'s instances; `verify/COVERAGE.md`.
-- [ ] T039 [US5] Write the spec-010 part of `verify/values/EVALUATION.md` (spec FR-016,
+- [X] T039 [US5] Write the spec-010 part of `verify/values/EVALUATION.md` (spec FR-016,
   SC-013).
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T040 Final run, one at a time (quickstart §1–5).
-- [ ] T041 Check each SC against the evidence and update the spec's status line.
-- [ ] T042 [P] `quickstart.md`: replace the expected values with the measured ones.
+- [X] T040 Final run, one at a time (quickstart §1–5).
+- [X] T041 Check each SC against the evidence and update the spec's status line.
+- [X] T042 [P] `quickstart.md`: replace the expected values with the measured ones.
 - [ ] T043 Live CI check (spec SC-006): needs a push and a draft PR. **The user said never
   push**, so it stays open; SC-006 is measured on the workstation only.
 

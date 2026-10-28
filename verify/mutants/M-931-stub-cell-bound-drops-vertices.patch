@@ -1,6 +1,6 @@
 Mutant: M-931
 Targets: P-LREG-02
-Expect-Fail: rl_reg::p_lreg_02
+Expect-Fail: ll_reg::p_lreg_02
 Defect: stub mutant: `cell_rect_bound_contract` drops the vertex clause
 
 diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs

@@ -1,6 +1,6 @@
 Mutant: M-924
 Targets: P-LREG-01
-Expect-Fail: rl_reg::p_lreg_01
+Expect-Fail: ll_reg::p_lreg_01
 Defect: `Region for Rect::contains_cell` tests only the latitudes
 
 diff --git a/core/src/s2/region.rs b/core/src/s2/region.rs

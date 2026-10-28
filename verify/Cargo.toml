@@ -43,7 +43,7 @@ decoding = []
 # rectangle `s2::Rect`) from spec 005, `ur_*` (the u-v rectangle `r2::Rect`) and `pt_*` (the
 # point `s2::Point`) from spec 006, `ca_*` (the chord angle `s1::ChordAngle`) and `ag_*` (the
 # angle `s1::Angle`) from spec 007, `cp_*` (the cap `s2::Cap`) from spec 008, `ll_*` (the
-# latitude–longitude `s2::LatLng`) from spec 010, which also adds `rl_reg` (the rectangle's
+# latitude–longitude `s2::LatLng`) from spec 010, which also adds `ll_reg` (the rectangle's
 # `Region` laws). `make verify-values` runs all ten; `P=<part>` one, selected
 # by module name (`--harness ri_exp::`), since a bare prefix matches inside other names.
 values = []
