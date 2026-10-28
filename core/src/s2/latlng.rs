@@ -168,16 +168,21 @@ impl LatLng {
 
     /// Clamps the latitude to [-π/2, π/2] and reduces the longitude to
     /// [-π, π] using IEEE remainder. Returns `invalid()` if not finite.
+    ///
+    /// The longitude is upstream's `remainder(lng, 2π)`, exactly: it moves by a whole number
+    /// of turns, rounded to the even number at a tie, so π stays π, −π stays −π and 3π
+    /// becomes −π, and a zero keeps its sign (−2π gives −0). The result is valid for every
+    /// finite input.
     pub fn normalized(self) -> Self {
         let lat_rad = self.lat.radians();
         let lng_rad = self.lng.radians();
         if !lat_rad.is_finite() || !lng_rad.is_finite() {
             return Self::invalid();
         }
-        // C++ uses std::remainder(lng, 2*PI) which returns the IEEE remainder
-        // in [-PI, PI]. Rust equivalent: x - round(x/y)*y.
-        let lng_normalized = lng_rad - (lng_rad / (2.0 * PI)).round() * (2.0 * PI);
-        LatLng::from_radians(lat_rad.clamp(-FRAC_PI_2, FRAC_PI_2), lng_normalized)
+        LatLng::from_radians(
+            lat_rad.clamp(-FRAC_PI_2, FRAC_PI_2),
+            crate::s1::remainder_2pi(lng_rad),
+        )
     }
 
     /// Converts this `LatLng` to the equivalent unit-length `S2Point`.
@@ -308,6 +313,10 @@ impl From<LatLng> for Point {
         ll.to_point()
     }
 }
+
+#[cfg(test)]
+#[path = "latlng_tests.rs"]
+mod latlng_tests;
 
 #[cfg(test)]
 mod tests {
