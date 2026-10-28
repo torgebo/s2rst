@@ -66,6 +66,17 @@ impl<'de> serde::Deserialize<'de> for PointRegion {
     }
 }
 
+/// # Panics
+///
+/// For a unit point, none. For other points, in debug builds, where the functions they call
+/// check what upstream's checks with `ABSL_DCHECK` (spec 011 K4); release builds skip the
+/// checks:
+/// - `rect_bound`, if `x` or `y` is NaN: the longitude is then NaN, which
+///   [`Rect::from_lat_lng`] rejects;
+/// - `intersects_cell`, where [`Cell::contains_point`] panics: the coordinate on the cell
+///   face's axis is NaN, or it has the face's sign and another coordinate is NaN or infinite;
+/// - `cell_union_bound`, where [`CellId::from_point`] panics: the zero vector, some points with
+///   a NaN coordinate, and every point with two or more infinite coordinates.
 impl Region for PointRegion {
     fn cap_bound(&self) -> Cap {
         Cap::from_point(self.point)

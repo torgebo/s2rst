@@ -232,3 +232,44 @@ mod pole_min_lat_tests {
         assert_eq!(south.lat.lo, -FRAC_PI_2);
     }
 }
+
+/// Spec 011 K4 (FR-019): `contains_point` panics in debug builds exactly where the face
+/// projection's check fails, as upstream's `ABSL_DCHECK`.
+mod contains_point_panic_tests {
+    use super::super::*;
+
+    fn face0() -> Cell {
+        Cell::from_cell_id(CellId::from_face(Face::F0))
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "does not belong to face")]
+    fn nan_on_the_face_axis() {
+        let _ = face0().contains_point(Point(crate::r3::Vector {
+            x: f64::NAN,
+            y: 0.0,
+            z: 0.0,
+        }));
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "does not belong to face")]
+    fn infinity_off_the_axis_on_the_faces_side() {
+        let _ = face0().contains_point(Point(crate::r3::Vector {
+            x: 1.0,
+            y: f64::INFINITY,
+            z: 0.0,
+        }));
+    }
+
+    #[test]
+    fn infinity_off_the_axis_on_the_other_side_returns() {
+        assert!(!face0().contains_point(Point(crate::r3::Vector {
+            x: -1.0,
+            y: f64::INFINITY,
+            z: 0.0,
+        })));
+    }
+}

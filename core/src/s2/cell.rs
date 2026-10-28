@@ -502,6 +502,14 @@ impl Cell {
     ///
     /// The cell is treated as a closed set (boundary points belong to
     /// both adjacent cells).
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `p`'s coordinate on the axis of the cell's face is NaN, or if
+    /// it has the face's sign and another coordinate is NaN or infinite: the face projection
+    /// checks `p · n > 0` for the face normal `n`, and `∞ · 0` is NaN. Upstream's
+    /// `S2::ValidFaceXYZtoUV` makes the same check (`ABSL_DCHECK`); release builds skip it
+    /// (spec 011 K4).
     #[inline]
     pub fn contains_point(self, p: Point) -> bool {
         let uv = face_xyz_to_uv(self.face, &p.vector());

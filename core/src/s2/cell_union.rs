@@ -245,7 +245,9 @@ impl CellUnion {
     /// # Panics
     ///
     /// On a union that is not valid the result is unspecified, and in debug builds it may be a
-    /// panic.
+    /// panic. In debug builds, also panics where [`CellId::from_point`] does: for the zero
+    /// vector, some points with a NaN coordinate, and every point with two or more infinite
+    /// coordinates.
     pub fn contains_point(&self, p: Point) -> bool {
         self.contains_cell_id(CellId::from_point(&p))
     }
@@ -450,7 +452,9 @@ impl CellUnion {
     /// # Panics
     ///
     /// Panics if an id has no level marker (through [`CellId::level`]). Like
-    /// [`CellUnion::expand_at_level`], may also panic for other invalid ids.
+    /// [`CellUnion::expand_at_level`], may also panic for other invalid ids. In debug builds,
+    /// panics if `min_radius` is NaN: the level lookup checks it, as upstream's
+    /// `GetLevelForMinValue` does with `ABSL_DCHECK` (spec 011 K4).
     pub fn expand_by_radius(&mut self, min_radius: Angle, max_level_diff: u8) {
         let min_level = self
             .0
