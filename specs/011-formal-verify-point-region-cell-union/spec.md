@@ -64,9 +64,20 @@ every law count. It finds:
   The library's `new` neither checks nor documents the precondition, and its derived
   deserialiser accepts any three numbers, where `Cap`'s rejects a centre that is not unit length
   since 008 (K7 there).
-- **K4, `expand_by_radius` panics on a NaN radius in debug builds, undocumented.** The level
-  lookup checks for NaN in debug builds, as upstream's does; `expand_by_radius`'s documentation
-  does not say so.
+- **K4, debug-build panics that the documentation does not state.** Each is a debug-build
+  check that upstream makes too (a `DCHECK`), so release builds agree with upstream's; the
+  library's documentation omits them. Found by the probe and by the planning probe's proofs
+  (research R0):
+  - `expand_by_radius` on a NaN radius (the level lookup's check);
+  - `PointRegion::rect_bound` for a point with a NaN `x` or `y`, through `Rect::from_lat_lng`
+    and `s1::Interval::from_point`, which check that the longitude is in range;
+  - `PointRegion::intersects_cell`, through `Cell::contains_point`, for a point whose
+    coordinate on the cell's face axis is NaN, or is on the face's side while another
+    coordinate is infinite (the face projection's check);
+  - `CellId::from_point` (so `PointRegion::cell_union_bound` and `CellUnion::contains_point`)
+    for a point with two or more infinite coordinates: its documentation names the zero vector
+    and NaN coordinates only (112 of the 1,331 special triples the planning probe tried
+    panic without a NaN or a zero vector).
 - **K5, upstream's `S2PointRegion` codec is missing** (not a defect of existing code): a
   25-byte encoding (a version byte and three doubles), whose decoder rejects a point that is not
   unit length.
@@ -104,8 +115,8 @@ or as a tool limit with a measurement.
 1. **Given** the unmodified repository, **When** the maintainer runs the verification command,
    **Then** it reports each in-scope operation by name as proven crash-free or as a measured
    tool limit, states its domain, and exits successfully.
-2. **Given** an operation with a documented panic (`expand_by_radius` on a NaN radius in debug
-   builds, after K4; the bounds on an id that has no `Cell`), **When** verification runs,
+2. **Given** an operation with a documented panic (the debug-build panics of K4, after
+   FR-019; the bounds on an id that has no `Cell`), **When** verification runs,
    **Then** a proof shows the panic happens exactly where documented, and a separate proof
    shows the operation returns everywhere else in its domain.
 3. **Given** an in-scope operation deliberately changed so that it can panic inside its
@@ -221,7 +232,8 @@ proven, which `Region` laws hold for each, and what next?"
 - **Points that are not unit length.** `PointRegion::new` accepts any three numbers: the zero
   vector, (3, 4, 0), NaN and infinite coordinates. Its bounds are then those of the given
   vector (the probe's special vectors match upstream's Release build), and the laws are stated
-  over unit points, upstream's precondition (K3).
+  over unit points, upstream's precondition (K3). In debug builds, NaN and infinite
+  coordinates can reach upstream's debug checks (K4).
 - **A point equal to a cell vertex.** The region of a vertex intersects the cell, since
   `Cell::contains_point` accepts its own vertices (expanded by ε in u-v); the vertex law for
   `PointRegion` rests on it.
@@ -369,7 +381,10 @@ proven, which `Region` laws hold for each, and what next?"
     does with any other point;
   - `PointRegion`'s deserialiser MUST reject a point that is not unit length, as upstream's
     decoder and `Cap`'s deserialiser do (a documented behaviour change, as 008's K7);
-  - `CellUnion::expand_by_radius` MUST document its debug-build panic on a NaN radius.
+  - every debug-build panic of K4 MUST be documented where it happens and on the operations of
+    this feature that reach it (`expand_by_radius`, `PointRegion::rect_bound`,
+    `intersects_cell` and `cell_union_bound`, `CellUnion::contains_point`), stating the inputs
+    exactly, and proven exactly there where the checker reaches it.
 
   Each with a test.
 - **FR-020** (K5): Upstream's `S2PointRegion` codec is missing from the library. It is a

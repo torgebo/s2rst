@@ -45,3 +45,15 @@ Findings:
   that unions it inherits the difference.
 - **K2**: `CellUnion::approx_area` and `exact_area` sum with `Iterator::sum`, whose neutral
   element for `f64` is −0, so the empty union's area is −0; upstream starts its sum at +0.
+
+## Planning probe R0, R0b, R0c (research R0)
+
+- `r0_harnesses.rs` (35 harnesses): run inside the verification crate through a temporary
+  `#[cfg(all(kani, feature = "values"))] #[path = "../../specs/011-formal-verify-point-region-cell-union/probe/r0_harnesses.rs"] mod r0;`
+  at the end of `verify/src/lib.rs` (not committed), with
+  `VERIFY_PLAYBACK=0 VERIFY_RUN_DIR=target/run-r011 ./run-verify.sh --harness r0::r0_` (4 GiB,
+  12 minutes, 4 jobs; `r0b_`, `r0c_` for the later rounds). Results: `r0_results.txt`.
+- `rust/src/bin/leaf.rs`: does `CellId::from_point` return a valid leaf for every triple? In
+  release builds, all 1,001,331 tried (the 1,331 special triples and 10⁶ random ones); in debug
+  builds 443 of the specials panic, 112 of them without a NaN or a zero vector: every one has
+  two or more infinite coordinates (K4). `rust/src/bin/inf.rs`: the backtrace of one.
