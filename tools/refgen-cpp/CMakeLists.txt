@@ -29,3 +29,6 @@ target_link_libraries(generate_cap PRIVATE s2::s2)
 
 add_executable(generate_latlng generate_latlng.cc)
 target_link_libraries(generate_latlng PRIVATE s2::s2)
+
+add_executable(generate_region generate_region.cc)
+target_link_libraries(generate_region PRIVATE s2::s2)

@@ -299,3 +299,27 @@ LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_latlng > ../../core/tests/d
 FR-019, `UPSTREAM.md` U-016); the diff test checks the centre bit for bit and the radius
 against upstream's widened by the documented rule, and pins upstream's misses (993 of the 5,552
 contained points), where the library's bound has none.
+
+## Point-region and cell-union-bounds oracle (`generate_region`)
+
+`generate_region` writes
+[`core/tests/data/cpp_region_vectors.csv`](../../core/tests/data/cpp_region_vectors.csv)
+(3.5 MB), which [`core/tests/cpp_region_diff.rs`](../../core/tests/cpp_region_diff.rs) diffs
+`PointRegion` and `CellUnion`'s floating-point methods against (spec 011, FR-021, research R9).
+
+```sh
+cmake --build build --target generate_region
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_region > ../../core/tests/data/cpp_region_vectors.csv
+```
+
+| Section | Rows | Library operations checked | Oracle |
+|---------|------|----------------------------|--------|
+| `POINTREGION` | 2,211: the axes, (−1, −0, 0), (−0, −0, −1), face boundaries and corners, 200 cell vertices, 2,000 random unit points | `PointRegion::cap_bound`, `rect_bound`, `cell_union_bound` | `GetCapBound`, `GetRectBound`, `GetCellUnionBound` |
+| `POINTREGION_CELL` | 6,000: each point's own cell at a random level and a random cell; each cell's four vertices against the cell | `contains_cell`, `intersects_cell` | `Contains(S2Cell)`, `MayIntersect` |
+| `CELLUNION_BOUND` | 2,014: the empty union, the whole sphere, each face, opposite faces, a polar face with a cell, one leaf, a level-3 cell at the south pole, 2,000 random unions (scattered or clustered, 1 to 8 cells) | `CellUnion`'s `cap_bound`, `rect_bound`, `cell_union_bound` | the same, by name |
+| `CELLUNION_AREA` | 2,014: the same unions | `average_based_area`, `approx_area`, `exact_area` | `AverageBasedArea`, `ApproxArea`, `ExactArea` |
+| `CELLUNION_POINT` | 10,026: random points, and a point inside and a vertex of each cell of 1,000 unions | `contains_point`, `Region::contains_point` | `Contains(S2Point)` |
+| `CELLUNION_EXPAND` | 1,000: small clustered unions, the special radii (0, −1, 2, 4, 10⁻³⁰⁰, ∞, the face widths) and random ones, `max_level_diff` up to 40, at most three levels below the coarsest cell | `expand_by_radius` | `Expand(S1Angle, int)` |
+| `CELL_FACE_RECT` | 6 | `Cell::rect_bound` of the face cells (spec 011 FR-017) | `GetRectBound` |
+
+There is no deviation: every row matches bit for bit.
