@@ -1,0 +1,5 @@
+checked 74647924 contained points of 1000000 rectangles
+library misses: pole cap 0 (max 0.0 eps of r2, abs 0e0), mid cap 0 (max 0.0 eps of r2, abs 0e0)
+candidate upstream: misses 10507883 (pole caps 10018418)
+candidate 2.5e-16 + 4eps: misses 0 (pole caps 0)
+candidate 1e-15 + 8eps: misses 0 (pole caps 0)

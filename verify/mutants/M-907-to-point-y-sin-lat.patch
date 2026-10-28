@@ -1,0 +1,19 @@
+Mutant: M-907
+Targets: P-LLTP-01
+Expect-Fail: 
+Test: verify --lib latlng_spec::latlng_spec_tests::conversions_are_the_restatements
+Test: core --test cpp_latlng_diff
+Defect: `to_point`'s `y` is `sin lng · sin lat`
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -199,7 +199,7 @@
+         let (sin_lng, cos_lng) = self.lng.sin_cos();
+         Point(Vector {
+             x: cos_lng * cos_lat,
+-            y: sin_lng * cos_lat,
++            y: sin_lng * sin_lat,
+             z: sin_lat,
+         })
+     }

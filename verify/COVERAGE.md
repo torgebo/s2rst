@@ -219,6 +219,25 @@ of the red runs, beyond the spec's list:
 
   All 318 patches apply.
 
+## Spec 010: `LatLng` and `Rect` as a `Region` (2026-10-28)
+
+Spec 010 added a value type in the same pattern as 004–008, so this review's two gaps are
+closed for it from the start:
+
+- **Gap 1 (the documented panics):** `LatLng` documents no panic, and none of its operations
+  panics anywhere (`ll_crash::c_*` over every pair of `f64`). Its two documented preconditions,
+  `to_point`'s finite coordinates and `get_distance`'s normalised inputs, are not panics:
+  `c_to_point` proves the operation over every pair (NaN coordinates outside), and
+  `o_get_distance` proves `get_distance` over every pair without an infinity (NaN where upstream
+  gives NaN).
+- **Gap 2 (floating-point geometry):** every entry through `atan2`, `sin_cos`, `sin`, `cos` and
+  `asin` has a crash proof under the contracts; none is excluded as floating-point geometry.
+  `Display` and `to_string_in_degrees`' formatting stay out with the other `Display`s (gap 3).
+
+`values/INVENTORY.md` section 12 has the rows. `Rect`'s three `Region` methods that the new law
+instances exercise (`contains_cell`, `intersects_cell`, `contains_point`) already had crash
+proofs from gap 2.
+
 ## What changed outside `verify/`
 
 Only documentation: the `# Panics` sections of gap 1, in `core/src/s2/cell_id.rs`, `cell.rs`,

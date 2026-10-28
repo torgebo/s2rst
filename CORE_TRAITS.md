@@ -162,10 +162,14 @@ Internal (non-public):
 - **Debug is implemented** (from supertrait).
 
 **Proven instances (Kani, `verify/src/laws.rs`):** containment implies intersection for `Cell`
-(P-CCNT-03) and `Cap` (P-CPREG-01, by composition, spec 008); the vertex part of
-non-intersection for `Cap` (P-CPREG-02); the bounding cap for `Cap` (P-CPREG-03); the
-cell-union cover for `Cell` (P-CCNT-03; for `Cap` not proven, P-CPREG-04). Every invariant
-also has quickcheck instances (below).
+(P-CCNT-03), `Cap` (P-CPREG-01, by composition, spec 008) and `Rect` (P-LREG-01, under
+contract, spec 010); the vertex part of non-intersection for `Cap` (P-CPREG-02) and `Rect`
+(P-LREG-02, under the `Cell::rect_bound` contract); the bounding cap for `Cap` (P-CPREG-03; for
+`Rect` not proven, P-LREG-03: it needs the values of `atan2` and `sin_cos`); the cell-union cover
+for `Cell` (P-CCNT-03; for `Cap` and `Rect` not proven, P-CPREG-04, P-LREG-04). Every invariant
+also has quickcheck instances (below). Upstream's `S2LatLngRect::GetCapBound` breaks the
+bounding-cap invariant near a rectangle's boundary; `Rect::cap_bound` widens it, a documented
+deviation (`UPSTREAM.md` U-016, spec 010 FR-019).
 
 **Implementations (12):** `Cap`, `Rect`, `Cell`, `PointRegion`, `RegionIntersection`, `RegionUnion`, `Polyline`, `Loop`, `Polygon`, `CellUnion`, `ShapeIndexRegion<'_>`, `ShapeIndexBufferedRegion<'_>`.
 
@@ -380,14 +384,18 @@ and their instantiations for each concrete type.
 The same laws are stated once more for the Kani model checker, in
 `verify/src/laws.rs` (`laws::region`, `laws::eq`, `laws::ord`), and
 instantiated over symbolic values in the `values` suite: the `Region`
-laws for `Cell` (P-CCNT-03) and `Cap` (P-CPREG-01 to -03), equality for
-`Cell`, `s1::Interval`, `r2::Rect`, `Point` and `Cap`. Spec 008 added two
+laws for `Cell` (P-CCNT-03), `Cap` (P-CPREG-01 to -03) and `Rect`
+(P-LREG-01, -02), equality for `Cell`, `s1::Interval`, `r2::Rect`,
+`Point`, `Cap` and `LatLng`. Spec 008 added two
 `Region` laws to both harnesses: a cell the region does not intersect
 has no vertex the region contains (`no_intersect_no_vertex`; a law for
 `Cap` and `Rect`, not for `Cell`), and the bounding cap contains every
-contained point (`cap_bound_contains_points`). Each Kani law names its
-quickcheck twin in its doc comment; the catalogue is
-`verify/values/PROPERTIES.md` §3.
+contained point (`cap_bound_contains_points`). Spec 010 gave the
+rectangle twins arbitrary-`f64` rectangles near the poles and points on
+and a few ulps inside their boundaries (`region_rect_cap_contains_boundary`),
+which found nothing new after the fix but fail at once on upstream's
+bound. Each Kani law names its quickcheck twin in its doc comment; the
+catalogue is `verify/values/PROPERTIES.md` §3.
 
 ---
 

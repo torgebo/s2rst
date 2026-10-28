@@ -1,0 +1,17 @@
+Mutant: M-906
+Targets: P-LLFP-02
+Expect-Fail: ll_fp::p_llfp_02
+Defect: `latitude` takes `atan2(sqrt(x² + y²), z)`, which leaves [−π/2, π/2]
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -140,7 +140,7 @@
+     /// negative zeros are converted to positive zeros for consistent results.
+     #[inline]
+     pub fn latitude(p: Point) -> Angle {
+-        Angle::from_radians((p.z() + 0.0).atan2((p.x() * p.x() + p.y() * p.y()).sqrt()))
++        Angle::from_radians((p.x() * p.x() + p.y() * p.y()).sqrt().atan2(p.z() + 0.0))
+     }
+ 
+     /// Computes the longitude of a direction vector (not necessarily unit length).

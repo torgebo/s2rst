@@ -1,0 +1,18 @@
+Mutant: M-920
+Targets: P-LLAPX-01
+Expect-Fail: ll_apx::p_llapx_01
+Tier: slow
+Defect: `approx_eq` uses 10⁻¹⁴
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -234,7 +234,7 @@
+     /// closeness on the sphere near the poles. Use `get_distance()` for that.
+     #[inline]
+     pub fn approx_eq(self, other: LatLng) -> bool {
+-        self.approx_eq_with(other, Angle::from_radians(1e-15))
++        self.approx_eq_with(other, Angle::from_radians(1e-14))
+     }
+ 
+     /// Like [`approx_eq`](LatLng::approx_eq) but with a configurable tolerance.

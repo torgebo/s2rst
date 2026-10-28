@@ -671,6 +671,73 @@ those are box values. The real vertices' computation is spec 006's normalisation
   C++'s, and K9's containment counts); the deserialiser (tested, as 004–007's).
 - **Weekly:** listed in `values/PROPERTIES.md` §10.
 
+## `s2::LatLng` and `s2::Rect` as a `Region` (spec 010)
+
+Everything the latitude–longitude proofs and `Rect`'s law instances rely on, in addition to the
+sections above, which apply unchanged. Design: `specs/010-formal-verify-latlng/` (data-model
+§1–§3; research R3, R5, R6). Records: section 12 of `values/INVENTORY.md`, section 11 and
+`Rect`'s rows in section 5 of `values/PROPERTIES.md`, and the spec-010 part of
+`values/EVALUATION.md`.
+
+### Reliance on 004, 005, 007 and 008
+
+| Used | For | Taken from |
+|------|-----|------------|
+| `laws::eq`, `laws::region` | P-LLEQ-01, P-LREG-01, P-LREG-02 | specs 004, 008 |
+| `rect_spec` (validity, membership) and P-LMEM-01, P-LREL-02 | the `Rect` laws' statements and the `Cell::rect_bound` stubs | spec 005 |
+| `Angle`'s constructors and conversions (P-AGCNV-01, P-AGEF-01) | P-LLCON-01 compares with them; P-LLGEO-01's composition | spec 007 |
+| the contracts of `atan2`, `sin`, `cos`, `sin_cos`, `asin` and the abstract cell (`fixed_vertex`) | the conversions, the distance, P-LREG-02 | spec 008, the 2026-10-26 coverage review |
+| gap 2's abstract u-v bound (`any_uv_bound`) | L-LL-01, the `Rect` laws' cells | the 2026-10-27 coverage review |
+
+### Pure contracts and `sqrt`'s contract (research R5)
+
+`pure_sin`, `pure_cos`, `pure_asin`, `pure_atan2`, `pure_sin_cos` and `pure_sqrt` return, for an
+input they have seen, the value they returned, and otherwise a value the existing contract (and
+`sqrt_contract`) allows. A restatement that calls the function again (P-LLFP-01, P-LLTP-01,
+P-LLDST-01, P-LMEM-03) then gets the library's value.
+
+- **What it trusts:** the contracts, as above (`tests/libm_contracts.rs`, now with `sqrt`), and
+  that the C library's functions are deterministic, one value per input, as IEEE-754's correctly
+  rounded `sqrt` is by definition. The checker's own `sqrt` is not (memory "CBMC sqrt is
+  nondeterministic"), which is why the restatements stub it.
+- **`sqrt_contract`:** NaN below zero and for NaN, `x` itself at ±0 and +∞, otherwise positive
+  and finite, at most 1 for `x ≤ 1` and at least 1 for `x ≥ 1`.
+
+### The contract on `Cell::rect_bound` (research R6)
+
+`cell_rect_bound_contract` replaces `Cell::rect_bound` in P-LREG-02 by one valid rectangle per
+cell that contains the `LatLng` of each of the cell's four vertices (as `fixed_vertex` and
+`pure_from_point` give them). It is the first contract on a function of the library itself: the
+relation goes through `atan2`'s value in both `Cell::rect_bound` and `from_point`, which no
+contract fixes.
+
+- **What it trusts:** that upstream's conservative bound contains its cell's vertices, which
+  `libm_contracts::cell_rect_bound_satisfies_its_contract` checks with the real functions on
+  every cell to level 5 (8,190) and 10⁶ random cells at every level, and the C++ vectors'
+  `RECT_REGION` rows check indirectly (0 violations of the vertex law in C++ and here).
+- **`any_cell_bound`** (P-LREG-01) rests on a proven lemma instead, L-LL-01 (the bound of every
+  valid cell is valid and non-empty, under `atan2_contract`); **`pure_from_point`** on P-LLFP-02
+  (a point without NaN has a valid `LatLng`) and purity.
+
+### IEEE `fmod` (research R3)
+
+`LatLng::normalized` and `Angle::normalized` reduce through `s1::angle::remainder_2pi`: `x % 2π`,
+then a correction step. The correction step is proven (P-LLNRM-03, on a drift-guarded copy);
+that Rust's `%` on `f64` is IEEE-754's exact `fmod` (the sign of `x`, `|r| < |y|`, no rounding)
+is trusted, since Kani's model of `%` is wrong (`KANI_ISSUES.md`). P-LLNRM-02, -04 and -05 are
+compositions over it. `latlng_tests::prop_normalized_is_the_exact_remainder` and
+`angle_tests::prop_shared_remainder_is_exact` check the whole against the exact `num-bigint`
+remainder at every binade, and the `LATLNG_NORM` rows against C++.
+
+### Bounds and gaps
+
+- **Not proven:** P-LLDST-04 (the distance's symmetry within a tolerance needs the functions'
+  values); P-LREG-03 (the bounding cap: it needs `atan2`'s and `sin_cos`'s values; tested
+  natively, by the quickcheck twin and by the `RECT_CAPBOUND` rows); P-LREG-04 (the covering:
+  `asin`'s value, as P-CPREG-04); the deserialiser (tested).
+- **Outside the checker:** the four `geo-types` conversions (by composition from `Angle`'s
+  entries; the verification crate does not enable the feature) and the text output.
+
 ## The documented panics (2026-10-26)
 
 The `n_*`, `r_*` and `o_*` harnesses of the crash modules (inventories: 001 section 3,

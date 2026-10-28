@@ -1,0 +1,17 @@
+Mutant: M-904
+Targets: P-LLFP-01
+Expect-Fail: ll_fp::p_llfp_01
+Defect: `longitude` takes `atan2(x, y)`
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -148,7 +148,7 @@
+     /// The `+ 0.0` ensures that negative zeros are converted to positive zeros.
+     #[inline]
+     pub fn longitude(p: Point) -> Angle {
+-        Angle::from_radians((p.y() + 0.0).atan2(p.x() + 0.0))
++        Angle::from_radians((p.x() + 0.0).atan2(p.y() + 0.0))
+     }
+ 
+     /// Creates a `LatLng` from a direction vector (not necessarily unit length).

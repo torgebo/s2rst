@@ -1,0 +1,19 @@
+Mutant: M-932
+Targets: P-LLNRM-02
+Expect-Fail: 
+Test: core --lib s2::latlng::latlng_tests
+Test: core --test cpp_latlng_diff
+Defect: FR-017 reverted: the remainder rounds the quotient (K1)
+
+diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
+--- a/core/src/s1/angle.rs
++++ b/core/src/s1/angle.rs
+@@ -224,7 +224,7 @@
+ /// sign of `x`. ±∞ and NaN give NaN (spec 010 FR-017, research R3).
+ pub(crate) fn remainder_2pi(x: f64) -> f64 {
+     // `%` is IEEE fmod, which is exact: its result has the sign of `x` and |r| < 2π.
+-    reduce_fmod(x % (2.0 * PI), x)
++    x - (x / (2.0 * PI)).round() * (2.0 * PI)
+ }
+ 
+ /// The step from `r = fmod(x, 2π)` to the remainder of `x`: `r` and the remainder differ by

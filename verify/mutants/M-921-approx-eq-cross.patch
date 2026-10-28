@@ -1,0 +1,18 @@
+Mutant: M-921
+Targets: P-LLAPX-02
+Expect-Fail: ll_apx::p_llapx_02
+Tier: slow
+Defect: `approx_eq_with` compares `self.lng − other.lat`, which is not symmetric
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -241,7 +241,7 @@
+     #[inline]
+     pub fn approx_eq_with(self, other: LatLng, max_error: Angle) -> bool {
+         (self.lat - other.lat).abs().radians() <= max_error.radians()
+-            && (self.lng - other.lng).abs().radians() <= max_error.radians()
++            && (self.lng - other.lat).abs().radians() <= max_error.radians()
+     }
+ 
+     /// Exports the latitude and longitude in degrees, separated by a comma.

@@ -1,0 +1,17 @@
+Mutant: M-910
+Targets: P-LLNRM-01
+Expect-Fail: ll_nrm::p_llnrm_01
+Defect: `normalized` returns a non-finite input as it is, not `invalid()`
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -180,7 +180,7 @@
+         let lat_rad = self.lat.radians();
+         let lng_rad = self.lng.radians();
+         if !lat_rad.is_finite() || !lng_rad.is_finite() {
+-            return Self::invalid();
++            return self;
+         }
+         LatLng::from_radians(
+             lat_rad.clamp(-FRAC_PI_2, FRAC_PI_2),

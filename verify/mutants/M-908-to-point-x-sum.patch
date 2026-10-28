@@ -1,0 +1,17 @@
+Mutant: M-908
+Targets: P-LLTP-02
+Expect-Fail: ll_tp::p_lltp_02
+Defect: `to_point`'s `x` is `cos lng + cos lat`, which leaves [−1, 1]
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -198,7 +198,7 @@
+         let (sin_lat, cos_lat) = self.lat.sin_cos();
+         let (sin_lng, cos_lng) = self.lng.sin_cos();
+         Point(Vector {
+-            x: cos_lng * cos_lat,
++            x: cos_lng + cos_lat,
+             y: sin_lng * cos_lat,
+             z: sin_lat,
+         })

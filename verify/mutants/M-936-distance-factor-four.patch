@@ -1,0 +1,17 @@
+Mutant: M-936
+Targets: P-LLDST-02
+Expect-Fail: ll_dst::p_lldst_02
+Defect: `get_distance` doubles the result, which leaves [0, π]
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -224,7 +224,7 @@
+         let x = dlat * dlat + dlng * dlng * lat1.cos() * lat2.cos();
+         // Upstream's `sqrt(min(1.0, x))`: clamping after the root would turn a negative `x`
+         // (NaN) into 1 (spec 010 FR-018).
+-        Angle::from_radians(2.0 * x.min(1.0).sqrt().asin())
++        Angle::from_radians(4.0 * x.min(1.0).sqrt().asin())
+     }
+ 
+     /// Reports whether the coordinates of two `LatLngs` are close, within the

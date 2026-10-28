@@ -1,0 +1,24 @@
+Mutant: M-934
+Targets: P-LREG-03
+Expect-Fail: 
+Test: core --lib s2::rect::rect_tests::cap_bound
+Test: core --test cpp_latlng_diff
+Defect: FR-019 reverted: `cap_bound` without the widening (K4, U-016)
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -658,12 +658,7 @@
+             return Cap::empty();
+         }
+         let widen = |cap: Cap| {
+-            let cap = cap.expanded(Angle::from_radians(1e-15));
+-            let radius = cap.chord_radius();
+-            Cap::from_center_chord_angle(
+-                cap.center(),
+-                radius.plus_error(8.0 * f64::EPSILON * radius.length2()),
+-            )
++            cap
+         };
+ 
+         let (pole_z, pole_angle) = if self.lat.hi + self.lat.lo < 0.0 {

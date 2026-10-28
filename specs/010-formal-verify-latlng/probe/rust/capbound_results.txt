@@ -1,0 +1,11 @@
+# target/release/capbound 1000000 (2026-10-28, at 99b67b1; candidates select upstream's cap, then widen it)
+checked 74647924 contained points of 1000000 rectangles
+library misses: pole cap 10018418 (abs up to 1.3322676295501878e-15 of length²), mid cap 489465 (max 24207.0 eps of r2, abs 8.881784197001252e-16)
+worst pole: rect lat [1.5707963267948966e0, 1.5707963267948966e0] lng [-3.141592653589793e0, 3.141592653589793e0] pt (1.5707963267948968e0, 4.6539129845781746e-1) r2 0e0 d2 2.5860584564030066e-32
+worst mid: rect lat [1.0712215270180785e0, 1.0712376688984673e0] lng [-8.905155217671079e-1, -8.905155217089906e-1] pt (1.0712215270180785e0, -8.905155217089911e-1) r2 6.514007562162967e-11 d2 6.51400756219798e-11
+candidate upstream: misses 10507883 (pole caps 10018418)
+candidate 2.5e-16 + 4eps: misses 0 (pole caps 0)
+candidate 1e-15 + 8eps: misses 0 (pole caps 0)
+# earlier rounds (upstream's selection, widened caps compared by height):
+#   100,000 rectangles: expand 5e-16 alone 4248 misses, expand 1e-15 alone 3069, 0 + 8eps 9542795 (of 1M),
+#   1e-15 + 8eps, 2e-15 + 8eps, 4e-15 + 16eps, 5e-16 + 2eps, 1e-15 + 2eps: 0

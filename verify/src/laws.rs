@@ -17,7 +17,7 @@ pub mod region {
 
     /// Containing a cell implies intersecting it.
     ///
-    /// Instances: P-CCNT-03 (`Cell`).
+    /// Instances: P-CCNT-03 (`Cell`), P-CPREG-01 (`Cap`), P-LREG-01 (`Rect`).
     pub fn contains_implies_intersects<R: Region>(r: &R, c: &Cell) {
         if r.contains_cell(c) {
             assert!(
@@ -69,8 +69,9 @@ pub mod region {
     /// the values the region's test read: a recomputed normalisation is not one value to the
     /// checker (spec 008 spec Edge Cases, "Two `sqrt` results"; research R7).
     ///
-    /// Instances: P-CPREG-02 (`Cap`). Quickcheck twin: `region_no_intersect_no_vertex` in
-    /// `core/tests/trait_property_tests.rs`.
+    /// Instances: P-CPREG-02 (`Cap`), P-LREG-02 (`Rect`, whose bound stubs supply the vertices'
+    /// `LatLng`s the rectangle tests). Quickcheck twins: `region_no_intersect_no_vertex`,
+    /// `region_rect_no_intersect_no_vertex_f64` in `core/tests/trait_property_tests.rs`.
     pub fn no_intersect_no_vertex<R: Region>(r: &R, c: &Cell) {
         if !r.intersects_cell(c) {
             for k in s2rst::s2::CellVertex::ALL {
@@ -85,8 +86,9 @@ pub mod region {
     /// The bounding cap contains every point the region contains (`CORE_TRAITS.md`, "Bounding
     /// cap contains contained points").
     ///
-    /// Instances: P-CPREG-03 (`Cap`). Quickcheck twin: `region_cap_bound_contains_point` in
-    /// `core/tests/trait_property_tests.rs`.
+    /// Instances: P-CPREG-03 (`Cap`); for `Rect` not instantiated (P-LREG-03: it needs the values
+    /// of `atan2` and `sin_cos`). Quickcheck twins: `region_cap_bound_contains_point`,
+    /// `region_rect_cap_contains_boundary` in `core/tests/trait_property_tests.rs`.
     pub fn cap_bound_contains_points<R: Region>(r: &R, p: &Point) {
         if r.contains_point(p) {
             assert!(

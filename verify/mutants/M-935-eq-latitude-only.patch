@@ -1,0 +1,29 @@
+Mutant: M-935
+Targets: P-LLEQ-01
+Expect-Fail: ll_eq::p_lleq_01
+Defect: `==` compares the latitudes only (a hand-written `PartialEq` in place of the derived one)
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -48,13 +48,19 @@
+ /// assert!(dist.degrees() > 3.0 && dist.degrees() < 4.0);
+ /// ```
+ #[must_use]
+-#[derive(Clone, Copy, Debug, PartialEq)]
++#[derive(Clone, Copy, Debug)]
+ #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+ pub struct LatLng {
+     /// Latitude angle.
+     pub lat: Angle,
+     /// Longitude angle.
+     pub lng: Angle,
++}
++
++impl PartialEq for LatLng {
++    fn eq(&self, other: &Self) -> bool {
++        self.lat == other.lat
++    }
+ }
+ 
+ impl LatLng {

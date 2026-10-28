@@ -1,0 +1,18 @@
+Mutant: M-919
+Targets: P-LLAPX-01
+Expect-Fail: ll_apx::p_llapx_01
+Tier: slow
+Defect: `approx_eq_with` compares the latitudes strictly
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -240,7 +240,7 @@
+     /// Like [`approx_eq`](LatLng::approx_eq) but with a configurable tolerance.
+     #[inline]
+     pub fn approx_eq_with(self, other: LatLng, max_error: Angle) -> bool {
+-        (self.lat - other.lat).abs().radians() <= max_error.radians()
++        (self.lat - other.lat).abs().radians() < max_error.radians()
+             && (self.lng - other.lng).abs().radians() <= max_error.radians()
+     }
+ 

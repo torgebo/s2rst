@@ -1,0 +1,17 @@
+Mutant: M-922
+Targets: P-LLARI-01
+Expect-Fail: ll_ari::p_llari_01__sub
+Defect: `Sub` adds the longitudes
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -271,7 +271,7 @@
+     fn sub(self, rhs: LatLng) -> LatLng {
+         LatLng {
+             lat: self.lat - rhs.lat,
+-            lng: self.lng - rhs.lng,
++            lng: self.lng + rhs.lng,
+         }
+     }
+ }

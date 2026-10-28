@@ -32,5 +32,6 @@ mod chord_angle;
 mod interval;
 
 pub use angle::Angle;
+pub(crate) use angle::remainder_2pi;
 pub use chord_angle::ChordAngle;
 pub use interval::Interval;

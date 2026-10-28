@@ -1,0 +1,17 @@
+Mutant: M-911
+Targets: P-LLNRM-03
+Expect-Fail: ll_nrm::p_llnrm_03
+Defect: spec mutant: the reduction's copy keeps `r` above π (no correction)
+
+diff --git a/verify/src/latlng_spec.rs b/verify/src/latlng_spec.rs
+--- a/verify/src/latlng_spec.rs
++++ b/verify/src/latlng_spec.rs
+@@ -43,7 +43,7 @@
+ pub fn reduce_fmod_copy(r: f64, r4: f64) -> f64 {
+     let y = 2.0 * PI;
+     if r > PI {
+-        r - y
++        r
+     } else if r < -PI {
+         r + y
+     } else if r == PI || r == -PI {

@@ -1,0 +1,2 @@
+pole: rect contains 1, cap contains 0, cap centre (0, 0, 1) height 0
+mid: rect contains 1, cap contains 0, cap centre (0.301324905093457, -0.37240792821460178, 0.8777902007731273) height 3.2570037810814837e-11

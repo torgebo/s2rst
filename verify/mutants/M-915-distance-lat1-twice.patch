@@ -1,0 +1,19 @@
+Mutant: M-915
+Targets: P-LLDST-01
+Expect-Fail: 
+Test: verify --lib latlng_spec::latlng_spec_tests::conversions_are_the_restatements
+Test: core --test cpp_latlng_diff
+Defect: `get_distance` uses `cos lat1` twice
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -221,7 +221,7 @@
+         let lng2 = other.lng.radians();
+         let dlat = (0.5 * (lat2 - lat1)).sin();
+         let dlng = (0.5 * (lng2 - lng1)).sin();
+-        let x = dlat * dlat + dlng * dlng * lat1.cos() * lat2.cos();
++        let x = dlat * dlat + dlng * dlng * lat1.cos() * lat1.cos();
+         // Upstream's `sqrt(min(1.0, x))`: clamping after the root would turn a negative `x`
+         // (NaN) into 1 (spec 010 FR-018).
+         Angle::from_radians(2.0 * x.min(1.0).sqrt().asin())

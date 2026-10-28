@@ -20,12 +20,13 @@ use s2rst::s1::Interval;
 use s2rst::s2::{Point, Rect};
 use s2rst::{r1, r2};
 use s2rst_verify::{
-    angle_spec, arc_spec, cap_spec, cell_spec, chord_spec, point_spec, real_spec, rect_spec, spec,
-    uv_spec,
+    angle_spec, arc_spec, cap_spec, cell_spec, chord_spec, latlng_spec, point_spec, real_spec,
+    rect_spec, spec, uv_spec,
 };
 
 const CSV: &str = include_str!("../../core/tests/data/cpp_values_vectors.csv");
 const CAP_CSV: &str = include_str!("../../core/tests/data/cpp_cap_vectors.csv");
+const LATLNG_CSV: &str = include_str!("../../core/tests/data/cpp_latlng_vectors.csv");
 
 /// The rows of one `# SECTION`, split at commas.
 fn section(name: &str) -> Vec<Vec<&'static str>> {
@@ -703,4 +704,48 @@ fn cap_level_matches_cpp() {
         n += 1;
     }
     eprintln!("CAP_BOUNDS: {n} rows");
+}
+
+/// Spec 010: `latlng_spec`'s validity, clamp and restatements against the `LATLNG_*` rows.
+#[test]
+fn latlng_description_matches_cpp() {
+    let same = |x: f64, hex: &str| x.to_bits() == f(hex).to_bits();
+    for r in section_of(LATLNG_CSV, "LATLNG_POINT") {
+        let (x, y, z) = (f(r[0]), f(r[1]), f(r[2]));
+        assert!(same(latlng_spec::upstream_latitude(x, y, z), r[3]), "{r:?}");
+        assert!(same(latlng_spec::upstream_longitude(x, y), r[4]), "{r:?}");
+    }
+    for r in section_of(LATLNG_CSV, "LATLNG_NORM") {
+        let (lat, lng) = (f(r[0]), f(r[1]));
+        if lat.is_finite() && lng.is_finite() {
+            assert!(same(latlng_spec::clamp_lat(lat), r[2]), "{r:?}");
+            assert!(latlng_spec::valid(f(r[2]), f(r[3])), "{r:?}");
+        } else {
+            assert!(same(latlng_spec::INVALID.0, r[2]) && same(latlng_spec::INVALID.1, r[3]));
+        }
+    }
+    let ops = section_of(LATLNG_CSV, "LATLNG_OPS");
+    for r in &ops {
+        let (alat, alng, blat, blng, m) = (f(r[0]), f(r[1]), f(r[2]), f(r[3]), f(r[5]));
+        let res: Vec<&str> = r[6].split(';').collect();
+        let (x, y, z) = latlng_spec::upstream_to_point(alat, alng);
+        assert!(
+            same(x, res[0]) && same(y, res[1]) && same(z, res[2]),
+            "{r:?}"
+        );
+        let d = latlng_spec::upstream_distance(alat, alng, blat, blng);
+        assert!(same(d, res[3]), "{r:?}");
+        assert_eq!(
+            latlng_spec::upstream_approx_eq(alat, alng, blat, blng, 1e-15),
+            b(res[4]),
+            "{r:?}"
+        );
+        assert_eq!(
+            latlng_spec::upstream_approx_eq(alat, alng, blat, blng, m),
+            b(res[5]),
+            "{r:?}"
+        );
+        assert_eq!(latlng_spec::valid(alat, alng), b(res[14]), "{r:?}");
+    }
+    assert_eq!(ops.len(), 2759);
 }
