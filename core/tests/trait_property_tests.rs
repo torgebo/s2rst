@@ -181,6 +181,64 @@ mod generators {
         Rect::from_lat_lng(make_latlng_safe(lat0, lng0)).add_point(make_latlng_safe(lat1, lng1))
     }
 
+    /// A rectangle from arbitrary `f64`s (spec 010 FR-011): two latitudes and two longitudes
+    /// (radians), folded into range, and a family that moves the latitudes next to a pole
+    /// (within 10⁻ᵏ of it), onto the north pole, or onto one latitude, so that spec 010's K4
+    /// inputs (`UPSTREAM.md` U-016) are reachable. Non-finite inputs become 0.
+    pub fn rect_f64(lat0: f64, lat1: f64, lng0: f64, lng1: f64, family: u8) -> Rect {
+        use std::f64::consts::{FRAC_PI_2, PI};
+        let fin = |x: f64, m: f64| if x.is_finite() { x % m } else { 0.0 };
+        let (a, c) = (fin(lat0, FRAC_PI_2), fin(lat1, FRAC_PI_2));
+        let (lo, hi) = (a.min(c), a.max(c));
+        let k = i32::from(family / 6 % 17);
+        let (lo, hi) = match family % 6 {
+            1 => (
+                FRAC_PI_2 - (a.abs() / FRAC_PI_2) * 10f64.powi(-k),
+                FRAC_PI_2,
+            ),
+            2 => (
+                -FRAC_PI_2,
+                -FRAC_PI_2 + (a.abs() / FRAC_PI_2) * 10f64.powi(-k),
+            ),
+            3 => (FRAC_PI_2, FRAC_PI_2),
+            4 => (lo, lo),
+            _ => (lo, hi),
+        };
+        Rect::new(
+            s2rst::r1::Interval::new(lo, hi),
+            s2rst::s1::Interval::new(fin(lng0, PI), fin(lng1, PI)),
+        )
+    }
+
+    /// A point on or next to `r`'s boundary: a corner, a point on either latitude bound or
+    /// either longitude bound at the fraction `t`, or such a point moved `k` ulps inward
+    /// (spec 010 research R0's points).
+    pub fn boundary_point(r: Rect, which: u8, t: f64, k: u8) -> Point {
+        use std::f64::consts::PI;
+        let t = if t.is_finite() { t.abs().fract() } else { 0.5 };
+        let step = |x: f64, up: bool| {
+            (0..k % 17).fold(x, |y, _| if up { y.next_up() } else { y.next_down() })
+        };
+        let lng = if r.lng.is_inverted() {
+            let v = r.lng.lo + t * r.lng.length();
+            if v > PI { v - 2.0 * PI } else { v }
+        } else {
+            r.lng.lo + t * (r.lng.hi - r.lng.lo)
+        };
+        let lat = r.lat.lo + t * (r.lat.hi - r.lat.lo);
+        let (la, ln) = match which % 8 {
+            0 => (r.lat.lo, r.lng.lo),
+            1 => (r.lat.hi, r.lng.hi),
+            2 => (r.lat.lo, lng),
+            3 => (r.lat.hi, lng),
+            4 => (step(r.lat.lo, true), step(r.lng.lo, true)),
+            5 => (step(r.lat.hi, false), step(r.lng.hi, false)),
+            6 => (r.lat.lo, step(r.lng.hi, false)),
+            _ => (lat, step(r.lng.lo, true)),
+        };
+        LatLng::from_radians(la, ln).to_point()
+    }
+
     pub fn point_region(lat_i: i32, lng_i: i32) -> PointRegion {
         PointRegion::new(safe_point(lat_i, lng_i))
     }
@@ -813,6 +871,73 @@ fn region_rect_cap_contains(
     let r = generators::rect(lat0, lng0, lat1, lng1);
     let p = generators::safe_point(p_lat, p_lng);
     prop::region_cap_bound_contains_point(&r, p)
+}
+
+/// Spec 010 FR-011: the bounding cap contains the points on and next to a rectangle's boundary,
+/// for rectangles near and at the poles, where upstream's `GetCapBound` misses some (U-016).
+#[quickcheck]
+fn region_rect_cap_contains_boundary(
+    lats: (f64, f64),
+    lngs: (f64, f64),
+    family: u8,
+    which: u8,
+    t: f64,
+    k: u8,
+) -> bool {
+    let r = generators::rect_f64(lats.0, lats.1, lngs.0, lngs.1, family);
+    let p = generators::boundary_point(r, which, t, k);
+    prop::region_cap_bound_contains_point(&r, p)
+}
+
+/// Spec 010 K4's fixed examples (`UPSTREAM.md` U-016): the north pole as a rectangle and a point
+/// one ulp past it, and a point five ulps inside a vertex of a small rectangle; upstream's bound
+/// misses both.
+#[test]
+fn region_rect_cap_contains_k4() {
+    use s2rst::{r1, s1};
+    use std::f64::consts::{FRAC_PI_2, PI};
+    let pole = Rect::new(
+        r1::Interval::new(FRAC_PI_2, FRAC_PI_2),
+        s1::Interval::new(-PI, PI),
+    );
+    let p = LatLng::from_radians(1.570_796_326_794_896_8, 4.653_912_984_578_174_6e-1).to_point();
+    assert!(pole.contains_point(p));
+    assert!(prop::region_cap_bound_contains_point(&pole, p));
+    let mid = Rect::new(
+        r1::Interval::new(1.071_221_527_018_078_5, 1.071_237_668_898_467_3),
+        s1::Interval::new(-8.905_155_217_671_079e-1, -8.905_155_217_089_906e-1),
+    );
+    let p = LatLng::from_radians(1.071_221_527_018_078_5, -8.905_155_217_089_911e-1).to_point();
+    assert!(mid.contains_point(p));
+    assert!(prop::region_cap_bound_contains_point(&mid, p));
+}
+
+#[quickcheck]
+fn region_rect_contains_implies_intersects_f64(
+    lats: (f64, f64),
+    lngs: (f64, f64),
+    family: u8,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let r = generators::rect_f64(lats.0, lats.1, lngs.0, lngs.1, family);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_contains_implies_intersects(&r, &cell)
+}
+
+#[quickcheck]
+fn region_rect_no_intersect_no_vertex_f64(
+    lats: (f64, f64),
+    lngs: (f64, f64),
+    family: u8,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let r = generators::rect_f64(lats.0, lats.1, lngs.0, lngs.1, family);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_no_intersect_no_vertex(&r, &cell)
 }
 
 #[quickcheck]
