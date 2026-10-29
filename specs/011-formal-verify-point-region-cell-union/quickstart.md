@@ -16,7 +16,7 @@ run replaces them with measured ones.
 make test
 ```
 
-Expected: passes. It includes the `cell` tests (FR-017, the polar faces' bounds),
+Measured: passes (2026-10-29, 1 min 37 s). It includes the `cell` tests (FR-017, the polar faces' bounds),
 `cell_union_tests` (FR-018, the empty union's areas; FR-019, `expand_by_radius`'s NaN panic in
 debug builds), the `point_region` tests (FR-019, the deserialiser), `cpp_region_diff` (every
 row, no deviation) and the trait property tests with the two new laws' twins.
@@ -34,19 +34,21 @@ python3 -I specs/011-formal-verify-point-region-cell-union/probe/compare.py \
   specs/011-formal-verify-point-region-cell-union/probe/cpp/survey_cpp.txt
 ```
 
-Expected: 0 differences in every section (the C++ output is regenerated as in
-`probe/README.md`).
+Measured: 0 differences in every section (`probe/compare.after.txt`; the C++ output is
+regenerated as in `probe/README.md`).
 
 ## 3. The proofs
 
 ```sh
-make verify-values P=regions
-make verify-slow F=values P='<the weekly members, research R0>'
+make verify-values P=pointregion
+make verify-values P=unionfloat
+make verify-slow F=values P='<the values-regions slow leg's filters, verify.yml>'
 make verify-release
 ```
 
-Expected: every `pr_*` and `uf_*` harness `SUCCESSFUL` per change in under 10 minutes; the
-weekly members `SUCCESSFUL`; the release pass includes the new `n_`/`o_` members.
+Measured (2026-10-29, 4 jobs): `P=pointregion` 15 of 15 in 1 min 37 s, `P=unionfloat` 27 of 27
+in 4 min 41 s (`P=regions`, both at once, 14 min 48 s). Weekly: every member `SUCCESSFUL` but the
+six vertex-law faces, `KNOWN-TIMEOUT`. `make verify-release`: 44 of 44.
 
 ## 4. Non-vacuity
 
@@ -54,7 +56,7 @@ weekly members `SUCCESSFUL`; the release pass includes the new `n_`/`o_` members
 make verify-mutants M='M-95* M-96* M-97*'
 ```
 
-Expected: every mutant killed (`verify/MUTANTS.md`).
+Measured: 24 of 24 killed (`verify/MUTANTS.md`).
 
 ## 5. Records
 
@@ -62,6 +64,6 @@ Expected: every mutant killed (`verify/MUTANTS.md`).
 cd verify && cargo test --test property_kinds
 ```
 
-Expected: passes: every catalogue entry appears once in `PROPERTIES_BY_KIND.md` (SC-011).
+Measured: passes: every catalogue entry appears once in `PROPERTIES_BY_KIND.md` (SC-011).
 Then read `verify/values/EVALUATION.md`'s spec-011 part and check that it answers SC-013's
 three questions.

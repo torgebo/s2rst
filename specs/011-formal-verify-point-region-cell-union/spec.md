@@ -4,8 +4,11 @@
 
 **Created**: 2026-10-28
 
-**Status**: Draft. Scope chosen by the maintainer on 2026-10-28: `PointRegion` together with
-`CellUnion`'s floating-point methods (the first item of spec 010's ranked list).
+**Status**: Implemented 2026-10-29. Scope chosen by the maintainer on 2026-10-28: `PointRegion`
+together with `CellUnion`'s floating-point methods (the first item of spec 010's ranked list).
+Every success criterion is met on the workstation; SC-006 on a hosted runner needs a push (tasks
+T047). The vertex law for `PointRegion` (P-PRREG-03) is a tool limit, as SC-004 allows. Evaluation:
+the spec-011 part of `verify/values/EVALUATION.md`.
 
 **Input**: User description: "Continue with formally verifying the next type on the list"
 

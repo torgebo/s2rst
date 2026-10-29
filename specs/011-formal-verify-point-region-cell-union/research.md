@@ -262,3 +262,24 @@ At least one per proven entry and one per proven law instance, one exact-string 
   follow-ups: `Cell`'s remaining floating-point methods (its bounding-cap and rectangle laws,
   which P-UREG-04 and -05 wait on), the region adaptors, the `S2PointRegion` codec (FR-020),
   010's open items (the `S2LatLng` codec, `Intersects(S2Cell)`, the two inexact remainders).
+
+## R12: Measured in implementation (2026-10-28/29)
+
+What the runs changed in the design (records: `verify/values/PROPERTIES.md` §12,
+`verify/cell_union/PROPERTIES.md`, the spec-011 part of `verify/values/EVALUATION.md`):
+
+- **The vertex law (P-PRREG-03)** times out at 60 minutes on each of the six faces, with
+  `sqrt_between`: a tool limit, in `known-timeouts.txt`, tested by the survey's 80,000 vertices.
+  M-971 (the cell's margin dropped) is killed by the C++ vertex rows and the twin instead.
+- **P-PRCEL-02** timed out comparing two copies of `Cell::contains_point`'s divisions; with an
+  uninterpreted pure stub (`pure_cell_contains`) it proves in 13 s.
+- **`n_intersects_cell`** failed on CBMC's NaN check for `∞ · 0` before the debug panic: the
+  harness covers the NaN cases, and native tests the infinite ones. The same made
+  `n_from_point_infinities` impossible; `r_from_point_infinities` and the native tests stand.
+- **The covering law's leaf form** fails for a `Cell` at its own vertices (the quickcheck twin):
+  stated for by-leaf regions and interior points, with the closed form at the boundary.
+- **The per-change part** took 14 min 48 s as one: some `uf_*` harnesses spend far more wall time
+  than their solver time. It runs as two legs, `P=pointregion` (1 min 37 s) and `P=unionfloat`
+  (4 min 41 s), with five members moved weekly.
+- **M-965** timed out in P-UAREA-03's harness (it calls the real `approx_area`); the C++ rows kill
+  it.

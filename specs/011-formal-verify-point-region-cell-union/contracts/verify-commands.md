@@ -5,7 +5,9 @@ The 001–010 contracts still apply. This file lists only what changes.
 ## `make verify-values [P=…|regions]` (extended)
 
 - `P=regions` selects the `pr_*` modules (`PointRegion`) and the `uf_*` modules (`CellUnion`'s
-  floating-point methods), each passed as `--harness <module>::`.
+  floating-point methods), each passed as `--harness <module>::`; `P=pointregion` and
+  `P=unionfloat` select each half, the two CI legs (measured in implementation: together the
+  part took 14 min 48 s, over SC-006's 10 minutes).
 - Without `P`, the target runs all eleven parts.
 - The crate's tests (`cargo test` in `verify/`) run first, as for every part: the new
   `libm_contracts` cases for the `Cell::cap_bound` and `CellId::from_point` contracts (research
@@ -25,7 +27,7 @@ The mutants `M-950` … of data-model §7. They share series 9 with spec 010's `
 
 | Job | Change |
 |-----|--------|
-| `verify` | The matrix gains `values-regions`. `core/src/s2/point_region.rs` and `core/tests/data/cpp_region_vectors.csv` join the path filters |
+| `verify` | The matrix gains `values-pointregion` and `values-unionfloat`. `core/src/s2/point_region.rs` and `core/tests/data/cpp_region_vectors.csv` join the path filters |
 | `slow` | A `values-regions` leg with the weekly members' filters |
 | `mutants` | Unchanged matrix; the comment says series 9 holds 010's and 011's |
 

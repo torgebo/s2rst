@@ -101,38 +101,38 @@ Never change upstream code, never file upstream.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Add the `pr_*` and `uf_*` modules and `region_spec` to `verify/src/lib.rs` (`uf_*`
+- [X] T001 Add the `pr_*` and `uf_*` modules and `region_spec` to `verify/src/lib.rs` (`uf_*`
   gated on `values` and `cellunion`), and the two prefixes to `verify/Cargo.toml`'s `values`
   comment (contracts/harness-conventions.md).
-- [ ] T002 [P] Extend `make verify-values` with `P=regions` in `Makefile` (its comment, the
+- [X] T002 [P] Extend `make verify-values` with `P=regions` in `Makefile` (its comment, the
   `VALUES_HARNESSES` chain calling `values_part` for `pr` and `uf`, the default list, the help
   text).
-- [ ] T003 [P] Add the record sections: `verify/values/INVENTORY.md` §13 and
+- [X] T003 [P] Add the record sections: `verify/values/INVENTORY.md` §13 and
   `verify/values/PROPERTIES.md` §12 headers, and a "Floating-point methods (spec 011)" heading
   in `verify/cell_union/PROPERTIES.md`, filled in by T021, T030 and T038.
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T004 Write `verify/src/region_spec.rs` and `verify/src/region_spec_tests.rs`: the
+- [X] T004 Write `verify/src/region_spec.rs` and `verify/src/region_spec_tests.rs`: the
   description (data-model §1), unit tests at the special values (±0, NaN), and the five drift
   guards on the library's source text (after T012–T014 land the text they read).
-- [ ] T005 Extend `verify/src/stubs.rs`: `pure_leaf`, `pure_cell_cap`, `any_center`,
+- [X] T005 Extend `verify/src/stubs.rs`: `pure_leaf`, `pure_cell_cap`, `any_center`,
   `pure_cell_area`, `pure_avg_area`, `sqrt_between` (data-model §3; research R5), with tables
   of ten slots and `reset()` clearing them.
-- [ ] T006 [P] Extend `verify/src/laws.rs` with `region::rect_bound_contains_points` and
+- [X] T006 [P] Extend `verify/src/laws.rs` with `region::rect_bound_contains_points` and
   `region::covering_contains_points::<R, MAX>` (FR-010; research R6), each doc comment naming
   its instances and quickcheck twins; `no_intersect_no_vertex`'s comment names `CellUnion` as
   a region it does not hold for.
 - [X] T007 [P] Add `tools/refgen-cpp/generate_region.cc` (a `CMakeLists.txt` target, a README
   step) and generate `core/tests/data/cpp_region_vectors.csv` (research R9; seven sections).
-- [ ] T008 [P] Extend `verify/tests/libm_contracts.rs`: `sqrt_between`'s clause (specials and
+- [X] T008 [P] Extend `verify/tests/libm_contracts.rs`: `sqrt_between`'s clause (specials and
   10⁶ random inputs), `pure_leaf`'s basis (`CellId::from_point` a valid leaf for the 1,331
   special triples and 10⁶ random ones, in release builds; the debug panics are K4's), and
   `pure_cell_cap`'s and `any_center`'s (the centre in the unit box, the radius in [0, 4]) on
   every cell to level 5 and 10⁶ random cells.
-- [ ] T009 [P] Add `verify/tests/area_enumeration.rs`: `Cell::average_area_for_level(l)` equals
+- [X] T009 [P] Add `verify/tests/area_enumeration.rs`: `Cell::average_area_for_level(l)` equals
   `ldexp(4π/6, −2l)` bit for bit for each of the 31 levels (P-UAREA-04).
-- [ ] T010 Write the lemmas: L-PR-01 as an assertion in `cl_crash::c_fg_from_point` (weekly)
+- [X] T010 Write the lemmas: L-PR-01 as an assertion in `cl_crash::c_fg_from_point` (weekly)
   that the result is a valid leaf; L-PR-02 in `verify/src/uf_bnd.rs` (`l_pr_02`, `BoxCap³`,
   `pure_chord`, `pure_add`); measure L-PR-02 first (`make verify-harness H=uf_bnd::l_pr_02`).
 
@@ -180,16 +180,16 @@ without it.
 **Independent test**: `make verify-values P=regions` reports every `pr_crash` and `uf_crash`
 harness `SUCCESSFUL` with its covers satisfied; `make verify-release` the `n_`/`o_` members.
 
-- [ ] T019 [US1] Write `verify/src/pr_crash.rs` (data-model §5.1 rows 1–4: `c_basic`,
+- [X] T019 [US1] Write `verify/src/pr_crash.rs` (data-model §5.1 rows 1–4: `c_basic`,
   `c_rect_bound`, `c_intersects_cell`, `c_cell_union_bound` weekly; `n_rect_bound_nan`,
   `n_intersects_cell_nan`; `o_` members for the release pass where a debug check is skipped).
-- [ ] T020 [US1] Write `verify/src/uf_crash.rs` (data-model §5.2: `c_contains_point__n{0..3}`,
+- [X] T020 [US1] Write `verify/src/uf_crash.rs` (data-model §5.2: `c_contains_point__n{0..3}`,
   `c_average_based_area__n{1..3}`, `c_approx_area__n{1..3}`, `c_cap_bound__n1` and `__n2`
   weekly, `c_rect_bound__n1` real and `__n{2,3}` stubbed, `n_expand_by_radius_nan`).
-- [ ] T021 [US1] Run the crash suites and fill `verify/values/INVENTORY.md` §13 and the nine
+- [X] T021 [US1] Run the crash suites and fill `verify/values/INVENTORY.md` §13 and the nine
   rows of `verify/cell_union/INVENTORY.md` (the inherited limits written down: `exact_area`,
   `cell_union_bound`, `expand_by_radius`'s expansion).
-- [ ] T022 [US1] Record any further undocumented precondition a proof needed (spec FR-005;
+- [X] T022 [US1] Record any further undocumented precondition a proof needed (spec FR-005;
   SC-010).
 
 ## Phase 5: User Story 2 — `PointRegion`'s catalogue and laws (Priority: P1)
@@ -199,18 +199,18 @@ harness `SUCCESSFUL` with its covers satisfied; `make verify-release` the `n_`/`
 **Independent test**: every entry proven, by composition or under contract, or not proven with a
 reason; each proven one killed by a mutant.
 
-- [ ] T023 [P] [US2] P-PRCON-01 in `verify/src/pr_con.rs`.
-- [ ] T024 [P] [US2] P-PRBND-01, -02, -03 (weekly) in `verify/src/pr_bnd.rs`.
-- [ ] T025 [P] [US2] P-PRCEL-01, -02, -03 in `verify/src/pr_cel.rs`.
-- [ ] T026 [P] [US2] P-PREQ-01 in `verify/src/pr_eq.rs` (`laws::eq::all` over `PlainTriple`).
-- [ ] T027 [US2] `verify/src/pr_reg.rs`: P-PRREG-01, -04, -05 per change; P-PRREG-06 weekly;
+- [X] T023 [P] [US2] P-PRCON-01 in `verify/src/pr_con.rs`.
+- [X] T024 [P] [US2] P-PRBND-01, -02, -03 (weekly) in `verify/src/pr_bnd.rs`.
+- [X] T025 [P] [US2] P-PRCEL-01, -02, -03 in `verify/src/pr_cel.rs`.
+- [X] T026 [P] [US2] P-PREQ-01 in `verify/src/pr_eq.rs` (`laws::eq::all` over `PlainTriple`).
+- [X] T027 [US2] `verify/src/pr_reg.rs`: P-PRREG-01, -04, -05 per change; P-PRREG-06 weekly;
   P-PRREG-03 weekly, one harness per face (`__f0` … `__f5`, `sqrt_between`); P-PRREG-02's
   composition in the module's documentation.
-- [ ] T028 [US2] Run the weekly members (`make verify-slow F=values P='pr_bnd::p_prbnd_03
+- [X] T028 [US2] Run the weekly members (`make verify-slow F=values P='pr_bnd::p_prbnd_03
   pr_reg::p_prreg_03 pr_reg::p_prreg_06 pr_crash::c_cell_union_bound'`); a member that times out
   at 60 minutes goes to `verify/known-timeouts.txt` and is recorded as a tool limit.
-- [ ] T029 [US2] P-PRDES-01: the deserialiser tests of T014 cited.
-- [ ] T030 [US2] Fill `verify/values/PROPERTIES.md` §12 (spec SC-003, SC-004).
+- [X] T029 [US2] P-PRDES-01: the deserialiser tests of T014 cited.
+- [X] T030 [US2] Fill `verify/values/PROPERTIES.md` §12 (spec SC-003, SC-004).
 
 ## Phase 6: User Story 3 — `CellUnion`'s floating-point methods and laws (Priority: P2)
 
@@ -219,42 +219,42 @@ reason; each proven one killed by a mutant.
 **Independent test**: `make verify-values P=regions` runs the `uf_*` harnesses; each fails on its
 mutant.
 
-- [ ] T031 [P] [US3] P-UPT-01 in `verify/src/uf_pt.rs`.
-- [ ] T032 [P] [US3] P-UBND-01, -03 and the weekly `p_ubnd_02__n1` in `verify/src/uf_bnd.rs`
+- [X] T031 [P] [US3] P-UPT-01 in `verify/src/uf_pt.rs`.
+- [X] T032 [P] [US3] P-UBND-01, -03 and the weekly `p_ubnd_02__n1` in `verify/src/uf_bnd.rs`
   (beside L-PR-02); P-UBND-02's composition and P-UBND-04's drift guards in its documentation.
-- [ ] T033 [P] [US3] P-UAREA-01 to -03 in `verify/src/uf_area.rs` (`__n0` is FR-018's: it fails
+- [X] T033 [P] [US3] P-UAREA-01 to -03 in `verify/src/uf_area.rs` (`__n0` is FR-018's: it fails
   before T013); P-UAREA-04 cites T009.
-- [ ] T034 [P] [US3] `verify/src/uf_exp.rs`: the documentation of P-UEXP-01's composition (008's
+- [X] T034 [P] [US3] `verify/src/uf_exp.rs`: the documentation of P-UEXP-01's composition (008's
   P-CPBND-02 and the drift guard) and P-UEXP-02's limit; no harness.
-- [ ] T035 [US3] `verify/src/uf_reg.rs`: P-UREG-01 (`__n0` … `__n3`); the reasons for P-UREG-02,
+- [X] T035 [US3] `verify/src/uf_reg.rs`: P-UREG-01 (`__n0` … `__n3`); the reasons for P-UREG-02,
   -04, -05, -06 and the vertex-law exception (P-UREG-03) in its documentation.
-- [ ] T036 [US3] Run the weekly members (`make verify-slow F=values P='uf_bnd::p_ubnd_01__n3
+- [X] T036 [US3] Run the weekly members (`make verify-slow F=values P='uf_bnd::p_ubnd_01__n3
   uf_bnd::p_ubnd_02__n1 uf_area::p_uarea_02__n3 uf_area::p_uarea_03__n3 uf_crash::c_cap_bound__n2
   cl_crash::c_fg_from_point'`).
-- [ ] T037 [US3] Write the mutants `verify/mutants/M-950…` (data-model §7) and run them
+- [X] T037 [US3] Write the mutants `verify/mutants/M-950…` (data-model §7) and run them
   (`make verify-mutants M='M-95* M-96* M-97*'`); record them in `verify/MUTANTS.md`.
-- [ ] T038 [US3] Fill `verify/cell_union/PROPERTIES.md`'s new entries (spec SC-003, SC-004).
+- [X] T038 [US3] Fill `verify/cell_union/PROPERTIES.md`'s new entries (spec SC-003, SC-004).
 
 ## Phase 7: User Story 5 — CI, records and evaluation (Priority: P3)
 
-- [ ] T039 [US5] Extend `.github/workflows/verify.yml`: `values-regions` in the `verify` matrix,
+- [X] T039 [US5] Extend `.github/workflows/verify.yml`: `values-regions` in the `verify` matrix,
   a `values-regions` leg in `slow` with T028's and T036's filters, `point_region.rs` and
   `cpp_region_vectors.csv` in the path filters, the `mutants` comment (series 9 holds 010's and
   011's) (contracts/verify-commands.md).
-- [ ] T040 [P] [US5] Extend `verify/TRUSTED_BASE.md` (the new stubs and contracts, L-PR-01,
+- [X] T040 [P] [US5] Extend `verify/TRUSTED_BASE.md` (the new stubs and contracts, L-PR-01,
   `sqrt_between`) and `KANI_ISSUES.md` (KI-013, `powi`, with R0b's reproducer).
-- [ ] T041 [P] [US5] `verify/PROPERTIES_BY_KIND.md` and its HTML render (spec SC-011).
-- [ ] T042 [P] [US5] `VERIFIED_TYPES.md`: §2.12 for `PointRegion` and `CellUnion`'s float half,
+- [X] T041 [P] [US5] `verify/PROPERTIES_BY_KIND.md` and its HTML render (spec SC-011).
+- [X] T042 [P] [US5] `VERIFIED_TYPES.md`: §2.12 for `PointRegion` and `CellUnion`'s float half,
   §3's `Region` row, the missing `S2PointRegion` codec (FR-020); `CORE_TRAITS.md`'s `Region`
   invariants name the new instances and `CellUnion`'s vertex-law exception; `verify/COVERAGE.md`.
-- [ ] T043 [US5] Write the spec-011 part of `verify/values/EVALUATION.md` (spec FR-023, SC-013).
+- [X] T043 [US5] Write the spec-011 part of `verify/values/EVALUATION.md` (spec FR-023, SC-013).
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T044 Final run, one at a time (quickstart §1–5), including `make verify-values P=latlng`
+- [X] T044 Final run, one at a time (quickstart §1–5), including `make verify-values P=latlng`
   and `P=cell` (FR-017 touches `Cell`, and L-PR-01 `cl_crash`).
-- [ ] T045 Check each SC against the evidence and update the spec's status line.
-- [ ] T046 [P] `quickstart.md`: replace the expected values with the measured ones.
+- [X] T045 Check each SC against the evidence and update the spec's status line.
+- [X] T046 [P] `quickstart.md`: replace the expected values with the measured ones.
 - [ ] T047 Live CI check (spec SC-006): needs a push and a draft PR. **The user said never
   push**, so it stays open; SC-006 is measured on the workstation only.
 
