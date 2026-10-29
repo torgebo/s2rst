@@ -1,0 +1,19 @@
+Mutant: M-964
+Targets: P-UAREA-02
+Expect-Fail: uf_area::p_uarea_02__n0
+Test: core --lib s2::cell_union::cell_union_tests::empty_union_areas_are_positive_zero
+Defect: FR-018 reverted: `approx_area` sums from −0 (K2)
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -499,7 +499,8 @@
+         // FR-018).
+         self.0
+             .iter()
+-            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).approx_area())
++            .map(|&id| Cell::from_cell_id(id).approx_area())
++            .sum()
+     }
+ 
+     /// Returns the exact area of this cell union, using `Cell::exact_area()`

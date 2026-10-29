@@ -1,6 +1,6 @@
 # Kani issues
 
-Bugs met in the verification tools while formally verifying s2rst (specs 001–008 under
+Bugs met in the verification tools while formally verifying s2rst (specs 001–011 under
 `specs/`): Kani and the CBMC it bundles. They are recorded here and not filed with the Kani
 project, at the maintainer's choice (2026-10-25). Each entry gives the proofs' workaround. Bugs
 in the upstream S2 libraries are in `UPSTREAM.md`.
@@ -29,6 +29,7 @@ again. The reproducers are harnesses in a library crate with
 | [KI-010](#ki-010-the-driver-keeps-memory-for-every-harness-it-has-run) | the driver's memory grows with every harness until it runs out | crash (driver) | 003, 008 | `run-verify.sh` runs batches of 32, and splits a batch whose driver crashes | — |
 | [KI-011](#ki-011---verbose-panics-the-compiler) | `--verbose` panics `kani-compiler` | crash (compiler) | 008 | not used | — |
 | [KI-012](#ki-012---no-overflow-checks-keeps-the-overflow-checks) | `--no-overflow-checks` keeps rustc's overflow checks and drops the NaN check | misleading option | gap 1, 2026-10-26 | the release pass claims "no overflow", and uses the option for the NaN check | — |
+| [KI-013](#ki-013-powi-is-not-a-function) | `powi` gives two results for one input | false alarm | 011, 2026-10-28 | no harness compares two `powi` results; `pure_avg_area`; the 31 levels enumerated natively | — |
 
 ## KI-001: `<` and `<=` on symbolic bools
 
@@ -300,6 +301,31 @@ fn sqrt_deterministic() {
   outside the proof (`crash::r_children`'s `child_end`, `cu_crash::r_cell_queries__n2`'s `none`).
   It passes `--no-overflow-checks` for its other effect, so that a NaN, which a release build's
   skipped check often leaves and Rust computes without a panic, is not reported.
+
+## KI-013: `powi` is not a function
+
+```rust
+#[kani::proof]
+fn powi_deterministic() {
+    let n: i32 = kani::any();
+    kani::assume((0..=30).contains(&n));
+    assert!(4.0_f64.powi(n).to_bits() == 4.0_f64.powi(n).to_bits());
+}
+```
+
+- **Observed:** FAILED in 0.1 s (2026-10-28, spec 011's planning probe R0b, inside the
+  verification crate: `specs/011-formal-verify-point-region-cell-union/probe/r0_harnesses.rs`,
+  `r0b_powi_deterministic`). Kani lowers `f64::powi` (an LLVM intrinsic) to a model that does
+  not fix one result per input, as KI-007's `sqrt`.
+- **Expected:** SUCCESSFUL: `powi` is a function of its arguments in every build Rust makes.
+- **Effect:** `Cell::average_area_for_level` is `4π / (6 · 4^level)` through `powi`, so a harness
+  that compares `CellUnion::average_based_area` with the same expression written again fails
+  spuriously (R0's `r0_cu_avg_area__n1`, `__n3`).
+- **Workaround:** the statement stubs `Cell::average_area_for_level` with a pure, uninterpreted
+  function (`stubs::pure_avg_area`, P-UAREA-01), and the real function is pinned to upstream's
+  `ldexp` by enumerating its 31 levels natively (`verify/tests/area_enumeration.rs`, P-UAREA-04).
+- **Records:** `specs/011-formal-verify-point-region-cell-union/research.md` R0;
+  `verify/TRUSTED_BASE.md`.
 
 ## Limits that are not bugs
 

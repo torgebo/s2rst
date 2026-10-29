@@ -6,8 +6,9 @@
 //! (spec 002), the decoding layer (spec 003) and the value types `s2rst::s2::Cell` and
 //! `s2rst::s1::Interval` (spec 004), `s2rst::r1::Interval` and `s2rst::s2::Rect` (spec 005),
 //! `s2rst::r2::Rect` and `s2rst::s2::Point` (spec 006), `s2rst::s1::ChordAngle` and
-//! `s2rst::s1::Angle` (spec 007), `s2rst::s2::Cap` (spec 008), and `s2rst::s2::LatLng` with
-//! `s2rst::s2::Rect` as a `Region` (spec 010).
+//! `s2rst::s1::Angle` (spec 007), `s2rst::s2::Cap` (spec 008), `s2rst::s2::LatLng` with
+//! `s2rst::s2::Rect` as a `Region` (spec 010), and `s2rst::s2::point_region::PointRegion` with
+//! `s2rst::s2::CellUnion`'s floating-point methods (spec 011).
 //!
 //! - [`spec`] is the reference model of the S2 cell hierarchy, written from upstream
 //!   `s2cell_id.h` / `s2coords.h` and independent of `core/src/s2/cell_id.rs` (FR-006). It is
@@ -55,6 +56,11 @@
 //!   correction step (spec 010). The `ll_*` (`s2::LatLng`) modules are its harnesses, and
 //!   `ll_reg` instantiates the `Region` laws for `s2::Rect`; `stubs` gains pure contracts (one
 //!   contract value per input) and a contract on `Cell::rect_bound` (spec 010 research R5, R6).
+//! - [`region_spec`] describes a point region as its point and a cell union as the points whose
+//!   leaf it contains, with drift guards pinning the library's text of upstream's bound
+//!   constructions (spec 011). The `pr_*` (`PointRegion`) and `uf_*` (`CellUnion`'s
+//!   floating-point methods, also behind `cellunion`) modules are its harnesses, in the same
+//!   `values` suite; `laws` gains the bounding-rectangle and covering laws (spec 011 FR-010).
 //!
 //! Every property harness's doc comment starts with its catalogue id and its kind, then a
 //! plain-language statement, then the exact one: `P-HIER-01 (correct result): …`. The kinds
@@ -88,6 +94,7 @@ pub mod latlng_spec;
 pub mod point_spec;
 pub mod real_spec;
 pub mod rect_spec;
+pub mod region_spec;
 pub mod spec;
 pub mod union_spec;
 pub mod uv_spec;
@@ -344,3 +351,31 @@ mod ll_reg;
 mod ll_tp;
 #[cfg(all(kani, feature = "values"))]
 mod ll_val;
+
+// `PointRegion` (spec 011).
+#[cfg(all(kani, feature = "values"))]
+mod pr_bnd;
+#[cfg(all(kani, feature = "values"))]
+mod pr_cel;
+#[cfg(all(kani, feature = "values"))]
+mod pr_con;
+#[cfg(all(kani, feature = "values"))]
+mod pr_crash;
+#[cfg(all(kani, feature = "values"))]
+mod pr_eq;
+#[cfg(all(kani, feature = "values"))]
+mod pr_reg;
+
+// `CellUnion`'s floating-point methods (spec 011): in the value suite, with 002's union domains.
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_area;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_bnd;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_crash;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_exp;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_pt;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_reg;

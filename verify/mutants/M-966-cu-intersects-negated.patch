@@ -1,0 +1,17 @@
+Mutant: M-966
+Targets: P-UREG-01
+Expect-Fail: uf_reg::p_ureg_01__n1
+Defect: `Region for CellUnion::intersects_cell` is negated
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -767,7 +767,7 @@
+     }
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {
+-        self.intersects_cell_id(cell.id())
++        !self.intersects_cell_id(cell.id())
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {

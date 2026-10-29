@@ -261,7 +261,10 @@ impl CellId {
     ///
     /// In debug builds, panics if `p` is the zero vector, which no face contains (the face
     /// projection's check), and may panic for a point with a NaN coordinate: `(1, NaN, 0)`
-    /// panics, `(NaN, 1, 0)` does not. Release builds return an unspecified leaf for those.
+    /// panics, `(NaN, 1, 0)` does not. It also panics for every point with two or more infinite
+    /// coordinates: one of them is off the face's axis, and the check's `∞ · 0` is NaN
+    /// (upstream's `ABSL_DCHECK` in `S2::ValidFaceXYZtoUV` too; spec 011 K4). Release builds
+    /// return a valid leaf for all of these, an unspecified one.
     #[inline]
     pub fn from_point(p: &Point) -> Self {
         let (f, u, v) = xyz_to_face_uv(&p.0);

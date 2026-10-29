@@ -123,6 +123,13 @@ static ANGLE_E6: Mutex<Table<1>> = Mutex::new(Table::new());
 static ANGLE_E7: Mutex<Table<1>> = Mutex::new(Table::new());
 static ANGLE_UE6: Mutex<Table<1>> = Mutex::new(Table::new());
 static ANGLE_UE7: Mutex<Table<1>> = Mutex::new(Table::new());
+// Spec 011: the pure `CellId::from_point`, the cells' cap bounds, areas and average areas.
+static LEAF: Mutex<Table<3>> = Mutex::new(Table::new());
+static CELL_CAP: Mutex<Table<1>> = Mutex::new(Table::new());
+static CELL_CAPS: Mutex<[[u64; 4]; SLOTS]> = Mutex::new([[0; 4]; SLOTS]);
+static CELL_AREA: Mutex<Table<1>> = Mutex::new(Table::new());
+static AVG_AREA: Mutex<Table<1>> = Mutex::new(Table::new());
+static CELL_CONTAINS: Mutex<Table<4>> = Mutex::new(Table::new());
 
 /// Clears every table. Kani runs each harness from a fresh state; a harness that uses a lemma
 /// stub calls this first anyway, so the intent is explicit (contracts/harness-conventions.md).
@@ -143,6 +150,11 @@ pub fn reset() {
     FP_LAT.lock().unwrap().clear();
     FP_LNG.lock().unwrap().clear();
     CELL_BOUND.lock().unwrap().clear();
+    LEAF.lock().unwrap().clear();
+    CELL_CAP.lock().unwrap().clear();
+    CELL_AREA.lock().unwrap().clear();
+    AVG_AREA.lock().unwrap().clear();
+    CELL_CONTAINS.lock().unwrap().clear();
     for t in [
         &ANGLE_DEG, &ANGLE_E5, &ANGLE_E6, &ANGLE_E7, &ANGLE_UE6, &ANGLE_UE7,
     ] {
@@ -779,4 +791,115 @@ pub fn pure_angle_from_unsigned_e6(e: u32) -> s2rst::s1::Angle {
 /// `Angle::from_unsigned_e7`, uninterpreted.
 pub fn pure_angle_from_unsigned_e7(e: u32) -> s2rst::s1::Angle {
     pure_angle(&ANGLE_UE7, u64::from(e))
+}
+
+// ---- spec 011: `PointRegion` and `CellUnion`'s floating-point methods (research R5) -----------
+
+/// `sqrt_contract`, and the root lies between `x` and 1: true of the correctly rounded root, since
+/// `x` and 1 are representable and the exact root lies between them (checked by
+/// `libm_contracts::sqrt`). Spec 011 R0: `sqrt_contract` alone lets the root of `1 + u² + v²` be
+/// 10³⁰⁰, so the normalised cell vertex underflows and leaves its cell, which the real one never
+/// does.
+pub fn sqrt_between(x: f64) -> f64 {
+    let r = sqrt_contract(x);
+    if x.is_finite() && x > 0.0 {
+        kani::assume(if x >= 1.0 { r <= x } else { r >= x });
+    }
+    r
+}
+
+/// `CellId::from_point`, pure: one valid leaf cell per point (L-PR-01: the real function returns a
+/// valid leaf wherever it returns; its debug-build panics, spec 011 K4, are its own crash proof's).
+/// The covering law and the union's point test call it twice on one point, and its projection
+/// takes a square root, which is not one value per input to the checker (KI-007).
+pub fn pure_leaf(p: &Point) -> s2rst::s2::CellId {
+    s2rst::s2::CellId(
+        LEAF.lock()
+            .unwrap()
+            .get(bits3(*p), || crate::domain::any_valid_at(30).0.id()),
+    )
+}
+
+/// `Cell::cap_bound`, pure: one non-empty cap per cell, its centre in the unit box and its
+/// squared radius in [0, 4]. The real bound's centre is a normalised point and its radius a chord
+/// length (`libm_contracts::cell_cap_bound` checks both on every cell to level 5 and 10⁶ random
+/// cells).
+pub fn pure_cell_cap(c: Cell) -> Cap {
+    let mut t = CELL_CAP.lock().unwrap();
+    let used = t.used;
+    let slot = t.get([c.id().id()], || used as u64) as usize;
+    let mut caps = CELL_CAPS.lock().unwrap();
+    if slot == used && used < SLOTS {
+        let cap = Cap::from_center_chord_angle(any_box_point(), any_chord_len());
+        let p = cap.center();
+        caps[slot] = [
+            p.0.x.to_bits(),
+            p.0.y.to_bits(),
+            p.0.z.to_bits(),
+            cap.chord_radius().length2().to_bits(),
+        ];
+        return cap;
+    }
+    if slot >= SLOTS {
+        return Cap::from_center_chord_angle(any_box_point(), any_chord_len());
+    }
+    let v = caps[slot];
+    Cap::from_center_chord_angle(
+        from3([v[0], v[1], v[2]]),
+        ChordAngle::from_length2(f64::from_bits(v[3])),
+    )
+}
+
+/// A chord length in [0, 4].
+fn any_chord_len() -> ChordAngle {
+    let l: f64 = kani::any();
+    kani::assume((0.0..=4.0).contains(&l));
+    ChordAngle::from_length2(l)
+}
+
+/// `CellId::to_point`, abstracted: any point in the unit box (the real centre is a normalised
+/// point; `libm_contracts::cell_cap_bound` checks it).
+pub fn any_center(_id: s2rst::s2::CellId) -> Point {
+    any_box_point()
+}
+
+/// `Cell::approx_area` or `Cell::exact_area`, pure and uninterpreted: one finite non-negative
+/// value per cell. The statements that use it are about the union's sum, not the values.
+pub fn pure_cell_area(c: Cell) -> f64 {
+    f64::from_bits(CELL_AREA.lock().unwrap().get([c.id().id()], || {
+        let a: f64 = kani::any();
+        kani::assume(a.is_finite() && a >= 0.0);
+        a.to_bits()
+    }))
+}
+
+/// `Cell::average_area_for_level`, pure and uninterpreted: one positive finite value per level.
+/// The real function's `powi` is not one value per input to the checker (KI-013), so a statement
+/// that compares two of its results needs this; P-UAREA-04 pins the real function to upstream's
+/// `ldexp` by enumeration.
+pub fn pure_avg_area(level: s2rst::s2::Level) -> f64 {
+    f64::from_bits(
+        AVG_AREA
+            .lock()
+            .unwrap()
+            .get([u64::from(level.as_u8())], || {
+                let a: f64 = kani::any();
+                kani::assume(a.is_finite() && a > 0.0);
+                a.to_bits()
+            }),
+    )
+}
+
+/// `Cell::contains_point`, pure and uninterpreted: one answer per cell and point. A statement
+/// that a method answers as `contains_point` does (P-PRCEL-02) is then about the method's code,
+/// not two copies of the projection's divisions, which time out (spec 011, 2026-10-28).
+pub fn pure_cell_contains(c: Cell, p: Point) -> bool {
+    let b = bits3(p);
+    CELL_CONTAINS
+        .lock()
+        .unwrap()
+        .get([c.id().id(), b[0], b[1], b[2]], || {
+            u64::from(kani::any::<bool>())
+        })
+        == 1
 }

@@ -1,0 +1,18 @@
+Mutant: M-956
+Targets: P-PRBND-03, P-PRREG-06
+Expect-Fail: pr_bnd::p_prbnd_03,pr_reg::p_prreg_06
+Tier: slow
+Defect: `PointRegion::cell_union_bound` is the empty cap's covering
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -88,7 +88,7 @@
+     }
+ 
+     fn cell_union_bound(&self) -> Vec<CellId> {
+-        self.cap_bound().cell_union_bound()
++        Cap::empty().cell_union_bound()
+     }
+ 
+     fn contains_cell(&self, _cell: &Cell) -> bool {

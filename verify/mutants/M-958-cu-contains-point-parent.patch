@@ -1,0 +1,17 @@
+Mutant: M-958
+Targets: P-UPT-01
+Expect-Fail: uf_pt::p_upt_01__n1
+Defect: `CellUnion::contains_point` tests the leaf's parent
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -249,7 +249,7 @@
+     /// vector, some points with a NaN coordinate, and every point with two or more infinite
+     /// coordinates.
+     pub fn contains_point(&self, p: Point) -> bool {
+-        self.contains_cell_id(CellId::from_point(&p))
++        self.contains_cell_id(CellId::from_point(&p).parent())
+     }
+ 
+     /// Reports whether this union contains the other union.

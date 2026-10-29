@@ -1,0 +1,16 @@
+Mutant: M-963
+Targets: P-UAREA-02
+Expect-Fail: uf_area::p_uarea_02__n1
+Defect: `approx_area` skips the first cell
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -499,6 +499,7 @@
+         // FR-018).
+         self.0
+             .iter()
++            .skip(1)
+             .fold(0.0, |area, &id| area + Cell::from_cell_id(id).approx_area())
+     }
+ 

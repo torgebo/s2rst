@@ -1,0 +1,17 @@
+Mutant: M-953
+Targets: P-PRBND-02, P-PRREG-05
+Expect-Fail: pr_bnd::p_prbnd_02,pr_reg::p_prreg_05
+Defect: `PointRegion::rect_bound` is the bound of `(0, 0)`
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -83,7 +83,7 @@
+     }
+ 
+     fn rect_bound(&self) -> Rect {
+-        let ll = LatLng::from_point(self.point);
++        let ll = LatLng::default();
+         Rect::from_lat_lng(ll)
+     }
+ 

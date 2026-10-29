@@ -245,7 +245,9 @@ impl CellUnion {
     /// # Panics
     ///
     /// On a union that is not valid the result is unspecified, and in debug builds it may be a
-    /// panic.
+    /// panic. In debug builds, also panics where [`CellId::from_point`] does: for the zero
+    /// vector, some points with a NaN coordinate, and every point with two or more infinite
+    /// coordinates.
     pub fn contains_point(&self, p: Point) -> bool {
         self.contains_cell_id(CellId::from_point(&p))
     }
@@ -450,7 +452,9 @@ impl CellUnion {
     /// # Panics
     ///
     /// Panics if an id has no level marker (through [`CellId::level`]). Like
-    /// [`CellUnion::expand_at_level`], may also panic for other invalid ids.
+    /// [`CellUnion::expand_at_level`], may also panic for other invalid ids. In debug builds,
+    /// panics if `min_radius` is NaN: the level lookup checks it, as upstream's
+    /// `GetLevelForMinValue` does with `ABSL_DCHECK` (spec 011 K4).
     pub fn expand_by_radius(&mut self, min_radius: Angle, max_level_diff: u8) {
         let min_level = self
             .0
@@ -483,7 +487,7 @@ impl CellUnion {
     }
 
     /// Returns the approximate area of this cell union, using `Cell::approx_area()`
-    /// for each cell.
+    /// for each cell: their sum in order, +0 for the empty union, as upstream's `ApproxArea`.
     ///
     /// # Panics
     ///
@@ -491,14 +495,15 @@ impl CellUnion {
     /// building its `Cell` panics ([`Cell::from_cell_id`]). The other invalid ids give an
     /// unspecified area.
     pub fn approx_area(&self) -> f64 {
+        // From +0, as upstream's `double area = 0`: `Iterator::sum` of no `f64`s is −0 (spec 011
+        // FR-018).
         self.0
             .iter()
-            .map(|&id| Cell::from_cell_id(id).approx_area())
-            .sum()
+            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).approx_area())
     }
 
     /// Returns the exact area of this cell union, using `Cell::exact_area()`
-    /// for each cell.
+    /// for each cell: their sum in order, +0 for the empty union, as upstream's `ExactArea`.
     ///
     /// # Panics
     ///
@@ -506,10 +511,11 @@ impl CellUnion {
     /// building its `Cell` panics ([`Cell::from_cell_id`]). The other invalid ids give an
     /// unspecified area.
     pub fn exact_area(&self) -> f64 {
+        // From +0, as upstream's `double area = 0`: `Iterator::sum` of no `f64`s is −0 (spec 011
+        // FR-018).
         self.0
             .iter()
-            .map(|&id| Cell::from_cell_id(id).exact_area())
-            .sum()
+            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).exact_area())
     }
 
     /// Replaces large cells with smaller cells at `min_level` and ensures

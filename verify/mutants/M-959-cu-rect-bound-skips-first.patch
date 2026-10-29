@@ -1,0 +1,17 @@
+Mutant: M-959
+Targets: P-UBND-01
+Expect-Fail: uf_bnd::p_ubnd_01__n1
+Defect: `CellUnion::rect_bound` skips the first cell
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -752,7 +752,7 @@
+ 
+     fn rect_bound(&self) -> Rect {
+         let mut bound = Rect::empty();
+-        for &id in &self.0 {
++        for &id in self.0.iter().skip(1) {
+             bound = bound.union(Cell::from_cell_id(id).rect_bound());
+         }
+         bound

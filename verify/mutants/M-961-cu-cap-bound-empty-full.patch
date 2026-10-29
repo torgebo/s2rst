@@ -1,0 +1,17 @@
+Mutant: M-961
+Targets: P-UBND-03
+Expect-Fail: uf_bnd::p_ubnd_03
+Defect: the empty union's cap bound is the full cap
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -728,7 +728,7 @@
+ impl Region for CellUnion {
+     fn cap_bound(&self) -> Cap {
+         if self.0.is_empty() {
+-            return Cap::empty();
++            return Cap::full();
+         }
+ 
+         // Use the centroid as the cap center.

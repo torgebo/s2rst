@@ -1,0 +1,17 @@
+Mutant: M-962
+Targets: P-UAREA-01
+Expect-Fail: uf_area::p_uarea_01__n1
+Defect: `average_based_area` uses the level-29 area
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -483,7 +483,7 @@
+     ///
+     /// As [`CellUnion::leaf_cells_covered`].
+     pub fn average_based_area(&self) -> f64 {
+-        Cell::average_area_for_level(Level::MAX) * self.leaf_cells_covered() as f64
++        Cell::average_area_for_level(Level::new(29)) * self.leaf_cells_covered() as f64
+     }
+ 
+     /// Returns the approximate area of this cell union, using `Cell::approx_area()`

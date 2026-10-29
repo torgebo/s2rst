@@ -97,6 +97,12 @@ impl Interval {
     }
 
     /// Returns an interval containing a single point.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `p` is NaN or outside \[-π, π\], as upstream's
+    /// `S1Interval::FromPoint` checks with `ABSL_DCHECK` (spec 011 K4). In release builds the
+    /// result is then not valid.
     pub fn from_point(p: f64) -> Self {
         let p = if p == -PI { PI } else { p };
         Interval::new_checked(p, p)

@@ -3,8 +3,10 @@
 // Written for this crate (not ported from upstream S2).
 
 //! The function contracts of `src/stubs.rs` against the real `asin`, `atan2` and `cos` (spec 008
-//! FR-003, research R5), `tan`, `atan`, `sin`, `sin_cos` (gap 2, 2026-10-26), and `sqrt` and the
-//! library's `Cell::rect_bound` (spec 010 research R5, R6): every special value, and
+//! FR-003, research R5), `tan`, `atan`, `sin`, `sin_cos` (gap 2, 2026-10-26), `sqrt` and the
+//! library's `Cell::rect_bound` (spec 010 research R5, R6), and `sqrt_between`, `pure_leaf`
+//! (`CellId::from_point`), `pure_cell_cap` and `any_center` (`Cell::cap_bound`,
+//! `CellId::to_point`) (spec 011 research R5): every special value, and
 //! 10⁶ random inputs per function from a fixed seed, as uniform bit patterns and as uniform values
 //! in the function's domain.
 //!
@@ -339,6 +341,11 @@ fn sqrt_ok(x: f64, r: f64) -> bool {
     r > 0.0 && r.is_finite() && (x > 1.0 || r <= 1.0) && (x < 1.0 || r >= 1.0)
 }
 
+/// `sqrt_between`'s extra clause (spec 011): the root lies between `x` and 1.
+fn sqrt_between_ok(x: f64, r: f64) -> bool {
+    sqrt_ok(x, r) && (!x.is_finite() || x <= 0.0 || if x >= 1.0 { r <= x } else { r >= x })
+}
+
 #[test]
 fn sqrt_satisfies_its_contract() {
     for x in
@@ -346,7 +353,7 @@ fn sqrt_satisfies_its_contract() {
             .into_iter()
             .chain([1.0f64.next_up(), 1.0f64.next_down(), f64::MAX.next_down()])
     {
-        assert!(sqrt_ok(x, x.sqrt()), "sqrt({x:e}) = {:e}", x.sqrt());
+        assert!(sqrt_between_ok(x, x.sqrt()), "sqrt({x:e}) = {:e}", x.sqrt());
     }
     let mut rng = Rng(0x5851_F42D_4C95_7F2D);
     for i in 0..RANDOM {
@@ -355,7 +362,7 @@ fn sqrt_satisfies_its_contract() {
         } else {
             rng.uniform(0.0, 4.0)
         };
-        assert!(sqrt_ok(x, x.sqrt()), "sqrt({x:e}) = {:e}", x.sqrt());
+        assert!(sqrt_between_ok(x, x.sqrt()), "sqrt({x:e}) = {:e}", x.sqrt());
     }
 }
 
@@ -392,5 +399,77 @@ fn cell_rect_bound_satisfies_its_contract() {
         let level = Level::try_from((rng.next() % 31) as u8).unwrap();
         let id = CellId::from_face_pos_level(face, rng.next() & ((1 << 61) - 1), level);
         assert!(cell_bound_ok(Cell::from(id)), "{id:?}");
+    }
+}
+
+/// `pure_leaf`'s basis (spec 011 research R5, L-PR-01): wherever `CellId::from_point` returns, it
+/// returns a valid leaf; it panics (debug builds) only where its documentation says: the zero
+/// vector, a NaN coordinate, or two or more infinite coordinates (spec 011 K4). Every special
+/// triple, and 10⁶ random triples over 600 decades.
+#[test]
+fn cell_id_from_point_returns_a_valid_leaf() {
+    use s2rst::r3::Vector;
+    use s2rst::s2::{CellId, Level, Point};
+    let check = |x: f64, y: f64, z: f64| {
+        let r = std::panic::catch_unwind(|| CellId::from_point(&Point(Vector { x, y, z })));
+        match r {
+            Ok(id) => assert!(id.is_valid() && id.level() == Level::MAX, "({x}, {y}, {z})"),
+            Err(_) => {
+                let c = [x, y, z];
+                let documented = c.iter().all(|&t| t == 0.0)
+                    || c.iter().any(|t| t.is_nan())
+                    || c.iter().filter(|t| t.is_infinite()).count() >= 2;
+                assert!(documented, "an undocumented panic at ({x}, {y}, {z})");
+            }
+        }
+    };
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let v = specials();
+    for &x in &v {
+        for &y in &v {
+            for &z in &v {
+                check(x, y, z);
+            }
+        }
+    }
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+    for _ in 0..RANDOM {
+        let w =
+            |rng: &mut Rng| rng.uniform(-1.0, 1.0) * 10f64.powi((rng.next() % 600) as i32 - 300);
+        let (x, y, z) = (w(&mut rng), w(&mut rng), w(&mut rng));
+        check(x, y, z);
+    }
+    std::panic::set_hook(hook);
+}
+
+/// `pure_cell_cap`'s and `any_center`'s basis (spec 011 research R5): a cell's cap bound has a
+/// centre in the unit box and a squared radius in [0, 4], and its id's centre point is in the box,
+/// on every cell to level 5 and 10⁶ random cells.
+fn cell_cap_ok(cell: s2rst::s2::Cell) -> bool {
+    let in_box =
+        |p: s2rst::s2::Point| p.x().abs() <= 1.0 && p.y().abs() <= 1.0 && p.z().abs() <= 1.0;
+    let cap = cell.cap_bound();
+    let l = cap.chord_radius().length2();
+    in_box(cap.center()) && (0.0..=4.0).contains(&l) && in_box(cell.id().to_point())
+}
+
+#[test]
+fn cell_cap_bound_satisfies_its_contract() {
+    use s2rst::s2::{Cell, CellId, Face, Level};
+    for level in 0..=5u8 {
+        let level = Level::try_from(level).unwrap();
+        let mut id = CellId::begin(level);
+        while id != CellId::end(level) {
+            assert!(cell_cap_ok(Cell::from(id)), "{id:?}");
+            id = id.next();
+        }
+    }
+    let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+    for _ in 0..RANDOM {
+        let face = Face::ALL[(rng.next() % 6) as usize];
+        let level = Level::try_from((rng.next() % 31) as u8).unwrap();
+        let id = CellId::from_face_pos_level(face, rng.next() & ((1 << 61) - 1), level);
+        assert!(cell_cap_ok(Cell::from(id)), "{id:?}");
     }
 }

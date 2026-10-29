@@ -198,6 +198,8 @@ fn o_from_cell_id_unspecified() {
 /// float-geometry rows): complete without panic, overflow or undefined behaviour for every box
 /// point but the origin (which no face contains: `n_from_point`).
 ///
+/// L-PR-01 (spec 011): the identifier is a valid leaf, the fact `stubs::pure_leaf` rests on.
+///
 /// Stubs: `any_uv_bound` (the abstract u-v bound: any rectangle in [−1, 1]², which holds every
 /// cell's).
 #[cfg(feature = "slow")]
@@ -208,6 +210,10 @@ fn c_fg_from_point() {
     let p = crate::value_domain::any_box_point();
     kani::assume(p.0.x != 0.0 || p.0.y != 0.0 || p.0.z != 0.0);
     let (c, id) = (Cell::from_point(p), CellId::from(&p));
+    assert!(
+        id.is_valid() && id.is_leaf(),
+        "L-PR-01: from_point returns a valid leaf"
+    );
     kani::cover!(c.face().as_u8() == 5 && id.is_leaf(), "a leaf on face 5");
 }
 
@@ -530,6 +536,26 @@ fn n_from_point() {
 #[kani::unwind(9)]
 fn r_from_point() {
     let p = any_zero_vector();
+    let (c, id) = (Cell::from_point(p), CellId::from_point(&p));
+    assert!(c.is_leaf() && id.is_leaf());
+    kani::cover!(true, "a leaf");
+}
+
+/// R-Cell::from_point, R-CellId::from_point (spec 011 K4): in a build without debug assertions,
+/// each completes for every point with two or more infinite coordinates, with a leaf. (In debug
+/// builds they panic there, which the checker cannot show: it reports the face check's `∞ · 0`
+/// as a NaN check first; `cell_id_tests::from_point_panics_for_two_infinities` and
+/// `libm_contracts::cell_id_from_point_returns_a_valid_leaf` show it natively.)
+#[cfg(not(debug_assertions))]
+#[kani::proof]
+#[kani::unwind(9)]
+fn r_from_point_infinities() {
+    let p = crate::value_domain::any_triple();
+    let inf = [p.0.x, p.0.y, p.0.z]
+        .iter()
+        .filter(|t| t.is_infinite())
+        .count();
+    kani::assume(inf >= 2);
     let (c, id) = (Cell::from_point(p), CellId::from_point(&p));
     assert!(c.is_leaf() && id.is_leaf());
     kani::cover!(true, "a leaf");

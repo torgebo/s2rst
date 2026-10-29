@@ -228,7 +228,10 @@ verify-decoding: verify-kani-check ## Run the decoding-layer proofs only (spec 0
 # (spec 005); P=uvrect the r2::Rect ones (ur_*), P=point the s2::Point ones (pt_*) (spec 006);
 # P=chord the s1::ChordAngle ones (ca_*), P=angle the s1::Angle ones (ag_*) (spec 007); P=cap the
 # s2::Cap ones (cp_*) (spec 008); P=latlng the s2::LatLng ones (ll_*) (spec 010; its ll_reg holds
-# the rectangle's Region laws, which go through LatLng). Without P, all ten; CI runs each as a leg. Without P and with P=angle, the E-form round trips are also
+# the rectangle's Region laws, which go through LatLng); P=regions the PointRegion ones (pr_*) and
+# CellUnion's floating-point ones (uf_*) (spec 011), which CI runs as two legs, P=pointregion and
+# P=unionfloat (together they took 14 min 48 s; apart 1 min 37 s and 4 min 41 s, 2026-10-29).
+# Without P, all eleven; CI runs each as a leg. Without P and with P=angle, the E-form round trips are also
 # proven by enumerating every i32 in release mode (verify/tests/angle_enumeration.rs, about
 # 70 s; spec 007 research R12). A part selects its modules by name
 # (`--harness ri_exp::`): Kani matches a filter anywhere in a harness's name, so a bare prefix
@@ -236,10 +239,10 @@ verify-decoding: verify-kani-check ## Run the decoding-layer proofs only (spec 0
 # `pt_scl`, `iv_` matches `ri_val::p_riv_01`). P may instead list harness filters, each
 # `<module>::<prefix>` (P='cl_bnd::p_cchd_ cl_bnd::p_ceq_'), as the weekly CI legs do.
 values_part = $(foreach m,$(basename $(notdir $(wildcard verify/src/$(1)_*.rs))),--harness $(m)::)
-VALUES_HARNESSES = $(if $(findstring ::,$(P)),$(addprefix --harness ,$(P)),$(if $(filter cell,$(P)),$(call values_part,cl),$(if $(filter interval,$(P)),$(call values_part,iv),$(if $(filter real,$(P)),$(call values_part,ri),$(if $(filter rect,$(P)),$(call values_part,rl),$(if $(filter uvrect,$(P)),$(call values_part,ur),$(if $(filter point,$(P)),$(call values_part,pt),$(if $(filter chord,$(P)),$(call values_part,ca),$(if $(filter angle,$(P)),$(call values_part,ag),$(if $(filter cap,$(P)),$(call values_part,cp),$(if $(filter latlng,$(P)),$(call values_part,ll),--harness cl_ --harness iv_ --harness ri_ --harness rl_ --harness ur_ --harness pt_ --harness ca_ --harness ag_ --harness cp_ $(call values_part,ll))))))))))))
+VALUES_HARNESSES = $(if $(findstring ::,$(P)),$(addprefix --harness ,$(P)),$(if $(filter cell,$(P)),$(call values_part,cl),$(if $(filter interval,$(P)),$(call values_part,iv),$(if $(filter real,$(P)),$(call values_part,ri),$(if $(filter rect,$(P)),$(call values_part,rl),$(if $(filter uvrect,$(P)),$(call values_part,ur),$(if $(filter point,$(P)),$(call values_part,pt),$(if $(filter chord,$(P)),$(call values_part,ca),$(if $(filter angle,$(P)),$(call values_part,ag),$(if $(filter cap,$(P)),$(call values_part,cp),$(if $(filter latlng,$(P)),$(call values_part,ll),$(if $(filter regions,$(P)),$(call values_part,pr) $(call values_part,uf),$(if $(filter pointregion,$(P)),$(call values_part,pr),$(if $(filter unionfloat,$(P)),$(call values_part,uf),--harness cl_ --harness iv_ --harness ri_ --harness rl_ --harness ur_ --harness pt_ --harness ca_ --harness ag_ --harness cp_ $(call values_part,ll) $(call values_part,pr) $(call values_part,uf)))))))))))))))
 
 .PHONY: verify-values
-verify-values: verify-kani-check ## Run the value-type proofs only: Cell, s1::Interval (spec 004), r1::Interval, s2::Rect (spec 005), r2::Rect, s2::Point (spec 006), s1::ChordAngle, s1::Angle (spec 007), s2::Cap (spec 008), s2::LatLng (spec 010) [P=<cell|interval|real|rect|uvrect|point|chord|angle|cap|latlng|module::prefix ...>]
+verify-values: verify-kani-check ## Run the value-type proofs only: Cell, s1::Interval (spec 004), r1::Interval, s2::Rect (spec 005), r2::Rect, s2::Point (spec 006), s1::ChordAngle, s1::Angle (spec 007), s2::Cap (spec 008), s2::LatLng (spec 010), PointRegion and CellUnion's float methods (spec 011) [P=<cell|interval|real|rect|uvrect|point|chord|angle|cap|latlng|regions|pointregion|unionfloat|module::prefix ...>]
 	cd verify && cargo test
 	$(if $(filter-out angle,$(P)),,cd verify && cargo test --release --test angle_enumeration -- --ignored)
 	cd verify && ./run-verify.sh $(VALUES_HARNESSES)

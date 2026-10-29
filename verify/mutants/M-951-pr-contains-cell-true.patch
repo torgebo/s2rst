@@ -1,0 +1,17 @@
+Mutant: M-951
+Targets: P-PRCEL-01, P-PRREG-01
+Expect-Fail: pr_cel::p_prcel_01,pr_reg::p_prreg_01
+Defect: `PointRegion::contains_cell` is always true
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -92,7 +92,7 @@
+     }
+ 
+     fn contains_cell(&self, _cell: &Cell) -> bool {
+-        false
++        true
+     }
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {

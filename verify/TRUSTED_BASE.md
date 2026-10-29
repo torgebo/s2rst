@@ -738,6 +738,65 @@ remainder at every binade, and the `LATLNG_NORM` rows against C++.
 - **Outside the checker:** the four `geo-types` conversions (by composition from `Angle`'s
   entries; the verification crate does not enable the feature) and the text output.
 
+## `PointRegion` and `CellUnion`'s floating-point methods (spec 011)
+
+Everything the point-region proofs and `CellUnion`'s floating-point proofs rely on, in addition
+to the sections above, which apply unchanged. Design:
+`specs/011-formal-verify-point-region-cell-union/` (data-model §1–§3; research R0, R5, R6).
+Records: section 13 of `values/INVENTORY.md`, section 12 of `values/PROPERTIES.md`, the nine
+floating-point rows of `cell_union/INVENTORY.md` and the spec-011 entries of
+`cell_union/PROPERTIES.md`, and the spec-011 part of `values/EVALUATION.md`.
+
+### Reliance on 002, 004, 008 and 010
+
+| Used | For | Taken from |
+|------|-----|------------|
+| `union_domain` (valid unions of exact length), `union_spec`, P-UMEM-01 to -05 | every `uf_*` harness; P-UPT-01's composition | spec 002 |
+| `laws::eq`, `laws::region` (and the two laws added here) | P-PREQ-01, P-PRREG-*, P-UREG-01 | specs 004, 008, 011 |
+| P-CPGRO-02 (`add_cap` contains its argument), `pure_chord`, `pure_add`, P-CPBND-02 (the metric's level) | P-UBND-02's composition and L-PR-02; P-UEXP-01 | spec 008 |
+| `pure_from_point` (P-LLFP-02), `any_cell_bound` (L-LL-01), `sqrt_contract`, `atan2_contract`, `asin_contract` | P-PRBND-02, P-PRREG-05, P-UBND-01, the crash proofs | specs 008, 010 |
+| the abstract u-v bound (`any_uv_bound`) and `Cell`'s float crash proofs (`c_fg_*`) | every harness with a cell; the crash compositions | the 2026-10-26 coverage review |
+
+### Contracts and stubs on library functions (research R5)
+
+- **`pure_leaf`** replaces `CellId::from_point` by one valid leaf per point. It rests on L-PR-01
+  (`cl_crash::c_fg_from_point` asserts the leaf is valid, weekly, over its box-point domain) and on
+  `libm_contracts::cell_id_from_point_returns_a_valid_leaf` (every special triple and 10⁶ random
+  ones: wherever the function returns, the leaf is valid, and it panics only where its
+  documentation says, spec 011 K4). Purity: the library's `from_point` is a function of its
+  argument; the checker's projection takes a square root, which is not (KI-007).
+- **`pure_cell_cap`** (any non-empty cap per cell, its centre in the unit box, its squared radius
+  in [0, 4]) and **`any_center`** (any box point for `CellId::to_point`) rest on
+  `libm_contracts::cell_cap_bound_satisfies_its_contract` (every cell to level 5 and 10⁶ random
+  cells), and on the crash proofs of the functions they replace.
+- **`pure_cell_area`**, **`pure_avg_area`** and **`pure_cell_contains`** are uninterpreted: any
+  value (finite and non-negative, positive, any answer), one per input. A statement proven with
+  them holds for every function of the input, the real one among them. `pure_avg_area` is needed
+  because the checker's `powi` is not a function (KI-013); the real `average_area_for_level` is
+  pinned to upstream's `ldexp` by enumerating its 31 levels (`tests/area_enumeration.rs`).
+- **`sqrt_between`** is `sqrt_contract` with the root between `x` and 1, true of the correctly
+  rounded root; `libm_contracts::sqrt` checks the clause. Spec 011's R0 found that
+  `sqrt_contract` alone lets the root of `1 + u² + v²` be 10³⁰⁰, which no real root is.
+
+### The drift guards (research R4)
+
+`region_spec_tests` pins the library's text of `CellUnion::cap_bound`, `rect_bound`, both
+`cell_union_bound`s, the two area sums and `expand_by_radius`'s level arithmetic, each against a
+listing whose comments name upstream's lines. P-UBND-04 and P-UEXP-01 rest on the listings being
+upstream's, which a reviewer checks when a guard fails, and on the `CELLUNION_*` C++ vectors.
+
+### Bounds and gaps
+
+- **Size bounds:** `CellUnion` proofs at concrete lengths, at most 3 cells (P-UAREA-01 at 1);
+  P-UBND-02 is by composition for every length.
+- **Not proven:** P-UEXP-02 (`expand_at_level`'s `all_neighbors`, 001 R12); P-UREG-02, -04, -05,
+  -06 (they wait on `Cell`'s own bounding laws and `asin`'s value); the deserialiser (tested).
+  P-UREG-03 is not a law of `CellUnion`.
+- **The checker's NaN check** reports `∞ · 0` before a debug panic, so the panics of K4 that
+  need an infinite coordinate (`Cell::contains_point` off the axis, `CellId::from_point` with two
+  infinities) are shown by native `should_panic` tests and the probe's sweep, not by `n_*`
+  harnesses; their release behaviour is (`r_from_point_infinities`, `r_intersects_cell`).
+
 ## The documented panics (2026-10-26)
 
 The `n_*`, `r_*` and `o_*` harnesses of the crash modules (inventories: 001 section 3,

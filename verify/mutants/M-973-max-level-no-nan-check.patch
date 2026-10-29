@@ -1,0 +1,17 @@
+Mutant: M-973
+Targets: N-CellUnion::expand_by_radius
+Expect-Fail: uf_exp::n_expand_by_radius_nan
+Test: core --lib s2::cell_union::cell_union_tests::expand_by_radius_panics_on_a_nan_radius
+Defect: the metric's level lookup drops its NaN check, so `expand_by_radius` returns on a NaN radius
+
+diff --git a/core/src/s2/metric.rs b/core/src/s2/metric.rs
+--- a/core/src/s2/metric.rs
++++ b/core/src/s2/metric.rs
+@@ -91,7 +91,6 @@
+     ///
+     /// In C++, this is `GetLevelForMinValue`.
+     pub fn max_level(&self, val: f64) -> Level {
+-        debug_assert!(!val.is_nan(), "max_level: value must not be NaN");
+         if val <= 0.0 || val.is_nan() {
+             return Level::MAX;
+         }

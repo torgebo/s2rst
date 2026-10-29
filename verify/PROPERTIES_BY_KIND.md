@@ -7,18 +7,18 @@ mutants: [`PROPERTIES.md`](PROPERTIES.md) (`CellId`),
 [`cell_union/PROPERTIES.md`](cell_union/PROPERTIES.md) (`CellUnion`),
 [`decoding/PROPERTIES.md`](decoding/PROPERTIES.md) (the decoding layer) and
 [`values/PROPERTIES.md`](values/PROPERTIES.md) (the value types: `Cell`, `s1::Interval`,
-`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle`, `s2::Cap` and `s2::LatLng`). The operation
+`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle`, `s2::Cap`, `s2::LatLng` and `PointRegion`). The operation
 inventories carry the crash-freedom proofs.
 
 | Kind | It guarantees that… | Entries |
 |------|---------------------|---------|
 | [Never crashes](#never-crashes) | an operation finishes without a panic, an arithmetic overflow, undefined behaviour or a hang, whatever its input | every in-scope operation, plus 2 |
-| [Correct result](#correct-result) | an operation returns what the model says it should | 156 |
+| [Correct result](#correct-result) | an operation returns what the model says it should | 175 |
 | [Round trip](#round-trip) | converting a value there and back gives the original | 17 |
 | [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 28 |
 | [Exact input](#exact-input) | a decoder or parser accepts exactly the well-formed inputs, returns what they say, consumes exactly them and rejects the rest | 17 |
 | [Validity](#validity) | a validity check answers exactly, and results are well formed | 16 |
-| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 47 |
+| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 60 |
 | [Model checks](#model-checks) | the models and restated copies that the proofs compare against are themselves right | 5, plus the links |
 
 ## Browsing the code by kind
@@ -70,7 +70,7 @@ inventories say which harness discharges each operation.
 | Type | What is proven | Harnesses | Record |
 |------|----------------|-----------|--------|
 | `CellId` | all 48 in-scope operations, over every input in their domain (the three text parsers up to 17 or 33 bytes, beyond which the length check rejects before any loop); since 2026-10-27 also 7 floating-point ones (`from_point`, `from_lat_lng`, `to_point`, `to_point_raw`, `size_st` and the two `From`s), run by the `Cell` harnesses | `crash::c_*`; the parsers by `enc::p_enc_06`, `p_enc_09`, `p_enc_10`; `cl_crash::c_fg_*` (shared) | [`INVENTORY.md`](INVENTORY.md) |
-| `CellUnion` | all 27 in-scope operations, within each one's union-size bound | `cu_crash::c_*`, and the property harnesses the inventory names | [`cell_union/INVENTORY.md`](cell_union/INVENTORY.md) |
+| `CellUnion` | all 33 in-scope operations, within each one's union-size bound: the 27 of spec 002, and since spec 011 six floating-point ones (the point tests, the average-based and approximate areas, the cap and rectangle bounds), given the crash proofs of the `Cell` functions they call; `exact_area`, `cell_union_bound` and `expand_by_radius` inherit a tool limit | `cu_crash::c_*`, `uf_crash::c_*`, and the property harnesses the inventory names | [`cell_union/INVENTORY.md`](cell_union/INVENTORY.md) |
 | Decoding layer | all 22 in-scope encoders and decoders: 13 over every input, 9 within bounds (the string vector decoder is a tool limit) | `cd_crash::c_*`, and the agreement harnesses of `cd_fw`, `cd_uv`, `cd_cv`, `cd_pv`, `cd_fx` | [`decoding/INVENTORY.md`](decoding/INVENTORY.md) |
 | `Cell` | 40 of the 52 operations: the 21 integer and stored-bound ones over every valid cell (and every edge, face, position and level), with no size bound; since 2026-10-27, 19 floating-point ones (vertices, edges, centre, areas but the exact one, containment, both bounds, `from_point`, `from_lat_lng`), 10 per change and 9 weekly, under contracts and with the abstract u-v bound. The exact area and the distances to an edge or a cell run out of memory; the distances to a point fail the NaN check off the unit sphere | `cl_crash::c_*`, `cl_crash::c_fg_*`, and the property harnesses the inventory names | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s1::Interval` | all 30 in-scope operations, over every valid pair of `f64` bounds, every point in [−π, π] and every margin but NaN, with no size bound | `iv_crash::c_*` | [`values/INVENTORY.md`](values/INVENTORY.md) |
@@ -82,6 +82,7 @@ inventories say which harness discharges each operation.
 | `s1::Angle` | all 30 operations (`tan` under a contract since 2026-10-27), over every `f64` of radians (NaN and infinities included), `i32` and `u32`, except exactly where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`, `0 / 0`) and the division by an infinity (a tool limit: the checker reports it as NaN); `normalized` over every angle but ±∞; `tan` over every angle | `ag_crash::c_*`, `ag_crash::c_fg_tan` | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s2::Cap` | 39 of the 42 in-scope operations: on the real code or with lemma stubs over every box cap, and under the contracts of `asin`, `atan2` and `cos` where they reach them; `union` and both `cell_union_bound`s are tool limits | `cp_crash::c_*` | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s2::LatLng` | 30 of the 31 in-scope operations (`to_string_in_degrees`' formatting and `Display` out): the 26 Kani entries over every pair of `f64` (NaN and the infinities included) but where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`), `get_distance` over valid pairs (its documented domain) and, outside it, every pair without an infinity; the conversions and the distance under the contracts of `atan2`, `sin_cos`, `sin`, `cos`, `asin` (and `sqrt` outside the distance's domain); the four `geo-types` conversions by composition | `ll_crash::c_*`, `ll_crash::o_get_distance` | [`values/INVENTORY.md`](values/INVENTORY.md) section 12 |
+| `PointRegion` | all 10 Kani entries (spec 011): `new`, `point`, the six `Region` methods and `PartialEq` over every triple of `f64`, but `rect_bound` over the triples without NaN and `intersects_cell` over the box (`Cell::contains_point`'s domain), whose debug panics are proven exact; `rect_bound` under `atan2`'s contract, `cell_union_bound` under `CellId::from_point`'s (weekly); `Deserialize` tested | `pr_crash::c_*`, `pr_crash::n_*`, `pr_crash::r_*` | [`values/INVENTORY.md`](values/INVENTORY.md) section 13 |
 
 Two catalogue entries are crash-freedom statements in their own right:
 
@@ -105,6 +106,7 @@ the proofs found a section claiming more panics than the code has, the section w
 | `CellUnion` | 11 operations, for unions of one or two ids: the normalising constructors on invalid ids outside every valid cell, the cell queries on invalid ids, `leaf_cells_covered` and `denormalize` without a level marker (a bad `level_mod` is unrepresentable since spec 009; `LevelMod::new` panics on one, `cu_crash::n_level_mod_new`), and the three range constructors outside their bounds | `cu_crash::n_*`, `cu_crash::r_*` | [`cell_union/INVENTORY.md`](cell_union/INVENTORY.md) section 3 |
 | Decoding layer | the three fixed-width helpers: a length above 8, an input shorter than the length | `cd_crash::n_*` | [`decoding/INVENTORY.md`](decoding/INVENTORY.md) section 2 |
 | Value types | 36 operations of `Cell` (and `CellId::from_point`), both intervals, both rectangles, `s1::ChordAngle` and `s2::Cap`; and the inputs outside a domain that the sections say return (an odd-marker cell id, a NaN margin on full longitudes, the empty cap expanded by +∞) | `cl_crash`, `iv_crash`, `ri_crash`, `rl_crash`, `ur_crash`, `ca_crash`, `cp_crash`: `n_*`, `r_*`, `o_*` | [`values/INVENTORY.md`](values/INVENTORY.md) section 10 |
+| Regions (spec 011) | the debug-build checks upstream's `DCHECK`s share, found by spec 011's probe: `PointRegion::rect_bound` for a NaN `x` or `y`; `PointRegion::intersects_cell` (`Cell::contains_point`) for a NaN on the face's axis, or on its side with another coordinate NaN; `CellUnion::expand_by_radius` for a NaN radius. Release builds return there. The cases that need an infinite coordinate (`Cell::contains_point`, `CellId::from_point` with two infinities) are tested natively: the checker reports `∞ · 0` first | `pr_crash::n_*`, `pr_crash::r_*`, `uf_exp::n_expand_by_radius_nan`, `cl_crash::r_from_point_infinities` | [`values/INVENTORY.md`](values/INVENTORY.md) section 13; [`cell_union/INVENTORY.md`](cell_union/INVENTORY.md) |
 | Bounded types (spec 009) | each constructor accepts exactly its range: `Level` (0..=30), `Face` (0..=5), `LevelMod` (1..=3), `CellVertex` (0..=3). `try_from` returns `Ok` exactly in range, with the value back, and `OutOfRange` (kind and value) outside it; `new` (`Face::from_u8`) panics exactly outside it, in every build. The operations that took the raw values take the types, so their range panics (`crash::n_raw_level`, `cl_crash::n_vertex`, `denormalize`'s `level_mod`) are retired | `crash::c_level_try_from`, `n_level_new`, `c_face_try_from`, `n_face_from_u8`; `cu_crash::c_level_mod_try_from`, `n_level_mod_new`; `cl_crash::c_cell_vertex_try_from` | [`COVERAGE.md`](COVERAGE.md), "Spec 009"; [`../BOUNDED_TYPES.md`](../BOUNDED_TYPES.md) |
 
 ## Correct result
@@ -353,6 +355,35 @@ The operation returns exactly what the model computes for the same input.
 | [P-LLGEO-01](values/PROPERTIES.md) | The `geo-types` conversions are degrees, x the longitude and y the latitude. | — | every pair, by composition from `Angle`'s conversions (the crate does not build `geo-types` for the checker) |
 | [P-LLDES-01](values/PROPERTIES.md) | Deserialisation accepts every pair and round-trips. | — | not proven: tested (`latlng_tests`) |
 
+### `PointRegion`: construction, bounds, and the cell and point tests
+
+| ID | What is guaranteed | Proved by | Holds for |
+|----|--------------------|-----------|-----------|
+| [P-PRCON-01](values/PROPERTIES.md) | The region keeps the point it was given, bit for bit. | [`pr_con::p_prcon_01`](src/pr_con.rs) | every triple |
+| [P-PRBND-01](values/PROPERTIES.md) | The bounding cap is the point's zero-radius cap. | [`pr_bnd::p_prbnd_01`](src/pr_bnd.rs) | every triple |
+| [P-PRBND-02](values/PROPERTIES.md) | The bounding rectangle is the point's single `LatLng`, a valid rectangle. | [`pr_bnd::p_prbnd_02`](src/pr_bnd.rs) | every triple without NaN, under `from_point`'s proven validity |
+| [P-PRBND-03](values/PROPERTIES.md) | The covering is three or four level-29 cells, one of them the point's leaf's ancestor. | [`pr_bnd::p_prbnd_03`](src/pr_bnd.rs) (weekly) | every triple, under the `from_point` and `asin` contracts |
+| [P-PRCEL-01](values/PROPERTIES.md) | The region contains no cell. | [`pr_cel::p_prcel_01`](src/pr_cel.rs) | every triple and valid cell |
+| [P-PRCEL-02](values/PROPERTIES.md) | The region intersects a cell exactly when the cell contains its point. | [`pr_cel::p_prcel_02`](src/pr_cel.rs) | every triple and valid cell (the cell's test uninterpreted) |
+| [P-PRCEL-03](values/PROPERTIES.md) | The region contains exactly the points equal to its own as numbers. | [`pr_cel::p_prcel_03`](src/pr_cel.rs) | every pair of triples |
+| [P-PRDES-01](values/PROPERTIES.md) | Deserialisation rejects a point that is not unit length. | — | not proven: tested (`point_region_tests`) |
+
+### `CellUnion`: floating-point methods (spec 011)
+
+| ID | What is guaranteed | Proved by | Holds for |
+|----|--------------------|-----------|-----------|
+| [P-UPT-01](cell_union/PROPERTIES.md) | A union contains a point exactly when it contains the point's leaf cell. | [`uf_pt::p_upt_01__n*`](src/uf_pt.rs) | valid unions of up to 3 cells, under the `from_point` contract |
+| [P-UBND-01](cell_union/PROPERTIES.md) | The rectangle bound contains each cell's rectangle bound. | [`uf_bnd::p_ubnd_01__n*`](src/uf_bnd.rs) (2 and 3 cells weekly) | valid unions of up to 3 cells |
+| [P-UBND-02](cell_union/PROPERTIES.md) | The cap bound contains each cell's cap bound. | [`uf_bnd::l_pr_02`](src/uf_bnd.rs), [`uf_bnd::p_ubnd_02__n1`](src/uf_bnd.rs) (weekly) | every valid union, by composition (spec 008's P-CPGRO-02 and L-PR-02) |
+| [P-UBND-03](cell_union/PROPERTIES.md) | The empty union's bounds are empty. | [`uf_bnd::p_ubnd_03`](src/uf_bnd.rs) | the empty union |
+| [P-UBND-04](cell_union/PROPERTIES.md) | The bounds are upstream's constructions. | — | every valid union, by composition (drift guards on the source; the C++ rows check the values) |
+| [P-UAREA-01](cell_union/PROPERTIES.md) | The average-based area is the leaf area times the leaf count. | [`uf_area::p_uarea_01__n1`](src/uf_area.rs) | valid one-cell unions |
+| [P-UAREA-02](cell_union/PROPERTIES.md) | The approximate area is the cells' sum in order from +0. | [`uf_area::p_uarea_02__n*`](src/uf_area.rs) (2 and 3 cells weekly) | valid unions of up to 3 cells |
+| [P-UAREA-03](cell_union/PROPERTIES.md) | The exact area is the cells' sum in order from +0. | [`uf_area::p_uarea_03__n*`](src/uf_area.rs) (2 and 3 cells weekly) | valid unions of up to 3 cells |
+| [P-UAREA-04](cell_union/PROPERTIES.md) | A cell's average area is upstream's at every level. | — | every level, by enumeration (`tests/area_enumeration.rs`) |
+| [P-UEXP-01](cell_union/PROPERTIES.md) | `expand_by_radius` expands at upstream's level. | — | every radius and difference, by composition (spec 008's P-CPBND-02 and a drift guard) |
+| [P-UEXP-02](cell_union/PROPERTIES.md) | Expanding keeps the original union. | — | not proven: a tool limit (`all_neighbors`) |
+
 ## Round trip
 
 Converting a value one way and back gives the original value, consuming exactly what was
@@ -519,6 +550,19 @@ Relations that must hold between operations, or between an operation's arguments
 | [P-LREG-02](values/PROPERTIES.md) | A cell the rectangle does not intersect has no vertex the rectangle contains. | [`ll_reg::p_lreg_02`](src/ll_reg.rs) | every valid rectangle and abstract cell, under the `Cell::rect_bound` contract |
 | [P-LREG-03](values/PROPERTIES.md) | The rectangle's bounding cap contains every point the rectangle contains (after FR-019's widening). | — | not proven: it needs `atan2`'s and `sin_cos`'s values; tested natively, by the quickcheck twin and the C++ rows |
 | [P-LREG-04](values/PROPERTIES.md) | Every cell the rectangle contains lies in its covering. | — | not proven: the covering's level needs `asin`'s value, as P-CPREG-04 |
+| [P-PREQ-01](values/PROPERTIES.md) | Two point regions are equal exactly when their points are, and equality is an equivalence. | [`pr_eq::p_preq_01`](src/pr_eq.rs) | every three triples without NaN |
+| [P-PRREG-01](values/PROPERTIES.md) | The generic `Region` law holds for `PointRegion`: containing a cell implies intersecting it. | [`pr_reg::p_prreg_01`](src/pr_reg.rs) | every box point and valid cell |
+| [P-PRREG-02](values/PROPERTIES.md) | Every cell the point region contains lies in its covering. | — | every point, by composition (it contains no cell) |
+| [P-PRREG-03](values/PROPERTIES.md) | A cell the point region does not intersect has no vertex equal to its point: a cell contains its own vertices. | — | not proven: a tool limit (each face's harness times out at 60 minutes); tested (80,000 vertices, C++ and library alike) |
+| [P-PRREG-04](values/PROPERTIES.md) | The point region's bounding cap contains every point it contains. | [`pr_reg::p_prreg_04`](src/pr_reg.rs) | every two box points |
+| [P-PRREG-05](values/PROPERTIES.md) | The point region's bounding rectangle contains its point. | [`pr_reg::p_prreg_05`](src/pr_reg.rs) | every triple without NaN, under `from_point`'s proven validity |
+| [P-PRREG-06](values/PROPERTIES.md) | The point region's covering contains its point's leaf. | [`pr_reg::p_prreg_06`](src/pr_reg.rs) (weekly) | every box point, under the `from_point` and `asin` contracts |
+| [P-UREG-01](cell_union/PROPERTIES.md) | The generic `Region` law holds for `CellUnion`: containing a cell implies intersecting it. | [`uf_reg::p_ureg_01__n*`](src/uf_reg.rs) | valid unions of up to 3 cells, every valid cell |
+| [P-UREG-02](cell_union/PROPERTIES.md) | Every cell the union contains lies in its covering. | — | not proven: the covering's level needs `asin`'s value, as P-CPREG-04 |
+| [P-UREG-03](cell_union/PROPERTIES.md) | The vertex law. | — | not a law of `CellUnion` (by design, upstream too): its cell test is by id, its point test by leaf |
+| [P-UREG-04](cell_union/PROPERTIES.md) | The union's bounding cap contains every point it contains. | — | not proven: it waits on `Cell`'s own bounding-cap law; tested |
+| [P-UREG-05](cell_union/PROPERTIES.md) | The union's bounding rectangle contains every point it contains. | — | not proven: it waits on `Cell`'s own rectangle law; tested |
+| [P-UREG-06](cell_union/PROPERTIES.md) | The union's covering contains every point it contains. | — | not proven: as P-UREG-02 |
 
 ## Model checks
 

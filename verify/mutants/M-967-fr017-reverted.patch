@@ -1,0 +1,19 @@
+Mutant: M-967
+Targets: FR-017
+Expect-Fail: 
+Test: core --lib s2::cell::cell_tests::pole_min_lat_tests
+Test: core --test cpp_region_diff
+Defect: FR-017 reverted: Go's 15-digit literal for the polar latitude (K1)
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -33,7 +33,7 @@
+ /// upstream computes at start-up (`kPoleMinLat` in `S2Cell::GetRectBound`, before its
+ /// `- 0.5 * DBL_EPSILON`). Go's 15-digit literal `0.615479708670387` is 2 ulps below it, which
+ /// made the polar faces' bounds 2 ulps wider than upstream's (spec 011 K1).
+-const POLE_MIN_LAT: f64 = 0.615_479_708_670_387_3;
++const POLE_MIN_LAT: f64 = 0.615_479_708_670_387;
+ 
+ /// Identifies one of the four edges of a [`Cell`].
+ ///

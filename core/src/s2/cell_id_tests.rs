@@ -37,3 +37,26 @@ fn invalid_debug_string_is_zero_padded() {
     assert_eq!(CellId(2).to_string(), CellId(2).to_debug_string());
     assert_eq!(CellId::from_face(Face::F3).to_debug_string(), "3/");
 }
+
+/// Spec 011 K4 (FR-019): `from_point` panics in debug builds for every point with two or more
+/// infinite coordinates (the face check's `∞ · 0`), and returns for one.
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "does not belong to face")]
+fn from_point_panics_for_two_infinities() {
+    let _ = CellId::from_point(&Point(crate::r3::Vector {
+        x: 0.0,
+        y: f64::INFINITY,
+        z: f64::INFINITY,
+    }));
+}
+
+#[test]
+fn from_point_returns_a_leaf_for_one_infinity() {
+    let id = CellId::from_point(&Point(crate::r3::Vector {
+        x: 0.0,
+        y: f64::INFINITY,
+        z: 1.0,
+    }));
+    assert!(id.is_valid() && id.is_leaf());
+}
