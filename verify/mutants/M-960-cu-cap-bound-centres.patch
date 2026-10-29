@@ -1,0 +1,19 @@
+Mutant: M-960
+Targets: P-UBND-02
+Expect-Fail: uf_bnd::p_ubnd_02__n1
+Tier: slow
+Test: core --test cpp_region_diff
+Defect: `CellUnion::cap_bound` adds each cell's centre, not its cap bound
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -745,7 +745,7 @@
+         };
+ 
+         for &id in &self.0 {
+-            cap = cap.add_cap(Cell::from_cell_id(id).cap_bound());
++            cap = cap.add_cap(Cap::from_point(id.to_point()));
+         }
+         cap
+     }

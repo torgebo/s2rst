@@ -1,0 +1,18 @@
+Mutant: M-965
+Targets: P-UAREA-03
+Expect-Fail: 
+Test: core --test cpp_region_diff
+Defect: `exact_area` sums the approximate areas (killed by the C++ rows: P-UAREA-03's harness stubs only `exact_area`, so the mutant runs the real `approx_area`, which timed out)
+
+diff --git a/core/src/s2/cell_union.rs b/core/src/s2/cell_union.rs
+--- a/core/src/s2/cell_union.rs
++++ b/core/src/s2/cell_union.rs
+@@ -515,7 +515,7 @@
+         // FR-018).
+         self.0
+             .iter()
+-            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).exact_area())
++            .fold(0.0, |area, &id| area + Cell::from_cell_id(id).approx_area())
+     }
+ 
+     /// Replaces large cells with smaller cells at `min_level` and ensures

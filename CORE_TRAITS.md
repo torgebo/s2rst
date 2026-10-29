@@ -155,18 +155,23 @@ Internal (non-public):
 **Invariants (verified by generic properties):**
 - **Bounding cap contains contained points.** If `contains_point(p)` is `true`, then `cap_bound().contains_point(p)` is `true`.
 - **Bounding rect contains contained points.** If `contains_point(p)` is `true`, then `rect_bound().contains_latlng(LatLng::from_point(p))` is `true`.
-- **Cell-union cover covers the region.** Every cell in `cell_union_bound()` either intersects the region or is redundant; taken together, they cover every contained point.
+- **Cell-union cover covers the region.** Every cell in `cell_union_bound()` either intersects the region or is redundant; taken together, they cover every contained point. Stated generically (spec 011) as "some cell of the covering contains the point's leaf", which holds for the regions whose point test is by leaf (`PointRegion`, `CellUnion`) and for points inside a closed region; at a closed region's boundary only the closed form holds (some covering cell contains the point): a `Cell` contains its own vertices, whose leaves lie in a neighbour.
 - **Containment implies intersection.** `contains_cell(c) ⇒ intersects_cell(c)` for all cells `c`.
-- **Non-intersection implies non-containment.** If `!intersects_cell(c)`, then `!contains_cell(c)`. For a region whose cell test checks the vertices first (`Cap`, `Rect`), also `!contains_point(&v)` for every vertex `v` of `c`; this second part does not hold for `Cell`, whose `intersects_cell` compares ids while its closed region contains the shared vertices of a neighbour (as upstream's `S2Cell`; spec 008 T022).
+- **Non-intersection implies non-containment.** If `!intersects_cell(c)`, then `!contains_cell(c)`. For a region whose cell test checks the vertices first (`Cap`, `Rect`), also `!contains_point(&v)` for every vertex `v` of `c`; this second part does not hold for `Cell`, whose `intersects_cell` compares ids while its closed region contains the shared vertices of a neighbour (as upstream's `S2Cell`; spec 008 T022), nor for `CellUnion`, whose cell test is by id and point test by leaf (the union of cell `14` contains a vertex of its neighbour `1c`, upstream too; spec 011 P-UREG-03). It holds for `PointRegion` on every case tested (a cell contains its own vertices: 80,000 of 80,000).
 - **Determinism.** All methods are pure functions of `(&self, inputs)`; repeated calls yield identical results.
 - **Debug is implemented** (from supertrait).
 
 **Proven instances (Kani, `verify/src/laws.rs`):** containment implies intersection for `Cell`
-(P-CCNT-03), `Cap` (P-CPREG-01, by composition, spec 008) and `Rect` (P-LREG-01, under
-contract, spec 010); the vertex part of non-intersection for `Cap` (P-CPREG-02) and `Rect`
-(P-LREG-02, under the `Cell::rect_bound` contract); the bounding cap for `Cap` (P-CPREG-03; for
-`Rect` not proven, P-LREG-03: it needs the values of `atan2` and `sin_cos`); the cell-union cover
-for `Cell` (P-CCNT-03; for `Cap` and `Rect` not proven, P-CPREG-04, P-LREG-04). Every invariant
+(P-CCNT-03), `Cap` (P-CPREG-01, by composition, spec 008), `Rect` (P-LREG-01, under
+contract, spec 010), `PointRegion` (P-PRREG-01) and `CellUnion` (P-UREG-01, within size bounds,
+spec 011); the vertex part of non-intersection for `Cap` (P-CPREG-02), `Rect` (P-LREG-02, under
+the `Cell::rect_bound` contract) (for `PointRegion`, P-PRREG-03, a tool limit: its harnesses time out; tested); the bounding cap
+for `Cap` (P-CPREG-03) and `PointRegion` (P-PRREG-04) (for `Rect` not proven, P-LREG-03: it
+needs the values of `atan2` and `sin_cos`; for `CellUnion`, P-UREG-04, it waits on `Cell`'s own
+law); the bounding rect for `PointRegion` (P-PRREG-05; for `CellUnion` not proven, P-UREG-05);
+the cell-union cover for `Cell` (P-CCNT-03) and `PointRegion` (P-PRREG-02, vacuous, and P-PRREG-06
+for its point) (for `Cap`, `Rect` and `CellUnion` not proven, P-CPREG-04, P-LREG-04, P-UREG-02,
+-06: the covering's level needs `asin`'s value). Every invariant
 also has quickcheck instances (below). Upstream's `S2LatLngRect::GetCapBound` breaks the
 bounding-cap invariant near a rectangle's boundary; `Rect::cap_bound` widens it, a documented
 deviation (`UPSTREAM.md` U-016, spec 010 FR-019).
@@ -394,8 +399,15 @@ contained point (`cap_bound_contains_points`). Spec 010 gave the
 rectangle twins arbitrary-`f64` rectangles near the poles and points on
 and a few ulps inside their boundaries (`region_rect_cap_contains_boundary`),
 which found nothing new after the fix but fail at once on upstream's
-bound. Each Kani law names its quickcheck twin in its doc comment; the
-catalogue is `verify/values/PROPERTIES.md` §3.
+bound. Spec 011 added two laws, the bounding rectangle and the covering
+contain every contained point (`rect_bound_contains_points`,
+`covering_contains_points`), with twins for `Cap`, `Rect`, `Cell`,
+`CellUnion` and `PointRegion` at cell vertices, face boundaries and the
+poles, and unions with polar and opposite faces; the covering twin found
+that a `Cell` breaks the law's leaf form at its own vertices, so the
+twin checks the closed form there. Each Kani law names its quickcheck
+twin in its doc comment; the catalogue is `verify/values/PROPERTIES.md`
+§3.
 
 ---
 

@@ -1571,3 +1571,198 @@ Ranked:
 | SC-011 the index by kind | met | `tests/property_kinds.rs` passes: every catalogue entry once, the code's tags matching. |
 | SC-012 upstream findings | met | U-016 has a follow-up (T014), an entry in `UPSTREAM.md` and here. |
 | SC-013 the evaluation answers | met | How much of `LatLng` is proven: "Summary"; which `Region` laws hold for `Rect`: the same and §5; what next: "Recommendations". |
+
+# Spec 011: `PointRegion`, and `CellUnion`'s floating-point methods
+
+## Summary (spec 011)
+
+Spec 011 verified `PointRegion`, the first item of spec 010's list, together with the
+floating-point half of `CellUnion` that spec 002 had excluded, the second. A survey against
+running C++ (`specs/011-formal-verify-point-region-cell-union/probe/`, 132,000 cases) found
+K1–K5; the planning probe R0 (35 harnesses) and a native sweep found three more of K4's panics.
+
+- **Crash freedom:** `PointRegion`'s 10 Kani entries over every triple of `f64` (its documented
+  debug panics proven exact for the NaN cases), `Deserialize` tested. `CellUnion`: six of the nine
+  floating-point rows within 002's size bounds; `exact_area`, `cell_union_bound` and
+  `expand_by_radius`'s expansion inherit measured tool limits.
+- **Meaning:** `PointRegion`: 13 of the 14 counted entries proven (92.9%); the vertex law, P-PRREG-03, is a tool limit. `CellUnion`: all 11
+  counted entries proven (the point test, both bounds' containment of each cell's bound — the
+  cap's for every length by composition —, the empty union's bounds, the constructions by drift
+  guards, the four area entries, `expand_by_radius`'s level, containment implies intersection).
+- **The `Region` laws:** for `PointRegion`, five of the six proven: containment implies intersection, the covering of contained cells (vacuous), the bounding cap, the bounding rectangle and the covering containing the point (the last weekly); the vertex law reduces to "a cell contains its own vertices", whose harnesses time out at 60 minutes per face, and the survey's 80,000 vertices check it. For `CellUnion`, containment implies
+  intersection; the vertex law is not one of its laws (by design, upstream too); the bounding and
+  covering laws wait on `Cell`'s own laws and `asin`'s value. Two laws are new and generic
+  (FR-010): the bounding rectangle and the covering contain every contained point.
+- **Library changes:** FR-017 (the polar faces' latitude is upstream's), FR-018 (the empty union's
+  areas are +0), FR-019 (`PointRegion`'s precondition documented and enforced on deserialisation;
+  four debug panics documented), each its own commit with a test that failed before. New C++
+  vectors (FR-021, 23,271 rows) match every row; the probe matches C++ in every section.
+- **Upstream findings:** none. **Tool finding:** KI-013 (`powi` is not a function to the checker).
+- **Non-vacuity:** all 24 mutants `M-950` … `M-973` are killed (2026-10-29).
+
+## What the probe and R0 found (spec 011)
+
+- **The survey** agreed with C++ almost everywhere. Two library-only parity defects: Go's
+  15-digit literal for the polar latitude, 2 ulps below upstream's computed `asin(sqrt(1/3))`, so
+  the polar faces' bounds (and every union's holding them) were 2 ulps wider (K1); and
+  `Iterator::sum`'s −0 for the empty union's areas (K2). And one law that does not hold for
+  `CellUnion` in either: of 39,636 edge neighbours a union does not intersect, it contains 20,573
+  of their vertices (by-id cell test, by-leaf point test).
+- **R0** measured every harness before the design was fixed. Ten of its 17 first failures were
+  unwinding bounds (a `Cell` needs 9, a stub table 11); two were real debug-build panics of
+  upstream's `DCHECK`s (`rect_bound` on a NaN longitude, `Cell::contains_point` off its face);
+  two were the checker's: `sqrt_contract` alone lets a cell vertex underflow (so `sqrt_between`),
+  and `powi` gives two values for one input (KI-013).
+- **The native sweep** of `CellId::from_point` over 1,331 special triples found the third K4
+  panic, two or more infinite coordinates, and confirmed that release builds return a valid leaf
+  for all 1,001,331 triples tried.
+- **The quickcheck twin** of the new covering law found that its leaf form fails for a `Cell` at
+  its own vertices (closed region, neighbour's leaf), so the law is stated for by-leaf regions and
+  interior points, with the closed form at a closed region's boundary.
+
+## Effort log (spec 011)
+
+| Date | Work |
+|------|------|
+| 2026-10-28 | Survey (132,000 cases on C++ and the library), spec; R0, R0b, R0c (35 harnesses), plan and tasks; FR-017 to FR-019 with their tests; the C++ generator and diff test; the quickcheck twins; the description, drift guards, stubs, laws and contract tests; the per-change run (47 harnesses) |
+| 2026-10-29 | The weekly members; the mutants; the records and the final run |
+
+## Exclusions and tool limits (spec 011)
+
+- **Excluded:** `PointRegion`'s `Debug` (`core::fmt`).
+- **Inherited tool limits:** `CellUnion::exact_area` (`Cell::exact_area`, out of memory at 8 GiB),
+  `cell_union_bound` (`Cap::cell_union_bound`, spec 008's timeout), `expand_by_radius`'s
+  expansion (`all_neighbors`, 001 R12).
+- **Not proven:** P-UEXP-02, P-UREG-02, -04, -05, -06 (with reasons in `cell_union/PROPERTIES.md`);
+  P-PRREG-03 (a tool limit: each face's harness times out at 60 minutes; `known-timeouts.txt`).
+- **Outside the checker:** `PointRegion`'s `Deserialize` (tested); the K4 panics that need an
+  infinite coordinate (the checker reports `∞ · 0` as a NaN check first; native tests).
+
+## Defects found (spec 011)
+
+None beyond the survey's K1–K4, which FR-017 to FR-019 fixed or documented. No D-010.
+
+## Measurements (spec 011)
+
+Per change, 2026-10-29 on the workstation (4 jobs), as two CI legs: `make verify-values
+P=pointregion`, 15 harnesses, 1 min 37 s; `make verify-values P=unionfloat`, 27 harnesses,
+4 min 41 s (crate tests and build included). As one part, `P=regions`, the 47 harnesses took
+14 min 48 s: a few `uf_*` harnesses spend far longer than their reported solver time (`c_cap_bound__n1`
+165.5 s reported, about nine minutes of wall time; `p_uarea_03__n2` 88.4 s reported, about 16
+minutes), so the part was split and five members moved weekly (`c_cap_bound__n1`,
+`p_uarea_02__n2`, `p_uarea_03__n2`, `p_ubnd_01__n2`, `c_rect_bound__n2`; their one-cell members stay
+per change). The per-change members' solver times: under 10 s for every `pr_*` but
+`c_intersects_cell` (44.0 s), `p_prcel_02` (13.2 s with `pure_cell_contains`; it timed out
+unstubbed); the `uf_*` ones 0.3 s to 75.6 s (`c_rect_bound__n1`, the real `Cell::rect_bound`).
+
+Weekly (`make verify-slow F=values`, 8 GiB, 60 minutes, 2 jobs):
+
+| Harness | Time | Harness | Time |
+|---------|------|---------|------|
+| `cl_crash::c_fg_from_point` (L-PR-01) | 794.5 s | `uf_area::p_uarea_02__n3` | 347.5 s |
+| `pr_bnd::p_prbnd_03` | 361.4 s | `uf_area::p_uarea_03__n3` | 348.2 s |
+| `pr_crash::c_cell_union_bound` | 485.9 s | `uf_bnd::p_ubnd_01__n3` | 246.7 s |
+| `pr_reg::p_prreg_06` | 438.4 s | `uf_bnd::p_ubnd_02__n1` | 160.6 s |
+| `pr_reg::p_prreg_03__f0` … `__f5` | 60-minute timeout, each | `uf_crash::c_approx_area__n3` | 35.2 s |
+| | | `uf_crash::c_cap_bound__n2` | 823.3 s |
+| | | `uf_crash::c_rect_bound__n3` | 46.5 s |
+
+The run took 4 hours 35 minutes (16,521 s), most of it the six vertex-law faces; in CI they are
+`KNOWN-TIMEOUT` entries of the `values-regions` slow leg, which keeps re-trying them. The five
+members moved weekly on 2026-10-29 passed per change before the move (2026-10-28 and -29), and
+again weekly (2026-10-29, 2 jobs, 297 s for the five): `p_uarea_02__n2` 97.8 s, `p_uarea_03__n2` 97.0 s, `p_ubnd_01__n2` 85.6 s, `c_cap_bound__n1` 154.0 s, `c_rect_bound__n2` 33.6 s.
+
+## Non-vacuity (spec 011)
+
+`make verify-mutants M='M-95* M-96* M-97*'` (2026-10-29): **23 killed, 1 error**, 40 minutes:
+M-965 (`exact_area` summing the approximate areas) timed out in P-UAREA-03's harness, which stubs
+only `exact_area`, so the mutant ran the real `approx_area`. It is now killed by the C++ rows
+alone (`cpp_region_diff`), re-run and killed: **24 of 24 killed**. Every proven entry and law
+instance has at least one: 20 are killed by Kani harnesses (two in the weekly tier, M-956 and
+M-960), 7 by ordinary tests through `Test:` headers (3 of them by both): FR-017's, FR-018's and FR-019's reverts
+(`cell_tests`, `cell_union_tests`, `point_region_tests`, `cpp_region_diff`), M-965, M-971 (the
+cell's u-v margin dropped, which the vertex law's timed-out harnesses cannot see: the
+`POINTREGION_CELL` vertex rows and the point-region twin kill it) and M-973 (the metric's NaN
+check removed, killed by `n_expand_by_radius_nan` returning and by the `should_panic` test).
+Three patch the description, the stubs or a dependency: M-969 (`pr_contains` with `!=`), M-970
+(`pure_leaf` without its table: the point test's two calls get two leaves, P-UPT-01 fails) and
+M-972 (`Cap::add_cap` taking the smaller radius, L-PR-02 fails), which show the statements depend
+on the facts they rest on. Every crash harness satisfies its covers; the `n_*` harnesses' covers
+stay unreachable.
+
+The check that every patch still applies (`git apply --check`, 379 patches) found two of spec
+007's stale since spec 010 refactored `Angle::normalized` through `remainder_2pi`: M-646 (−π at
+π) and M-647 (the old inexact formula). Both were regenerated with the same defects on the
+current code and are killed again by `angle_tests` (2026-10-29).
+
+## Comparison with 004–010 (spec 011)
+
+`PointRegion` is the smallest type of the suite: each method is one call into a proven type, and
+most proofs take seconds. What spec 011 adds is the treatment of a region whose laws hold by
+construction (every one of `PointRegion`'s is a statement about one point), of a region whose
+point test and cell test differ in kind (`CellUnion`: by leaf and by id, so the vertex law fails
+by design), and of uninterpreted stubs for values a statement does not need (`Cell::contains_point`,
+the cells' areas), which turned two timeouts into seconds. As in 008 and 010, the survey against
+running C++ found the defects, and the planning probe found what the survey could not: here, the
+debug panics.
+
+## Limitations (spec 011)
+
+- **Trust:** the contracts on library functions (`CellId::from_point`'s valid leaf, resting on a
+  weekly lemma and a native test; `Cell::cap_bound`'s and `CellId::to_point`'s box, tested), the
+  uninterpreted stubs, and the drift guards' listings being upstream's. All in `TRUSTED_BASE.md`.
+- **Size bounds:** `CellUnion`'s proofs at up to 3 cells (the average-based area at 1);
+  P-UBND-02 for every length by composition.
+- **`CellUnion`'s bounding laws** rest on tests (the survey's 262,154 contained points, the C++
+  rows, the twins) until `Cell`'s own bounding laws are proven.
+
+## Recommendations (FR-023) (spec 011)
+
+Ranked:
+
+1. **`Cell`'s bounding laws** (its cap and rectangle bounds contain the points whose leaf it
+   holds, and its own covering): with them, `CellUnion`'s P-UREG-04 and -05 follow by composition
+   from P-UBND-01 and -02. They need the projections' values; a contract relating `Cell::contains_point`
+   to the u-v bound, as 010's on `Cell::rect_bound`, is the likely route.
+2. **The region adaptors** (`RegionUnion`, `RegionIntersection`): their laws compose from their
+   members', now that five implementors have instances.
+3. **The `S2PointRegion` codec (FR-020)** and spec 010's missing operations (the `S2LatLng` codec,
+   `S2LatLngRect::Intersects(const S2Cell&)`).
+4. **The two inexact remainders** (`s1::Interval`'s `ieee_remainder`, the projections'
+   `remainder`), as spec 010 ranked them.
+
+## Final run (spec 011)
+
+2026-10-29, on the workstation, one run at a time (quickstart §1–5):
+
+- `make verify-values P=regions`: 47 of 47 `SUCCESSFUL` (14 min 48 s, before the split);
+  `P=pointregion` 15 of 15 (1 min 37 s) and `P=unionfloat` 27 of 27 (4 min 41 s) after it.
+- `make verify-values P=latlng`: 27 of 27 (6 min 27 s); `P=cell`: 45 of 45 (6 min 28 s), after
+  FR-017's change to `Cell` and L-PR-01's assertion in `cl_crash`.
+- `make verify-release`: 44 of 44 (5 min 24 s), with the new `r_rect_bound`, `r_intersects_cell`
+  and `r_from_point_infinities`.
+- Weekly: 11 of the 17 members `SUCCESSFUL`, the six vertex-law faces `TIMEOUT` (now
+  `KNOWN-TIMEOUT`); the five members moved later, see "Measurements".
+- `make verify-mutants M='M-95* M-96* M-97*'`: 24 of 24 killed (M-965 after its change).
+- `make test`: passed (1 min 37 s; the core suite with `cpp_region_diff` and the new twins, the
+  Python and wasm suites, documentation, `cargo-deny`).
+- `cargo test` in `verify/`: passed (the drift guards, the contract tests, the area enumeration,
+  the index by kind).
+
+## Success criteria (SC-001 … SC-013) (spec 011)
+
+| Criterion | Outcome | Evidence |
+|-----------|---------|----------|
+| SC-001 crash freedom of `PointRegion` over its whole domain | met | Every triple of `f64`, with no size bound; the debug panics of K4 documented and proven exact for the NaN cases (INVENTORY §13). |
+| SC-002 every entry proven or a measured limit | met | `PointRegion`: 10 Kani entries proven, `Deserialize` tested, `Debug` excluded. `CellUnion`: 6 of 9 rows proven within bounds, 3 inherited tool limits with their measurements (`cell_union/INVENTORY.md`). Every new contract passes its tests (`libm_contracts`). |
+| SC-003 at least 90% of the counted entries | met | `PointRegion` 13 of 14 (92.9%; P-PRREG-03 a tool limit), `CellUnion` 11 of 11; together 24 of 25 (96%). |
+| SC-004 the `Region` laws | met | `PointRegion`: five of six proven, the vertex law a tool limit with its reason and 80,000 tested vertices (the spec allows a written reason). `CellUnion`: containment implies intersection proven; the bounding and covering laws with reasons; the vertex law's exception pinned (`vertex_law_does_not_hold`). |
+| SC-005 non-vacuity | met | 24 mutants, all killed; every proven entry and law instance has one; every crash harness satisfies its covers. |
+| SC-006 per change under 10 minutes on CI | met on the workstation | `P=pointregion` 1 min 37 s, `P=unionfloat` 4 min 41 s, 4 jobs. Not measured on a hosted runner: that needs a push (T047). |
+| SC-007 regression tests red then green; the probe | met | FR-017's, FR-018's and FR-019's tests failed before their commits (`5be7410`, `515eff1`, `3969468`, `82daec1`); the probe after the fixes: 0 differences in every section (`probe/compare.after.txt`). |
+| SC-008 the C++ vectors | met | `cpp_region_diff`: every one of 23,271 rows matches; with FR-017 reverted two tests fail. |
+| SC-009 API and behaviour otherwise unchanged; the gate | met | No public signature changed; `make test` passed before and after the changes. The deserialiser's rejection is FR-019's documented change. |
+| SC-010 panics documented | met | The four debug-build panics of K4 are documented where they happen and on the operations that reach them, each with a test. |
+| SC-011 the index by kind | met | `tests/property_kinds.rs` passes. |
+| SC-012 upstream findings | met (none) | No upstream defect met; KI-013 is a tool finding (`KANI_ISSUES.md`). |
+| SC-013 the evaluation answers | met | How much is proven: "Summary"; which laws hold: the same, `values/PROPERTIES.md` §12 and `cell_union/PROPERTIES.md`; what next: "Recommendations". |

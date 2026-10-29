@@ -1,0 +1,17 @@
+Mutant: M-972
+Targets: L-PR-02
+Expect-Fail: uf_bnd::l_pr_02
+Defect: `Cap::add_cap` takes the smaller radius
+
+diff --git a/core/src/s2/cap.rs b/core/src/s2/cap.rs
+--- a/core/src/s2/cap.rs
++++ b/core/src/s2/cap.rs
+@@ -394,7 +394,7 @@
+         // contained.
+         let dist = self.center.chord_angle(other.center) + other.radius;
+         let new_rad = dist.plus_error((2.0 * f64::EPSILON + 2.02 * f64::EPSILON) * dist.length2());
+-        if new_rad > self.radius {
++        if new_rad < self.radius {
+             Cap::from_center_chord_angle(self.center, new_rad)
+         } else {
+             self

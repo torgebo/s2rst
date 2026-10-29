@@ -1,0 +1,22 @@
+Mutant: M-970
+Targets: P-UPT-01
+Expect-Fail: uf_pt::p_upt_01__n1
+Defect: stub mutant: `pure_leaf` returns a fresh leaf on every call
+
+diff --git a/verify/src/stubs.rs b/verify/src/stubs.rs
+--- a/verify/src/stubs.rs
++++ b/verify/src/stubs.rs
+@@ -813,11 +813,8 @@
+ /// The covering law and the union's point test call it twice on one point, and its projection
+ /// takes a square root, which is not one value per input to the checker (KI-007).
+ pub fn pure_leaf(p: &Point) -> s2rst::s2::CellId {
+-    s2rst::s2::CellId(
+-        LEAF.lock()
+-            .unwrap()
+-            .get(bits3(*p), || crate::domain::any_valid_at(30).0.id()),
+-    )
++    let _ = bits3(*p);
++    crate::domain::any_valid_at(30).0
+ }
+ 
+ /// `Cell::cap_bound`, pure: one non-empty cap per cell, its centre in the unit box and its

@@ -1,0 +1,17 @@
+Mutant: M-955
+Targets: P-PRCON-01
+Expect-Fail: pr_con::p_prcon_01
+Defect: `PointRegion::point` returns a normalised copy
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -40,7 +40,7 @@
+ 
+     /// Returns the contained point.
+     pub fn point(&self) -> Point {
+-        self.point
++        self.point.normalize()
+     }
+ }
+ 

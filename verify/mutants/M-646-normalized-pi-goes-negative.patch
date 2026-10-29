@@ -7,12 +7,12 @@ Defect: `normalized` subtracts 2π at π, giving −π
 diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
 --- a/core/src/s1/angle.rs
 +++ b/core/src/s1/angle.rs
-@@ -180,7 +180,7 @@
-         // −π to π (spec 007 FR-021, research R6).
-         let y = 2.0 * PI;
-         let r = self.0 % y;
--        if r > PI {
-+        if r >= PI {
-             Angle(r - y)
-         } else if r <= -PI {
-             Angle(r + y)
+@@ -177,7 +177,7 @@
+         // The remainder is ±π exactly at a tie, by the quotient's parity; upstream maps −π
+         // to π, so either ends at π (spec 007 FR-021, research R6; spec 010 FR-017).
+         let r = remainder_2pi(self.0);
+-        Angle(if r == -PI { PI } else { r })
++        Angle(if r == PI { -PI } else { r })
+     }
+ 
+     /// Returns the sine of this angle.

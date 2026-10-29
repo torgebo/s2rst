@@ -1,0 +1,19 @@
+Mutant: M-971
+Targets: P-PRREG-03
+Expect-Fail: 
+Test: core --all-features --test cpp_region_diff
+Test: core --all-features --test trait_property_tests region_point_region
+Defect: `Cell::contains_point` drops the u-v margin, so a cell can reject its own vertex (P-PRREG-03 is a tool limit: its harnesses time out, so the vertex rows and the twin kill it)
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -516,7 +516,7 @@
+         let Some((u, v)) = uv else {
+             return false;
+         };
+-        let margin = (5.0 / 3.0) * f64::EPSILON;
++        let margin = 0.0;
+         self.uv
+             .expanded_by_margin(margin)
+             .contains_point(r2::Point::new(u, v))

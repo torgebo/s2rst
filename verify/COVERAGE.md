@@ -238,6 +238,31 @@ closed for it from the start:
 instances exercise (`contains_cell`, `intersects_cell`, `contains_point`) already had crash
 proofs from gap 2.
 
+## Spec 011: `PointRegion` and `CellUnion`'s floating-point methods (2026-10-28)
+
+Spec 011 closed both gaps for `PointRegion` from the start, and gap 2 for the nine
+floating-point rows that spec 002 had excluded from `CellUnion`:
+
+- **Gap 1 (the documented panics):** the planning probe found four debug-build panics that the
+  documentation did not state, each upstream's `DCHECK` too (spec 011 K4): `PointRegion::rect_bound`
+  for a NaN `x` or `y`, `Cell::contains_point` (and so `PointRegion::intersects_cell`) off its
+  face, `CellId::from_point` with two or more infinite coordinates, and
+  `CellUnion::expand_by_radius` on a NaN radius. FR-019 documented each, with a `should_panic`
+  test; `pr_crash::n_rect_bound_nan`, `n_intersects_cell` and `uf_exp::n_expand_by_radius_nan`
+  prove the NaN cases exact, and `r_rect_bound`, `r_intersects_cell`, `r_from_point_infinities`
+  the release builds. The checker cannot show the infinite cases' panics (it reports `∞ · 0` as
+  a NaN check first), so those rest on the native tests and the probe's sweep.
+- **Gap 2 (floating-point geometry):** every `PointRegion` entry has a crash proof (the
+  rectangle under `atan2`'s contract, the covering under `CellId::from_point`'s, weekly). Of
+  `CellUnion`'s nine rows, six are now proven within 002's size bounds, given the crash proofs of
+  the `Cell` functions they call (`uf_crash`); three inherit a measured limit: `exact_area`
+  (`Cell::exact_area`, the xlarge tier), `cell_union_bound` (`Cap::cell_union_bound`, spec 008)
+  and `expand_by_radius`'s expansion (`all_neighbors`, 001). `cell_union/INVENTORY.md`'s counts are
+  33 in scope and 9 excluded.
+
+`values/INVENTORY.md` section 13 and `cell_union/INVENTORY.md` rows 12, 25–28, 35–37, 40 have the
+rows.
+
 ## What changed outside `verify/`
 
 Only documentation: the `# Panics` sections of gap 1, in `core/src/s2/cell_id.rs`, `cell.rs`,

@@ -1,0 +1,17 @@
+Mutant: M-954
+Targets: P-PRBND-01, P-PRREG-04
+Expect-Fail: pr_bnd::p_prbnd_01,pr_reg::p_prreg_04
+Defect: `PointRegion::cap_bound` is the cap of `(1, 0, 0)`
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -79,7 +79,7 @@
+ ///   a NaN coordinate, and every point with two or more infinite coordinates.
+ impl Region for PointRegion {
+     fn cap_bound(&self) -> Cap {
+-        Cap::from_point(self.point)
++        Cap::from_point(Point::from_coords(1.0, 0.0, 0.0))
+     }
+ 
+     fn rect_bound(&self) -> Rect {

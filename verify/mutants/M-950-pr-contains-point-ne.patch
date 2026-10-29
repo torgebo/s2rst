@@ -1,0 +1,17 @@
+Mutant: M-950
+Targets: P-PRCEL-03
+Expect-Fail: pr_cel::p_prcel_03
+Defect: `PointRegion::contains_point` is `!=`
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -100,7 +100,7 @@
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {
+-        self.point == *p
++        self.point != *p
+     }
+ }
+ 

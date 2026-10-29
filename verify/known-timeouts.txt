@@ -33,3 +33,9 @@ cp_crash::c_cell_union_bound C-s2::Cap::cell_union_bound
 rl_crash::c_fg_boundary_intersects C-s2::Rect::boundary_intersects
 rl_crash::c_fg_get_distance C-s2::Rect::get_distance
 rl_crash::c_fg_hausdorff C-s2::Rect::get_hausdorff_distance
+pr_reg::p_prreg_03__f0 P-PRREG-03
+pr_reg::p_prreg_03__f1 P-PRREG-03
+pr_reg::p_prreg_03__f2 P-PRREG-03
+pr_reg::p_prreg_03__f3 P-PRREG-03
+pr_reg::p_prreg_03__f4 P-PRREG-03
+pr_reg::p_prreg_03__f5 P-PRREG-03

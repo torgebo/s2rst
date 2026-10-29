@@ -1,0 +1,26 @@
+Mutant: M-957
+Targets: P-PREQ-01
+Expect-Fail: pr_eq::p_preq_01
+Defect: a hand-written `PartialEq` comparing `x` and `y` only
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -18,10 +18,16 @@
+ ///
+ /// With the `serde` feature, deserialisation rejects a point that is not unit length
+ /// ([`Point::is_unit`]), as upstream's `S2PointRegion::Decode` does (spec 011 FR-019).
+-#[derive(Clone, Copy, Debug, PartialEq)]
++#[derive(Clone, Copy, Debug)]
+ #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+ pub struct PointRegion {
+     point: Point,
++}
++
++impl PartialEq for PointRegion {
++    fn eq(&self, other: &Self) -> bool {
++        self.point.0.x == other.point.0.x && self.point.0.y == other.point.0.y
++    }
+ }
+ 
+ impl PointRegion {

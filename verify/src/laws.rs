@@ -17,7 +17,8 @@ pub mod region {
 
     /// Containing a cell implies intersecting it.
     ///
-    /// Instances: P-CCNT-03 (`Cell`), P-CPREG-01 (`Cap`), P-LREG-01 (`Rect`).
+    /// Instances: P-CCNT-03 (`Cell`), P-CPREG-01 (`Cap`), P-LREG-01 (`Rect`), P-PRREG-01
+    /// (`PointRegion`), P-UREG-01 (`CellUnion`, within size bounds).
     pub fn contains_implies_intersects<R: Region>(r: &R, c: &Cell) {
         if r.contains_cell(c) {
             assert!(
@@ -32,7 +33,8 @@ pub mod region {
     /// the law asserts, so the search runs over a concrete length (collections are never
     /// compared with `==` in a harness).
     ///
-    /// Instances: P-CCNT-03 (`Cell`, `MAX = 1`).
+    /// Instances: P-CCNT-03 (`Cell`, `MAX = 1`); for `PointRegion` by composition (P-PRREG-02:
+    /// it contains no cell).
     pub fn covering_covers<R: Region, const MAX: usize>(r: &R, c: &Cell) {
         let ids = r.cell_union_bound();
         assert!(
@@ -61,15 +63,18 @@ pub mod region {
     ///
     /// Not every implementor satisfies it: a region whose cell test is by id and whose point set
     /// is closed (`Cell`, as upstream's `S2Cell`) contains the shared vertices of a neighbour it
-    /// does not intersect. It is a law of regions whose cell test checks the vertices first, as
-    /// `Cap`'s (upstream's `MayIntersect`).
+    /// does not intersect, and so does one whose cell test is by id and whose point test is by
+    /// leaf (`CellUnion`, as upstream's `S2CellUnion`: the union of cell `14` contains a vertex
+    /// of its neighbour `1c`, spec 011 P-UREG-03). It is a law of regions whose cell test checks
+    /// the vertices first, as `Cap`'s (upstream's `MayIntersect`), and of `PointRegion`, whose
+    /// cell test is `Cell::contains_point` (P-PRREG-03, a tool limit: tested).
     ///
     /// The vertices are those of `c.vertex(k)`. An instance whose region computes them itself
     /// (`Cap`'s upstream cell tests) stubs `Cell::vertex` with a pure function, so the law reads
     /// the values the region's test read: a recomputed normalisation is not one value to the
     /// checker (spec 008 spec Edge Cases, "Two `sqrt` results"; research R7).
     ///
-    /// Instances: P-CPREG-02 (`Cap`), P-LREG-02 (`Rect`, whose bound stubs supply the vertices'
+    /// Instances: P-CPREG-02 (`Cap`), P-PRREG-03 (`PointRegion`, a weekly tool limit), P-LREG-02 (`Rect`, whose bound stubs supply the vertices'
     /// `LatLng`s the rectangle tests). Quickcheck twins: `region_no_intersect_no_vertex`,
     /// `region_rect_no_intersect_no_vertex_f64` in `core/tests/trait_property_tests.rs`.
     pub fn no_intersect_no_vertex<R: Region>(r: &R, c: &Cell) {
@@ -86,8 +91,9 @@ pub mod region {
     /// The bounding cap contains every point the region contains (`CORE_TRAITS.md`, "Bounding
     /// cap contains contained points").
     ///
-    /// Instances: P-CPREG-03 (`Cap`); for `Rect` not instantiated (P-LREG-03: it needs the values
-    /// of `atan2` and `sin_cos`). Quickcheck twins: `region_cap_bound_contains_point`,
+    /// Instances: P-CPREG-03 (`Cap`), P-PRREG-04 (`PointRegion`); for `Rect` not instantiated
+    /// (P-LREG-03: it needs the values of `atan2` and `sin_cos`), nor for `CellUnion` (P-UREG-04:
+    /// it needs `Cell`'s own bounding-cap law). Quickcheck twins: `region_cap_bound_contains_point`,
     /// `region_rect_cap_contains_boundary` in `core/tests/trait_property_tests.rs`.
     pub fn cap_bound_contains_points<R: Region>(r: &R, p: &Point) {
         if r.contains_point(p) {
@@ -95,6 +101,54 @@ pub mod region {
                 r.cap_bound().contains_point(*p),
                 "a contained point outside the bounding cap"
             );
+        }
+    }
+
+    /// The bounding rectangle contains every point the region contains (`CORE_TRAITS.md`,
+    /// "Bounding rect contains contained points"; spec 011 FR-010): `rect_bound().contains_point(p)`,
+    /// which is `contains_lat_lng(LatLng::from_point(p))`.
+    ///
+    /// Instances: P-PRREG-05 (`PointRegion`, with `pure_from_point`); for `CellUnion` not
+    /// instantiated (P-UREG-05: it needs `Cell`'s own rectangle law). Quickcheck twins:
+    /// `region_*_rect_*contain*` in `core/tests/trait_property_tests.rs`.
+    pub fn rect_bound_contains_points<R: Region>(r: &R, p: &Point) {
+        if r.contains_point(p) {
+            assert!(
+                r.rect_bound().contains_point(*p),
+                "a contained point outside the bounding rectangle"
+            );
+        }
+    }
+
+    /// The covering bound contains every point the region contains, in its leaf form: some
+    /// identifier of `cell_union_bound()` contains `CellId::from_point(p)` (`CORE_TRAITS.md`, "Cell-union cover
+    /// covers the region"; spec 011 FR-010). The bound has at most `MAX` identifiers, which the
+    /// law asserts, so the search runs over a concrete length.
+    ///
+    /// A law of regions whose point test is by leaf, and of points inside a closed region. At the
+    /// boundary of a closed region it fails by design: a `Cell` contains its own vertices, whose
+    /// leaves lie in a neighbour (spec 011 research R6); there the closed form holds, some cell of
+    /// the covering containing the point, which the quickcheck twin
+    /// `region_covering_contains_point_closed` checks.
+    ///
+    /// Instances: P-PRREG-06 (`PointRegion`, `MAX = 4`, with `pure_leaf`; weekly); for
+    /// `CellUnion` not instantiated (P-UREG-06: the cap bound's covering needs `asin`'s value).
+    /// Quickcheck twins: `region_*_covering_contain*` in `core/tests/trait_property_tests.rs`.
+    pub fn covering_contains_points<R: Region, const MAX: usize>(r: &R, p: &Point) {
+        let ids = r.cell_union_bound();
+        assert!(
+            ids.len() <= MAX,
+            "the covering bound has more ids than the instance allows"
+        );
+        if r.contains_point(p) {
+            let leaf = s2rst::s2::CellId::from_point(p);
+            let mut covered = false;
+            for (k, id) in ids.iter().enumerate().take(MAX) {
+                if k < ids.len() && id.contains(leaf) {
+                    covered = true;
+                }
+            }
+            assert!(covered, "a contained point outside the covering bound");
         }
     }
 }

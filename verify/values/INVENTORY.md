@@ -591,3 +591,30 @@ computes the NaN of a negative argument through a division its NaN check reports
 | 10 | `Display for LatLng` | excluded | `core::fmt` |  |  |  | — |
 | 11 | `Deserialize for LatLng` (derived) | in scope (tested) |  | every serialised `LatLng` |  | `latlng_tests::prop_serde_accepts_every_pair` (not a Kani entry) | tested |
 | 12 | `From<Coord> for LatLng`, `From<LatLng> for Coord`, `From<geo_types::Point> for LatLng`, `From<LatLng> for geo_types::Point` | in scope (by composition) |  | every `f64` pair |  | each is one `from_degrees` or two `degrees` calls (`geo_types_interop.rs:114–155`), crash-free for every `f64` by `ag_crash::c_construction_and_accessors` (spec 007); the verification crate does not enable `geo-types` | proven-by-composition |
+
+## 13. `PointRegion` (12 entries)
+
+Spec 011 (`specs/011-formal-verify-point-region-cell-union/data-model.md` §5.1). `new`, `point`,
+the six `Region` methods, the derived `PartialEq`, the hand-written `Deserialize` (spec 011
+FR-019), the derived `Debug` and `Serialize` (the latter not an entry). `new` takes any point
+(upstream's unit-length precondition is documented, not checked: spec 011 K3), so the domains are
+every triple of `f64`, narrowed only by the documented debug-build checks of the functions the
+methods call (spec 011 K4), which the `n_*` harnesses prove exact and the `r_*` ones show a
+release build skips.
+
+Statuses as section 9's. The rows group the entries.
+
+**Summary** (T021, 2026-10-28): 11 in scope, 1 excluded (`Debug`). The 10 entries of rows 1–4
+have Kani crash proofs, every one `SUCCESSFUL` with its covers satisfied: rows 1 and 3 on the
+real code, row 2 under `atan2_contract`, row 4 under `pure_leaf` and `asin_contract` (weekly).
+Per change: 5 harnesses, 64.7 s of harness time (`make verify-values P=regions`). `Deserialize`
+is tested. The proofs needed no precondition beyond K4's, which FR-019 documented.
+
+| # | entries | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|---------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `PointRegion::new`, `point`, `Region::cap_bound`, `Region::contains_cell`, `Region::contains_point`, `PartialEq` | in scope |  | `AnyTriple` (× `ValidCell`, `AnyTriple`) | a unit point for the `Region` laws (upstream's `DCHECK`; documented, not needed for crash freedom) | `pr_crash::c_basic` (5.6 s) | proven |
+| 2 | `Region::rect_bound` | in scope (under contract) |  | `PlainTriple`; a NaN `x` or `y` panics in debug builds (documented, FR-019): `n_rect_bound_nan` (1.3 s); a release build returns for every triple: `r_rect_bound` | upstream's `S1Interval` `DCHECK` | `pr_crash::c_rect_bound` (2.3 s; `atan2_contract`) | proven-under-contract |
+| 3 | `Region::intersects_cell` | in scope |  | `BoxPoint × ValidCell` (`Cell::contains_point`'s proven domain); a NaN on the cell face's axis, or on the face's side with another coordinate NaN, panics in debug builds: `n_intersects_cell` (7.1 s); with another coordinate infinite too, shown natively (`cell_tests`); a release build returns for every triple: `r_intersects_cell` | upstream's `ValidFaceXYZtoUV` `DCHECK` (documented, FR-019) | `pr_crash::c_intersects_cell` (48.4 s; `any_uv_bound`) | proven |
+| 4 | `Region::cell_union_bound` | in scope (under contract) |  | `AnyTriple`; `CellId::from_point`'s documented debug panics (the zero vector, NaN, two infinite coordinates) are its own (`cl_crash::n_from_point`, the native tests) | — | `pr_crash::c_cell_union_bound` (weekly; `pure_leaf`, `asin_contract`) with `cl_crash::c_fg_from_point` by composition | proven-under-contract |
+| 5 | `Deserialize for PointRegion` (hand-written, FR-019) | in scope (tested) |  | every serialised `PointRegion` |  | `point_region_tests::deserialise_rejects_points_off_unit_length` (not a Kani entry) | tested |
+| 6 | `Debug for PointRegion` (derived) | excluded | `core::fmt`, as every type's text |  |  |  | — |

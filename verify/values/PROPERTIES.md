@@ -367,3 +367,37 @@ trusted (`TRUSTED_BASE.md`, "IEEE `fmod`"), and on P-LLNRM-01 and -03.
 |----|-----------|---------|--------|------|
 | L-LL-01 | `Cell::rect_bound` is a valid, non-empty rectangle for every valid cell. | `ll_lem::l_ll_01` | proven-under-contract (`atan2_contract`; gap 2's `any_uv_bound`) | 125.9 s |
 | L-LL-02 | Rust's `x.min(1.0)` is upstream's `std::min(1.0, x)`, bit for bit, for every `f64`. | `ll_lem::l_ll_02` | proven | 0.0 s |
+
+## 12. `PointRegion`
+
+Spec 011 (`specs/011-formal-verify-point-region-cell-union/data-model.md` §4.1), against
+`region_spec`: a point region is its point; it contains a point exactly when the coordinates are
+equal as numbers, and no cell. The `Region` laws hold over unit points, upstream's precondition
+(spec 011 K3); the harnesses take box points (which hold every unit point) or every triple
+without NaN. Spec 011 adds no status. **SC-003 (spec 011)**: 14 counted entries (P-PRDES-01 is
+outside the checker), 13 proven (92.9%); P-PRREG-03 is a tool limit.
+
+| ID | Kind | Statement | Upstream source (`v0.14.0-40`) | Domain | Harness | Status | Bound | Mutants |
+|----|------|-----------|--------------------------------|--------|---------|--------|-------|---------|
+| P-PRCON-01 | correct result | `point()` returns the point `new` was given, bit for bit. | `S2PointRegion(p)`, `point()` | `AnyTriple` | `pr_con::p_prcon_01` | proven | whole domain, per change (0.0 s) | M-955 |
+| P-PRBND-01 | correct result | The bounding cap is the point's zero-radius cap: centre `p` bit for bit, squared radius +0. | `GetCapBound()` (`S2Cap::FromPoint`) | `AnyTriple` | `pr_bnd::p_prbnd_01` | proven | whole domain, per change (0.0 s) | M-954 |
+| P-PRBND-02 | correct result | The bounding rectangle is the single `LatLng` of the point, a valid rectangle (π for a longitude −π). | `GetRectBound()` (`S2LatLngRect(ll, ll)`) | `PlainTriple` | `pr_bnd::p_prbnd_02` | proven-under-contract | whole domain, per change (6.6 s); `pure_from_point` (P-LLFP-02) | M-953 |
+| P-PRBND-03 | correct result | The covering is three or four cells at level 29, one of them the point's leaf's level-29 ancestor. | `GetCellUnionBound()` (the cap's, `s2cap.cc:196–213`) | `AnyTriple` | `pr_bnd::p_prbnd_03` (weekly) | proven-under-contract | whole domain, weekly (361.4 s); `pure_leaf` (L-PR-01), `asin_contract` | M-956 |
+| P-PRCEL-01 | correct result | The region contains no cell. | `Contains(const S2Cell&)` | `AnyTriple × ValidCell` | `pr_cel::p_prcel_01` | proven | whole domain, per change (2.8 s; `any_uv_bound`) | M-951 |
+| P-PRCEL-02 | correct result | The region intersects a cell exactly when the cell contains the point. | `MayIntersect(const S2Cell&)` | `AnyTriple × ValidCell` | `pr_cel::p_prcel_02` | proven | whole domain, per change (13.2 s); `Cell::contains_point` uninterpreted (`pure_cell_contains`: two copies of its divisions timed out at 12 minutes, 2026-10-28) | M-952 |
+| P-PRCEL-03 | correct result | The region contains exactly the points equal to its own as numbers (`region_spec::pr_contains`): ±0 agree, NaN contains nothing. | `Contains(const S2Point&)` | `AnyTriple²` | `pr_cel::p_prcel_03` | proven | whole domain, per change (0.2 s) | M-950, M-969 |
+| P-PREQ-01 | law | Equality is the point's, and an equivalence on regions without NaN (`laws::eq::all`). | — (the derived `operator==` of the point) | `PlainTriple³` | `pr_eq::p_preq_01` | proven | whole domain, per change (0.4 s) | M-957 |
+| P-PRDES-01 | correct result | Deserialisation rejects a point that is not unit length and keeps a unit one, bit for bit (FR-019). | `Decode` (`S2::IsUnitLength`) | every serialised `PointRegion` | — | not-proven (tested) | serde is out of the checker's reach; `point_region_tests::deserialise_rejects_points_off_unit_length` | M-968 |
+| P-PRREG-01 | law | Containing a cell implies intersecting it (`laws::region::contains_implies_intersects`). | `S2Region` contract | `BoxPoint × ValidCell` | `pr_reg::p_prreg_01` | proven | whole domain, per change (6.6 s) | M-951 |
+| P-PRREG-02 | law | The covering covers every contained cell (`laws::region::covering_covers`). | `S2Region` contract | every point | the composition in `pr_reg.rs`: P-PRCEL-01 | proven-by-composition | vacuous: the region contains no cell | M-951 |
+| P-PRREG-03 | law | A cell the region does not intersect has no vertex equal to its point (`laws::region::no_intersect_no_vertex`): a cell contains each of its own vertices. | `S2Region` contract, `S2Cell::Contains(p)` | `ValidCell × CellVertex` | `pr_reg::p_prreg_03__f{0..=5}` (weekly) and the composition in `pr_reg.rs` | not-proven (tool limit: each of the six faces times out at 60 minutes, weekly, 2026-10-29; unsplit, 12 minutes, R0) | listed in `known-timeouts.txt`; checked by the survey's `PV` (80,000 vertices, C++ and library alike), the `POINTREGION_CELL` vertex rows (2,000) and the twin `region_point_region_rect_and_covering_contain_point` | M-971 |
+| P-PRREG-04 | law | The bounding cap contains every contained point (`laws::region::cap_bound_contains_points`). | `S2Region` contract | `BoxPoint²` | `pr_reg::p_prreg_04` | proven | whole domain, per change (7.8 s) | M-954 |
+| P-PRREG-05 | law | The bounding rectangle contains the region's point (`laws::region::rect_bound_contains_points`, FR-010). | `S2Region` contract | `PlainTriple` | `pr_reg::p_prreg_05` | proven-under-contract | whole domain, per change (7.8 s); `pure_from_point`. A point equal as a number with another zero's sign has the same `LatLng` (the `+ 0.0`); the twins check it | M-953 |
+| P-PRREG-06 | law | The covering contains the region's point: a cell of it holds the point's leaf (`laws::region::covering_contains_points`, FR-010). | `S2Region` contract | `BoxPoint` | `pr_reg::p_prreg_06` (weekly) | proven-under-contract | whole domain, weekly (438.4 s); `pure_leaf`, `asin_contract` | M-956 |
+
+### Lemmas (spec 011 data-model §3)
+
+| ID | Statement | Harness | Status | Time |
+|----|-----------|---------|--------|------|
+| L-PR-01 | `CellId::from_point(p)` is a valid leaf wherever it returns. | `cl_crash::c_fg_from_point` (weekly, box points); natively `libm_contracts::cell_id_from_point_returns_a_valid_leaf` (every special triple, 10⁶ random) | proven (weekly; box points) | 794.5 s |
+| L-PR-02 | A non-empty cap that contains `b` still contains it after any `add_cap`. | `uf_bnd::l_pr_02` | proven (`pure_chord`, `pure_add`) | 38.5 s |

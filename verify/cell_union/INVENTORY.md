@@ -26,7 +26,11 @@ Every bound is a concrete-length family (`__n<k>`, `__b<L>`), so "`n ≤ 3`" mea
 per length 0…3 (research R4).
 
 **Summary**: 27 in scope (64.3 %, SC-002 floor 60 %), 15 excluded (9 `float-geometry`, 1
-`excluded: depends on CellId::all_neighbors`, 5 `tool-limit`). Every in-scope row is proven
+`excluded: depends on CellId::all_neighbors`, 5 `tool-limit`). **Spec 011 (2026-10-28)** brought
+the nine `float-geometry` rows into scope (`specs/011-formal-verify-point-region-cell-union/`):
+six are now proven crash-free within bounds (rows 12, 26, 27, 35, 36, 40), and three inherit a
+measured tool limit (rows 25, 28, 37), so the counts are 33 in scope (78.6 %) and 9 excluded
+(1 `all_neighbors`, 8 `tool-limit`). Every in-scope row is proven
 crash-free: 2 over the whole domain (`new`, `whole_sphere`) and 25 within the stated
 bounds, which all meet or exceed SC-001's minimums. The bounds count the weekly slow tier
 (`make verify-slow F=union`), which runs the largest members; the inventory marks them.
@@ -57,7 +61,7 @@ build.
 | 9 | `CellUnion::normalize` | transform | in-scope |  | `ValidSeq` | `ValidSeq(n)` | every id valid (upstream `Normalize`) | `cu_norm::p_unorm_01__n{0,1}` (shared) and `cu_crash::c_normalize__n2` | `n ≤ 2`. Unreached: the sibling merge and its cascades; exercised as for `from_cell_ids` | proven-within-bounds | 6/6 (3 harnesses) |
 | 10 | `CellUnion::contains_cell_id` | query | in-scope |  | `ValidUnion` | `ValidUnion(n)` × `Valid` | `id` valid (`debug_assert!`) | `cu_mem::p_umem_01__n{0,1}` (shared) and `cu_crash::c_contains_cell_id__n{2,3}` | `n ≤ 3`. Longer unions: `prop_cell_union_queries_match_covered_sets` (up to 20 cells) | proven-within-bounds | 8/8 (4 harnesses) |
 | 11 | `CellUnion::intersects_cell_id` | query | in-scope |  | `ValidUnion` | `ValidUnion(n)` × `Valid` | `id` valid (`debug_assert!`) | `cu_mem::p_umem_02__n{0,1}` (shared) and `cu_crash::c_intersects_cell_id__n{2,3}` | `n ≤ 3`; longer unions as `contains_cell_id` | proven-within-bounds | 8/8 (4 harnesses) |
-| 12 | `CellUnion::contains_point` | query | excluded | float-geometry |  |  |  |  |  |  |  |
+| 12 | `CellUnion::contains_point` | query | in-scope (spec 011, under contract) |  | `ValidUnion` | `ValidUnion(n) × AnyTriple` | `CellId::from_point`'s documented debug panics (the zero vector, NaN, two infinite coordinates; spec 011 FR-019) are its own | `uf_crash::c_contains_point__n{0..3}` (`pure_leaf`), with `cl_crash::c_fg_from_point` by composition | `n ≤ 3` (8.0–20.9 s) | proven-within-bounds | 8/8 (4 harnesses) |
 | 13 | `CellUnion::contains_union` | query | in-scope |  | `ValidUnion` | `ValidUnion(a)` × `ValidUnion(b)` | — | `cu_mem::p_umem_04__n{a}_n{b}`, `a, b ≤ 1` (shared), and `cu_crash::c_contains_union__n{a}_n{b}` for the 12 pairs with a union of 2 or 3 cells | `3 × 3` (raised from the planned `2 × 2`, T020). Larger: `set_ops_match_cpp` and `prop_cell_union_queries_match_covered_sets` | proven-within-bounds | 28/28 (16 harnesses) |
 | 14 | `CellUnion::intersects_union` | query | in-scope |  | `ValidUnion` | `ValidUnion(a)` × `ValidUnion(b)` | — | `cu_mem::p_umem_04__n{a}_n{b}`, `a, b ≤ 1` (shared), and `cu_crash::c_intersects_union__n{a}_n{b}` for the 12 pairs with a union of 2 or 3 cells | `3 × 3`; larger as `contains_union` | proven-within-bounds | 28/28 (16 harnesses) |
 | 15 | `CellUnion::leaf_cells_covered` | measure | in-scope |  | `ValidUnion` | `ValidUnion(n)` | the union is valid (upstream `LeafCellsCovered` bound and `FromVerbatim` REQUIRES; FR-016) | `cu_crash::c_leaf_cells_covered__n{0..=3}` | `n ≤ 3`; any size by the written argument (disjoint cells, `6·4^30 < 2^63`; FR-016). `leaf_cells_covered_matches_cpp` checks larger unions | proven-within-bounds | 7/7 |
@@ -70,22 +74,22 @@ build.
 | 22 | `CellUnion::intersection_with_cell_id` | set-op | in-scope |  | `ValidUnion` | `ValidUnion(n)` × `Valid` | `id` valid (via `contains_cell_id`'s `debug_assert!`) | `cu_set::p_uset_03__n{0..=2}` (shared) and `cu_crash::c_intersection_with_cell_id__n3` | `n ≤ 3` (raised from the planned 2, T020). Longer: `prop_cell_union_queries_match_covered_sets` | proven-within-bounds | 6/6 (4 harnesses) |
 | 23 | `CellUnion::difference` | set-op | excluded | tool-limit: over 5 min at `1 × 1` cells in a one-level window (unwind 3), and out of memory at 6 GB in 156 s in a two-level window (R0) | — | `ValidUnion` × `ValidUnion` | — |  | covered instead by `prop_cell_union_set_ops_match_covered_sets` and `CELLUNION_SETOPS` |  |  |
 | 24 | `CellUnion::expand_at_level` | transform | excluded | excluded: depends on `CellId::all_neighbors` (001) |  |  |  |  |  |  |  |
-| 25 | `CellUnion::expand_by_radius` | transform | excluded | float-geometry |  |  |  |  |  |  |  |
-| 26 | `CellUnion::average_based_area` | measure | excluded | float-geometry |  |  |  |  |  |  |  |
-| 27 | `CellUnion::approx_area` | measure | excluded | float-geometry |  |  |  |  |  |  |  |
-| 28 | `CellUnion::exact_area` | measure | excluded | float-geometry |  |  |  |  |  |  |  |
+| 25 | `CellUnion::expand_by_radius` | transform | excluded (spec 011) | tool-limit (inherited): the expansion is `expand_at_level`, through `CellId::all_neighbors` (001's tool limit, out of memory above 9.5 GB, 001 R12). Its documented debug panic on a NaN radius, reached first, is proven exact: `uf_exp::n_expand_by_radius_nan` (7.0 s) | `ValidUnion` | — | a non-NaN radius in debug builds (the metric's check, upstream's `DCHECK`; documented, spec 011 FR-019) | covered instead by the `CELLUNION_EXPAND` C++ rows (1,000) and the unit tests | — | — | `never` (the `n_` harness) |
+| 26 | `CellUnion::average_based_area` | measure | in-scope (spec 011) |  | `ValidUnion` | `ValidUnion(n)` | — | `uf_crash::c_average_based_area__n{1..3}` | `n ≤ 3` (1.7–11.0 s) | proven-within-bounds | 3/3 |
+| 27 | `CellUnion::approx_area` | measure | in-scope (spec 011, by composition) |  | `ValidUnion` | `ValidUnion(n)` | — | `uf_crash::c_approx_area__n{1,2}` (`pure_cell_area`), `__n3` weekly, with `cl_crash::c_fg_approx_area` by composition | `n ≤ 3` (22.6 s, 31.3 s; `__n3` weekly) | proven-within-bounds | 3/3 |
+| 28 | `CellUnion::exact_area` | measure | excluded (spec 011) | tool-limit (inherited): `Cell::exact_area` runs out of memory at 8 GiB (the coverage review's xlarge tier). The sum itself is P-UAREA-03 | `ValidUnion` | — | — | covered instead by the `CELLUNION_AREA` C++ rows (2,014) | — | — | — |
 | 29 | `CellUnion::denormalize` | transform | in-scope |  | `ValidUnion` | `ValidUnion(n)` × `Level` × `LevelMod` | `level_mod` 1–3 (upstream `DCHECK`; an `assert!` in every build from the v0.4.0..v0.5.0 review; since spec 009 a `LevelMod`, so no other value can be passed) | `cu_den::p_uden_01__n0_ids` (shared) and `cu_crash::c_denormalize__n{1,2}` (`__n2` weekly) | `n ≤ 2` (raised from the planned 1, T020); loop bound: a level gap of at most 2 (16 descendants per cell). Unreached: more cells, gaps 3–30. Exercised by `denormalize_clamps_to_max_level`, `denormalize_matches_cpp` and `prop_cell_union_denormalize_preserves_coverage` | proven-within-bounds | 7/7 (3 harnesses) |
 | 30 | `impl Deref for CellUnion` | trait | in-scope |  | `Seq` | `Seq(n)` | — | `cu_acc::p_uacc_01__n{0..=3}` (shared) | `n ≤ 3`; longer unions: unit tests and every other proof, which build their inputs through `from_verbatim` | proven-within-bounds | 7/7 |
 | 31 | `impl Display for CellUnion` | trait | excluded | tool-limit: goes through `CellId::to_token`, over 5 min in 001 (001 R6) |  |  |  |  |  |  |  |
 | 32 | `impl FromIterator<CellId> for CellUnion` | trait | in-scope |  | `ValidSeq` | `ValidSeq(n)` | every id valid (upstream `Normalize`) | `cu_norm::p_unorm_01__n{0,1}` (shared) and `cu_crash::c_from_iter__n2` | `n ≤ 2`. Unreached: the sibling merge; exercised as for `from_cell_ids` | proven-within-bounds | 6/6 (3 harnesses) |
 | 33 | `impl IntoIterator for CellUnion` | trait | in-scope |  | `Seq` | `Seq(n)` | — | `cu_acc::p_uacc_01__n{0..=3}` (shared) | `n ≤ 3`; longer unions: unit tests and every other proof, which build their inputs through `from_verbatim` | proven-within-bounds | 7/7 |
 | 34 | `impl IntoIterator for &CellUnion` | trait | in-scope |  | `Seq` | `Seq(n)` | — | `cu_acc::p_uacc_01__n{0..=3}` (shared) | `n ≤ 3`; longer unions: unit tests and every other proof, which build their inputs through `from_verbatim` | proven-within-bounds | 7/7 |
-| 35 | `Region::cap_bound` | trait | excluded | float-geometry |  |  |  |  |  |  |  |
-| 36 | `Region::rect_bound` | trait | excluded | float-geometry |  |  |  |  |  |  |  |
-| 37 | `Region::cell_union_bound` | trait | excluded | float-geometry (through `cap_bound`) |  |  |  |  |  |  |  |
+| 35 | `Region::cap_bound` | trait | in-scope (spec 011, by composition) |  | `ValidUnion` | `ValidUnion(n)` | — | `uf_crash::c_cap_bound__n1`, `__n2` (`pure_cell_cap`, `any_center`), both weekly, with `cl_crash::c_fg_cap_bound`, `c_fg_center` by composition | `n ≤ 2`, weekly (165.5 s and 823.3 s of solver time; per change `__n1` took about nine minutes of wall time, 2026-10-29) | proven-within-bounds | 2/2 |
+| 36 | `Region::rect_bound` | trait | in-scope (spec 011) |  | `ValidUnion` | `ValidUnion(n)` | — | `uf_crash::c_rect_bound__n1` (the real `Cell::rect_bound`, `atan2_contract`), `__n2`, `__n3` (`any_cell_bound`) weekly, with `cl_crash::c_fg_rect_bound` by composition | `n ≤ 3` (75.6 s per change; 44.5 s and 46.5 s of solver time weekly) | proven-within-bounds | 3/3 |
+| 37 | `Region::cell_union_bound` | trait | excluded (spec 011) | tool-limit (inherited): the cap bound's `Cap::cell_union_bound`, spec 008's timeout at 60 minutes | `ValidUnion` | — | — | covered instead by the `CELLUNION_BOUND` C++ rows (2,014) and the survey's `UUC` (10,000 unions) | — | — | — |
 | 38 | `Region::contains_cell` | trait | in-scope |  | `ValidUnion` | `ValidUnion(n)` × `Cell` of a `Valid` id | the cell's id valid (via `contains_cell_id`) | `cu_mem::p_umem_05__n{0,1}` (shared) and `cu_crash::c_region_contains_cell__n{2,3}` | `n ≤ 3` (building the `Cell` needs an unwind of 9, T020) | proven-within-bounds | 8/8 (4 harnesses) |
 | 39 | `Region::intersects_cell` | trait | in-scope |  | `ValidUnion` | `ValidUnion(n)` × `Cell` of a `Valid` id | the cell's id valid (via `intersects_cell_id`) | `cu_mem::p_umem_05__n{0,1}` (shared) and `cu_crash::c_region_intersects_cell__n{2,3}` | `n ≤ 3` | proven-within-bounds | 8/8 (4 harnesses) |
-| 40 | `Region::contains_point` | trait | excluded | float-geometry |  |  |  |  |  |  |  |
+| 40 | `Region::contains_point` | trait | in-scope (spec 011, under contract) |  | `ValidUnion` | `ValidUnion(n) × AnyTriple` | as row 12 | `uf_crash::c_contains_point__n{0..3}` (shared with row 12) | `n ≤ 3` | proven-within-bounds | (row 12's) |
 | 41 | `impl S2Encode for CellUnion` | encoding | in-scope |  | `Seq` | `Seq(n)` | — | `cu_enc::p_uenc_01__n{0..=3}` (shared) | `n ≤ 3`. Longer: `encode_matches_cpp` and every decode round trip | proven-within-bounds | 5/5 |
 | 42 | `impl S2Decode for CellUnion` | encoding | in-scope |  | — | `Bytes(L)` | — | `cu_enc::p_uenc_03__b{0..=16}` (shared) and `cu_enc::p_uenc_04__b{17..=24}`; `__b25` in the weekly slow tier (8 GB) | `L ≤ 24` per change (one cell), `L = 25` weekly (two cells, which reaches the FR-017 order check). Longer inputs: `decoder_robustness`, `decode_matches_cpp`, the nightly `decode_cell_union` fuzz target | proven-within-bounds | 43/43 (26 harnesses, `__b25` weekly) |
 
@@ -116,7 +120,7 @@ invalid ids (row 29). The table keeps what the T030 commit documented.
 | 9 | `CellUnion::normalize` | P-UNORM-01, P-UNORM-02, P-UNORM-03, P-UNORM-04 | normalised: P-UNORM-01 | as `from_cell_ids` | added (T030) |  |
 | 10 | `CellUnion::contains_cell_id` | P-UMEM-01, P-UMEM-03 | — (returns no union) | in debug builds: an invalid `id` (`debug_assert!`, not in rustdoc before), or an invalid union (id 0 underflows in `range_max`) | added (T030) |  |
 | 11 | `CellUnion::intersects_cell_id` | P-UMEM-02 | — (returns no union) | as `contains_cell_id` | added (T030) |  |
-| 12 | `CellUnion::contains_point` | — | — (returns no union) | excluded row: in debug builds, an invalid union | added (T030) |  |
+| 12 | `CellUnion::contains_point` | P-UPT-01 (spec 011) | — (returns no union) | in debug builds, an invalid union; and `CellId::from_point`'s panics | added (T030); `from_point`'s added (spec 011 FR-019) |  |
 | 13 | `CellUnion::contains_union` | P-UMEM-04 | — (returns no union) | in debug builds, an invalid id in either union | added (T030) |  |
 | 14 | `CellUnion::intersects_union` | P-UMEM-04 | — (returns no union) | as `contains_union` | added (T030) |  |
 | 15 | `CellUnion::leaf_cells_covered` | P-UMEAS-01 | — (returns no union) | an id without a level marker panics in all builds (`CellId::level`); in debug builds the `i64` sum overflows for eight or more overlapping face cells (FR-016) | added (T030), with the FR-016 precondition and deviation note |  |
@@ -129,22 +133,22 @@ invalid ids (row 29). The table keeps what the T030 commit documented.
 | 22 | `CellUnion::intersection_with_cell_id` | P-USET-03 | normalised when the union is: P-USET-03 | as `contains_cell_id` | added (T030) |  |
 | 23 | `CellUnion::difference` | P-USET-04 | not proven (tool limit); normalised when the first input is, in `set_ops_match_cpp` and `prop_cell_union_set_ops_match_covered_sets` | excluded row: in debug builds, an invalid union | added (T030) |  |
 | 24 | `CellUnion::expand_at_level` | — | — (returns no union) | excluded row: some invalid ids in all builds, others in debug builds | added (T030) |  |
-| 25 | `CellUnion::expand_by_radius` | — | — (returns no union) | excluded row: an id without a level marker in all builds | added (T030) |  |
-| 26 | `CellUnion::average_based_area` | — | — (returns no union) | excluded row: as `leaf_cells_covered` | added (T030) |  |
-| 27 | `CellUnion::approx_area` | — | — (returns no union) | excluded row: an invalid id, in all builds | added (T030) |  |
-| 28 | `CellUnion::exact_area` | — | — (returns no union) | excluded row: an invalid id, in all builds | added (T030) |  |
+| 25 | `CellUnion::expand_by_radius` | P-UEXP-01, P-UEXP-02 (spec 011) | — (returns no union) | an id without a level marker in all builds; a NaN radius in debug builds | added (T030); the NaN radius added (spec 011 FR-019) |  |
+| 26 | `CellUnion::average_based_area` | P-UAREA-01, P-UAREA-04 (spec 011) | — (returns no union) | as `leaf_cells_covered` | added (T030) |  |
+| 27 | `CellUnion::approx_area` | P-UAREA-02 (spec 011) | — (returns no union) | an invalid id, in all builds | added (T030) | K2: −0 for the empty union, fixed (spec 011 FR-018) |
+| 28 | `CellUnion::exact_area` | P-UAREA-03 (spec 011) | — (returns no union) | excluded row: an invalid id, in all builds | added (T030) | K2, as row 27 |
 | 29 | `CellUnion::denormalize` | P-UDEN-01, P-UDEN-02 | valid: P-UDEN-01 (`p_uden_01__n*_valid`) | an id without a level marker in every build (and, until spec 009 made it a `LevelMod`, a `level_mod` outside 1–3); in debug builds, any invalid id | added (T030) |  |
 | 30 | `impl Deref for CellUnion` | P-UACC-01 | — (returns no union) |  | — (cannot panic) |  |
 | 31 | `impl Display for CellUnion` | — | — (returns no union) |  | — (cannot panic) |  |
 | 32 | `impl FromIterator<CellId> for CellUnion` | P-UNORM-01, P-UNORM-02 | normalised: P-UNORM-01 | as `from_cell_ids` | added (T030, on the impl) |  |
 | 33 | `impl IntoIterator for CellUnion` | P-UACC-01 | — (returns no union) |  | — (cannot panic) |  |
 | 34 | `impl IntoIterator for &CellUnion` | P-UACC-01 | — (returns no union) |  | — (cannot panic) |  |
-| 35 | `Region::cap_bound` | — | — (returns no union) | excluded row: an invalid id, in all builds | added (T030, on the impl) |  |
-| 36 | `Region::rect_bound` | — | — (returns no union) | excluded row: an invalid id, in all builds | added (T030, on the impl) |  |
-| 37 | `Region::cell_union_bound` | — | — (returns no union) | excluded row: an invalid id, in all builds | added (T030, on the impl) |  |
+| 35 | `Region::cap_bound` | P-UBND-02, P-UBND-03, P-UBND-04 (spec 011) | — (returns no union) | an invalid id, in all builds | added (T030, on the impl) |  |
+| 36 | `Region::rect_bound` | P-UBND-01, P-UBND-03, P-UBND-04 (spec 011) | — (returns no union) | an invalid id, in all builds | added (T030, on the impl) | K1: the polar faces' bounds, fixed in `Cell` (spec 011 FR-017) |
+| 37 | `Region::cell_union_bound` | P-UBND-04 (spec 011) | — (returns no union) | excluded row: an invalid id, in all builds | added (T030, on the impl) |  |
 | 38 | `Region::contains_cell` | P-UMEM-05 | — (returns no union) | in debug builds, an invalid union | added (T030, on the impl) |  |
 | 39 | `Region::intersects_cell` | P-UMEM-05 | — (returns no union) | in debug builds, an invalid union | added (T030, on the impl) |  |
-| 40 | `Region::contains_point` | — | — (returns no union) | excluded row: in debug builds, an invalid union | added (T030, on the impl) |  |
+| 40 | `Region::contains_point` | P-UPT-01 (spec 011) | — (returns no union) | in debug builds, an invalid union; and `CellId::from_point`'s panics | added (T030, on the impl); `from_point`'s added (spec 011 FR-019) |  |
 | 41 | `impl S2Encode for CellUnion` | P-UENC-01, P-UENC-02 | — (returns no union) |  | — (cannot panic) |  |
 | 42 | `impl S2Decode for CellUnion` | P-UENC-02, P-UENC-03, P-UENC-04 | a valid union: P-UENC-03 (exactly the encodings of valid unions are accepted, FR-017) |  | — (cannot panic) | U-003 |
 
