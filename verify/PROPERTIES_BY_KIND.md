@@ -7,18 +7,18 @@ mutants: [`PROPERTIES.md`](PROPERTIES.md) (`CellId`),
 [`cell_union/PROPERTIES.md`](cell_union/PROPERTIES.md) (`CellUnion`),
 [`decoding/PROPERTIES.md`](decoding/PROPERTIES.md) (the decoding layer) and
 [`values/PROPERTIES.md`](values/PROPERTIES.md) (the value types: `Cell`, `s1::Interval`,
-`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle`, `s2::Cap`, `s2::LatLng` and `PointRegion`). The operation
+`r1::Interval`, `s2::Rect`, `r2::Rect`, `s2::Point`, `s1::ChordAngle`, `s1::Angle`, `s2::Cap`, `s2::LatLng`, `PointRegion`, `RegionUnion` and `RegionIntersection`). The operation
 inventories carry the crash-freedom proofs.
 
 | Kind | It guarantees that… | Entries |
 |------|---------------------|---------|
 | [Never crashes](#never-crashes) | an operation finishes without a panic, an arithmetic overflow, undefined behaviour or a hang, whatever its input | every in-scope operation, plus 2 |
-| [Correct result](#correct-result) | an operation returns what the model says it should | 175 |
+| [Correct result](#correct-result) | an operation returns what the model says it should | 181 |
 | [Round trip](#round-trip) | converting a value there and back gives the original | 17 |
 | [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 28 |
 | [Exact input](#exact-input) | a decoder or parser accepts exactly the well-formed inputs, returns what they say, consumes exactly them and rejects the rest | 17 |
 | [Validity](#validity) | a validity check answers exactly, and results are well formed | 16 |
-| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 60 |
+| [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 68 |
 | [Model checks](#model-checks) | the models and restated copies that the proofs compare against are themselves right | 5, plus the links |
 
 ## Browsing the code by kind
@@ -83,6 +83,7 @@ inventories say which harness discharges each operation.
 | `s2::Cap` | 39 of the 42 in-scope operations: on the real code or with lemma stubs over every box cap, and under the contracts of `asin`, `atan2` and `cos` where they reach them; `union` and both `cell_union_bound`s are tool limits | `cp_crash::c_*` | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s2::LatLng` | 30 of the 31 in-scope operations (`to_string_in_degrees`' formatting and `Display` out): the 26 Kani entries over every pair of `f64` (NaN and the infinities included) but where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`), `get_distance` over valid pairs (its documented domain) and, outside it, every pair without an infinity; the conversions and the distance under the contracts of `atan2`, `sin_cos`, `sin`, `cos`, `asin` (and `sqrt` outside the distance's domain); the four `geo-types` conversions by composition | `ll_crash::c_*`, `ll_crash::o_get_distance` | [`values/INVENTORY.md`](values/INVENTORY.md) section 12 |
 | `PointRegion` | all 10 Kani entries (spec 011): `new`, `point`, the six `Region` methods and `PartialEq` over every triple of `f64`, but `rect_bound` over the triples without NaN and `intersects_cell` over the box (`Cell::contains_point`'s domain), whose debug panics are proven exact; `rect_bound` under `atan2`'s contract, `cell_union_bound` under `CellId::from_point`'s (weekly); `Deserialize` tested | `pr_crash::c_*`, `pr_crash::n_*`, `pr_crash::r_*` | [`values/INVENTORY.md`](values/INVENTORY.md) section 13 |
+| `RegionUnion`, `RegionIntersection` | all 16 in-scope entries (spec 012), over abstract members (any answers, so any members whose methods do not panic): the API and the tests for up to 3 members, the bounds for up to 2 (under `atan2`'s and `asin`'s contracts, weekly from one member); `cell_union_bound` inherits `Cap`'s tool limit; `region(i)` panics exactly past the end | `ad_crash::c_*`, `ad_crash::n_region_past_end` | [`values/INVENTORY.md`](values/INVENTORY.md) section 14 |
 
 Two catalogue entries are crash-freedom statements in their own right:
 
@@ -384,6 +385,18 @@ The operation returns exactly what the model computes for the same input.
 | [P-UEXP-01](cell_union/PROPERTIES.md) | `expand_by_radius` expands at upstream's level. | — | every radius and difference, by composition (spec 008's P-CPBND-02 and a drift guard) |
 | [P-UEXP-02](cell_union/PROPERTIES.md) | Expanding keeps the original union. | — | not proven: a tool limit (`all_neighbors`) |
 
+
+### `RegionUnion`, `RegionIntersection`: the adaptors (spec 012)
+
+| ID | What is guaranteed | Proved by | Holds for |
+|----|--------------------|-----------|-----------|
+| [P-ADCON-01](values/PROPERTIES.md) | The adaptors keep their members in order; `add` appends. | [`ad_mean::p_adcon_01`](src/ad_mean.rs) | three abstract members |
+| [P-ADBND-01](values/PROPERTIES.md) | The union's rectangle contains each member's; the intersection's holds every point all members' hold. | [`ad_mean::p_adbnd_01__n*`](src/ad_mean.rs) (3 members weekly) | up to 3 abstract members |
+| [P-ADBND-02](values/PROPERTIES.md) | The cap bound is the rectangle's cap bound, the covering the cap's. | — | every adaptor, by composition (a drift guard on the source; the C++ rows) |
+| [P-ADBND-03](values/PROPERTIES.md) | The empty union's bounds are empty, the empty intersection's rectangle full. | [`ad_mean::p_adbnd_03`](src/ad_mean.rs) | the empty adaptors |
+| [P-ADTST-01](values/PROPERTIES.md) | A union contains (intersects) what some member does; an intersection what every member does. | [`ad_mean::p_adtst_01__n*`](src/ad_mean.rs) | up to 3 abstract members, any number by the fold |
+| [P-CREG-04](values/PROPERTIES.md) | A cell's bounds can miss points of `contains_point`'s margin, as upstream's (U-017). | — | not proven: an exception, tested (`cell_tests`) |
+
 ## Round trip
 
 Converting a value one way and back gives the original value, consuming exactly what was
@@ -563,6 +576,14 @@ Relations that must hold between operations, or between an operation's arguments
 | [P-UREG-04](cell_union/PROPERTIES.md) | The union's bounding cap contains every point it contains. | — | not proven: it waits on `Cell`'s own bounding-cap law; tested |
 | [P-UREG-05](cell_union/PROPERTIES.md) | The union's bounding rectangle contains every point it contains. | — | not proven: it waits on `Cell`'s own rectangle law; tested |
 | [P-UREG-06](cell_union/PROPERTIES.md) | The union's covering contains every point it contains. | — | not proven: as P-UREG-02 |
+| [P-CREG-01](values/PROPERTIES.md) | A cell's bounding cap contains every point of the cell's own u-v bound. | — | not proven: a tool limit (timeouts); tested on 240,000 own points, C++ alike |
+| [P-CREG-02](values/PROPERTIES.md) | A cell's bounding rectangle contains every point of the cell's own u-v bound. | — | not proven: it needs `atan2`'s monotonicity; tested as P-CREG-01 |
+| [P-CREG-03](values/PROPERTIES.md) | A cell's covering contains every point the cell contains, in the closed form. | — | every cell, by composition (the covering is the cell's own id) |
+| [P-ADREG-01](values/PROPERTIES.md) | The adaptors preserve "containing a cell implies intersecting it". | [`ad_reg::p_adreg_01__n*`](src/ad_reg.rs) | up to 3 abstract members, any number by the argument |
+| [P-ADREG-02](values/PROPERTIES.md) | The adaptors preserve the vertex law. | [`ad_reg::p_adreg_02__n*`](src/ad_reg.rs) (2 members weekly) | up to 2 abstract members, any number by the argument |
+| [P-ADREG-03](values/PROPERTIES.md) | The adaptors preserve the bounding-rectangle law. | [`ad_reg::p_adreg_03__n*`](src/ad_reg.rs) (2 and 3 members weekly) | up to 3 abstract members, any number by the argument |
+| [P-ADREG-04](values/PROPERTIES.md) | The adaptors' bounding cap contains every point they contain. | — | not proven: it needs `Rect`'s bounding-cap law (P-LREG-03) |
+| [P-ADREG-05](values/PROPERTIES.md) | The adaptors' covering laws. | — | not proven: `Cap`'s covering law (P-CPREG-04) |
 
 ## Model checks
 

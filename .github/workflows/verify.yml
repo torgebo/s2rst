@@ -77,6 +77,9 @@ on:
       - 'core/tests/data/cpp_latlng_vectors.csv'
       - 'core/src/s2/point_region.rs'
       - 'core/tests/data/cpp_region_vectors.csv'
+      - 'core/src/s2/region_union.rs'
+      - 'core/src/s2/region_intersection.rs'
+      - 'core/tests/data/cpp_cell_bounds_vectors.csv'
       - 'core/src/s2/metric.rs'
       - 'core/tests/trait_property_tests.rs'
       - 'verify/**'
@@ -116,6 +119,9 @@ on:
       - 'core/tests/data/cpp_latlng_vectors.csv'
       - 'core/src/s2/point_region.rs'
       - 'core/tests/data/cpp_region_vectors.csv'
+      - 'core/src/s2/region_union.rs'
+      - 'core/src/s2/region_intersection.rs'
+      - 'core/tests/data/cpp_cell_bounds_vectors.csv'
       - 'core/src/s2/metric.rs'
       - 'core/tests/trait_property_tests.rs'
       - 'verify/**'
@@ -142,7 +148,7 @@ jobs:
         # The decoding suite runs as three parts, so each leg stays under SC-006's 10 minutes,
         # and the value types as four (spec 004 research R12, spec 005 research R8).
         # `release` is the documented panics' release pass (`make verify-release`).
-        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap, values-latlng, values-pointregion, values-unionfloat, release]
+        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap, values-latlng, values-pointregion, values-unionfloat, values-adaptors, release]
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -239,7 +245,7 @@ jobs:
         part: ['0', '1', '2', '3', '4', '5', vertex, union, decoding-vectors, decoding-links, decoding-codecs,
                values-cell-a, values-cell-b, values-interval-rect, values-uvrect-point, values-chord-angle,
                values-cap, values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e,
-               values-limits-f, values-limits-g, values-limits-h, values-fg-a, values-fg-b, values-latlng, values-regions]
+               values-limits-f, values-limits-g, values-limits-h, values-fg-a, values-fg-b, values-latlng, values-regions, values-adaptors]
         # The value-type suite's 87 weekly members take about 34 hours one at a time on the
         # workstation (2026-10-14, 2026-10-18, 2026-10-25), so they run as thirteen legs of
         # `make verify-slow F=values`, each a list of harness filters. The first six hold the
@@ -295,6 +301,10 @@ jobs:
           # three-cell bounds and areas, its two-cell cap bound, and L-PR-01 (2026-10-28).
           - part: values-regions
             filters: 'pr_bnd::p_prbnd_03 pr_reg::p_prreg_06 pr_reg::p_prreg_03__f pr_crash::c_cell_union_bound uf_bnd::p_ubnd_01__n2 uf_bnd::p_ubnd_01__n3 uf_bnd::p_ubnd_02__n1 uf_area::p_uarea_02__n2 uf_area::p_uarea_02__n3 uf_area::p_uarea_03__n2 uf_area::p_uarea_03__n3 uf_crash::c_approx_area__n3 uf_crash::c_cap_bound__n uf_crash::c_rect_bound__n2 uf_crash::c_rect_bound__n3'
+          # Spec 012: the adaptors' bounds from one member, the rectangle law at 2 and 3 members,
+          # the vertex law at 2 (2026-10-30).
+          - part: values-adaptors
+            filters: 'ad_crash::c_bounds__ru__n1 ad_crash::c_bounds__ri__n1 ad_crash::c_bounds__ru__n2 ad_crash::c_bounds__ri__n2 ad_mean::p_adbnd_01__n3 ad_reg::p_adreg_02__n2 ad_reg::p_adreg_03__n2 ad_reg::p_adreg_03__n3'
     env:
       # One CBMC per physical core: these harnesses run close to their 30-minute limit,
       # and hyperthread contention slows them (EVALUATION.md, "Measurements"). The union and

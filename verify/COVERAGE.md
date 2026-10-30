@@ -263,6 +263,15 @@ floating-point rows that spec 002 had excluded from `CellUnion`:
 `values/INVENTORY.md` section 13 and `cell_union/INVENTORY.md` rows 12, 25–28, 35–37, 40 have the
 rows.
 
+## Spec 012: `Cell`'s bounding laws and the region adaptors (2026-10-30)
+
+- **Gap 1 (the documented panics):** `RegionIntersection::region(i)` panicked past the end without
+  saying so (spec 012 K2); it is documented, and `ad_crash::n_region_past_end` proves the panic
+  exact in every build.
+- **Gap 2 (floating-point geometry):** the adaptors' 16 in-scope entries have crash proofs over
+  abstract members, the bounds under `atan2`'s and `asin`'s contracts; `cell_union_bound` inherits
+  `Cap::cell_union_bound`'s limit. `values/INVENTORY.md` section 14 has the rows.
+
 ## What changed outside `verify/`
 
 Only documentation: the `# Panics` sections of gap 1, in `core/src/s2/cell_id.rs`, `cell.rs`,

@@ -61,6 +61,9 @@
 //!   constructions (spec 011). The `pr_*` (`PointRegion`) and `uf_*` (`CellUnion`'s
 //!   floating-point methods, also behind `cellunion`) modules are its harnesses, in the same
 //!   `values` suite; `laws` gains the bounding-rectangle and covering laws (spec 011 FR-010).
+//! - `any_region` is the abstract region, a `Region` with any answers (spec 012); the `ad_*`
+//!   modules prove over it that `RegionUnion` and `RegionIntersection` preserve the `Region`
+//!   laws of their members, whatever they are.
 //!
 //! Every property harness's doc comment starts with its catalogue id and its kind, then a
 //! plain-language statement, then the exact one: `P-HIER-01 (correct result): …`. The kinds
@@ -109,6 +112,9 @@ mod laws;
 // one of these.
 #[cfg(kani)]
 mod stubs;
+// The abstract region (spec 012): any answers, one per input, for the adaptors' proofs.
+#[cfg(all(kani, feature = "values"))]
+mod any_region;
 
 #[cfg(kani)]
 mod anc;
@@ -365,6 +371,14 @@ mod pr_crash;
 mod pr_eq;
 #[cfg(all(kani, feature = "values"))]
 mod pr_reg;
+
+// The region adaptors (spec 012), over the abstract region.
+#[cfg(all(kani, feature = "values"))]
+mod ad_crash;
+#[cfg(all(kani, feature = "values"))]
+mod ad_mean;
+#[cfg(all(kani, feature = "values"))]
+mod ad_reg;
 
 // `CellUnion`'s floating-point methods (spec 011): in the value suite, with 002's union domains.
 #[cfg(all(kani, feature = "values", feature = "cellunion"))]

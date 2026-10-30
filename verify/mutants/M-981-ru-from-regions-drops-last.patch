@@ -1,0 +1,17 @@
+Mutant: M-981
+Targets: C-RegionUnion::from_regions
+Expect-Fail: ad_crash::c_union_api__n1
+Defect: `RegionUnion::from_regions` drops the last member
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -38,6 +38,8 @@
+ 
+     /// Creates a `RegionUnion` from a vector of regions.
+     pub fn from_regions(regions: Vec<Box<dyn Region>>) -> Self {
++        let mut regions = regions;
++        regions.pop();
+         RegionUnion { regions }
+     }
+ 

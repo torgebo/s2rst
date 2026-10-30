@@ -797,6 +797,40 @@ upstream's, which a reviewer checks when a guard fails, and on the `CELLUNION_*`
   infinities) are shown by native `should_panic` tests and the probe's sweep, not by `n_*`
   harnesses; their release behaviour is (`r_from_point_infinities`, `r_intersects_cell`).
 
+## `Cell`'s bounding laws and the region adaptors (spec 012)
+
+Design: `specs/012-formal-verify-cell-bounds-adaptors/` (data-model §1–§4; research R0, R4, R5).
+Records: sections 14 and 13 of `values/INVENTORY.md` and `values/PROPERTIES.md`, the `P-CREG`
+rows of `PROPERTIES.md` §1, and the spec-012 part of `values/EVALUATION.md`.
+
+### The abstract region (research R4)
+
+`any_region::AnyRegion` is the adaptors' members: a `Region` whose every answer is any value, one
+per input and region, from `static Mutex` tables of ten slots (`stubs::Table`). It is not a stub
+of library code: it stands for "any implementor". A preservation statement reads each member's
+answers through the methods the adaptor calls, assumes a law of them, and asserts it of the
+adaptor; the tables make the two reads one value. What it trusts: nothing beyond the checker, but a
+statement over more inputs than ten slots per table gets unrecorded answers (more behaviours, so
+never a false proof), which is why member counts stay at 3 (2 for the vertex law).
+
+### The argument for any number of members
+
+The proofs cover up to three members. An adaptor's answers are associative folds (`any`, `all`,
+`Rect::union` from the empty rectangle, `Rect::intersection` from the full one), and each law is a
+statement about one member's answers, so a law for `n + 1` members follows by induction from the
+proofs at 1 and 2 members and spec 005's P-LSET-01 and P-LSET-02. Written in `ad_reg.rs`.
+
+### Bounds and gaps
+
+- **Not proven:** `Cell`'s bounding laws for its own points (P-CREG-01: timeouts; P-CREG-02: it
+  needs `atan2`'s monotonicity); the adaptors' bounding-cap and covering laws (P-ADREG-04, -05:
+  they need `Rect`'s and `Cap`'s laws). Tested: the survey's 240,000 own points, the C++ rows,
+  the twins.
+- **U-017:** `Cell::contains_point`'s margin is outside `Cell`'s bounds, upstream's behaviour kept
+  and documented; the laws are stated for the cell's own points.
+- **Under the range contracts** the full rectangle's cap bound is not fixed to the full cap
+  (P-ADBND-03's cap half is a native test).
+
 ## The documented panics (2026-10-26)
 
 The `n_*`, `r_*` and `o_*` harnesses of the crash modules (inventories: 001 section 3,

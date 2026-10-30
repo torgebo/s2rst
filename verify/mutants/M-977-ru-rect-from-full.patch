@@ -1,0 +1,17 @@
+Mutant: M-977
+Targets: P-ADBND-03
+Expect-Fail: ad_mean::p_adbnd_03
+Defect: `RegionUnion::rect_bound` folds from the full rectangle
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -92,7 +92,7 @@
+     }
+ 
+     fn rect_bound(&self) -> Rect {
+-        let mut ret = Rect::empty();
++        let mut ret = Rect::full();
+         for region in &self.regions {
+             ret = ret.union(region.rect_bound());
+         }

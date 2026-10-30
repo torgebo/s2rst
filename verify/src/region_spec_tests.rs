@@ -165,3 +165,27 @@ fn expand_level_is_upstreams() {
         ]
     );
 }
+
+const UNION: &str = include_str!("../../core/src/s2/region_union.rs");
+const INTERSECTION: &str = include_str!("../../core/src/s2/region_intersection.rs");
+
+/// `S2RegionUnion` and `S2RegionIntersection` (`s2region_union.cc`, `s2region_intersection.cc`):
+/// `GetCapBound` is `GetRectBound().GetCapBound()`, `GetCellUnionBound` the cap's (P-ADBND-02,
+/// spec 012).
+#[test]
+fn adaptors_are_upstreams() {
+    for src in [UNION, INTERSECTION] {
+        assert_eq!(
+            body(src, "    fn cap_bound(&self) -> Cap {", "    "),
+            ["self.rect_bound().cap_bound()"]
+        );
+        assert_eq!(
+            body(
+                src,
+                "    fn cell_union_bound(&self) -> Vec<CellId> {",
+                "    "
+            ),
+            ["self.cap_bound().cell_union_bound()"]
+        );
+    }
+}

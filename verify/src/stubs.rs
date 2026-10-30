@@ -49,7 +49,7 @@ use std::sync::Mutex;
 
 /// Slots per table. A harness's statement touches at most a handful of keys; an eleventh key
 /// gets a fresh, unrecorded value (only more behaviours, research R6).
-const SLOTS: usize = 10;
+pub(crate) const SLOTS: usize = 10;
 
 /// A pure function's memory: up to [`SLOTS`] keys of `K` 64-bit words and their values.
 pub struct Table<const K: usize> {
@@ -59,7 +59,7 @@ pub struct Table<const K: usize> {
 }
 
 impl<const K: usize> Table<K> {
-    const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Table {
             keys: [[0; K]; SLOTS],
             vals: [0; SLOTS],
@@ -67,12 +67,12 @@ impl<const K: usize> Table<K> {
         }
     }
 
-    fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.used = 0;
     }
 
     /// The value stored for `key`, or `fresh()`, stored if a slot is free, and returned.
-    fn get(&mut self, key: [u64; K], fresh: impl FnOnce() -> u64) -> u64 {
+    pub(crate) fn get(&mut self, key: [u64; K], fresh: impl FnOnce() -> u64) -> u64 {
         for i in 0..SLOTS {
             if i < self.used {
                 let mut eq = true;
@@ -162,7 +162,7 @@ pub fn reset() {
     }
 }
 
-fn bits3(p: Point) -> [u64; 3] {
+pub(crate) fn bits3(p: Point) -> [u64; 3] {
     [p.0.x.to_bits(), p.0.y.to_bits(), p.0.z.to_bits()]
 }
 
@@ -476,7 +476,7 @@ pub fn pure_approx_eq_angle(a: Point, b: Point, eps: s2rst::s1::Angle) -> bool {
 // ---- the abstract cell (research R7)
 // -------------------------------------------------------------
 
-fn any_box_point() -> Point {
+pub(crate) fn any_box_point() -> Point {
     let (x, y, z): (f64, f64, f64) = (kani::any(), kani::any(), kani::any());
     kani::assume(x.abs() <= 1.0 && y.abs() <= 1.0 && z.abs() <= 1.0);
     Point(Vector { x, y, z })
@@ -702,7 +702,7 @@ fn cell_bound(c: Cell, fresh: impl FnOnce() -> s2rst::s2::Rect) -> s2rst::s2::Re
 }
 
 /// Any rectangle `crate::rect_spec` accepts.
-fn any_valid_rect() -> s2rst::s2::Rect {
+pub(crate) fn any_valid_rect() -> s2rst::s2::Rect {
     let r = s2rst::s2::Rect {
         lat: s2rst::r1::Interval {
             lo: kani::any(),

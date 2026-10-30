@@ -45,7 +45,8 @@ decoding = []
 # angle `s1::Angle`) from spec 007, `cp_*` (the cap `s2::Cap`) from spec 008, `ll_*` (the
 # latitude–longitude `s2::LatLng`) from spec 010, which also adds `ll_reg` (the rectangle's
 # `Region` laws), and `pr_*` (`PointRegion`) and `uf_*` (`CellUnion`'s floating-point methods,
-# also behind `cellunion`) from spec 011. `make verify-values` runs all eleven; `P=<part>` one, selected
+# also behind `cellunion`) from spec 011, and `ad_*` (the region adaptors) from spec 012. `make
+# verify-values` runs all twelve; `P=<part>` one, selected
 # by module name (`--harness ri_exp::`), since a bare prefix matches inside other names.
 values = []
 # The weekly slow tier: harnesses over the per-change budget (research R12, R15), run by

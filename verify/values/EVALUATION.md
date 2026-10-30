@@ -1766,3 +1766,142 @@ Ranked:
 | SC-011 the index by kind | met | `tests/property_kinds.rs` passes. |
 | SC-012 upstream findings | met (none) | No upstream defect met; KI-013 is a tool finding (`KANI_ISSUES.md`). |
 | SC-013 the evaluation answers | met | How much is proven: "Summary"; which laws hold: the same, `values/PROPERTIES.md` §12 and `cell_union/PROPERTIES.md`; what next: "Recommendations". |
+
+# Spec 012: `Cell`'s bounding laws, and the region adaptors
+
+## Summary (spec 012)
+
+Spec 012 took the first two items of spec 011's list: `Cell`'s bounding laws (which
+`CellUnion`'s wait on) and the region adaptors `RegionUnion` and `RegionIntersection`. A survey
+against running C++ (`specs/012-formal-verify-cell-bounds-adaptors/probe/`: 20,000 cells with 60
+adversarial points each, 10,000 adaptors) found U-017 first.
+
+- **U-017:** `Cell::contains_point` accepts points up to `(5/3)·ε` outside the cell in u-v
+  (upstream's, so that a point's leaf cell contains it), and the cap and rectangle bounds cover the
+  cell alone, upstream too: 118,093 and 36,315 of 1,008,724 contained points lie outside them, all
+  in the margin. The maintainer chose to keep upstream's bounds: they are documented, a test pins
+  both inputs, `CORE_TRAITS.md` names the exception, and the laws are stated for the cell's own
+  points.
+- **`Cell`'s bounding laws** for its own points are not proven: the cap's harnesses time out at 12
+  minutes (CBMC's `sqrt` and `sqrt_between`), and the rectangle's need `atan2`'s monotonicity,
+  which no contract gives. The survey's 240,000 own points and the C++ rows find no miss. The
+  covering law holds in its closed form by composition. `CellUnion`'s bounding laws keep their
+  reason.
+- **The adaptors:** all 16 in-scope entries proven crash-free over abstract members (any answers,
+  so any members whose methods do not panic), `region(i)`'s panic proven exact and now documented
+  (K2). 8 counted catalogue entries, all proven: their meaning (`any`/`all` folds, the rectangle
+  bounds, the empty adaptors, the cap and covering through the rectangle by a drift guard), and
+  the preservation of three `Region` laws (containment implies intersection, the vertex law, the
+  bounding rectangle) for up to 3 members (2 for the vertex law), any number by a written
+  argument. The bounding-cap and covering laws need `Rect`'s and `Cap`'s, not proven.
+- **Library changes:** documentation only (U-017, K2), each with a test; new C++ vectors (31,216
+  rows) match every row but spec 010's documented cap radii.
+- **Non-vacuity:** all 14 mutants `M-974` … `M-987` are killed.
+
+## The abstract region (spec 012)
+
+The adaptors hold `Box<dyn Region>` members of any type. Proving them over concrete members would
+prove them for those types only, at each type's cost (a `Cell` member alone brings a projection).
+Instead their members are `any_region::AnyRegion`: a `Region` whose answers are any values, one
+per input and region. A preservation statement assumes a law of each member's answers and asserts
+it of the adaptor; since every implementor's answers are among the abstract region's, it holds for
+every implementor that satisfies the law. The tables hold ten keys, so the member counts stay
+where a statement's keys fit (three members' twelve vertex keys timed out in R0).
+
+## What R0 and the runs found (spec 012)
+
+- **`Cell`'s bounds** cannot be compared with its points in the checker: the cap needs the chord
+  distances of a normalised point to agree with the vertices' (12-minute timeouts), the rectangle
+  `atan2`'s monotonicity (a counterexample under its range contract, which the real function never
+  gives).
+- **`s1::Interval::intersection` keeps the shorter operand** when the overlap is two pieces, and a
+  near-full inverted interval's length rounds to 2π, a tie the full interval wins: the full
+  rectangle intersected with a member is then not inside the member (C++ alike). Upstream's
+  comment promises the smallest containing interval; the result does contain the intersection,
+  which is what spec 004's P-ISET-03 proves, so P-ADBND-01 is stated for the points all members
+  hold. An observation, not a defect report.
+- **Under the range contracts** the full rectangle's cap bound is not fixed to the full cap; the
+  empty intersection's cap is a native test.
+
+## Effort log (spec 012)
+
+| Date | Work |
+|------|------|
+| 2026-10-29 | Survey (20,000 cells × 60 points, 10,000 adaptors, on C++ and the library), U-017 found |
+| 2026-10-30 | The maintainer's choice on U-017, spec; R0, R0b (22 harnesses), plan and tasks; the documentation and its tests; the C++ generator and diff test; the twins; the abstract region and 40 harnesses; the mutants; the records |
+
+## Exclusions and tool limits (spec 012)
+
+- **Excluded:** both adaptors' `Debug` (`core::fmt`); their `cell_union_bound` inherits
+  `Cap::cell_union_bound`'s limit (spec 008).
+- **Not proven:** `Cell`'s P-CREG-01, -02; the adaptors' P-ADREG-04, -05.
+
+## Upstream findings (FR-019) (spec 012)
+
+- **U-017**, `S2Cell::Contains(const S2Point&)` with `GetCapBound` and `GetRectBound`
+  (`s2cell.cc`): the bounds miss points of `Contains`'s margin (`UPSTREAM.md`). Kept, documented,
+  at the maintainer's choice. Follow-up: T005; not reported upstream (the maintainer's call).
+
+## Defects found (spec 012)
+
+None in the library. No D-010.
+
+## Measurements (spec 012)
+
+Per change (`make verify-values P=adaptors`, 4 jobs, 2026-10-30): 32 harnesses, 261 s wall for the
+first run including the build; every one under 2 minutes of solver time, the longest
+`p_adbnd_01__n2` (118.9 s) and `p_adreg_02__n1` (99.5 s). Weekly (2 jobs, 8 GiB): the bounds at 1
+and 2 members 119.6–235.5 s, `p_adbnd_01__n3` 826.4 s, `p_adreg_02__n2` 656.7 s, `p_adreg_03__n2`
+169.1 s and `__n3` 741.4 s; 1,681 s in all.
+
+## Non-vacuity (spec 012)
+
+`make verify-mutants` (2026-10-30/31): 14 mutants `M-974` … `M-987`, **all killed**. M-979 (the
+intersection's rectangle skipping a member) survived its harness at first: P-ADBND-01 states only
+that the intersection's rectangle holds every common point (R0c), which a larger rectangle still
+does; it is killed by the C++ rows, which compare the bound bit for bit. M-987 (the union's
+rectangle skipping a member) was added for P-ADREG-03 and is killed by `p_adreg_03__n1`. Twelve are
+killed by Kani harnesses, M-979 by `cpp_cell_bounds_diff`, M-980 by both `n_region_past_end` and
+the `should_panic` test. One patches the abstract region (M-985: `contains_point` answers afresh on
+each call, so a member's answer and the adaptor's read of it differ). All 393 patches apply.
+
+## Recommendations (FR-020) (spec 012)
+
+Ranked:
+
+1. **`Rect`'s bounding-cap law** (P-LREG-03): with it, the adaptors' P-ADREG-04 follows by
+   composition. It needs `atan2`'s and `sin_cos`'s values; a monotonicity contract on `atan2`,
+   tested like the others, is the likely route, and would also open `Cell`'s rectangle law
+   (P-CREG-02).
+2. **The shape-backed regions** (`Loop`, `Polygon`, `Polyline`, the shape-index regions): edge
+   geometry over vertex lists, research first.
+3. **The missing codecs** (`S2PointRegion`, `S2LatLng`) and `S2LatLngRect::Intersects(const S2Cell&)`.
+4. **The two inexact remainders** (`s1::Interval`'s `ieee_remainder`, the projections'
+   `remainder`).
+5. **U-017 upstream**: the maintainer decides whether to report it.
+
+## Success criteria (SC-001 … SC-013) (spec 012)
+
+| Criterion | Outcome | Evidence |
+|-----------|---------|----------|
+| SC-001 the adaptors' crash freedom; `region(i)` exact | met | 16 entries over abstract members, up to 3 members (the bounds 2); `n_region_past_end` (INVENTORY §14). |
+| SC-002 every entry proven or excluded | met | 16 proven, 2 excluded (`Debug`), `cell_union_bound` an inherited limit; no new contract. |
+| SC-003 at least 90% of the counted entries | met (100%) | 8 of 8 (§13). |
+| SC-004 the laws | met | Three laws preserved, proven; P-ADREG-04, -05 with reasons; `Cell`'s P-CREG-01, -02 with reasons (tool limit, `atan2`'s values), P-CREG-03 by composition, the margin exception recorded with its counterexample (P-CREG-04). |
+| SC-005 non-vacuity | met | 14 mutants, all killed; every proven entry and law instance has one; every crash harness satisfies its covers. |
+| SC-006 per change under 10 minutes on CI | met on the workstation | `P=adaptors` 32 harnesses, 5 min 29 s with the crate tests and build (2026-10-31). Not measured on a hosted runner (T017, a push). |
+| SC-007 the documentation's tests; the probe | met | `cell_tests::margin_tests`, `region_panics_past_the_end`; the probe differs from C++ only by spec 010's cap radii. |
+| SC-008 the C++ vectors | met | `cpp_cell_bounds_diff`: every row, the cap radii as spec 010's rule. |
+| SC-009 API and behaviour unchanged; the gate | met | Documentation and tests only; `make test` passes. |
+| SC-010 panics documented | met | `region(i)` (K2). |
+| SC-011 the index by kind | met | `property_kinds` passes. |
+| SC-012 upstream findings | met | U-017 in `UPSTREAM.md`, here, follow-up T005. |
+| SC-013 the evaluation answers | met | "Summary", §13 and §1's `P-CREG` rows, "Recommendations". |
+
+## Final run (spec 012)
+
+2026-10-31, on the workstation, one run at a time: `make verify-values P=adaptors` 32 of 32 (5 min
+29 s); the weekly members 8 of 8 (1,681 s, 2 jobs); `make verify-release` 46 of 46 (5 min 51 s,
+`n_region_past_end` included); `make verify-mutants`: 14 of 14 killed; `make test` passed (1 min 39
+s, with `cpp_cell_bounds_diff`, the margin and `region(i)` tests and the twins); `cargo test` in
+`verify/` passed (the drift guards, the index by kind).

@@ -618,3 +618,31 @@ is tested. The proofs needed no precondition beyond K4's, which FR-019 documente
 | 4 | `Region::cell_union_bound` | in scope (under contract) |  | `AnyTriple`; `CellId::from_point`'s documented debug panics (the zero vector, NaN, two infinite coordinates) are its own (`cl_crash::n_from_point`, the native tests) | — | `pr_crash::c_cell_union_bound` (weekly; `pure_leaf`, `asin_contract`) with `cl_crash::c_fg_from_point` by composition | proven-under-contract |
 | 5 | `Deserialize for PointRegion` (hand-written, FR-019) | in scope (tested) |  | every serialised `PointRegion` |  | `point_region_tests::deserialise_rejects_points_off_unit_length` (not a Kani entry) | tested |
 | 6 | `Debug for PointRegion` (derived) | excluded | `core::fmt`, as every type's text |  |  |  | — |
+
+## 14. `RegionUnion` and `RegionIntersection` (18 entries)
+
+Spec 012 (`specs/012-formal-verify-cell-bounds-adaptors/data-model.md` §5). `RegionUnion`'s `new`,
+`from_regions`, `add`, `len`, `is_empty`, `iter`, both `IntoIterator`s and `Default`;
+`RegionIntersection`'s `new`, `from_regions`, `num_regions`, `region` and `Default`; the six
+`Region` methods of each (counted as one entry per adaptor for the tests and one for the bounds);
+the derived `Debug`s. The members are abstract regions (`any_region`): any answers, one per input,
+so a crash proof covers any members whose own methods do not panic on the arguments. Member
+counts are concrete, 0 to 3 (`__n<k>`).
+
+**Summary** (T008, 2026-10-30): 16 in scope, 2 excluded (`Debug`). Every in-scope entry has a Kani
+crash proof, `SUCCESSFUL` with its covers satisfied: the API and the tests per change for up to 3
+members, the bounds per change for the empty adaptors and weekly for 1 and 2 members (under
+`atan2`'s and `asin`'s contracts, through `Rect::cap_bound`); `cell_union_bound` is the cap
+bound's `Cap::cell_union_bound`, spec 008's tool limit, inherited. `region(i)`'s panic past the
+end is proven exact (`n_region_past_end`, every build; documented by FR-017).
+
+| # | entries | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|---------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `RegionUnion::new`, `from_regions`, `add`, `len`, `is_empty`, `iter`, `IntoIterator` (both), `Default` | in scope |  | 0–3 abstract members |  | `ad_crash::c_union_api__n{0..3}` (3.3–4.4 s) | proven-within-bounds |
+| 2 | `RegionIntersection::new`, `from_regions`, `num_regions`, `region`, `Default` | in scope |  | 0–3 abstract members; `region(i)` for `i` below `num_regions` | `i < num_regions` (documented, FR-017; upstream has no check) | `ad_crash::c_intersection_api__n{0..3}` (1.6–2.7 s), `n_region_past_end` (2.6 s) | proven-within-bounds |
+| 3 | `Region for RegionUnion`: `contains_cell`, `intersects_cell`, `contains_point` | in scope |  | 0–3 abstract members × `ValidCell` × `AnyTriple` |  | `ad_crash::c_tests__ru__n{0..3}` (6.7–19.9 s) | proven-within-bounds |
+| 4 | `Region for RegionIntersection`: the same | in scope |  | as row 3 |  | `ad_crash::c_tests__ri__n{0..3}` (5.5–22.2 s) | proven-within-bounds |
+| 5 | `Region for RegionUnion`: `rect_bound`, `cap_bound` | in scope (under contract) |  | 0–2 abstract members |  | `ad_crash::c_bounds__ru__n0` (1.7 s), `__n1` (124.1 s), `__n2` (188.6 s) weekly (`atan2_contract`, `asin_contract`) | proven-within-bounds |
+| 6 | `Region for RegionIntersection`: the same | in scope (under contract) |  | as row 5 |  | `ad_crash::c_bounds__ri__n0` (13.3 s), `__n1` (119.6 s), `__n2` (235.5 s) weekly | proven-within-bounds |
+| 7 | `Region::cell_union_bound` for both | excluded | tool-limit (inherited): `Cap::cell_union_bound` of the cap bound, spec 008's timeout | | | covered by the C++ rows (`REGION_UNION`, `REGION_INTERSECTION`, the covering's size) | — |
+| 8 | `Debug` for both (derived) | excluded | `core::fmt` |  |  |  | — |
