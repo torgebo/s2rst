@@ -42,6 +42,11 @@ impl RegionIntersection {
     }
 
     /// Returns a reference to the i-th region.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `i` is at least [`num_regions`](Self::num_regions). Upstream's `region(i)`
+    /// indexes without a check (spec 012 K2).
     pub fn region(&self, i: usize) -> &dyn Region {
         self.regions[i].as_ref()
     }
@@ -162,5 +167,14 @@ mod tests {
         let intersection = RegionIntersection::from_regions(vec![Box::new(cap)]);
         let r: &dyn Region = &intersection;
         assert!(r.contains_point(&Point::from_coords(1.0, 0.0, 0.0)));
+    }
+
+    /// Spec 012 K2 (FR-017): `region(i)` panics for `i` past the end, as documented.
+    #[test]
+    #[should_panic(expected = "index out of bounds")]
+    fn region_panics_past_the_end() {
+        let cap = Cap::from_point(Point::from_coords(1.0, 0.0, 0.0));
+        let intersection = RegionIntersection::from_regions(vec![Box::new(cap)]);
+        let _ = intersection.region(1);
     }
 }
