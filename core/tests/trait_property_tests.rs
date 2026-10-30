@@ -1805,3 +1805,71 @@ fn furthest_edge_target_cap_deterministic(a_lat: i32, a_lng: i32, b_lat: i32, b_
     let t = s2rst::s2::furthest_edge_query::EdgeTarget::new(a, b);
     prop::distance_target_cap_bound_deterministic(&t)
 }
+
+// ─── Spec 012 FR-012: Cell's own points, and adaptors of mixed and nested members ───
+
+/// `Cell`'s bounding cap and rectangle contain the cell's own points: its vertices and the
+/// centres of its descendants (not the points of `contains_point`'s margin, `UPSTREAM.md` U-017).
+#[quickcheck]
+fn region_cell_bounds_contain_own_points(lat: i32, lng: i32, lvl: u8, k: u8, d: u8) -> bool {
+    let c = generators::cell(lat, lng, lvl);
+    let u = CellUnion::from_cell_ids(vec![c.id()]);
+    let p = generators::point_in_union(&u, k, d);
+    c.contains_point(p) && c.cap_bound().contains_point(p) && c.rect_bound().contains_point(p)
+}
+
+/// A member of a law twin, by `kind`: a cap, a rectangle or a point region (implementors that
+/// satisfy the vertex and bounding-rectangle laws on the twin's inputs; a `Cell` or a
+/// `CellUnion` member breaks the vertex law).
+fn law_member(kind: u8, lat: i32, lng: i32, r: u16) -> Box<dyn Region> {
+    match kind % 3 {
+        0 => Box::new(generators::cap(lat, lng, r)),
+        1 => Box::new(generators::rect(
+            lat,
+            lng,
+            lat.wrapping_add(i32::from(r)),
+            lng.wrapping_add(i32::from(r)),
+        )),
+        _ => Box::new(generators::point_region(lat, lng)),
+    }
+}
+
+/// The adaptors preserve containment implies intersection, the vertex law and the bounding
+/// rectangle, for mixed members and an adaptor nested in another (the Kani statements are spec
+/// 012's `ad_reg`, over abstract members).
+#[quickcheck]
+fn region_adaptors_preserve_laws(
+    kinds: (u8, u8, u8),
+    a: (i32, i32, u16),
+    b: (i32, i32, u16),
+    c: (i32, i32, u16),
+    cell: (i32, i32, u8),
+    nest: bool,
+) -> bool {
+    let members = |union: bool| -> Vec<Box<dyn Region>> {
+        let ms = vec![
+            law_member(kinds.0, a.0, a.1, a.2),
+            law_member(kinds.1, b.0, b.1, b.2),
+        ];
+        let third = law_member(kinds.2, c.0, c.1, c.2);
+        if !nest {
+            return ms;
+        }
+        let inner: Box<dyn Region> = if union {
+            Box::new(RegionUnion::from_regions(ms))
+        } else {
+            Box::new(RegionIntersection::from_regions(ms))
+        };
+        vec![inner, third]
+    };
+    let cl = generators::cell(cell.0, cell.1, cell.2);
+    let p = generators::safe_point(a.0, a.1);
+    let u = RegionUnion::from_regions(members(true));
+    let i = RegionIntersection::from_regions(members(false));
+    prop::region_contains_implies_intersects(&u, &cl)
+        && prop::region_no_intersect_no_vertex(&u, &cl)
+        && prop::region_rect_bound_contains_point(&u, p)
+        && prop::region_contains_implies_intersects(&i, &cl)
+        && prop::region_no_intersect_no_vertex(&i, &cl)
+        && prop::region_rect_bound_contains_point(&i, p)
+}
