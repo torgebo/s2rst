@@ -4,10 +4,13 @@
 
 **Created**: 2026-10-29
 
-**Status**: Draft. Scope: the first two items of spec 011's ranked list. Clarified 2026-10-30
-by the maintainer: U-017 is recorded and upstream's `Cell` bounds are kept; the bounding laws
-are stated for the cell's own points, its `contains_point` margin a documented exception
-(FR-016).
+**Status**: Implemented 2026-10-31. Scope: the first two items of spec 011's ranked list.
+Clarified 2026-10-30 by the maintainer: U-017 is recorded and upstream's `Cell` bounds are kept;
+the bounding laws are stated for the cell's own points, its `contains_point` margin a documented
+exception (FR-016). Every success criterion is met on the workstation; SC-006 on a hosted runner
+needs a push (tasks T017). `Cell`'s bounding laws for its own points are not proven (tool limit,
+`atan2`'s values), as SC-004 allows. Evaluation: the spec-012 part of
+`verify/values/EVALUATION.md`.
 
 **Input**: User description: "next features to verify"
 

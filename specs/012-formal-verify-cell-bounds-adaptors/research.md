@@ -116,3 +116,17 @@ The adaptors' cap radii are spec 010's documented deviation: the diff test check
   `region_union.rs`, `region_intersection.rs` and the new CSV.
 - Evaluation: a spec-012 part ranking what is left: the shape-backed regions, the missing codecs,
   the two inexact remainders, and U-017's report (the maintainer's call).
+
+## R8: Measured in implementation (2026-10-30/31)
+
+- **P-ADBND-01** first asserted that each member's rectangle contains the intersection's; the
+  checker found a member whose longitudes miss a gap of 2.5·10⁻³⁰⁸ around 0: its length rounds to
+  2π, ties with the full interval's, and `s1::Interval::intersection` (upstream's rule, "return the
+  shorter operand") keeps the full one. C++ alike. The statement is now that the intersection's
+  rectangle holds every common point (R0c).
+- **P-ADBND-03**: under the range contracts the full rectangle's cap bound is not the full cap; the
+  native test shows it is (C++ alike).
+- **M-979** survived the weaker P-ADBND-01 and is killed by the C++ rows; **M-987** was added for
+  P-ADREG-03.
+- `P=adaptors` runs 32 harnesses in 5 min 29 s (crate tests and build included); no member had to
+  move.
