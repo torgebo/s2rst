@@ -98,6 +98,7 @@ mod tests {
         // Empty intersection covers the entire sphere.
         let r = RegionIntersection::new();
         assert!(r.rect_bound().is_full());
+        assert!(r.cap_bound().is_full());
         assert!(r.contains_point(&Point::from_coords(1.0, 0.0, 0.0)));
     }
 
