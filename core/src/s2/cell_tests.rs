@@ -273,3 +273,50 @@ mod contains_point_panic_tests {
         })));
     }
 }
+
+/// Spec 012 FR-016 (U-017): `contains_point` accepts points up to `(5/3)·ε` outside the cell in
+/// u-v, and the bounds cover the cell's own points only, as upstream's: a point of the margin can
+/// lie outside them. These pin the survey's two inputs, so a change to either side is seen.
+mod margin_tests {
+    use super::super::*;
+    use crate::r3::Vector;
+
+    fn bits(x: u64, y: u64, z: u64) -> Point {
+        Point(Vector {
+            x: f64::from_bits(x),
+            y: f64::from_bits(y),
+            z: f64::from_bits(z),
+        })
+    }
+
+    #[test]
+    fn bounds_miss_the_margin() {
+        // Face 0, level 1, u-v bound [−1, 0]²; the point is u = v = ε beyond the corner (0, 0).
+        let c = Cell::from_cell_id(CellId(0x0400_0000_0000_0000));
+        let p = Point(Vector {
+            x: 1.0,
+            y: f64::EPSILON,
+            z: f64::EPSILON,
+        });
+        assert!(c.contains_point(p));
+        assert!(!c.cap_bound().contains_point(p));
+        // An edge midpoint moved out by ε.
+        let c = Cell::from_cell_id(CellId(0x4340_0000_0000_0000));
+        let p = bits(
+            0xbcad_89d8_9d89_d89e,
+            0x3fd8_9d89_d89d_89d5,
+            0x3fed_89d8_9d89_d89e,
+        );
+        assert!(c.contains_point(p));
+        assert!(!c.rect_bound().contains_point(p));
+    }
+
+    #[test]
+    fn bounds_hold_the_cells_own_corners() {
+        for k in CellVertex::ALL {
+            let c = Cell::from_cell_id(CellId(0x0400_0000_0000_0000));
+            let v = c.vertex(k);
+            assert!(c.cap_bound().contains_point(v) && c.rect_bound().contains_point(v));
+        }
+    }
+}

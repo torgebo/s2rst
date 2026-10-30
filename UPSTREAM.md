@@ -32,6 +32,7 @@ because running it is undefined behaviour or needs a debug build.
 | [U-014](#u-014-s1angle-e5e6e7-outside-the-int32-range) | C++ `S1Angle::e5`/`e6`/`e7`, `S1ChordAngle::e5`/`e6`/`e7` | outside the `int32` range, release builds return −2147483648 (+∞ and large positive angles come back negative) and debug builds fail a check, also for `S1ChordAngle::Infinity()`, a valid value; ties round to even on x86-64 and away from zero elsewhere | wrong results (angles beyond ±214.7° for E7, the `Infinity()` sentinel) | saturates, ties to even, documented | 007 T061 |
 | [U-015](#u-015-s2capunion-does-not-always-enclose-both-caps) | C++ `S2Cap::Union` | the result does not contain both caps on 337 of 1,089 random and special reference rows, by rounding (one ulp of the radius in the example), though its comment says it "encloses" them | a union used as a bound can miss points of one cap by an ulp | adds the conversion errors to the radius (7 rows of 1,089 still miss), documented as a deviation; `add_cap` for guaranteed containment | 008 T060 |
 | [U-016](#u-016-s2latlngrectgetcapbound-misses-contained-points) | C++ `S2LatLngRect::GetCapBound` | the bounding cap misses points the rectangle contains, by up to an ulp of π/2 in angle: the north pole as a rectangle misses a point one ulp past the pole, and a cap around the centre a point a few ulps inside a vertex; 10,507,883 of 74,647,924 adversarial contained points, 114 of the survey's 129,595 | a bound used by the coverer and the `Region` contract misses points near the rectangle's boundary | widened by 10⁻¹⁵ rad and 8ε of the length², a documented deviation | 010 T014 |
+| [U-017](#u-017-s2cell-bounds-miss-points-of-containss-margin) | C++ `S2Cell::GetCapBound`, `GetRectBound` with `Contains(const S2Point&)` | `Contains(p)` accepts points up to `(5/3)·DBL_EPSILON` outside the cell in u-v (issue #463), and the two bounds cover the cell alone: 118,093 and 36,315 of 1,008,724 contained adversarial points lie outside the cap and the rectangle bound | the `Region` contract's "the bounds contain the region" fails at the cell's margin; a covering built from a cell's bounds can miss a point the cell contains | kept, a documented exception (the maintainer's choice, spec 012 FR-016); the bounds contain the cell's own points | 012 T005 |
 
 ## U-001: `S2CellId::level()` on id 0
 
@@ -489,6 +490,42 @@ S2Cap pole_cap(S2Point(0, 0, pole_z),
   deviation rows. Candidate, not reported.
 - **Follow-up:** `specs/010-formal-verify-latlng/tasks.md` T014; the spec-010 part of
   `verify/values/EVALUATION.md` ("Upstream findings").
+
+## U-017: `S2Cell` bounds miss points of `Contains`'s margin
+
+[`s2cell.cc:291–320`](https://github.com/google/s2geometry/blob/37a4501d5daea8da8bb2aa159b23ea5c61083a72/src/s2/s2cell.cc#L291-L320)
+(`Contains(const S2Point&)`), with `GetCapBound` and `GetRectBound` in the same file and the
+`S2Region` contract in `s2region.h` ("Returns a bounding spherical cap that contains the region").
+
+```cpp
+  // Expand the (u,v) bound to ensure that
+  //   S2Cell(S2CellId(p)).Contains(p)
+  // is always true. ...
+  return uv_.Expanded((5/3.) * DBL_EPSILON).Contains(uv);
+```
+
+- **Why.** The margin makes a point's own leaf cell contain it, but the bounds were not grown to
+  match: `GetCapBound` adds the four vertices with `AddPoint` (no margin), `GetRectBound` grows
+  the vertices' latitudes and longitudes by `2·DBL_EPSILON` radians. A point just outside the cell
+  in u-v, within the margin, is contained and can lie outside either bound.
+- **Inputs** (`specs/012-formal-verify-cell-bounds-adaptors/probe/`, observed, Release,
+  x86-64, the library alike):
+  - the level-1 cell `0400000000000000` (face 0, u-v bound [−1, 0]²) and the point
+    `(1, 2⁻⁵², 2⁻⁵²)` (u = v = `DBL_EPSILON`, beyond the corner (0, 0)): contained, outside the cap
+    bound;
+  - the cell `4340000000000000` and the point with bits `(bcad89d89d89d89e, 3fd89d89d89d89d5,
+    3fed89d89d89d89e)`, an edge midpoint moved out by `DBL_EPSILON`: contained, outside the
+    rectangle bound.
+- **How often.** The survey (20,000 random cells of every level, each with its corners and edge
+  midpoints moved outward by 0 to 2 `DBL_EPSILON` in u-v, and 4 interior points): of 1,008,724
+  contained points, 118,093 outside the cap bound and 36,315 outside the rectangle bound, every
+  one beyond the cell's u-v bound; the 240,000 points on or inside it all lie in both bounds.
+- **s2rst:** keeps upstream's bounds (the maintainer's choice, 2026-10-30): `Cell::contains_point`,
+  `cap_bound` and `rect_bound` document that the bounds hold the cell's own points but not every
+  point of the margin, and `CORE_TRAITS.md` names the exception. `cell_tests::bounds_miss_the_margin`
+  pins both inputs. Candidate, not reported.
+- **Follow-up:** `specs/012-formal-verify-cell-bounds-adaptors/tasks.md` T005; the spec-012 part
+  of `verify/values/EVALUATION.md`.
 
 ## Upstream behaviours s2rst does not follow
 
