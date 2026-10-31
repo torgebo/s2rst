@@ -1,0 +1,17 @@
+Mutant: M-909
+Targets: P-LLNRM-01
+Expect-Fail: ll_nrm::p_llnrm_01
+Defect: `normalized` clamps the latitude to [−π/2, π]
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -183,7 +183,7 @@
+             return Self::invalid();
+         }
+         LatLng::from_radians(
+-            lat_rad.clamp(-FRAC_PI_2, FRAC_PI_2),
++            lat_rad.clamp(-FRAC_PI_2, PI),
+             crate::s1::remainder_2pi(lng_rad),
+         )
+     }

@@ -671,6 +671,166 @@ those are box values. The real vertices' computation is spec 006's normalisation
   C++'s, and K9's containment counts); the deserialiser (tested, as 004–007's).
 - **Weekly:** listed in `values/PROPERTIES.md` §10.
 
+## `s2::LatLng` and `s2::Rect` as a `Region` (spec 010)
+
+Everything the latitude–longitude proofs and `Rect`'s law instances rely on, in addition to the
+sections above, which apply unchanged. Design: `specs/010-formal-verify-latlng/` (data-model
+§1–§3; research R3, R5, R6). Records: section 12 of `values/INVENTORY.md`, section 11 and
+`Rect`'s rows in section 5 of `values/PROPERTIES.md`, and the spec-010 part of
+`values/EVALUATION.md`.
+
+### Reliance on 004, 005, 007 and 008
+
+| Used | For | Taken from |
+|------|-----|------------|
+| `laws::eq`, `laws::region` | P-LLEQ-01, P-LREG-01, P-LREG-02 | specs 004, 008 |
+| `rect_spec` (validity, membership) and P-LMEM-01, P-LREL-02 | the `Rect` laws' statements and the `Cell::rect_bound` stubs | spec 005 |
+| `Angle`'s constructors and conversions (P-AGCNV-01, P-AGEF-01) | P-LLCON-01 compares with them; P-LLGEO-01's composition | spec 007 |
+| the contracts of `atan2`, `sin`, `cos`, `sin_cos`, `asin` and the abstract cell (`fixed_vertex`) | the conversions, the distance, P-LREG-02 | spec 008, the 2026-10-26 coverage review |
+| gap 2's abstract u-v bound (`any_uv_bound`) | L-LL-01, the `Rect` laws' cells | the 2026-10-27 coverage review |
+
+### Pure contracts and `sqrt`'s contract (research R5)
+
+`pure_sin`, `pure_cos`, `pure_asin`, `pure_atan2`, `pure_sin_cos` and `pure_sqrt` return, for an
+input they have seen, the value they returned, and otherwise a value the existing contract (and
+`sqrt_contract`) allows. A restatement that calls the function again (P-LLFP-01, P-LLTP-01,
+P-LLDST-01, P-LMEM-03) then gets the library's value.
+
+- **What it trusts:** the contracts, as above (`tests/libm_contracts.rs`, now with `sqrt`), and
+  that the C library's functions are deterministic, one value per input, as IEEE-754's correctly
+  rounded `sqrt` is by definition. The checker's own `sqrt` is not (memory "CBMC sqrt is
+  nondeterministic"), which is why the restatements stub it.
+- **`sqrt_contract`:** NaN below zero and for NaN, `x` itself at ±0 and +∞, otherwise positive
+  and finite, at most 1 for `x ≤ 1` and at least 1 for `x ≥ 1`.
+
+### The contract on `Cell::rect_bound` (research R6)
+
+`cell_rect_bound_contract` replaces `Cell::rect_bound` in P-LREG-02 by one valid rectangle per
+cell that contains the `LatLng` of each of the cell's four vertices (as `fixed_vertex` and
+`pure_from_point` give them). It is the first contract on a function of the library itself: the
+relation goes through `atan2`'s value in both `Cell::rect_bound` and `from_point`, which no
+contract fixes.
+
+- **What it trusts:** that upstream's conservative bound contains its cell's vertices, which
+  `libm_contracts::cell_rect_bound_satisfies_its_contract` checks with the real functions on
+  every cell to level 5 (8,190) and 10⁶ random cells at every level, and the C++ vectors'
+  `RECT_REGION` rows check indirectly (0 violations of the vertex law in C++ and here).
+- **`any_cell_bound`** (P-LREG-01) rests on a proven lemma instead, L-LL-01 (the bound of every
+  valid cell is valid and non-empty, under `atan2_contract`); **`pure_from_point`** on P-LLFP-02
+  (a point without NaN has a valid `LatLng`) and purity.
+
+### IEEE `fmod` (research R3)
+
+`LatLng::normalized` and `Angle::normalized` reduce through `s1::angle::remainder_2pi`: `x % 2π`,
+then a correction step. The correction step is proven (P-LLNRM-03, on a drift-guarded copy);
+that Rust's `%` on `f64` is IEEE-754's exact `fmod` (the sign of `x`, `|r| < |y|`, no rounding)
+is trusted, since Kani's model of `%` is wrong (`KANI_ISSUES.md`). P-LLNRM-02, -04 and -05 are
+compositions over it. `latlng_tests::prop_normalized_is_the_exact_remainder` and
+`angle_tests::prop_shared_remainder_is_exact` check the whole against the exact `num-bigint`
+remainder at every binade, and the `LATLNG_NORM` rows against C++.
+
+### Bounds and gaps
+
+- **Not proven:** P-LLDST-04 (the distance's symmetry within a tolerance needs the functions'
+  values); P-LREG-03 (the bounding cap: it needs `atan2`'s and `sin_cos`'s values; tested
+  natively, by the quickcheck twin and by the `RECT_CAPBOUND` rows); P-LREG-04 (the covering:
+  `asin`'s value, as P-CPREG-04); the deserialiser (tested).
+- **Outside the checker:** the four `geo-types` conversions (by composition from `Angle`'s
+  entries; the verification crate does not enable the feature) and the text output.
+
+## `PointRegion` and `CellUnion`'s floating-point methods (spec 011)
+
+Everything the point-region proofs and `CellUnion`'s floating-point proofs rely on, in addition
+to the sections above, which apply unchanged. Design:
+`specs/011-formal-verify-point-region-cell-union/` (data-model §1–§3; research R0, R5, R6).
+Records: section 13 of `values/INVENTORY.md`, section 12 of `values/PROPERTIES.md`, the nine
+floating-point rows of `cell_union/INVENTORY.md` and the spec-011 entries of
+`cell_union/PROPERTIES.md`, and the spec-011 part of `values/EVALUATION.md`.
+
+### Reliance on 002, 004, 008 and 010
+
+| Used | For | Taken from |
+|------|-----|------------|
+| `union_domain` (valid unions of exact length), `union_spec`, P-UMEM-01 to -05 | every `uf_*` harness; P-UPT-01's composition | spec 002 |
+| `laws::eq`, `laws::region` (and the two laws added here) | P-PREQ-01, P-PRREG-*, P-UREG-01 | specs 004, 008, 011 |
+| P-CPGRO-02 (`add_cap` contains its argument), `pure_chord`, `pure_add`, P-CPBND-02 (the metric's level) | P-UBND-02's composition and L-PR-02; P-UEXP-01 | spec 008 |
+| `pure_from_point` (P-LLFP-02), `any_cell_bound` (L-LL-01), `sqrt_contract`, `atan2_contract`, `asin_contract` | P-PRBND-02, P-PRREG-05, P-UBND-01, the crash proofs | specs 008, 010 |
+| the abstract u-v bound (`any_uv_bound`) and `Cell`'s float crash proofs (`c_fg_*`) | every harness with a cell; the crash compositions | the 2026-10-26 coverage review |
+
+### Contracts and stubs on library functions (research R5)
+
+- **`pure_leaf`** replaces `CellId::from_point` by one valid leaf per point. It rests on L-PR-01
+  (`cl_crash::c_fg_from_point` asserts the leaf is valid, weekly, over its box-point domain) and on
+  `libm_contracts::cell_id_from_point_returns_a_valid_leaf` (every special triple and 10⁶ random
+  ones: wherever the function returns, the leaf is valid, and it panics only where its
+  documentation says, spec 011 K4). Purity: the library's `from_point` is a function of its
+  argument; the checker's projection takes a square root, which is not (KI-007).
+- **`pure_cell_cap`** (any non-empty cap per cell, its centre in the unit box, its squared radius
+  in [0, 4]) and **`any_center`** (any box point for `CellId::to_point`) rest on
+  `libm_contracts::cell_cap_bound_satisfies_its_contract` (every cell to level 5 and 10⁶ random
+  cells), and on the crash proofs of the functions they replace.
+- **`pure_cell_area`**, **`pure_avg_area`** and **`pure_cell_contains`** are uninterpreted: any
+  value (finite and non-negative, positive, any answer), one per input. A statement proven with
+  them holds for every function of the input, the real one among them. `pure_avg_area` is needed
+  because the checker's `powi` is not a function (KI-013); the real `average_area_for_level` is
+  pinned to upstream's `ldexp` by enumerating its 31 levels (`tests/area_enumeration.rs`).
+- **`sqrt_between`** is `sqrt_contract` with the root between `x` and 1, true of the correctly
+  rounded root; `libm_contracts::sqrt` checks the clause. Spec 011's R0 found that
+  `sqrt_contract` alone lets the root of `1 + u² + v²` be 10³⁰⁰, which no real root is.
+
+### The drift guards (research R4)
+
+`region_spec_tests` pins the library's text of `CellUnion::cap_bound`, `rect_bound`, both
+`cell_union_bound`s, the two area sums and `expand_by_radius`'s level arithmetic, each against a
+listing whose comments name upstream's lines. P-UBND-04 and P-UEXP-01 rest on the listings being
+upstream's, which a reviewer checks when a guard fails, and on the `CELLUNION_*` C++ vectors.
+
+### Bounds and gaps
+
+- **Size bounds:** `CellUnion` proofs at concrete lengths, at most 3 cells (P-UAREA-01 at 1);
+  P-UBND-02 is by composition for every length.
+- **Not proven:** P-UEXP-02 (`expand_at_level`'s `all_neighbors`, 001 R12); P-UREG-02, -04, -05,
+  -06 (they wait on `Cell`'s own bounding laws and `asin`'s value); the deserialiser (tested).
+  P-UREG-03 is not a law of `CellUnion`.
+- **The checker's NaN check** reports `∞ · 0` before a debug panic, so the panics of K4 that
+  need an infinite coordinate (`Cell::contains_point` off the axis, `CellId::from_point` with two
+  infinities) are shown by native `should_panic` tests and the probe's sweep, not by `n_*`
+  harnesses; their release behaviour is (`r_from_point_infinities`, `r_intersects_cell`).
+
+## `Cell`'s bounding laws and the region adaptors (spec 012)
+
+Design: `specs/012-formal-verify-cell-bounds-adaptors/` (data-model §1–§4; research R0, R4, R5).
+Records: sections 14 and 13 of `values/INVENTORY.md` and `values/PROPERTIES.md`, the `P-CREG`
+rows of `PROPERTIES.md` §1, and the spec-012 part of `values/EVALUATION.md`.
+
+### The abstract region (research R4)
+
+`any_region::AnyRegion` is the adaptors' members: a `Region` whose every answer is any value, one
+per input and region, from `static Mutex` tables of ten slots (`stubs::Table`). It is not a stub
+of library code: it stands for "any implementor". A preservation statement reads each member's
+answers through the methods the adaptor calls, assumes a law of them, and asserts it of the
+adaptor; the tables make the two reads one value. What it trusts: nothing beyond the checker, but a
+statement over more inputs than ten slots per table gets unrecorded answers (more behaviours, so
+never a false proof), which is why member counts stay at 3 (2 for the vertex law).
+
+### The argument for any number of members
+
+The proofs cover up to three members. An adaptor's answers are associative folds (`any`, `all`,
+`Rect::union` from the empty rectangle, `Rect::intersection` from the full one), and each law is a
+statement about one member's answers, so a law for `n + 1` members follows by induction from the
+proofs at 1 and 2 members and spec 005's P-LSET-01 and P-LSET-02. Written in `ad_reg.rs`.
+
+### Bounds and gaps
+
+- **Not proven:** `Cell`'s bounding laws for its own points (P-CREG-01: timeouts; P-CREG-02: it
+  needs `atan2`'s monotonicity); the adaptors' bounding-cap and covering laws (P-ADREG-04, -05:
+  they need `Rect`'s and `Cap`'s laws). Tested: the survey's 240,000 own points, the C++ rows,
+  the twins.
+- **U-017:** `Cell::contains_point`'s margin is outside `Cell`'s bounds, upstream's behaviour kept
+  and documented; the laws are stated for the cell's own points.
+- **Under the range contracts** the full rectangle's cap bound is not fixed to the full cap
+  (P-ADBND-03's cap half is a native test).
+
 ## The documented panics (2026-10-26)
 
 The `n_*`, `r_*` and `o_*` harnesses of the crash modules (inventories: 001 section 3,

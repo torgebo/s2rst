@@ -1,0 +1,18 @@
+Mutant: M-968
+Targets: P-PRDES-01
+Expect-Fail: 
+Test: core --features serde --lib s2::point_region::point_region_tests
+Defect: FR-019 reverted: the deserialiser accepts any point (K3)
+
+diff --git a/core/src/s2/point_region.rs b/core/src/s2/point_region.rs
+--- a/core/src/s2/point_region.rs
++++ b/core/src/s2/point_region.rs
+@@ -59,7 +59,7 @@
+         }
+ 
+         let f = Fields::deserialize(deserializer)?;
+-        if !f.point.is_unit() {
++        if false {
+             return Err(D::Error::custom("point region's point is not unit length"));
+         }
+         Ok(PointRegion { point: f.point })

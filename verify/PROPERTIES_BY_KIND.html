@@ -14,8 +14,10 @@ href="values/PROPERTIES.md"><code>values/PROPERTIES.md</code></a> (the
 value types: <code>Cell</code>, <code>s1::Interval</code>,
 <code>r1::Interval</code>, <code>s2::Rect</code>, <code>r2::Rect</code>,
 <code>s2::Point</code>, <code>s1::ChordAngle</code>,
-<code>s1::Angle</code> and <code>s2::Cap</code>). The operation
-inventories carry the crash-freedom proofs.</p>
+<code>s1::Angle</code>, <code>s2::Cap</code>, <code>s2::LatLng</code>,
+<code>PointRegion</code>, <code>RegionUnion</code> and
+<code>RegionIntersection</code>). The operation inventories carry the
+crash-freedom proofs.</p>
 <table>
 <colgroup>
 <col style="width: 16%" />
@@ -39,7 +41,7 @@ undefined behaviour or a hang, whatever its input</td>
 <tr class="even">
 <td><a href="#correct-result">Correct result</a></td>
 <td>an operation returns what the model says it should</td>
-<td>146</td>
+<td>181</td>
 </tr>
 <tr class="odd">
 <td><a href="#round-trip">Round trip</a></td>
@@ -50,7 +52,7 @@ undefined behaviour or a hang, whatever its input</td>
 <td><a href="#exact-output">Exact output</a></td>
 <td>an encoder or printer writes exactly the bytes or text the format
 prescribes</td>
-<td>22</td>
+<td>28</td>
 </tr>
 <tr class="odd">
 <td><a href="#exact-input">Exact input</a></td>
@@ -61,13 +63,13 @@ what they say, consumes exactly them and rejects the rest</td>
 <tr class="even">
 <td><a href="#validity">Validity</a></td>
 <td>a validity check answers exactly, and results are well formed</td>
-<td>14</td>
+<td>16</td>
 </tr>
 <tr class="odd">
 <td><a href="#laws">Laws</a></td>
 <td>operations relate to each other as they must: symmetry, idempotence,
 order independence, partition, consistency</td>
-<td>39</td>
+<td>68</td>
 </tr>
 <tr class="even">
 <td><a href="#model-checks">Model checks</a></td>
@@ -164,9 +166,14 @@ harnesses</td>
 </tr>
 <tr class="even">
 <td><code>CellUnion</code></td>
-<td>all 27 in-scope operations, within each one’s union-size bound</td>
-<td><code>cu_crash::c_*</code>, and the property harnesses the inventory
-names</td>
+<td>all 33 in-scope operations, within each one’s union-size bound: the
+27 of spec 002, and since spec 011 six floating-point ones (the point
+tests, the average-based and approximate areas, the cap and rectangle
+bounds), given the crash proofs of the <code>Cell</code> functions they
+call; <code>exact_area</code>, <code>cell_union_bound</code> and
+<code>expand_by_radius</code> inherit a tool limit</td>
+<td><code>cu_crash::c_*</code>, <code>uf_crash::c_*</code>, and the
+property harnesses the inventory names</td>
 <td><a
 href="cell_union/INVENTORY.md"><code>cell_union/INVENTORY.md</code></a></td>
 </tr>
@@ -295,6 +302,53 @@ limits</td>
 <td><a
 href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a></td>
 </tr>
+<tr class="odd">
+<td><code>s2::LatLng</code></td>
+<td>30 of the 31 in-scope operations (<code>to_string_in_degrees</code>’
+formatting and <code>Display</code> out): the 26 Kani entries over every
+pair of <code>f64</code> (NaN and the infinities included) but where an
+operation makes a new NaN (<code>∞ − ∞</code>, <code>0 · ∞</code>),
+<code>get_distance</code> over valid pairs (its documented domain) and,
+outside it, every pair without an infinity; the conversions and the
+distance under the contracts of <code>atan2</code>,
+<code>sin_cos</code>, <code>sin</code>, <code>cos</code>,
+<code>asin</code> (and <code>sqrt</code> outside the distance’s domain);
+the four <code>geo-types</code> conversions by composition</td>
+<td><code>ll_crash::c_*</code>,
+<code>ll_crash::o_get_distance</code></td>
+<td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
+section 12</td>
+</tr>
+<tr class="even">
+<td><code>PointRegion</code></td>
+<td>all 10 Kani entries (spec 011): <code>new</code>,
+<code>point</code>, the six <code>Region</code> methods and
+<code>PartialEq</code> over every triple of <code>f64</code>, but
+<code>rect_bound</code> over the triples without NaN and
+<code>intersects_cell</code> over the box
+(<code>Cell::contains_point</code>’s domain), whose debug panics are
+proven exact; <code>rect_bound</code> under <code>atan2</code>’s
+contract, <code>cell_union_bound</code> under
+<code>CellId::from_point</code>’s (weekly); <code>Deserialize</code>
+tested</td>
+<td><code>pr_crash::c_*</code>, <code>pr_crash::n_*</code>,
+<code>pr_crash::r_*</code></td>
+<td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
+section 13</td>
+</tr>
+<tr class="odd">
+<td><code>RegionUnion</code>, <code>RegionIntersection</code></td>
+<td>all 16 in-scope entries (spec 012), over abstract members (any
+answers, so any members whose methods do not panic): the API and the
+tests for up to 3 members, the bounds for up to 2 (under
+<code>atan2</code>’s and <code>asin</code>’s contracts, weekly from one
+member); <code>cell_union_bound</code> inherits <code>Cap</code>’s tool
+limit; <code>region(i)</code> panics exactly past the end</td>
+<td><code>ad_crash::c_*</code>,
+<code>ad_crash::n_region_past_end</code></td>
+<td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
+section 14</td>
+</tr>
 </tbody>
 </table>
 <p>Two catalogue entries are crash-freedom statements in their own
@@ -412,6 +466,26 @@ NaN margin on full longitudes, the empty cap expanded by +∞)</td>
 section 10</td>
 </tr>
 <tr class="odd">
+<td>Regions (spec 011)</td>
+<td>the debug-build checks upstream’s <code>DCHECK</code>s share, found
+by spec 011’s probe: <code>PointRegion::rect_bound</code> for a NaN
+<code>x</code> or <code>y</code>;
+<code>PointRegion::intersects_cell</code>
+(<code>Cell::contains_point</code>) for a NaN on the face’s axis, or on
+its side with another coordinate NaN;
+<code>CellUnion::expand_by_radius</code> for a NaN radius. Release
+builds return there. The cases that need an infinite coordinate
+(<code>Cell::contains_point</code>, <code>CellId::from_point</code> with
+two infinities) are tested natively: the checker reports
+<code>∞ · 0</code> first</td>
+<td><code>pr_crash::n_*</code>, <code>pr_crash::r_*</code>,
+<code>uf_exp::n_expand_by_radius_nan</code>,
+<code>cl_crash::r_from_point_infinities</code></td>
+<td><a href="values/INVENTORY.md"><code>values/INVENTORY.md</code></a>
+section 13; <a
+href="cell_union/INVENTORY.md"><code>cell_union/INVENTORY.md</code></a></td>
+</tr>
+<tr class="even">
 <td>Bounded types (spec 009)</td>
 <td>each constructor accepts exactly its range: <code>Level</code>
 (0..=30), <code>Face</code> (0..=5), <code>LevelMod</code> (1..=3),
@@ -1392,6 +1466,14 @@ the rectangle itself.</td>
 <td><a href="src/rl_eq.rs"><code>rl_eq::p_leq_02</code></a></td>
 <td>every valid rectangle</td>
 </tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LMEM-03</a></td>
+<td>The rectangle’s point test is <code>contains_lat_lng</code> of the
+point’s <code>LatLng</code>, which is valid for every point without NaN,
+so P-LMEM-01 describes it.</td>
+<td><a href="src/ll_reg.rs"><code>ll_reg::p_lmem_03</code></a></td>
+<td>every valid rectangle and triple, by composition (P-LLFP-02)</td>
+</tr>
 </tbody>
 </table>
 <h3
@@ -1883,6 +1965,336 @@ the tolerance for the centres too.</td>
 </tr>
 </tbody>
 </table>
+<h3
+id="s2latlng-construction-conversions-normalisation-validity-distance-and-approximate-equality"><code>s2::LatLng</code>:
+construction, conversions, normalisation, validity, distance and
+approximate equality</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLCON-01</a></td>
+<td><code>new</code> and <code>from_radians</code> keep their arguments;
+the other constructors are the pairs of <code>Angle</code>’s;
+<code>invalid()</code> and the default are upstream’s.</td>
+<td><a href="src/ll_con.rs"><code>ll_con::p_llcon_01</code></a></td>
+<td>every <code>f64</code>, <code>i32</code> and <code>u32</code> pair,
+by composition (<code>Angle</code>’s constructors uninterpreted)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLTP-02</a></td>
+<td>For finite coordinates <code>to_point</code> gives finite
+coordinates in [−1, 1]; a non-finite coordinate gives NaN where it
+reaches.</td>
+<td><a href="src/ll_tp.rs"><code>ll_tp::p_lltp_02</code></a></td>
+<td>every pair of <code>f64</code>, under the <code>sin_cos</code>
+contract</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLNRM-01</a></td>
+<td><code>normalized</code> clamps the latitude as upstream does, and
+gives <code>invalid()</code> for a non-finite input.</td>
+<td><a href="src/ll_nrm.rs"><code>ll_nrm::p_llnrm_01</code></a></td>
+<td>every pair of <code>f64</code></td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLVAL-01</a></td>
+<td><code>is_valid</code> is upstream’s predicate; the default is
+valid.</td>
+<td><a href="src/ll_val.rs"><code>ll_val::p_llval_01</code></a></td>
+<td>every pair of <code>f64</code></td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDST-02</a></td>
+<td>The distance between valid <code>LatLng</code>s is a number in [0,
+π].</td>
+<td><a href="src/ll_dst.rs"><code>ll_dst::p_lldst_02</code></a></td>
+<td>every valid pair, under the contracts</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLDST-03</a></td>
+<td>The distance from a valid <code>LatLng</code> to itself is +0.</td>
+<td><a href="src/ll_dst.rs"><code>ll_dst::p_lldst_03</code></a></td>
+<td>every valid <code>LatLng</code>, under the contracts</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLAPX-01</a></td>
+<td>Approximate equality is upstream’s: both coordinates within the
+margin, inclusively; the default margin is 10⁻¹⁵.</td>
+<td><a href="src/ll_apx.rs"><code>ll_apx::p_llapx_01</code></a>
+(weekly)</td>
+<td>every two pairs without <code>∞ − ∞</code>, every margin</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLGEO-01</a></td>
+<td>The <code>geo-types</code> conversions are degrees, x the longitude
+and y the latitude.</td>
+<td>—</td>
+<td>every pair, by composition from <code>Angle</code>’s conversions
+(the crate does not build <code>geo-types</code> for the checker)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDES-01</a></td>
+<td>Deserialisation accepts every pair and round-trips.</td>
+<td>—</td>
+<td>not proven: tested (<code>latlng_tests</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="pointregion-construction-bounds-and-the-cell-and-point-tests"><code>PointRegion</code>:
+construction, bounds, and the cell and point tests</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRCON-01</a></td>
+<td>The region keeps the point it was given, bit for bit.</td>
+<td><a href="src/pr_con.rs"><code>pr_con::p_prcon_01</code></a></td>
+<td>every triple</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRBND-01</a></td>
+<td>The bounding cap is the point’s zero-radius cap.</td>
+<td><a href="src/pr_bnd.rs"><code>pr_bnd::p_prbnd_01</code></a></td>
+<td>every triple</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRBND-02</a></td>
+<td>The bounding rectangle is the point’s single <code>LatLng</code>, a
+valid rectangle.</td>
+<td><a href="src/pr_bnd.rs"><code>pr_bnd::p_prbnd_02</code></a></td>
+<td>every triple without NaN, under <code>from_point</code>’s proven
+validity</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRBND-03</a></td>
+<td>The covering is three or four level-29 cells, one of them the
+point’s leaf’s ancestor.</td>
+<td><a href="src/pr_bnd.rs"><code>pr_bnd::p_prbnd_03</code></a>
+(weekly)</td>
+<td>every triple, under the <code>from_point</code> and
+<code>asin</code> contracts</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRCEL-01</a></td>
+<td>The region contains no cell.</td>
+<td><a href="src/pr_cel.rs"><code>pr_cel::p_prcel_01</code></a></td>
+<td>every triple and valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRCEL-02</a></td>
+<td>The region intersects a cell exactly when the cell contains its
+point.</td>
+<td><a href="src/pr_cel.rs"><code>pr_cel::p_prcel_02</code></a></td>
+<td>every triple and valid cell (the cell’s test uninterpreted)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRCEL-03</a></td>
+<td>The region contains exactly the points equal to its own as
+numbers.</td>
+<td><a href="src/pr_cel.rs"><code>pr_cel::p_prcel_03</code></a></td>
+<td>every pair of triples</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRDES-01</a></td>
+<td>Deserialisation rejects a point that is not unit length.</td>
+<td>—</td>
+<td>not proven: tested (<code>point_region_tests</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="cellunion-floating-point-methods-spec-011"><code>CellUnion</code>:
+floating-point methods (spec 011)</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UPT-01</a></td>
+<td>A union contains a point exactly when it contains the point’s leaf
+cell.</td>
+<td><a href="src/uf_pt.rs"><code>uf_pt::p_upt_01__n*</code></a></td>
+<td>valid unions of up to 3 cells, under the <code>from_point</code>
+contract</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UBND-01</a></td>
+<td>The rectangle bound contains each cell’s rectangle bound.</td>
+<td><a href="src/uf_bnd.rs"><code>uf_bnd::p_ubnd_01__n*</code></a> (2
+and 3 cells weekly)</td>
+<td>valid unions of up to 3 cells</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UBND-02</a></td>
+<td>The cap bound contains each cell’s cap bound.</td>
+<td><a href="src/uf_bnd.rs"><code>uf_bnd::l_pr_02</code></a>, <a
+href="src/uf_bnd.rs"><code>uf_bnd::p_ubnd_02__n1</code></a>
+(weekly)</td>
+<td>every valid union, by composition (spec 008’s P-CPGRO-02 and
+L-PR-02)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UBND-03</a></td>
+<td>The empty union’s bounds are empty.</td>
+<td><a href="src/uf_bnd.rs"><code>uf_bnd::p_ubnd_03</code></a></td>
+<td>the empty union</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UBND-04</a></td>
+<td>The bounds are upstream’s constructions.</td>
+<td>—</td>
+<td>every valid union, by composition (drift guards on the source; the
+C++ rows check the values)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UAREA-01</a></td>
+<td>The average-based area is the leaf area times the leaf count.</td>
+<td><a
+href="src/uf_area.rs"><code>uf_area::p_uarea_01__n1</code></a></td>
+<td>valid one-cell unions</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UAREA-02</a></td>
+<td>The approximate area is the cells’ sum in order from +0.</td>
+<td><a href="src/uf_area.rs"><code>uf_area::p_uarea_02__n*</code></a> (2
+and 3 cells weekly)</td>
+<td>valid unions of up to 3 cells</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UAREA-03</a></td>
+<td>The exact area is the cells’ sum in order from +0.</td>
+<td><a href="src/uf_area.rs"><code>uf_area::p_uarea_03__n*</code></a> (2
+and 3 cells weekly)</td>
+<td>valid unions of up to 3 cells</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UAREA-04</a></td>
+<td>A cell’s average area is upstream’s at every level.</td>
+<td>—</td>
+<td>every level, by enumeration
+(<code>tests/area_enumeration.rs</code>)</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UEXP-01</a></td>
+<td><code>expand_by_radius</code> expands at upstream’s level.</td>
+<td>—</td>
+<td>every radius and difference, by composition (spec 008’s P-CPBND-02
+and a drift guard)</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UEXP-02</a></td>
+<td>Expanding keeps the original union.</td>
+<td>—</td>
+<td>not proven: a tool limit (<code>all_neighbors</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="regionunion-regionintersection-the-adaptors-spec-012"><code>RegionUnion</code>,
+<code>RegionIntersection</code>: the adaptors (spec 012)</h3>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 43%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>What is guaranteed</th>
+<th>Proved by</th>
+<th>Holds for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ADCON-01</a></td>
+<td>The adaptors keep their members in order; <code>add</code>
+appends.</td>
+<td><a href="src/ad_mean.rs"><code>ad_mean::p_adcon_01</code></a></td>
+<td>three abstract members</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ADBND-01</a></td>
+<td>The union’s rectangle contains each member’s; the intersection’s
+holds every point all members’ hold.</td>
+<td><a href="src/ad_mean.rs"><code>ad_mean::p_adbnd_01__n*</code></a> (3
+members weekly)</td>
+<td>up to 3 abstract members</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ADBND-02</a></td>
+<td>The cap bound is the rectangle’s cap bound, the covering the
+cap’s.</td>
+<td>—</td>
+<td>every adaptor, by composition (a drift guard on the source; the C++
+rows)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ADBND-03</a></td>
+<td>The empty union’s bounds are empty, the empty intersection’s
+rectangle full.</td>
+<td><a href="src/ad_mean.rs"><code>ad_mean::p_adbnd_03</code></a></td>
+<td>the empty adaptors</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ADTST-01</a></td>
+<td>A union contains (intersects) what some member does; an intersection
+what every member does.</td>
+<td><a
+href="src/ad_mean.rs"><code>ad_mean::p_adtst_01__n*</code></a></td>
+<td>up to 3 abstract members, any number by the fold</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CREG-04</a></td>
+<td>A cell’s bounds can miss points of <code>contains_point</code>’s
+margin, as upstream’s (U-017).</td>
+<td>—</td>
+<td>not proven: an exception, tested (<code>cell_tests</code>)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="round-trip">Round trip</h2>
 <p>Converting a value one way and back gives the original value,
 consuming exactly what was written. For the vector codecs Kani proves it
@@ -2228,6 +2640,59 @@ exactly 0 or ±2π and lands in [−π, π].</td>
 <td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_05</code></a></td>
 <td>every |x| ≤ 3π/2 (a drift-guarded copy)</td>
 </tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLFP-01</a></td>
+<td><code>latitude</code> and <code>longitude</code> are upstream’s
+formulas, <code>+ 0.0</code> included; <code>from_point</code> is the
+pair.</td>
+<td><a href="src/ll_fp.rs"><code>ll_fp::p_llfp_01</code></a>; the drift
+guard <code>latlng_spec_tests</code></td>
+<td>every triple: the longitude under the <code>atan2</code> contract,
+the latitude by composition (the guard)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLTP-01</a></td>
+<td><code>to_point</code> is upstream’s formula.</td>
+<td><a href="src/ll_tp.rs"><code>ll_tp::p_lltp_01</code></a>; the drift
+guard <code>latlng_spec_tests</code></td>
+<td>every pair: <code>z</code> under the <code>sin_cos</code> contract,
+the products by composition (the guard)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLNRM-02</a></td>
+<td><code>normalized</code>’s longitude is upstream’s
+<code>remainder(lng, 2π)</code>, exactly: ties to even, a zero’s sign
+kept.</td>
+<td>—</td>
+<td>every finite input, by composition (P-LLNRM-03 and IEEE
+<code>fmod</code>); tested against the exact remainder</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLNRM-03</a></td>
+<td>The reduction’s correction step lands in [−π, π], moves its input by
+exactly 0 or ±2π, and breaks ties by the quotient’s parity.</td>
+<td><a href="src/ll_nrm.rs"><code>ll_nrm::p_llnrm_03</code></a></td>
+<td>every <code>|r| &lt; 2π</code>, on a drift-guarded copy</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDST-01</a></td>
+<td><code>get_distance</code> is upstream’s haversine, with the clamp
+before the root.</td>
+<td>the drift guard <code>latlng_spec_tests</code>, with the lemma
+L-LL-02 (<code>ll_lem::l_ll_02</code>)</td>
+<td>every pair without <code>∞ − ∞</code>, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLARI-01</a></td>
+<td><code>+</code>, <code>−</code> and the scalings act on each
+coordinate, as upstream’s; <code>k * ll</code> is
+<code>ll * k</code>.</td>
+<td><a href="src/ll_ari.rs"><code>ll_ari::p_llari_01__add</code></a>, <a
+href="src/ll_ari.rs"><code>ll_ari::p_llari_01__sub</code></a>; the drift
+guard <code>latlng_spec_tests</code></td>
+<td>every pair without <code>∞ − ∞</code>; the scalings by
+composition</td>
+</tr>
 </tbody>
 </table>
 <h2 id="exact-input">Exact input</h2>
@@ -2514,6 +2979,21 @@ cap.</td>
 <td><a href="src/cp_bnd.rs"><code>cp_bnd::p_cpbnd_04</code></a></td>
 <td>every box cap, under the <code>asin</code>, <code>atan2</code>,
 <code>cos</code> contracts</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLFP-02</a></td>
+<td><code>from_point</code> gives a valid <code>LatLng</code> exactly
+for the points without a NaN coordinate, the zero vector and the
+infinities included.</td>
+<td><a href="src/ll_fp.rs"><code>ll_fp::p_llfp_02</code></a></td>
+<td>every triple, under the <code>atan2</code> contract</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLNRM-04</a></td>
+<td><code>normalized</code> returns a valid <code>LatLng</code> for
+every finite input.</td>
+<td>—</td>
+<td>every finite pair, by composition (P-LLNRM-01, -02)</td>
 </tr>
 </tbody>
 </table>
@@ -2842,6 +3322,215 @@ not its range</td>
 equality.</td>
 <td><a href="src/cp_eq.rs"><code>cp_eq::p_cpcod_01</code></a></td>
 <td>every valid cap, by composition</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLNRM-05</a></td>
+<td><code>normalized</code> leaves a valid <code>LatLng</code>
+unchanged, bit for bit.</td>
+<td>—</td>
+<td>every valid pair, by composition</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLDST-04</a></td>
+<td>The distance is symmetric within 10⁻¹⁴ rad.</td>
+<td>—</td>
+<td>not proven: it needs the functions’ values (the formula is not
+symmetric bit for bit, upstream’s neither)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LLAPX-02</a></td>
+<td>Approximate equality is symmetric, and reflexive for finite
+coordinates and a non-negative margin.</td>
+<td><a href="src/ll_apx.rs"><code>ll_apx::p_llapx_02</code></a>
+(weekly)</td>
+<td>every two pairs without <code>∞ − ∞</code>, every margin</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LLEQ-01</a></td>
+<td><code>==</code> compares the coordinates, and is an equivalence
+without NaN.</td>
+<td><a href="src/ll_eq.rs"><code>ll_eq::p_lleq_01</code></a></td>
+<td>every three pairs</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LREG-01</a></td>
+<td>The generic <code>Region</code> law holds for <code>Rect</code>:
+containing a cell implies intersecting it.</td>
+<td><a href="src/ll_reg.rs"><code>ll_reg::p_lreg_01</code></a></td>
+<td>every valid rectangle and cell, under contract (L-LL-01)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LREG-02</a></td>
+<td>A cell the rectangle does not intersect has no vertex the rectangle
+contains.</td>
+<td><a href="src/ll_reg.rs"><code>ll_reg::p_lreg_02</code></a></td>
+<td>every valid rectangle and abstract cell, under the
+<code>Cell::rect_bound</code> contract</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-LREG-03</a></td>
+<td>The rectangle’s bounding cap contains every point the rectangle
+contains (after FR-019’s widening).</td>
+<td>—</td>
+<td>not proven: it needs <code>atan2</code>’s and <code>sin_cos</code>’s
+values; tested natively, by the quickcheck twin and the C++ rows</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-LREG-04</a></td>
+<td>Every cell the rectangle contains lies in its covering.</td>
+<td>—</td>
+<td>not proven: the covering’s level needs <code>asin</code>’s value, as
+P-CPREG-04</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PREQ-01</a></td>
+<td>Two point regions are equal exactly when their points are, and
+equality is an equivalence.</td>
+<td><a href="src/pr_eq.rs"><code>pr_eq::p_preq_01</code></a></td>
+<td>every three triples without NaN</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRREG-01</a></td>
+<td>The generic <code>Region</code> law holds for
+<code>PointRegion</code>: containing a cell implies intersecting
+it.</td>
+<td><a href="src/pr_reg.rs"><code>pr_reg::p_prreg_01</code></a></td>
+<td>every box point and valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRREG-02</a></td>
+<td>Every cell the point region contains lies in its covering.</td>
+<td>—</td>
+<td>every point, by composition (it contains no cell)</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRREG-03</a></td>
+<td>A cell the point region does not intersect has no vertex equal to
+its point: a cell contains its own vertices.</td>
+<td>—</td>
+<td>not proven: a tool limit (each face’s harness times out at 60
+minutes); tested (80,000 vertices, C++ and library alike)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRREG-04</a></td>
+<td>The point region’s bounding cap contains every point it
+contains.</td>
+<td><a href="src/pr_reg.rs"><code>pr_reg::p_prreg_04</code></a></td>
+<td>every two box points</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-PRREG-05</a></td>
+<td>The point region’s bounding rectangle contains its point.</td>
+<td><a href="src/pr_reg.rs"><code>pr_reg::p_prreg_05</code></a></td>
+<td>every triple without NaN, under <code>from_point</code>’s proven
+validity</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-PRREG-06</a></td>
+<td>The point region’s covering contains its point’s leaf.</td>
+<td><a href="src/pr_reg.rs"><code>pr_reg::p_prreg_06</code></a>
+(weekly)</td>
+<td>every box point, under the <code>from_point</code> and
+<code>asin</code> contracts</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UREG-01</a></td>
+<td>The generic <code>Region</code> law holds for
+<code>CellUnion</code>: containing a cell implies intersecting it.</td>
+<td><a href="src/uf_reg.rs"><code>uf_reg::p_ureg_01__n*</code></a></td>
+<td>valid unions of up to 3 cells, every valid cell</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UREG-02</a></td>
+<td>Every cell the union contains lies in its covering.</td>
+<td>—</td>
+<td>not proven: the covering’s level needs <code>asin</code>’s value, as
+P-CPREG-04</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UREG-03</a></td>
+<td>The vertex law.</td>
+<td>—</td>
+<td>not a law of <code>CellUnion</code> (by design, upstream too): its
+cell test is by id, its point test by leaf</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UREG-04</a></td>
+<td>The union’s bounding cap contains every point it contains.</td>
+<td>—</td>
+<td>not proven: it waits on <code>Cell</code>’s own bounding-cap law;
+tested</td>
+</tr>
+<tr class="odd">
+<td><a href="cell_union/PROPERTIES.md">P-UREG-05</a></td>
+<td>The union’s bounding rectangle contains every point it
+contains.</td>
+<td>—</td>
+<td>not proven: it waits on <code>Cell</code>’s own rectangle law;
+tested</td>
+</tr>
+<tr class="even">
+<td><a href="cell_union/PROPERTIES.md">P-UREG-06</a></td>
+<td>The union’s covering contains every point it contains.</td>
+<td>—</td>
+<td>not proven: as P-UREG-02</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CREG-01</a></td>
+<td>A cell’s bounding cap contains every point of the cell’s own u-v
+bound.</td>
+<td>—</td>
+<td>not proven: a tool limit (timeouts); tested on 240,000 own points,
+C++ alike</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-CREG-02</a></td>
+<td>A cell’s bounding rectangle contains every point of the cell’s own
+u-v bound.</td>
+<td>—</td>
+<td>not proven: it needs <code>atan2</code>’s monotonicity; tested as
+P-CREG-01</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-CREG-03</a></td>
+<td>A cell’s covering contains every point the cell contains, in the
+closed form.</td>
+<td>—</td>
+<td>every cell, by composition (the covering is the cell’s own id)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ADREG-01</a></td>
+<td>The adaptors preserve “containing a cell implies intersecting
+it”.</td>
+<td><a href="src/ad_reg.rs"><code>ad_reg::p_adreg_01__n*</code></a></td>
+<td>up to 3 abstract members, any number by the argument</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ADREG-02</a></td>
+<td>The adaptors preserve the vertex law.</td>
+<td><a href="src/ad_reg.rs"><code>ad_reg::p_adreg_02__n*</code></a> (2
+members weekly)</td>
+<td>up to 2 abstract members, any number by the argument</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ADREG-03</a></td>
+<td>The adaptors preserve the bounding-rectangle law.</td>
+<td><a href="src/ad_reg.rs"><code>ad_reg::p_adreg_03__n*</code></a> (2
+and 3 members weekly)</td>
+<td>up to 3 abstract members, any number by the argument</td>
+</tr>
+<tr class="odd">
+<td><a href="values/PROPERTIES.md">P-ADREG-04</a></td>
+<td>The adaptors’ bounding cap contains every point they contain.</td>
+<td>—</td>
+<td>not proven: it needs <code>Rect</code>’s bounding-cap law
+(P-LREG-03)</td>
+</tr>
+<tr class="even">
+<td><a href="values/PROPERTIES.md">P-ADREG-05</a></td>
+<td>The adaptors’ covering laws.</td>
+<td>—</td>
+<td>not proven: <code>Cap</code>’s covering law (P-CPREG-04)</td>
 </tr>
 </tbody>
 </table>

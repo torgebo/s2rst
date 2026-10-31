@@ -270,3 +270,79 @@ exists: `cmake --install /home/t/sources/s2geometry/build --prefix /tmp/s2-insta
 
 `Union` differs from the library by design: the library adds an error margin so that the union
 contains both caps (`cap.rs`, a documented deviation); the diff test checks containment there.
+
+## LatLng and rectangle-region oracle (`generate_latlng`)
+
+`generate_latlng` writes
+[`core/tests/data/cpp_latlng_vectors.csv`](../../core/tests/data/cpp_latlng_vectors.csv)
+(3.7 MB), which [`core/tests/cpp_latlng_diff.rs`](../../core/tests/cpp_latlng_diff.rs) diffs
+`s2::LatLng` and `s2::Rect`'s region methods against and
+[`verify/tests/values_spec_vs_cpp.rs`](../../verify/tests/values_spec_vs_cpp.rs) checks
+`verify/src/latlng_spec.rs`'s restatements against (spec 010, FR-021, research R9).
+
+```sh
+cmake --build build --target generate_latlng
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_latlng > ../../core/tests/data/cpp_latlng_vectors.csv
+```
+
+| Section | Rows | Library operations checked | Oracle |
+|---------|------|----------------------------|--------|
+| `LATLNG_CTOR` | 1,884: random and special doubles, random and edge integers | `from_radians`, `from_degrees`, `from_e5`/`e6`/`e7`, `from_unsigned_e6`/`e7`, `invalid`, `Default` | `S2LatLng::FromRadians`, … |
+| `LATLNG_POINT` | 6,014: the special coordinates (±0, subnormals, huge, ±∞, NaN) crossed, random unit points, random points over 600 decades, points near the poles and the antimeridian | `latitude`, `longitude`, `from_point`, `From<Point>` | `Latitude`, `Longitude` |
+| `LATLNG_NORM` | 3,032: the survey's special longitudes, the ties ±π to ±7π, out-of-range and non-finite latitudes, random longitudes at six scales | `normalized` | `Normalized` |
+| `LATLNG_OPS` | 2,759: random valid pairs, close pairs, the survey's out-of-range pairs, the poles | `to_point`, `get_distance`, `approx_eq`, `approx_eq_with`, `+`, `−`, both scalings, `is_valid`, `==` | the same, by name |
+| `LATLNG_STR` | 309 | `to_string_in_degrees` | `ToStringInDegrees` |
+| `RECT_REGION` | 10,000: random rectangles and those of spec 010's R0 families, against cells of levels 0–12 | `Region::contains_cell`, `Region::intersects_cell` | `Contains(S2Cell)`, `MayIntersect` |
+| `RECT_CAPBOUND` | 6,004: R0's worst cases, the empty and full rectangles, 1,000 rectangles with six points on and next to their boundaries each | `cap_bound`, `contains_point` | `GetCapBound`, `Contains(S2Point)` |
+
+`RECT_CAPBOUND`'s radii are the one deviation: the library widens upstream's cap (spec 010
+FR-019, `UPSTREAM.md` U-016); the diff test checks the centre bit for bit and the radius
+against upstream's widened by the documented rule, and pins upstream's misses (993 of the 5,552
+contained points), where the library's bound has none.
+
+## Point-region and cell-union-bounds oracle (`generate_region`)
+
+`generate_region` writes
+[`core/tests/data/cpp_region_vectors.csv`](../../core/tests/data/cpp_region_vectors.csv)
+(3.5 MB), which [`core/tests/cpp_region_diff.rs`](../../core/tests/cpp_region_diff.rs) diffs
+`PointRegion` and `CellUnion`'s floating-point methods against (spec 011, FR-021, research R9).
+
+```sh
+cmake --build build --target generate_region
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_region > ../../core/tests/data/cpp_region_vectors.csv
+```
+
+| Section | Rows | Library operations checked | Oracle |
+|---------|------|----------------------------|--------|
+| `POINTREGION` | 2,211: the axes, (−1, −0, 0), (−0, −0, −1), face boundaries and corners, 200 cell vertices, 2,000 random unit points | `PointRegion::cap_bound`, `rect_bound`, `cell_union_bound` | `GetCapBound`, `GetRectBound`, `GetCellUnionBound` |
+| `POINTREGION_CELL` | 6,000: each point's own cell at a random level and a random cell; each cell's four vertices against the cell | `contains_cell`, `intersects_cell` | `Contains(S2Cell)`, `MayIntersect` |
+| `CELLUNION_BOUND` | 2,014: the empty union, the whole sphere, each face, opposite faces, a polar face with a cell, one leaf, a level-3 cell at the south pole, 2,000 random unions (scattered or clustered, 1 to 8 cells) | `CellUnion`'s `cap_bound`, `rect_bound`, `cell_union_bound` | the same, by name |
+| `CELLUNION_AREA` | 2,014: the same unions | `average_based_area`, `approx_area`, `exact_area` | `AverageBasedArea`, `ApproxArea`, `ExactArea` |
+| `CELLUNION_POINT` | 10,026: random points, and a point inside and a vertex of each cell of 1,000 unions | `contains_point`, `Region::contains_point` | `Contains(S2Point)` |
+| `CELLUNION_EXPAND` | 1,000: small clustered unions, the special radii (0, −1, 2, 4, 10⁻³⁰⁰, ∞, the face widths) and random ones, `max_level_diff` up to 40, at most three levels below the coarsest cell | `expand_by_radius` | `Expand(S1Angle, int)` |
+| `CELL_FACE_RECT` | 6 | `Cell::rect_bound` of the face cells (spec 011 FR-017) | `GetRectBound` |
+
+There is no deviation: every row matches bit for bit.
+
+## Cell-bounds and region-adaptor oracle (`generate_cell_bounds`)
+
+`generate_cell_bounds` writes
+[`core/tests/data/cpp_cell_bounds_vectors.csv`](../../core/tests/data/cpp_cell_bounds_vectors.csv)
+(3.4 MB), which [`core/tests/cpp_cell_bounds_diff.rs`](../../core/tests/cpp_cell_bounds_diff.rs)
+diffs `Cell`'s bounds and the region adaptors against (spec 012, FR-018, research R6).
+
+```sh
+cmake --build build --target generate_cell_bounds
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_cell_bounds > ../../core/tests/data/cpp_cell_bounds_vectors.csv
+```
+
+| Section | Rows | Library operations checked | Oracle |
+|---------|------|----------------------------|--------|
+| `CELL_BOUNDS` | 1,008: the six faces, U-017's two cells, 1,000 random cells of every level | `Cell::cap_bound`, `rect_bound` | `GetCapBound`, `GetRectBound` |
+| `CELL_BOUND_POINTS` | 26,208: each cell's u-v corners and edge midpoints moved outward by 0, 1 and 5/3 − 0.001 `DBL_EPSILON`, and two interior points | `contains_point`, the bounds' `contains_point` | `Contains(p)`, the bounds' `Contains(p)` |
+| `REGION_UNION`, `REGION_INTERSECTION` | 2,000 each: 0 to 4 members (cap, rectangle, cell, point region), a cell and a point | every `Region` method | the same |
+
+The adaptors' cap radii are spec 010's documented deviation (`Rect::cap_bound`'s widening): the
+diff test checks the centre bit for bit and the radius as upstream's widened by the rule. The
+`CELL_BOUND_POINTS` rows pin U-017: of 25,469 contained points, 2,371 lie outside the cap bound
+and 840 outside the rectangle bound, in C++ and the library alike.

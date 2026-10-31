@@ -7,12 +7,12 @@ Defect: the FR-021 fix removed: `normalized` reduces with the old inexact formul
 diff --git a/core/src/s1/angle.rs b/core/src/s1/angle.rs
 --- a/core/src/s1/angle.rs
 +++ b/core/src/s1/angle.rs
-@@ -179,7 +179,7 @@
-         // (Sterbenz: π ≤ |r| ≤ 2·2π), and at |r| = π either choice ends at π, as upstream maps
-         // −π to π (spec 007 FR-021, research R6).
-         let y = 2.0 * PI;
--        let r = self.0 % y;
-+        let r = self.0 - (self.0 / y).round() * y;
-         if r > PI {
-             Angle(r - y)
-         } else if r <= -PI {
+@@ -176,7 +176,7 @@
+     pub fn normalized(self) -> Angle {
+         // The remainder is ±π exactly at a tie, by the quotient's parity; upstream maps −π
+         // to π, so either ends at π (spec 007 FR-021, research R6; spec 010 FR-017).
+-        let r = remainder_2pi(self.0);
++        let r = self.0 - (self.0 / (2.0 * PI)).round() * (2.0 * PI);
+         Angle(if r == -PI { PI } else { r })
+     }
+ 

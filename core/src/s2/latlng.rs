@@ -152,6 +152,9 @@ impl LatLng {
     }
 
     /// Creates a `LatLng` from a direction vector (not necessarily unit length).
+    ///
+    /// The result is valid for every point without a NaN coordinate, the zero vector (0, 0)
+    /// and infinite coordinates included; a NaN coordinate makes it invalid.
     pub fn from_point(p: Point) -> Self {
         LatLng {
             lat: Self::latitude(p),
@@ -168,22 +171,29 @@ impl LatLng {
 
     /// Clamps the latitude to [-π/2, π/2] and reduces the longitude to
     /// [-π, π] using IEEE remainder. Returns `invalid()` if not finite.
+    ///
+    /// The longitude is upstream's `remainder(lng, 2π)`, exactly: it moves by a whole number
+    /// of turns, rounded to the even number at a tie, so π stays π, −π stays −π and 3π
+    /// becomes −π, and a zero keeps its sign (−2π gives −0). The result is valid for every
+    /// finite input.
     pub fn normalized(self) -> Self {
         let lat_rad = self.lat.radians();
         let lng_rad = self.lng.radians();
         if !lat_rad.is_finite() || !lng_rad.is_finite() {
             return Self::invalid();
         }
-        // C++ uses std::remainder(lng, 2*PI) which returns the IEEE remainder
-        // in [-PI, PI]. Rust equivalent: x - round(x/y)*y.
-        let lng_normalized = lng_rad - (lng_rad / (2.0 * PI)).round() * (2.0 * PI);
-        LatLng::from_radians(lat_rad.clamp(-FRAC_PI_2, FRAC_PI_2), lng_normalized)
+        LatLng::from_radians(
+            lat_rad.clamp(-FRAC_PI_2, FRAC_PI_2),
+            crate::s1::remainder_2pi(lng_rad),
+        )
     }
 
     /// Converts this `LatLng` to the equivalent unit-length `S2Point`.
     ///
     /// The maximum error in the result is 1.5 * `f64::EPSILON`.
-    /// Requires latitude and longitude to be finite.
+    /// Requires latitude and longitude to be finite (upstream checks it in debug builds); a
+    /// non-finite coordinate gives NaN coordinates, without a panic. Values outside the valid
+    /// range are wrapped around the sphere.
     pub fn to_point(self) -> Point {
         let (sin_lat, cos_lat) = self.lat.sin_cos();
         let (sin_lng, cos_lng) = self.lng.sin_cos();
@@ -201,7 +211,9 @@ impl LatLng {
     /// slightly faster. It is less accurate for distances approaching 180°
     /// (about 8 digits of precision vs 15 for the Point-based approach).
     ///
-    /// Both `LatLngs` must be normalized.
+    /// Both `LatLngs` must be normalized. Outside that domain the result is upstream's: a
+    /// latitude beyond ±π/2 can make the haversine term negative after rounding, and then the
+    /// distance is NaN.
     pub fn get_distance(self, other: LatLng) -> Angle {
         let lat1 = self.lat.radians();
         let lat2 = other.lat.radians();
@@ -210,7 +222,9 @@ impl LatLng {
         let dlat = (0.5 * (lat2 - lat1)).sin();
         let dlng = (0.5 * (lng2 - lng1)).sin();
         let x = dlat * dlat + dlng * dlng * lat1.cos() * lat2.cos();
-        Angle::from_radians(2.0 * x.sqrt().min(1.0).asin())
+        // Upstream's `sqrt(min(1.0, x))`: clamping after the root would turn a negative `x`
+        // (NaN) into 1 (spec 010 FR-018).
+        Angle::from_radians(2.0 * x.min(1.0).sqrt().asin())
     }
 
     /// Reports whether the coordinates of two `LatLngs` are close, within the
@@ -308,6 +322,10 @@ impl From<LatLng> for Point {
         ll.to_point()
     }
 }
+
+#[cfg(test)]
+#[path = "latlng_tests.rs"]
+mod latlng_tests;
 
 #[cfg(test)]
 mod tests {

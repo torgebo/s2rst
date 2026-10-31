@@ -181,8 +181,146 @@ mod generators {
         Rect::from_lat_lng(make_latlng_safe(lat0, lng0)).add_point(make_latlng_safe(lat1, lng1))
     }
 
+    /// A rectangle from arbitrary `f64`s (spec 010 FR-011): two latitudes and two longitudes
+    /// (radians), folded into range, and a family that moves the latitudes next to a pole
+    /// (within 10⁻ᵏ of it), onto the north pole, or onto one latitude, so that spec 010's K4
+    /// inputs (`UPSTREAM.md` U-016) are reachable. Non-finite inputs become 0.
+    pub fn rect_f64(lat0: f64, lat1: f64, lng0: f64, lng1: f64, family: u8) -> Rect {
+        use std::f64::consts::{FRAC_PI_2, PI};
+        let fin = |x: f64, m: f64| if x.is_finite() { x % m } else { 0.0 };
+        let (a, c) = (fin(lat0, FRAC_PI_2), fin(lat1, FRAC_PI_2));
+        let (lo, hi) = (a.min(c), a.max(c));
+        let k = i32::from(family / 6 % 17);
+        let (lo, hi) = match family % 6 {
+            1 => (
+                FRAC_PI_2 - (a.abs() / FRAC_PI_2) * 10f64.powi(-k),
+                FRAC_PI_2,
+            ),
+            2 => (
+                -FRAC_PI_2,
+                -FRAC_PI_2 + (a.abs() / FRAC_PI_2) * 10f64.powi(-k),
+            ),
+            3 => (FRAC_PI_2, FRAC_PI_2),
+            4 => (lo, lo),
+            _ => (lo, hi),
+        };
+        Rect::new(
+            s2rst::r1::Interval::new(lo, hi),
+            s2rst::s1::Interval::new(fin(lng0, PI), fin(lng1, PI)),
+        )
+    }
+
+    /// A point on or next to `r`'s boundary: a corner, a point on either latitude bound or
+    /// either longitude bound at the fraction `t`, or such a point moved `k` ulps inward
+    /// (spec 010 research R0's points).
+    pub fn boundary_point(r: Rect, which: u8, t: f64, k: u8) -> Point {
+        use std::f64::consts::PI;
+        let t = if t.is_finite() { t.abs().fract() } else { 0.5 };
+        let step = |x: f64, up: bool| {
+            (0..k % 17).fold(x, |y, _| if up { y.next_up() } else { y.next_down() })
+        };
+        let lng = if r.lng.is_inverted() {
+            let v = r.lng.lo + t * r.lng.length();
+            if v > PI { v - 2.0 * PI } else { v }
+        } else {
+            r.lng.lo + t * (r.lng.hi - r.lng.lo)
+        };
+        let lat = r.lat.lo + t * (r.lat.hi - r.lat.lo);
+        let (la, ln) = match which % 8 {
+            0 => (r.lat.lo, r.lng.lo),
+            1 => (r.lat.hi, r.lng.hi),
+            2 => (r.lat.lo, lng),
+            3 => (r.lat.hi, lng),
+            4 => (step(r.lat.lo, true), step(r.lng.lo, true)),
+            5 => (step(r.lat.hi, false), step(r.lng.hi, false)),
+            6 => (r.lat.lo, step(r.lng.hi, false)),
+            _ => (lat, step(r.lng.lo, true)),
+        };
+        LatLng::from_radians(la, ln).to_point()
+    }
+
     pub fn point_region(lat_i: i32, lng_i: i32) -> PointRegion {
         PointRegion::new(safe_point(lat_i, lng_i))
+    }
+
+    /// Spec 011 FR-013: a point region at a special place, by `kind`: a vertex of a cell (of the
+    /// level `lvl`), a point on a face boundary (an edge midpoint of a face cell), one of the
+    /// poles, or `safe_point`.
+    pub fn point_region_special(kind: u8, lat_i: i32, lng_i: i32, lvl: u8) -> PointRegion {
+        let c = cell(lat_i, lng_i, lvl);
+        let p = match kind % 4 {
+            0 => c.vertex(s2rst::s2::CellVertex::ALL[usize::from(lvl % 4)]),
+            1 => {
+                let f = Cell::from_cell_id(CellId::from_face(c.face()));
+                let k = usize::from(lvl % 4);
+                let (a, b) = (
+                    f.vertex(s2rst::s2::CellVertex::ALL[k]),
+                    f.vertex(s2rst::s2::CellVertex::ALL[(k + 1) % 4]),
+                );
+                Point::from_coords(a.x() + b.x(), a.y() + b.y(), a.z() + b.z())
+            }
+            2 => Point::from_coords(0.0, 0.0, if lat_i % 2 == 0 { 1.0 } else { -1.0 }),
+            _ => safe_point(lat_i, lng_i),
+        };
+        PointRegion::new(p)
+    }
+
+    /// Spec 011 FR-013: a union of a special kind: a polar face with a cell, opposite faces, a
+    /// cluster of descendants of one cell, or `cell_union`'s scattered cells.
+    pub fn cell_union_special(
+        kind: u8,
+        lat0: i32,
+        lng0: i32,
+        lat1: i32,
+        lng1: i32,
+        lvl: u8,
+    ) -> CellUnion {
+        let face = |f: usize| CellId::from_face(s2rst::s2::Face::ALL[f % 6]);
+        let ids = match kind % 4 {
+            0 => vec![
+                face(if lat0 % 2 == 0 { 2 } else { 5 }),
+                cell_id(lat1, lng1, lvl),
+            ],
+            1 => {
+                let f = usize::try_from(lat0.rem_euclid(3)).unwrap();
+                vec![face(f), face(f + 3)]
+            }
+            2 => {
+                let base = cell_id(lat0, lng0, lvl % 20);
+                let l = Level::new((base.level().as_u8() + 1 + lvl % 6).min(30));
+                vec![
+                    cell_id(lat0, lng0, l.as_u8()),
+                    cell_id(
+                        lat0.wrapping_add(lat1 % 7),
+                        lng0.wrapping_add(lng1 % 7),
+                        l.as_u8(),
+                    ),
+                    base.child_begin_at_level(l),
+                ]
+            }
+            _ => return cell_union(lat0, lng0, lat1, lng1, lat0 ^ 0x55, lng1 ^ 0x7f, lvl),
+        };
+        CellUnion::from_cell_ids(ids)
+    }
+
+    /// A point of a union: the centre of a descendant of one of its cells, or a vertex of one.
+    pub fn point_in_union(u: &CellUnion, k: u8, d: u8) -> Point {
+        let ids = u.cell_ids();
+        if ids.is_empty() {
+            return safe_point(i32::from(k), i32::from(d));
+        }
+        let id = ids[usize::from(k) % ids.len()];
+        if d % 3 == 0 {
+            return Cell::from_cell_id(id).vertex(s2rst::s2::CellVertex::ALL[usize::from(k % 4)]);
+        }
+        let mut c = id;
+        for i in 0..(d % 8) {
+            if c.level() == Level::MAX {
+                break;
+            }
+            c = c.children()[usize::from((k >> (i % 4)) & 3)];
+        }
+        c.to_point()
     }
 
     pub fn cell_union(
@@ -384,13 +522,36 @@ mod prop {
         }
     }
 
-    /// If the region contains a point, that point lies within the bounding rect.
+    /// If the region contains a point, that point lies within the bounding rect. The Kani twin
+    /// is `verify/src/laws.rs` (`laws::region::rect_bound_contains_points`, spec 011 FR-010).
     pub fn region_rect_bound_contains_point<R: Region>(r: &R, p: Point) -> bool {
         if r.contains_point(&p) {
             r.rect_bound().contains_lat_lng(LatLng::from_point(p))
         } else {
             true
         }
+    }
+
+    /// If the region contains a point, its covering bound contains the point's leaf: some id of
+    /// `cell_union_bound()` contains `CellId::from_point(p)`. The Kani twin is
+    /// `verify/src/laws.rs` (`laws::region::covering_contains_points`, spec 011 FR-010).
+    ///
+    /// A law of regions whose point test is by leaf (`PointRegion`'s covering is its leaf's
+    /// neighbours, `CellUnion`'s point test is by leaf) and of points inside a closed region. At
+    /// the boundary of a closed region it can fail by design: a `Cell` contains its own vertices,
+    /// whose leaves lie in a neighbour; there [`region_covering_contains_point_closed`] holds.
+    pub fn region_covering_contains_point<R: Region>(r: &R, p: Point) -> bool {
+        let leaf = CellId::from_point(&p);
+        !r.contains_point(&p) || r.cell_union_bound().iter().any(|id| id.contains(leaf))
+    }
+
+    /// The closed form: some cell of the covering bound contains the point (`Cell::contains_point`,
+    /// boundaries included), as upstream's "the union of the cells covers the region".
+    pub fn region_covering_contains_point_closed<R: Region>(r: &R, p: Point) -> bool {
+        !r.contains_point(&p)
+            || r.cell_union_bound()
+                .iter()
+                .any(|&id| Cell::from_cell_id(id).contains_point(p))
     }
 
     /// `contains_cell` implies `intersects_cell`.
@@ -815,6 +976,73 @@ fn region_rect_cap_contains(
     prop::region_cap_bound_contains_point(&r, p)
 }
 
+/// Spec 010 FR-011: the bounding cap contains the points on and next to a rectangle's boundary,
+/// for rectangles near and at the poles, where upstream's `GetCapBound` misses some (U-016).
+#[quickcheck]
+fn region_rect_cap_contains_boundary(
+    lats: (f64, f64),
+    lngs: (f64, f64),
+    family: u8,
+    which: u8,
+    t: f64,
+    k: u8,
+) -> bool {
+    let r = generators::rect_f64(lats.0, lats.1, lngs.0, lngs.1, family);
+    let p = generators::boundary_point(r, which, t, k);
+    prop::region_cap_bound_contains_point(&r, p)
+}
+
+/// Spec 010 K4's fixed examples (`UPSTREAM.md` U-016): the north pole as a rectangle and a point
+/// one ulp past it, and a point five ulps inside a vertex of a small rectangle; upstream's bound
+/// misses both.
+#[test]
+fn region_rect_cap_contains_k4() {
+    use s2rst::{r1, s1};
+    use std::f64::consts::{FRAC_PI_2, PI};
+    let pole = Rect::new(
+        r1::Interval::new(FRAC_PI_2, FRAC_PI_2),
+        s1::Interval::new(-PI, PI),
+    );
+    let p = LatLng::from_radians(1.570_796_326_794_896_8, 4.653_912_984_578_174_6e-1).to_point();
+    assert!(pole.contains_point(p));
+    assert!(prop::region_cap_bound_contains_point(&pole, p));
+    let mid = Rect::new(
+        r1::Interval::new(1.071_221_527_018_078_5, 1.071_237_668_898_467_3),
+        s1::Interval::new(-8.905_155_217_671_079e-1, -8.905_155_217_089_906e-1),
+    );
+    let p = LatLng::from_radians(1.071_221_527_018_078_5, -8.905_155_217_089_911e-1).to_point();
+    assert!(mid.contains_point(p));
+    assert!(prop::region_cap_bound_contains_point(&mid, p));
+}
+
+#[quickcheck]
+fn region_rect_contains_implies_intersects_f64(
+    lats: (f64, f64),
+    lngs: (f64, f64),
+    family: u8,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let r = generators::rect_f64(lats.0, lats.1, lngs.0, lngs.1, family);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_contains_implies_intersects(&r, &cell)
+}
+
+#[quickcheck]
+fn region_rect_no_intersect_no_vertex_f64(
+    lats: (f64, f64),
+    lngs: (f64, f64),
+    family: u8,
+    ce_lat: i32,
+    ce_lng: i32,
+    lvl: u8,
+) -> bool {
+    let r = generators::rect_f64(lats.0, lats.1, lngs.0, lngs.1, family);
+    let cell = generators::cell(ce_lat, ce_lng, lvl);
+    prop::region_no_intersect_no_vertex(&r, &cell)
+}
+
 #[quickcheck]
 fn region_rect_rect_contains(
     lat0: i32,
@@ -946,6 +1174,80 @@ fn region_cell_union_contains_implies_intersects(
     let u = generators::cell_union(lat0, lng0, lat1, lng1, lat0 ^ 0x55, lng1 ^ 0x7f, lvl);
     let c = generators::cell(ce_lat, ce_lng, ce_lvl);
     prop::region_contains_implies_intersects(&u, &c)
+}
+
+// Spec 011 FR-010, FR-013: the two new laws (the bounding rectangle and the covering contain
+// every contained point) for each implementor, with points where a bound shows first.
+
+#[quickcheck]
+fn region_cap_covering_contains_point(
+    c_lat: i32,
+    c_lng: i32,
+    r_i: u16,
+    p_lat: i32,
+    p_lng: i32,
+) -> bool {
+    let cap = generators::cap(c_lat, c_lng, r_i);
+    prop::region_covering_contains_point(&cap, cap.center())
+        && prop::region_covering_contains_point(&cap, generators::safe_point(p_lat, p_lng))
+}
+
+#[quickcheck]
+fn region_rect_covering_contains_point(
+    lat0: i32,
+    lng0: i32,
+    lat1: i32,
+    lng1: i32,
+    which: u8,
+    t: f64,
+) -> bool {
+    let r = generators::rect(lat0, lng0, lat1, lng1);
+    prop::region_covering_contains_point(&r, generators::boundary_point(r, which, t, 0))
+        && prop::region_covering_contains_point(&r, r.center().to_point())
+}
+
+#[quickcheck]
+fn region_cell_rect_and_covering_contain_point(lat: i32, lng: i32, lvl: u8, k: u8, d: u8) -> bool {
+    let c = generators::cell(lat, lng, lvl);
+    let u = CellUnion::from_cell_ids(vec![c.id()]);
+    let p = generators::point_in_union(&u, k, d);
+    // At a vertex (d % 3 == 0) only the closed form holds: the vertex's leaf is a neighbour's.
+    prop::region_rect_bound_contains_point(&c, p)
+        && prop::region_covering_contains_point_closed(&c, p)
+        && (d % 3 == 0 || prop::region_covering_contains_point(&c, p))
+}
+
+#[quickcheck]
+fn region_point_region_rect_and_covering_contain_point(
+    kind: u8,
+    lat: i32,
+    lng: i32,
+    lvl: u8,
+) -> bool {
+    let pr = generators::point_region_special(kind, lat, lng, lvl);
+    let p = pr.point();
+    prop::region_cap_bound_contains_point(&pr, p)
+        && prop::region_rect_bound_contains_point(&pr, p)
+        && prop::region_covering_contains_point(&pr, p)
+        && prop::region_no_intersect_no_vertex(&pr, &generators::cell(lat, lng, lvl))
+}
+
+#[quickcheck]
+fn region_cell_union_rect_and_covering_contain_point(
+    kind: u8,
+    lat0: i32,
+    lng0: i32,
+    lat1: i32,
+    lng1: i32,
+    lvl: u8,
+    k: u8,
+    d: u8,
+) -> bool {
+    let u = generators::cell_union_special(kind, lat0, lng0, lat1, lng1, lvl);
+    let p = generators::point_in_union(&u, k, d);
+    prop::region_cap_bound_contains_point(&u, p)
+        && prop::region_rect_bound_contains_point(&u, p)
+        && prop::region_covering_contains_point(&u, p)
 }
 
 #[quickcheck]
@@ -1502,4 +1804,72 @@ fn furthest_edge_target_cap_deterministic(a_lat: i32, a_lng: i32, b_lat: i32, b_
     }
     let t = s2rst::s2::furthest_edge_query::EdgeTarget::new(a, b);
     prop::distance_target_cap_bound_deterministic(&t)
+}
+
+// ─── Spec 012 FR-012: Cell's own points, and adaptors of mixed and nested members ───
+
+/// `Cell`'s bounding cap and rectangle contain the cell's own points: its vertices and the
+/// centres of its descendants (not the points of `contains_point`'s margin, `UPSTREAM.md` U-017).
+#[quickcheck]
+fn region_cell_bounds_contain_own_points(lat: i32, lng: i32, lvl: u8, k: u8, d: u8) -> bool {
+    let c = generators::cell(lat, lng, lvl);
+    let u = CellUnion::from_cell_ids(vec![c.id()]);
+    let p = generators::point_in_union(&u, k, d);
+    c.contains_point(p) && c.cap_bound().contains_point(p) && c.rect_bound().contains_point(p)
+}
+
+/// A member of a law twin, by `kind`: a cap, a rectangle or a point region (implementors that
+/// satisfy the vertex and bounding-rectangle laws on the twin's inputs; a `Cell` or a
+/// `CellUnion` member breaks the vertex law).
+fn law_member(kind: u8, lat: i32, lng: i32, r: u16) -> Box<dyn Region> {
+    match kind % 3 {
+        0 => Box::new(generators::cap(lat, lng, r)),
+        1 => Box::new(generators::rect(
+            lat,
+            lng,
+            lat.wrapping_add(i32::from(r)),
+            lng.wrapping_add(i32::from(r)),
+        )),
+        _ => Box::new(generators::point_region(lat, lng)),
+    }
+}
+
+/// The adaptors preserve containment implies intersection, the vertex law and the bounding
+/// rectangle, for mixed members and an adaptor nested in another (the Kani statements are spec
+/// 012's `ad_reg`, over abstract members).
+#[quickcheck]
+fn region_adaptors_preserve_laws(
+    kinds: (u8, u8, u8),
+    a: (i32, i32, u16),
+    b: (i32, i32, u16),
+    c: (i32, i32, u16),
+    cell: (i32, i32, u8),
+    nest: bool,
+) -> bool {
+    let members = |union: bool| -> Vec<Box<dyn Region>> {
+        let ms = vec![
+            law_member(kinds.0, a.0, a.1, a.2),
+            law_member(kinds.1, b.0, b.1, b.2),
+        ];
+        let third = law_member(kinds.2, c.0, c.1, c.2);
+        if !nest {
+            return ms;
+        }
+        let inner: Box<dyn Region> = if union {
+            Box::new(RegionUnion::from_regions(ms))
+        } else {
+            Box::new(RegionIntersection::from_regions(ms))
+        };
+        vec![inner, third]
+    };
+    let cl = generators::cell(cell.0, cell.1, cell.2);
+    let p = generators::safe_point(a.0, a.1);
+    let u = RegionUnion::from_regions(members(true));
+    let i = RegionIntersection::from_regions(members(false));
+    prop::region_contains_implies_intersects(&u, &cl)
+        && prop::region_no_intersect_no_vertex(&u, &cl)
+        && prop::region_rect_bound_contains_point(&u, p)
+        && prop::region_contains_implies_intersects(&i, &cl)
+        && prop::region_no_intersect_no_vertex(&i, &cl)
+        && prop::region_rect_bound_contains_point(&i, p)
 }

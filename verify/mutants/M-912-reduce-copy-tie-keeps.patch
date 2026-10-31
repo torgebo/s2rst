@@ -1,0 +1,17 @@
+Mutant: M-912
+Targets: P-LLNRM-03
+Expect-Fail: ll_nrm::p_llnrm_03
+Defect: spec mutant: the reduction's copy keeps `r` at a tie with an odd quotient
+
+diff --git a/verify/src/latlng_spec.rs b/verify/src/latlng_spec.rs
+--- a/verify/src/latlng_spec.rs
++++ b/verify/src/latlng_spec.rs
+@@ -47,7 +47,7 @@
+     } else if r < -PI {
+         r + y
+     } else if r == PI || r == -PI {
+-        if r4 == r { r } else { -r }
++        if r4 == r { r } else { r }
+     } else {
+         r
+     }

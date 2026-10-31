@@ -1,0 +1,17 @@
+Mutant: M-984
+Targets: P-ADTST-01
+Expect-Fail: ad_mean::p_adtst_01__n2
+Defect: `RegionIntersection::intersects_cell` is `any`
+
+diff --git a/core/src/s2/region_intersection.rs b/core/src/s2/region_intersection.rs
+--- a/core/src/s2/region_intersection.rs
++++ b/core/src/s2/region_intersection.rs
+@@ -80,7 +80,7 @@
+     }
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {
+-        self.regions.iter().all(|r| r.intersects_cell(cell))
++        self.regions.iter().any(|r| r.intersects_cell(cell))
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {

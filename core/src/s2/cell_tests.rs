@@ -204,3 +204,119 @@ mod bounded_index_tests {
         }
     }
 }
+
+/// Spec 011 FR-017 (K1): the polar face cells' rectangle bounds are upstream's bit for bit.
+/// Upstream computes the latitude of a polar face's corners, `asin(sqrt(1./3))`; the library
+/// wrote Go's 15-digit literal, 2 ulps below it, so the bounds of faces 2 and 5 (and every
+/// union's bound that contains them) were 2 ulps wider than upstream's.
+mod pole_min_lat_tests {
+    use super::super::*;
+
+    #[test]
+    fn pole_min_lat_is_upstreams_computed_value() {
+        assert_eq!(
+            POLE_MIN_LAT.to_bits(),
+            (1.0f64 / 3.0).sqrt().asin().to_bits()
+        );
+    }
+
+    #[test]
+    fn polar_face_rect_bounds_are_upstreams() {
+        // `S2Cell(S2CellId::FromFace(f)).GetRectBound()` on upstream v0.14.0-40 (spec 011
+        // probe, section CF): the latitude bound nearest the equator.
+        let north = Cell::from_cell_id(CellId::from_face(Face::F2)).rect_bound();
+        let south = Cell::from_cell_id(CellId::from_face(Face::F5)).rect_bound();
+        assert_eq!(north.lat.lo.to_bits(), 0x3fe3_b202_8082_e8d0);
+        assert_eq!(south.lat.hi.to_bits(), 0xbfe3_b202_8082_e8d0);
+        assert_eq!(north.lat.hi, FRAC_PI_2);
+        assert_eq!(south.lat.lo, -FRAC_PI_2);
+    }
+}
+
+/// Spec 011 K4 (FR-019): `contains_point` panics in debug builds exactly where the face
+/// projection's check fails, as upstream's `ABSL_DCHECK`.
+mod contains_point_panic_tests {
+    use super::super::*;
+
+    fn face0() -> Cell {
+        Cell::from_cell_id(CellId::from_face(Face::F0))
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "does not belong to face")]
+    fn nan_on_the_face_axis() {
+        let _ = face0().contains_point(Point(crate::r3::Vector {
+            x: f64::NAN,
+            y: 0.0,
+            z: 0.0,
+        }));
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "does not belong to face")]
+    fn infinity_off_the_axis_on_the_faces_side() {
+        let _ = face0().contains_point(Point(crate::r3::Vector {
+            x: 1.0,
+            y: f64::INFINITY,
+            z: 0.0,
+        }));
+    }
+
+    #[test]
+    fn infinity_off_the_axis_on_the_other_side_returns() {
+        assert!(!face0().contains_point(Point(crate::r3::Vector {
+            x: -1.0,
+            y: f64::INFINITY,
+            z: 0.0,
+        })));
+    }
+}
+
+/// Spec 012 FR-016 (U-017): `contains_point` accepts points up to `(5/3)·ε` outside the cell in
+/// u-v, and the bounds cover the cell's own points only, as upstream's: a point of the margin can
+/// lie outside them. These pin the survey's two inputs, so a change to either side is seen.
+mod margin_tests {
+    use super::super::*;
+    use crate::r3::Vector;
+
+    fn bits(x: u64, y: u64, z: u64) -> Point {
+        Point(Vector {
+            x: f64::from_bits(x),
+            y: f64::from_bits(y),
+            z: f64::from_bits(z),
+        })
+    }
+
+    #[test]
+    fn bounds_miss_the_margin() {
+        // Face 0, level 1, u-v bound [−1, 0]²; the point is u = v = ε beyond the corner (0, 0).
+        let c = Cell::from_cell_id(CellId(0x0400_0000_0000_0000));
+        let p = Point(Vector {
+            x: 1.0,
+            y: f64::EPSILON,
+            z: f64::EPSILON,
+        });
+        assert!(c.contains_point(p));
+        assert!(!c.cap_bound().contains_point(p));
+        // An edge midpoint moved out by ε.
+        let c = Cell::from_cell_id(CellId(0x4340_0000_0000_0000));
+        let p = bits(
+            0xbcad_89d8_9d89_d89e,
+            0x3fd8_9d89_d89d_89d5,
+            0x3fed_89d8_9d89_d89e,
+        );
+        assert!(c.contains_point(p));
+        assert!(!c.rect_bound().contains_point(p));
+    }
+
+    #[test]
+    fn bounds_hold_the_cells_own_corners() {
+        for k in CellVertex::ALL {
+            let c = Cell::from_cell_id(CellId(0x0400_0000_0000_0000));
+            let v = c.vertex(k);
+            assert!(c.cap_bound().contains_point(v) && c.rect_bound().contains_point(v));
+        }
+    }
+}

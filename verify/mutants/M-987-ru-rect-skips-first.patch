@@ -1,0 +1,17 @@
+Mutant: M-987
+Targets: P-ADREG-03
+Expect-Fail: ad_reg::p_adreg_03__n1
+Defect: `RegionUnion::rect_bound` skips the first member, so a point of that member can fall outside it
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -93,7 +93,7 @@
+ 
+     fn rect_bound(&self) -> Rect {
+         let mut ret = Rect::empty();
+-        for region in &self.regions {
++        for region in self.regions.iter().skip(1) {
+             ret = ret.union(region.rect_bound());
+         }
+         ret

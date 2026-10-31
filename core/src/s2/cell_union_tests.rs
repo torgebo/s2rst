@@ -199,3 +199,63 @@ fn denormalize_cannot_be_handed_a_large_level_mod() {
     let u = CellUnion::from_cell_ids(vec![CellId::from_face(Face::F0)]);
     drop(u.denormalize(Level::new(0), LevelMod::new(200)));
 }
+
+/// Spec 011 FR-018 (K2): the empty union's approximate and exact areas are +0, as upstream's
+/// sums from `double area = 0`; `Iterator::sum` of no `f64`s is −0.
+#[test]
+fn empty_union_areas_are_positive_zero() {
+    let u = CellUnion::new();
+    assert_eq!(u.approx_area().to_bits(), 0);
+    assert_eq!(u.exact_area().to_bits(), 0);
+    assert_eq!(u.average_based_area().to_bits(), 0);
+}
+
+/// FR-018 keeps a non-empty union's sums: the cells' areas added in order.
+#[test]
+fn union_areas_sum_in_order() {
+    let ids = vec![cell_at(3), cell_at(7).next(), CellId::from_face(Face::F4)];
+    let u = CellUnion::from_cell_ids(ids);
+    let (mut approx, mut exact) = (0.0, 0.0);
+    for &id in u.cell_ids() {
+        approx += Cell::from_cell_id(id).approx_area();
+        exact += Cell::from_cell_id(id).exact_area();
+    }
+    assert_eq!(u.approx_area().to_bits(), approx.to_bits());
+    assert_eq!(u.exact_area().to_bits(), exact.to_bits());
+}
+
+/// Spec 011 K4 (FR-019): `expand_by_radius` panics in debug builds on a NaN radius, as upstream's
+/// `GetLevelForMinValue` checks it.
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "must not be NaN")]
+fn expand_by_radius_panics_on_a_nan_radius() {
+    let mut u = CellUnion::from_cell_ids(vec![cell_at(10)]);
+    u.expand_by_radius(Angle::from_radians(f64::NAN), 2);
+}
+
+/// Spec 011 K4 (FR-019): `contains_point` panics in debug builds where `CellId::from_point` does.
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "does not belong to face")]
+fn contains_point_panics_for_two_infinities() {
+    let u = CellUnion::whole_sphere();
+    let _ = u.contains_point(Point(crate::r3::Vector {
+        x: f64::INFINITY,
+        y: 0.0,
+        z: f64::INFINITY,
+    }));
+}
+
+/// Spec 011 (P-UREG-03): the vertex law does not hold for `CellUnion`, in the library as
+/// upstream: its cell test is by id and its point test by leaf, so a union can contain the
+/// shared vertex of a neighbour it does not intersect. The union of the level-1 cell `14` holds
+/// the leaf of the upper-left vertex of its edge neighbour `1c` (`probe/rust/src/bin/vertex.rs`;
+/// the survey's `UV` section counts 20,573 such vertices, C++ and library alike).
+#[test]
+fn vertex_law_does_not_hold() {
+    let u = CellUnion::from_cell_ids(vec![CellId::from_token("14")]);
+    let neighbour = Cell::from_cell_id(CellId::from_token("1c"));
+    assert!(!u.intersects_cell(&neighbour));
+    assert!(u.contains_point(neighbour.vertex(crate::s2::CellVertex::UpperLeft)));
+}

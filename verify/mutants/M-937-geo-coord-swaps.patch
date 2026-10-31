@@ -1,0 +1,20 @@
+Mutant: M-937
+Targets: P-LLGEO-01
+Expect-Fail: 
+Test: core --lib --features geo-types coord_latlng_roundtrip
+Defect: `From<LatLng> for Coord` puts the latitude in x
+
+diff --git a/core/src/geo_types_interop.rs b/core/src/geo_types_interop.rs
+--- a/core/src/geo_types_interop.rs
++++ b/core/src/geo_types_interop.rs
+@@ -133,8 +133,8 @@
+ impl From<LatLng> for Coord<f64> {
+     fn from(ll: LatLng) -> Self {
+         Coord {
+-            x: ll.lng.degrees(),
+-            y: ll.lat.degrees(),
++            x: ll.lat.degrees(),
++            y: ll.lng.degrees(),
+         }
+     }
+ }

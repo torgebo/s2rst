@@ -174,19 +174,10 @@ impl Angle {
     /// the `f64` nearest 2π (`remainder(radians, 2 * M_PI)`), exact for every finite angle,
     /// with −π mapped to π. It lies in (−π, π] for every finite angle; ±∞ and NaN give NaN.
     pub fn normalized(self) -> Angle {
-        // `%` is IEEE fmod, which is exact: `r` has the sign of the angle and |r| < 2π. The
-        // remainder differs from it by 0 or ±2π. Where |r| > π the correction is exact
-        // (Sterbenz: π ≤ |r| ≤ 2·2π), and at |r| = π either choice ends at π, as upstream maps
-        // −π to π (spec 007 FR-021, research R6).
-        let y = 2.0 * PI;
-        let r = self.0 % y;
-        if r > PI {
-            Angle(r - y)
-        } else if r <= -PI {
-            Angle(r + y)
-        } else {
-            Angle(r)
-        }
+        // The remainder is ±π exactly at a tie, by the quotient's parity; upstream maps −π
+        // to π, so either ends at π (spec 007 FR-021, research R6; spec 010 FR-017).
+        let r = remainder_2pi(self.0);
+        Angle(if r == -PI { PI } else { r })
     }
 
     /// Returns the sine of this angle.
@@ -223,6 +214,35 @@ impl Angle {
     #[inline]
     pub fn approx_eq(self, other: Angle) -> bool {
         (self.0 - other.0).abs() <= 1e-15
+    }
+}
+
+/// The IEEE-754 remainder of `x` by the `f64` nearest 2π, exactly: C's
+/// `remainder(x, 2 * M_PI)`, which upstream's `S1Angle::Normalize` and `S2LatLng::Normalized`
+/// call. It lies in [−π, π]; the quotient rounds to the nearest whole number of turns, and to
+/// the even one at a tie, so π stays π, −π stays −π and 3π becomes −π; a zero result has the
+/// sign of `x`. ±∞ and NaN give NaN (spec 010 FR-017, research R3).
+pub(crate) fn remainder_2pi(x: f64) -> f64 {
+    // `%` is IEEE fmod, which is exact: its result has the sign of `x` and |r| < 2π.
+    reduce_fmod(x % (2.0 * PI), x)
+}
+
+/// The step from `r = fmod(x, 2π)` to the remainder of `x`: `r` and the remainder differ by
+/// 0 or ±2π. Where |r| > π the correction is exact (Sterbenz: π < |r| < 2·2π). At |r| = π
+/// the remainder's quotient is a tie, rounded to the even neighbour: `x % 4π` is `r` when the
+/// truncated quotient is even (4π = 2·2π exactly), and then `r` is the remainder; otherwise it
+/// is `r ∓ 2π = −r`, exactly. `verify/src/latlng_spec.rs` proves a copy of this function
+/// (P-LLNRM-03); its drift guard compares the two bodies.
+fn reduce_fmod(r: f64, x: f64) -> f64 {
+    let y = 2.0 * PI;
+    if r > PI {
+        r - y
+    } else if r < -PI {
+        r + y
+    } else if r == PI || r == -PI {
+        if x % (2.0 * y) == r { r } else { -r }
+    } else {
+        r
     }
 }
 

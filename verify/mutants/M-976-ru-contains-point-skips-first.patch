@@ -1,0 +1,17 @@
+Mutant: M-976
+Targets: P-ADTST-01
+Expect-Fail: ad_mean::p_adtst_01__n1
+Defect: `RegionUnion::contains_point` skips the first member
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -122,7 +122,7 @@
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {
+-        for region in &self.regions {
++        for region in self.regions.iter().skip(1) {
+             if region.contains_point(p) {
+                 return true;
+             }

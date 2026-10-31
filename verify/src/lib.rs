@@ -6,7 +6,9 @@
 //! (spec 002), the decoding layer (spec 003) and the value types `s2rst::s2::Cell` and
 //! `s2rst::s1::Interval` (spec 004), `s2rst::r1::Interval` and `s2rst::s2::Rect` (spec 005),
 //! `s2rst::r2::Rect` and `s2rst::s2::Point` (spec 006), `s2rst::s1::ChordAngle` and
-//! `s2rst::s1::Angle` (spec 007), and `s2rst::s2::Cap` (spec 008).
+//! `s2rst::s1::Angle` (spec 007), `s2rst::s2::Cap` (spec 008), `s2rst::s2::LatLng` with
+//! `s2rst::s2::Rect` as a `Region` (spec 010), and `s2rst::s2::point_region::PointRegion` with
+//! `s2rst::s2::CellUnion`'s floating-point methods (spec 011).
 //!
 //! - [`spec`] is the reference model of the S2 cell hierarchy, written from upstream
 //!   `s2cell_id.h` / `s2coords.h` and independent of `core/src/s2/cell_id.rs` (FR-006). It is
@@ -49,6 +51,19 @@
 //!   `cos`, and the lemma stubs, each resting on lemmas proven on the real code (spec 008
 //!   FR-003, FR-003a; research R5, R6); `tests/libm_contracts.rs` checks the contracts against
 //!   the real functions.
+//! - [`latlng_spec`] describes a latitude–longitude as a pair of angles, valid in the principal
+//!   ranges, with upstream's conversions restated apart and a copy of the exact reduction's
+//!   correction step (spec 010). The `ll_*` (`s2::LatLng`) modules are its harnesses, and
+//!   `ll_reg` instantiates the `Region` laws for `s2::Rect`; `stubs` gains pure contracts (one
+//!   contract value per input) and a contract on `Cell::rect_bound` (spec 010 research R5, R6).
+//! - [`region_spec`] describes a point region as its point and a cell union as the points whose
+//!   leaf it contains, with drift guards pinning the library's text of upstream's bound
+//!   constructions (spec 011). The `pr_*` (`PointRegion`) and `uf_*` (`CellUnion`'s
+//!   floating-point methods, also behind `cellunion`) modules are its harnesses, in the same
+//!   `values` suite; `laws` gains the bounding-rectangle and covering laws (spec 011 FR-010).
+//! - `any_region` is the abstract region, a `Region` with any answers (spec 012); the `ad_*`
+//!   modules prove over it that `RegionUnion` and `RegionIntersection` preserve the `Region`
+//!   laws of their members, whatever they are.
 //!
 //! Every property harness's doc comment starts with its catalogue id and its kind, then a
 //! plain-language statement, then the exact one: `P-HIER-01 (correct result): …`. The kinds
@@ -78,9 +93,11 @@ pub mod arc_spec;
 pub mod cap_spec;
 pub mod cell_spec;
 pub mod chord_spec;
+pub mod latlng_spec;
 pub mod point_spec;
 pub mod real_spec;
 pub mod rect_spec;
+pub mod region_spec;
 pub mod spec;
 pub mod union_spec;
 pub mod uv_spec;
@@ -95,6 +112,9 @@ mod laws;
 // one of these.
 #[cfg(kani)]
 mod stubs;
+// The abstract region (spec 012): any answers, one per input, for the adaptors' proofs.
+#[cfg(all(kani, feature = "values"))]
+mod any_region;
 
 #[cfg(kani)]
 mod anc;
@@ -310,3 +330,66 @@ mod cp_mem;
 mod cp_reg;
 #[cfg(all(kani, feature = "values"))]
 mod cp_rel;
+
+// Weekly, as `rl_bnd`: both harnesses take about eight minutes (spec 010, 2026-10-28).
+#[cfg(all(kani, feature = "values", feature = "slow"))]
+mod ll_apx;
+#[cfg(all(kani, feature = "values"))]
+mod ll_ari;
+#[cfg(all(kani, feature = "values"))]
+mod ll_con;
+#[cfg(all(kani, feature = "values"))]
+mod ll_crash;
+#[cfg(all(kani, feature = "values"))]
+mod ll_dst;
+#[cfg(all(kani, feature = "values"))]
+mod ll_eq;
+#[cfg(all(kani, feature = "values"))]
+mod ll_fp;
+#[cfg(all(kani, feature = "values"))]
+mod ll_lem;
+#[cfg(all(kani, feature = "values"))]
+mod ll_nrm;
+// `Rect`'s `Region` laws (spec 010): in the `LatLng` part, whose conversions they go through.
+#[cfg(all(kani, feature = "values"))]
+mod ll_reg;
+#[cfg(all(kani, feature = "values"))]
+mod ll_tp;
+#[cfg(all(kani, feature = "values"))]
+mod ll_val;
+
+// `PointRegion` (spec 011).
+#[cfg(all(kani, feature = "values"))]
+mod pr_bnd;
+#[cfg(all(kani, feature = "values"))]
+mod pr_cel;
+#[cfg(all(kani, feature = "values"))]
+mod pr_con;
+#[cfg(all(kani, feature = "values"))]
+mod pr_crash;
+#[cfg(all(kani, feature = "values"))]
+mod pr_eq;
+#[cfg(all(kani, feature = "values"))]
+mod pr_reg;
+
+// The region adaptors (spec 012), over the abstract region.
+#[cfg(all(kani, feature = "values"))]
+mod ad_crash;
+#[cfg(all(kani, feature = "values"))]
+mod ad_mean;
+#[cfg(all(kani, feature = "values"))]
+mod ad_reg;
+
+// `CellUnion`'s floating-point methods (spec 011): in the value suite, with 002's union domains.
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_area;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_bnd;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_crash;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_exp;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_pt;
+#[cfg(all(kani, feature = "values", feature = "cellunion"))]
+mod uf_reg;

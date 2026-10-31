@@ -1,0 +1,17 @@
+Mutant: M-918
+Targets: P-LLDST-03
+Expect-Fail: ll_dst::p_lldst_03
+Defect: `get_distance` halves the sum of the latitudes, so a point is not at distance 0 from itself
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -219,7 +219,7 @@
+         let lat2 = other.lat.radians();
+         let lng1 = self.lng.radians();
+         let lng2 = other.lng.radians();
+-        let dlat = (0.5 * (lat2 - lat1)).sin();
++        let dlat = (0.5 * (lat2 + lat1)).sin();
+         let dlng = (0.5 * (lng2 - lng1)).sin();
+         let x = dlat * dlat + dlng * dlng * lat1.cos() * lat2.cos();
+         // Upstream's `sqrt(min(1.0, x))`: clamping after the root would turn a negative `x`

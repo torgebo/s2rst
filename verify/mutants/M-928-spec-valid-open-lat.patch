@@ -1,0 +1,17 @@
+Mutant: M-928
+Targets: P-LLVAL-01
+Expect-Fail: ll_val::p_llval_01
+Defect: spec mutant: `latlng_spec::valid` excludes the latitude −π/2
+
+diff --git a/verify/src/latlng_spec.rs b/verify/src/latlng_spec.rs
+--- a/verify/src/latlng_spec.rs
++++ b/verify/src/latlng_spec.rs
+@@ -23,7 +23,7 @@
+ 
+ /// Upstream's `is_valid`: `|lat| ≤ π/2` and `|lng| ≤ π`; false when either is NaN.
+ pub fn valid(lat: f64, lng: f64) -> bool {
+-    -FRAC_PI_2 <= lat && lat <= FRAC_PI_2 && -PI <= lng && lng <= PI
++    -FRAC_PI_2 < lat && lat <= FRAC_PI_2 && -PI <= lng && lng <= PI
+ }
+ 
+ /// `Normalized()`'s latitude for a finite `lat`: `max(−π/2, min(π/2, lat))`, as upstream's two

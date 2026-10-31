@@ -331,3 +331,18 @@ pub fn any_lng_sum() -> f64 {
     kani::assume(x.abs() <= 1.5 * std::f64::consts::PI);
     x
 }
+
+// ---- spec 010 ------------------------------------------------------------------------------
+
+/// `AnyLatLng2`: every pair of `f64` bit patterns, NaN and the infinities included: a `LatLng`
+/// has no validity invariant (spec 010 research R7).
+pub fn any_lat_lng_bits() -> LatLng {
+    LatLng::from_radians(kani::any(), kani::any())
+}
+
+/// `FiniteLatLng`: both coordinates finite.
+pub fn any_finite_lat_lng() -> LatLng {
+    let (lat, lng): (f64, f64) = (kani::any(), kani::any());
+    kani::assume(lat.is_finite() && lng.is_finite());
+    LatLng::from_radians(lat, lng)
+}

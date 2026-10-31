@@ -1,0 +1,3 @@
+PV cells whose own vertex Cell::contains_point rejects: 0 of 80000
+UG contained points 262154, outside the cap bound 0, outside the rect bound 0; union cells outside the covering 0
+UV non-intersected edge neighbours 39636, their vertices the union contains 20573

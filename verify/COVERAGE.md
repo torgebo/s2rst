@@ -219,6 +219,59 @@ of the red runs, beyond the spec's list:
 
   All 318 patches apply.
 
+## Spec 010: `LatLng` and `Rect` as a `Region` (2026-10-28)
+
+Spec 010 added a value type in the same pattern as 004–008, so this review's two gaps are
+closed for it from the start:
+
+- **Gap 1 (the documented panics):** `LatLng` documents no panic, and none of its operations
+  panics anywhere (`ll_crash::c_*` over every pair of `f64`). Its two documented preconditions,
+  `to_point`'s finite coordinates and `get_distance`'s normalised inputs, are not panics:
+  `c_to_point` proves the operation over every pair (NaN coordinates outside), and
+  `o_get_distance` proves `get_distance` over every pair without an infinity (NaN where upstream
+  gives NaN).
+- **Gap 2 (floating-point geometry):** every entry through `atan2`, `sin_cos`, `sin`, `cos` and
+  `asin` has a crash proof under the contracts; none is excluded as floating-point geometry.
+  `Display` and `to_string_in_degrees`' formatting stay out with the other `Display`s (gap 3).
+
+`values/INVENTORY.md` section 12 has the rows. `Rect`'s three `Region` methods that the new law
+instances exercise (`contains_cell`, `intersects_cell`, `contains_point`) already had crash
+proofs from gap 2.
+
+## Spec 011: `PointRegion` and `CellUnion`'s floating-point methods (2026-10-28)
+
+Spec 011 closed both gaps for `PointRegion` from the start, and gap 2 for the nine
+floating-point rows that spec 002 had excluded from `CellUnion`:
+
+- **Gap 1 (the documented panics):** the planning probe found four debug-build panics that the
+  documentation did not state, each upstream's `DCHECK` too (spec 011 K4): `PointRegion::rect_bound`
+  for a NaN `x` or `y`, `Cell::contains_point` (and so `PointRegion::intersects_cell`) off its
+  face, `CellId::from_point` with two or more infinite coordinates, and
+  `CellUnion::expand_by_radius` on a NaN radius. FR-019 documented each, with a `should_panic`
+  test; `pr_crash::n_rect_bound_nan`, `n_intersects_cell` and `uf_exp::n_expand_by_radius_nan`
+  prove the NaN cases exact, and `r_rect_bound`, `r_intersects_cell`, `r_from_point_infinities`
+  the release builds. The checker cannot show the infinite cases' panics (it reports `∞ · 0` as
+  a NaN check first), so those rest on the native tests and the probe's sweep.
+- **Gap 2 (floating-point geometry):** every `PointRegion` entry has a crash proof (the
+  rectangle under `atan2`'s contract, the covering under `CellId::from_point`'s, weekly). Of
+  `CellUnion`'s nine rows, six are now proven within 002's size bounds, given the crash proofs of
+  the `Cell` functions they call (`uf_crash`); three inherit a measured limit: `exact_area`
+  (`Cell::exact_area`, the xlarge tier), `cell_union_bound` (`Cap::cell_union_bound`, spec 008)
+  and `expand_by_radius`'s expansion (`all_neighbors`, 001). `cell_union/INVENTORY.md`'s counts are
+  33 in scope and 9 excluded.
+
+`values/INVENTORY.md` section 13 and `cell_union/INVENTORY.md` rows 12, 25–28, 35–37, 40 have the
+rows.
+
+## Spec 012: `Cell`'s bounding laws and the region adaptors (2026-10-30)
+
+- **Gap 1 (the documented panics):** `RegionIntersection::region(i)` panicked past the end without
+  saying so (spec 012 K2); it is documented, and `ad_crash::n_region_past_end` proves the panic
+  exact in every build.
+- **Gap 2 (floating-point geometry):** the adaptors' 16 in-scope entries have crash proofs over
+  abstract members, the bounds under `atan2`'s and `asin`'s contracts; `cell_union_bound` inherits
+  `Cap::cell_union_bound`'s limit. `values/INVENTORY.md` section 14 has the rows.
+
 ## What changed outside `verify/`
 
 Only documentation: the `# Panics` sections of gap 1, in `core/src/s2/cell_id.rs`, `cell.rs`,

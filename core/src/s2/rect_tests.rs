@@ -221,3 +221,238 @@ mod serde_tests {
         );
     }
 }
+
+// --- spec 010 FR-019: the bounding cap contains every contained point (U-016) ---
+
+/// The probes' 64-bit LCG (`specs/010-formal-verify-latlng/probe/rust/src/main.rs`), so the
+/// tests below draw the probes' rectangles and points.
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        self.0
+    }
+    fn unit(&mut self) -> f64 {
+        (self.next() >> 11) as f64 / 9_007_199_254_740_992.0
+    }
+    fn range(&mut self, lo: f64, hi: f64) -> f64 {
+        lo + (hi - lo) * self.unit()
+    }
+}
+
+/// A longitude of `r` at the fraction `t` of its length.
+fn lng_at(r: Rect, t: f64) -> f64 {
+    if r.lng.is_inverted() {
+        let v = r.lng.lo + t * r.lng.length();
+        if v > PI { v - 2.0 * PI } else { v }
+    } else {
+        r.lng.lo + t * (r.lng.hi - r.lng.lo)
+    }
+}
+
+/// Upstream's `GetCapBound` (`s2latlng_rect.cc:298–332`), as the library computed it before
+/// FR-019: the cap the library widens.
+fn upstream_cap_bound(r: Rect) -> Cap {
+    if r.is_empty() {
+        return Cap::empty();
+    }
+    let (pole_z, pole_angle) = if r.lat.lo + r.lat.hi < 0.0 {
+        (-1.0, FRAC_PI_2 + r.lat.hi)
+    } else {
+        (1.0, FRAC_PI_2 - r.lat.lo)
+    };
+    let pole_cap = Cap::from_center_angle(
+        Point::new(crate::r3::Vector {
+            x: 0.0,
+            y: 0.0,
+            z: pole_z,
+        }),
+        Angle::from_radians((1.0 + 2.0 * f64::EPSILON) * pole_angle),
+    );
+    if r.lng.length() <= PI {
+        let mut mid_cap = Cap::from_point(r.center().to_point());
+        for v in RectVertex::iter() {
+            mid_cap = mid_cap.add_point(r.vertex(v).to_point());
+        }
+        if mid_cap.height() < pole_cap.height() {
+            return mid_cap;
+        }
+    }
+    pole_cap
+}
+
+/// Asserts that `r.cap_bound()` contains every point of `pts` that `r` contains, and returns
+/// how many it checked.
+fn assert_bound_contains(r: Rect, pts: impl IntoIterator<Item = LatLng>) -> usize {
+    let cap = r.cap_bound();
+    let mut n = 0;
+    for ll in pts {
+        let p = ll.to_point();
+        if r.contains_point(p) {
+            n += 1;
+            assert!(
+                cap.contains_point(p),
+                "{r:?}: the bound {cap:?} misses {ll:?}"
+            );
+        }
+    }
+    n
+}
+
+/// Spec 010 R0's two worst cases, which upstream's `GetCapBound` misses too
+/// (`probe/cpp/capbound_cases.txt`): the north pole as a rectangle and a point one ulp past
+/// the pole (a pole cap of radius 0), and a point on the low latitude bound five ulps inside
+/// the high longitude bound (the cap around the centre).
+#[test]
+fn cap_bound_contains_r0_worst_cases() {
+    let pole = Rect::new(
+        r1::Interval::new(FRAC_PI_2, FRAC_PI_2),
+        s1::Interval::new(-PI, PI),
+    );
+    let ll = LatLng::from_radians(1.570_796_326_794_896_8, 4.653_912_984_578_174_6e-1);
+    assert_eq!(assert_bound_contains(pole, [ll]), 1);
+    let mid = Rect::new(
+        r1::Interval::new(1.071_221_527_018_078_5, 1.071_237_668_898_467_3),
+        s1::Interval::new(-8.905_155_217_671_079e-1, -8.905_155_217_089_906e-1),
+    );
+    let ll = LatLng::from_radians(1.071_221_527_018_078_5, -8.905_155_217_089_911e-1);
+    assert_eq!(assert_bound_contains(mid, [ll]), 1);
+    // The cap around the centre is the one widened here, as upstream chose it.
+    assert!(mid.cap_bound().center().0.z < 1.0);
+}
+
+/// The survey's section G, regenerated: 20,000 random rectangles and seven points on and
+/// inside each one's boundary, of which upstream's bound missed 114 (spec 010 K4).
+#[test]
+fn cap_bound_contains_the_survey_points() {
+    let mut g = Lcg(0x0060_0060_0060_0060);
+    let mut checked = 0;
+    for _ in 0..20_000 {
+        let a = g.range(-FRAC_PI_2, FRAC_PI_2);
+        let c = g.range(-FRAC_PI_2, FRAC_PI_2);
+        let (l1, l2) = (g.range(-PI, PI), g.range(-PI, PI));
+        let r = Rect::new(
+            r1::Interval::new(a.min(c), a.max(c)),
+            s1::Interval::new(l1, l2),
+        );
+        let lat = g.range(r.lat.lo, r.lat.hi);
+        let lng = lng_at(r, g.unit());
+        checked += assert_bound_contains(
+            r,
+            [
+                LatLng::from_radians(r.lat.lo, r.lng.lo),
+                LatLng::from_radians(r.lat.hi, r.lng.hi),
+                LatLng::from_radians(r.lat.lo, lng),
+                LatLng::from_radians(r.lat.hi, lng),
+                LatLng::from_radians(lat, r.lng.lo),
+                LatLng::from_radians(lat, r.lng.hi),
+                LatLng::from_radians(lat, lng),
+            ],
+        );
+    }
+    assert_eq!(checked, 129_595, "the survey's contained points");
+}
+
+/// Spec 010 R0's sweep, smaller: rectangles near the poles, at the poles, single latitudes and
+/// narrow longitudes, and for each the points on both latitude bounds and 1 and 3 ulps inside
+/// them, at both poles, on both longitude bounds and 1, 2, 4 and 16 ulps inside them.
+#[test]
+fn cap_bound_contains_boundary_points() {
+    fn step(x: f64, k: i32) -> f64 {
+        (0..k.unsigned_abs()).fold(x, |y, _| if k > 0 { y.next_up() } else { y.next_down() })
+    }
+    let mut g = Lcg(0x0100_0100_0100_0100);
+    let mut checked = 0;
+    for _ in 0..4_000 {
+        let k = (g.next() % 17) as i32;
+        let (lo, hi) = match g.next() % 6 {
+            0 => {
+                let (a, c) = (
+                    g.range(-FRAC_PI_2, FRAC_PI_2),
+                    g.range(-FRAC_PI_2, FRAC_PI_2),
+                );
+                (a.min(c), a.max(c))
+            }
+            1 => {
+                let lo = FRAC_PI_2 - g.unit() * 10f64.powi(-k);
+                (lo, FRAC_PI_2)
+            }
+            2 => {
+                let hi = -FRAC_PI_2 + g.unit() * 10f64.powi(-k);
+                (-FRAC_PI_2, hi)
+            }
+            3 => (FRAC_PI_2, FRAC_PI_2),
+            4 => {
+                let a = g.range(-FRAC_PI_2, FRAC_PI_2);
+                (a, a)
+            }
+            _ => {
+                let a = g.range(0.0, FRAC_PI_2);
+                (-a, a)
+            }
+        };
+        let lng = match g.next() % 4 {
+            0 => s1::Interval::full(),
+            1 => {
+                let c = g.range(-PI, PI);
+                let w = g.unit() * 10f64.powi(-((g.next() % 12) as i32));
+                s1::Interval::from_point_pair(c, (c + w).min(PI))
+            }
+            _ => s1::Interval::new(g.range(-PI, PI), g.range(-PI, PI)),
+        };
+        let r = Rect::new(r1::Interval::new(lo, hi), lng);
+        let lats = [
+            r.lat.lo,
+            r.lat.hi,
+            step(r.lat.lo, 1),
+            step(r.lat.hi, -1),
+            step(r.lat.lo, 3),
+            step(r.lat.hi, -3),
+            FRAC_PI_2,
+            -FRAC_PI_2,
+        ];
+        let mut lngs = vec![r.lng.lo, r.lng.hi, lng_at(r, 0.5), lng_at(r, g.unit())];
+        for k in [1, 2, 4, 16] {
+            lngs.push(step(r.lng.lo, k));
+            lngs.push(step(r.lng.hi, -k));
+        }
+        let pts = lats
+            .iter()
+            .flat_map(|&la| lngs.iter().map(move |&ln| LatLng::from_radians(la, ln)));
+        checked += assert_bound_contains(r, pts);
+    }
+    assert!(checked > 100_000, "only {checked} contained points");
+}
+
+/// FR-019 keeps upstream's choice of cap and its centre, bit for bit, and widens the radius by
+/// the documented rule: `expanded` by 10⁻¹⁵ rad, then 8ε of the length² (`UPSTREAM.md` U-016).
+#[test]
+fn cap_bound_widens_upstreams_cap() {
+    let mut g = Lcg(0x0060_0060_0060_0060);
+    for _ in 0..2_000 {
+        let a = g.range(-FRAC_PI_2, FRAC_PI_2);
+        let c = g.range(-FRAC_PI_2, FRAC_PI_2);
+        let (l1, l2) = (g.range(-PI, PI), g.range(-PI, PI));
+        let r = Rect::new(
+            r1::Interval::new(a.min(c), a.max(c)),
+            s1::Interval::new(l1, l2),
+        );
+        let (up, lib) = (upstream_cap_bound(r), r.cap_bound());
+        assert_eq!(lib.center(), up.center(), "{r:?}");
+        let wide = up.expanded(Angle::from_radians(1e-15));
+        let want = wide
+            .chord_radius()
+            .plus_error(8.0 * f64::EPSILON * wide.chord_radius().length2());
+        assert_eq!(
+            lib.chord_radius().length2().to_bits(),
+            want.length2().to_bits(),
+            "{r:?}"
+        );
+    }
+    assert!(Rect::empty().cap_bound().is_empty());
+    assert!(Rect::full().cap_bound().is_full());
+}

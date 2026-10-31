@@ -1,0 +1,17 @@
+Mutant: M-982
+Targets: P-ADCON-01
+Expect-Fail: ad_mean::p_adcon_01
+Defect: `RegionUnion::add` inserts at the front
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -43,7 +43,7 @@
+ 
+     /// Adds a region to the union.
+     pub fn add(&mut self, region: Box<dyn Region>) {
+-        self.regions.push(region);
++        self.regions.insert(0, region);
+     }
+ 
+     /// Returns the number of regions in the union.

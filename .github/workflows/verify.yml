@@ -74,6 +74,12 @@ on:
       - 'core/src/r2/**'
       - 'core/tests/data/cpp_values_vectors.csv'
       - 'core/tests/data/cpp_cap_vectors.csv'
+      - 'core/tests/data/cpp_latlng_vectors.csv'
+      - 'core/src/s2/point_region.rs'
+      - 'core/tests/data/cpp_region_vectors.csv'
+      - 'core/src/s2/region_union.rs'
+      - 'core/src/s2/region_intersection.rs'
+      - 'core/tests/data/cpp_cell_bounds_vectors.csv'
       - 'core/src/s2/metric.rs'
       - 'core/tests/trait_property_tests.rs'
       - 'verify/**'
@@ -110,6 +116,12 @@ on:
       - 'core/src/r2/**'
       - 'core/tests/data/cpp_values_vectors.csv'
       - 'core/tests/data/cpp_cap_vectors.csv'
+      - 'core/tests/data/cpp_latlng_vectors.csv'
+      - 'core/src/s2/point_region.rs'
+      - 'core/tests/data/cpp_region_vectors.csv'
+      - 'core/src/s2/region_union.rs'
+      - 'core/src/s2/region_intersection.rs'
+      - 'core/tests/data/cpp_cell_bounds_vectors.csv'
       - 'core/src/s2/metric.rs'
       - 'core/tests/trait_property_tests.rs'
       - 'verify/**'
@@ -136,7 +148,7 @@ jobs:
         # The decoding suite runs as three parts, so each leg stays under SC-006's 10 minutes,
         # and the value types as four (spec 004 research R12, spec 005 research R8).
         # `release` is the documented panics' release pass (`make verify-release`).
-        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap, release]
+        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap, values-latlng, values-pointregion, values-unionfloat, values-adaptors, release]
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -233,7 +245,7 @@ jobs:
         part: ['0', '1', '2', '3', '4', '5', vertex, union, decoding-vectors, decoding-links, decoding-codecs,
                values-cell-a, values-cell-b, values-interval-rect, values-uvrect-point, values-chord-angle,
                values-cap, values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e,
-               values-limits-f, values-limits-g, values-limits-h, values-fg-a, values-fg-b]
+               values-limits-f, values-limits-g, values-limits-h, values-fg-a, values-fg-b, values-latlng, values-regions, values-adaptors]
         # The value-type suite's 87 weekly members take about 34 hours one at a time on the
         # workstation (2026-10-14, 2026-10-18, 2026-10-25), so they run as thirteen legs of
         # `make verify-slow F=values`, each a list of harness filters. The first six hold the
@@ -282,6 +294,17 @@ jobs:
             filters: 'cl_crash::c_fg_from_point cl_crash::c_fg_center cl_crash::c_fg_approx_area cl_crash::c_fg_cap_bound cl_crash::c_fg_rect_bound'
           - part: values-fg-b
             filters: 'rl_crash::c_fg_region_cells rl_crash::c_fg_cap_bound rl_crash::c_fg_expanded_by_distance__pos pt_crash::c_fg_angles'
+          # Spec 010: `LatLng`'s approximate equality, about eight minutes per harness (2026-10-28).
+          - part: values-latlng
+            filters: 'll_apx::'
+          # Spec 011: PointRegion's covering and vertex law (one harness per face), CellUnion's
+          # three-cell bounds and areas, its two-cell cap bound, and L-PR-01 (2026-10-28).
+          - part: values-regions
+            filters: 'pr_bnd::p_prbnd_03 pr_reg::p_prreg_06 pr_reg::p_prreg_03__f pr_crash::c_cell_union_bound uf_bnd::p_ubnd_01__n2 uf_bnd::p_ubnd_01__n3 uf_bnd::p_ubnd_02__n1 uf_area::p_uarea_02__n2 uf_area::p_uarea_02__n3 uf_area::p_uarea_03__n2 uf_area::p_uarea_03__n3 uf_crash::c_approx_area__n3 uf_crash::c_cap_bound__n uf_crash::c_rect_bound__n2 uf_crash::c_rect_bound__n3'
+          # Spec 012: the adaptors' bounds from one member, the rectangle law at 2 and 3 members,
+          # the vertex law at 2 (2026-10-30).
+          - part: values-adaptors
+            filters: 'ad_crash::c_bounds__ru__n1 ad_crash::c_bounds__ri__n1 ad_crash::c_bounds__ru__n2 ad_crash::c_bounds__ri__n2 ad_mean::p_adbnd_01__n3 ad_reg::p_adreg_02__n2 ad_reg::p_adreg_03__n2 ad_reg::p_adreg_03__n3'
     env:
       # One CBMC per physical core: these harnesses run close to their 30-minute limit,
       # and hyperthread contention slows them (EVALUATION.md, "Measurements"). The union and
@@ -348,8 +371,10 @@ jobs:
     runs-on: ubuntu-latest
     # The most a hosted job may run. The 226 mutants take about 9 hours on the workstation
     # (2026-10-14), more than one job's 6, so each spec's mutants are a leg: series N holds
-    # spec 00(N+1)'s (M-0NN spec 001, … M-6NN spec 007, M-7NN spec 008), and M-8NN the
-    # documented panics' (2026-10-26; eight, about two minutes). Without the
+    # spec 00(N+1)'s (M-0NN spec 001, … M-6NN spec 007, M-7NN spec 008), M-8NN the
+    # documented panics' (2026-10-26; eight, about two minutes) and spec 009's, and M-9NN specs
+    # 010's (M-901 … M-937) and 011's (M-950 … M-973; a series 10 would be selected by series 1's
+    # `M-1*`). Without the
     # counterexample re-runs, which run-mutants.sh now skips, the workstation took 33, 50 and
     # 54 minutes for specs 001–003, about 3.8, 1.2 and 1.9 hours for specs 004–006, whose
     # weekly-tier mutants have 60 minutes, and 22 minutes for spec 008's first 40 (2026-10-25).
@@ -360,7 +385,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        series: ['0', '1', '2', '3', '4', '5', '6', '7', '8']
+        series: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
     env:
       # The weekly tier's limit, as the slow job's values legs have it: run-mutants.sh's
       # default of 30 minutes is too short for the weekly-tier mutants of specs 004–006.

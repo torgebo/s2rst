@@ -78,3 +78,12 @@ fn directed_hausdorff_distance_to_a_short_interval_near_zero() {
     assert_eq!(y.complement_center(), -PI);
     assert_eq!(x.directed_hausdorff_distance(y), 2.0);
 }
+
+/// Spec 011 K4 (FR-019): `from_point` panics in debug builds for NaN or a point outside
+/// [−π, π], as upstream's `S1Interval::FromPoint` checks.
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "is_valid_pair")]
+fn from_point_panics_for_nan() {
+    let _ = Interval::from_point(f64::NAN);
+}

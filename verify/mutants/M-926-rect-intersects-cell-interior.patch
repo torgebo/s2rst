@@ -1,0 +1,17 @@
+Mutant: M-926
+Targets: P-LREG-01, P-LREG-02
+Expect-Fail: ll_reg::p_lreg_01, ll_reg::p_lreg_02
+Defect: `Region for Rect::intersects_cell` is interior intersection, which misses a bound that only touches
+
+diff --git a/core/src/s2/region.rs b/core/src/s2/region.rs
+--- a/core/src/s2/region.rs
++++ b/core/src/s2/region.rs
+@@ -120,7 +120,7 @@
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {
+         // Conservative: check if rect intersects cell's rect bound.
+-        self.intersects(cell.rect_bound())
++        self.interior_intersects(cell.rect_bound())
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {

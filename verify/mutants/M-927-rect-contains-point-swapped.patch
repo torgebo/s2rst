@@ -1,0 +1,18 @@
+Mutant: M-927
+Targets: P-LMEM-03, P-LREG-02
+Expect-Fail: ll_reg::p_lmem_03, ll_reg::p_lreg_02
+Defect: `Rect::contains_point` tests the point's `LatLng` with its coordinates swapped
+
+diff --git a/core/src/s2/rect.rs b/core/src/s2/rect.rs
+--- a/core/src/s2/rect.rs
++++ b/core/src/s2/rect.rs
+@@ -349,7 +349,8 @@
+     /// Reports whether this rectangle contains the given Point.
+     #[inline]
+     pub fn contains_point(self, p: Point) -> bool {
+-        self.contains_lat_lng(LatLng::from_point(p))
++        let ll = LatLng::from_point(p);
++        self.contains_lat_lng(LatLng::new(ll.lng, ll.lat))
+     }
+ 
+     /// Reports whether this rectangle contains the other rectangle.

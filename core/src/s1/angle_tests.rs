@@ -84,6 +84,44 @@ fn prop_normalized_is_the_exact_remainder(bits: u64) -> bool {
         && Angle::from_radians(n).normalized().radians().to_bits() == n.to_bits()
 }
 
+/// Spec 010 FR-017: the shared `remainder_2pi` (without `normalized`'s −π to π) is the exact
+/// IEEE remainder, bit for bit, at every magnitude, the sign of a zero result included.
+#[quickcheck]
+fn prop_shared_remainder_is_exact(bits: u64) -> bool {
+    let x = f64::from_bits(bits);
+    let r = super::remainder_2pi(x);
+    if !x.is_finite() {
+        return r.is_nan();
+    }
+    r.to_bits() == crate::test_util::ieee_remainder_2pi(x).to_bits() && r.abs() <= PI
+}
+
+/// Spec 010 FR-017: the ties `(2k + 1)·π`, where the remainder's quotient rounds to the even
+/// neighbour: ±π and ±5π keep their sign, ±3π and ±7π change it.
+#[test]
+fn shared_remainder_ties_round_to_even() {
+    for (k, keeps) in [(1.0, true), (3.0, false), (5.0, true), (7.0, false)] {
+        for x in [k * PI, -k * PI] {
+            let r = super::remainder_2pi(x);
+            assert_eq!(
+                r.to_bits(),
+                crate::test_util::ieee_remainder_2pi(x).to_bits(),
+                "{x}"
+            );
+            let want = if keeps {
+                PI.copysign(x)
+            } else {
+                -PI.copysign(x)
+            };
+            assert_eq!(r, want, "{x}");
+        }
+    }
+    assert_eq!(
+        super::remainder_2pi(-2.0 * PI).to_bits(),
+        (-0.0f64).to_bits()
+    );
+}
+
 /// FR-022: exact ties round to even, as C++ on x86-64 (`MathUtil::Round<int32_t>` is
 /// `cvtsd2si`). The radians are the survey probe's, whose degrees × 10⁶ (or × 10⁷) is exactly
 /// the half integer named; the results are C++'s

@@ -42,8 +42,11 @@ decoding = []
 # `s1::Interval`) from spec 004, `ri_*` (the real interval `r1::Interval`) and `rl_*` (the
 # rectangle `s2::Rect`) from spec 005, `ur_*` (the u-v rectangle `r2::Rect`) and `pt_*` (the
 # point `s2::Point`) from spec 006, `ca_*` (the chord angle `s1::ChordAngle`) and `ag_*` (the
-# angle `s1::Angle`) from spec 007, `cp_*` (the cap `s2::Cap`) from spec 008. `make verify-values`
-# runs all nine; `P=<part>` one, selected
+# angle `s1::Angle`) from spec 007, `cp_*` (the cap `s2::Cap`) from spec 008, `ll_*` (the
+# latitude–longitude `s2::LatLng`) from spec 010, which also adds `ll_reg` (the rectangle's
+# `Region` laws), and `pr_*` (`PointRegion`) and `uf_*` (`CellUnion`'s floating-point methods,
+# also behind `cellunion`) from spec 011, and `ad_*` (the region adaptors) from spec 012. `make
+# verify-values` runs all twelve; `P=<part>` one, selected
 # by module name (`--harness ri_exp::`), since a bare prefix matches inside other names.
 values = []
 # The weekly slow tier: harnesses over the per-change budget (research R12, R15), run by

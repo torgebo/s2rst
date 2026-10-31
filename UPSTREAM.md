@@ -1,7 +1,7 @@
 # Upstream issues
 
 Undefined or wrong behaviour in the upstream S2 libraries, found while porting and formally
-verifying s2rst (specs 001–008 under `specs/`). None has been reported upstream yet; each
+verifying s2rst (specs 001–010 under `specs/`). None has been reported upstream yet; each
 numbered entry has a follow-up task that records that decision. Bugs in the verification tools
 (Kani and CBMC) are in `KANI_ISSUES.md`.
 
@@ -31,6 +31,8 @@ because running it is undefined behaviour or needs a debug build.
 | [U-013](#u-013-pointcross-breaks-its-documented-sign-laws) | Go `Point.PointCross` | the documented laws (2)–(4) fail for distinct parallel points, not only for `p == ±op`: `(1, 0, 0)` and `(1 + 2ε, 0, 0)`, both unit | wrong documentation | the same behaviour, the true exception documented | 006 T058 |
 | [U-014](#u-014-s1angle-e5e6e7-outside-the-int32-range) | C++ `S1Angle::e5`/`e6`/`e7`, `S1ChordAngle::e5`/`e6`/`e7` | outside the `int32` range, release builds return −2147483648 (+∞ and large positive angles come back negative) and debug builds fail a check, also for `S1ChordAngle::Infinity()`, a valid value; ties round to even on x86-64 and away from zero elsewhere | wrong results (angles beyond ±214.7° for E7, the `Infinity()` sentinel) | saturates, ties to even, documented | 007 T061 |
 | [U-015](#u-015-s2capunion-does-not-always-enclose-both-caps) | C++ `S2Cap::Union` | the result does not contain both caps on 337 of 1,089 random and special reference rows, by rounding (one ulp of the radius in the example), though its comment says it "encloses" them | a union used as a bound can miss points of one cap by an ulp | adds the conversion errors to the radius (7 rows of 1,089 still miss), documented as a deviation; `add_cap` for guaranteed containment | 008 T060 |
+| [U-016](#u-016-s2latlngrectgetcapbound-misses-contained-points) | C++ `S2LatLngRect::GetCapBound` | the bounding cap misses points the rectangle contains, by up to an ulp of π/2 in angle: the north pole as a rectangle misses a point one ulp past the pole, and a cap around the centre a point a few ulps inside a vertex; 10,507,883 of 74,647,924 adversarial contained points, 114 of the survey's 129,595 | a bound used by the coverer and the `Region` contract misses points near the rectangle's boundary | widened by 10⁻¹⁵ rad and 8ε of the length², a documented deviation | 010 T014 |
+| [U-017](#u-017-s2cell-bounds-miss-points-of-containss-margin) | C++ `S2Cell::GetCapBound`, `GetRectBound` with `Contains(const S2Point&)` | `Contains(p)` accepts points up to `(5/3)·DBL_EPSILON` outside the cell in u-v (issue #463), and the two bounds cover the cell alone: 118,093 and 36,315 of 1,008,724 contained adversarial points lie outside the cap and the rectangle bound | the `Region` contract's "the bounds contain the region" fails at the cell's margin; a covering built from a cell's bounds can miss a point the cell contains | kept, a documented exception (the maintainer's choice, spec 012 FR-016); the bounds contain the cell's own points | 012 T005 |
 
 ## U-001: `S2CellId::level()` on id 0
 
@@ -448,6 +450,82 @@ return S2Cap(result_center, result_radius);
   the other cap by construction (proven, spec 008 P-CPGRO-02). Candidate, not reported.
 - **Follow-up:** `specs/008-formal-verify-cap/tasks.md` T060; the spec-008 part of
   `verify/values/EVALUATION.md` ("Upstream findings").
+
+## U-016: `S2LatLngRect::GetCapBound` misses contained points
+
+[`s2latlng_rect.cc:298–332`](https://github.com/google/s2geometry/blob/37a4501d5daea8da8bb2aa159b23ea5c61083a72/src/s2/s2latlng_rect.cc#L298-L332),
+with the `S2Region` contract in `s2region.h`: "Returns a bounding spherical cap that contains
+the region."
+
+```cpp
+S2Cap pole_cap(S2Point(0, 0, pole_z),
+               S1Angle::Radians((1 + 2 * DBL_EPSILON) * pole_angle));
+...
+  S2Cap mid_cap(GetCenter().ToPoint(), S1Angle::Zero());
+  for (int k = 0; k < 4; ++k) mid_cap.AddPoint(GetVertex(k).ToPoint());
+```
+
+- **Why.** `Contains(const S2Point&)` tests the point's `S2LatLng`, whose `atan2` puts the
+  latitude within about an ulp of π/2 (2.2·10⁻¹⁶ rad) of the point's near the poles, so a
+  contained point can lie that far outside the rectangle's true region. The pole cap allows
+  only a relative `2ε` of its angle, and the cap around the centre is built from the four
+  vertices alone.
+- **Inputs** (`specs/010-formal-verify-latlng/probe/cpp/capbound_cases.cc`, observed, Release,
+  x86-64):
+  - the rectangle `[π/2, π/2] × [−π, π]` (the north pole) and the point of latitude
+    1.5707963267948968, longitude 0.46539129845781746 (one ulp past the pole): contained, and
+    outside the pole cap of radius 0 (its squared chord is 2.6·10⁻³²);
+  - the rectangle `[1.0712215270180785, 1.0712376688984673] × [−0.8905155217671079,
+    −0.8905155217089906]` and the point (1.0712215270180785, −0.8905155217089911), on the low
+    latitude bound five ulps inside the high longitude bound: contained, and outside the cap
+    around the centre by 1.8·10⁻²⁴ of squared chord.
+- **How often.** Spec 010's survey (section G: 20,000 random rectangles, 7 points on and inside
+  each boundary) found 114 of 129,595 contained points outside, all in pole caps, in C++ and the
+  library alike; its planning probe R0 (a million rectangles near and at the poles, points on
+  the bounds and a few ulps inside them) found 10,507,883 of 74,647,924, 489,465 of them in caps
+  around the centre.
+- **s2rst:** `Rect::cap_bound` computes and chooses upstream's cap, then widens it by 10⁻¹⁵ rad
+  (`Cap::expanded`) and by 8ε of its squared chord length, a documented deviation; R0 then
+  finds no miss. The centre stays upstream's bit for bit, and the C++ vectors mark the radii as
+  deviation rows. Candidate, not reported.
+- **Follow-up:** `specs/010-formal-verify-latlng/tasks.md` T014; the spec-010 part of
+  `verify/values/EVALUATION.md` ("Upstream findings").
+
+## U-017: `S2Cell` bounds miss points of `Contains`'s margin
+
+[`s2cell.cc:291–320`](https://github.com/google/s2geometry/blob/37a4501d5daea8da8bb2aa159b23ea5c61083a72/src/s2/s2cell.cc#L291-L320)
+(`Contains(const S2Point&)`), with `GetCapBound` and `GetRectBound` in the same file and the
+`S2Region` contract in `s2region.h` ("Returns a bounding spherical cap that contains the region").
+
+```cpp
+  // Expand the (u,v) bound to ensure that
+  //   S2Cell(S2CellId(p)).Contains(p)
+  // is always true. ...
+  return uv_.Expanded((5/3.) * DBL_EPSILON).Contains(uv);
+```
+
+- **Why.** The margin makes a point's own leaf cell contain it, but the bounds were not grown to
+  match: `GetCapBound` adds the four vertices with `AddPoint` (no margin), `GetRectBound` grows
+  the vertices' latitudes and longitudes by `2·DBL_EPSILON` radians. A point just outside the cell
+  in u-v, within the margin, is contained and can lie outside either bound.
+- **Inputs** (`specs/012-formal-verify-cell-bounds-adaptors/probe/`, observed, Release,
+  x86-64, the library alike):
+  - the level-1 cell `0400000000000000` (face 0, u-v bound [−1, 0]²) and the point
+    `(1, 2⁻⁵², 2⁻⁵²)` (u = v = `DBL_EPSILON`, beyond the corner (0, 0)): contained, outside the cap
+    bound;
+  - the cell `4340000000000000` and the point with bits `(bcad89d89d89d89e, 3fd89d89d89d89d5,
+    3fed89d89d89d89e)`, an edge midpoint moved out by `DBL_EPSILON`: contained, outside the
+    rectangle bound.
+- **How often.** The survey (20,000 random cells of every level, each with its corners and edge
+  midpoints moved outward by 0 to 2 `DBL_EPSILON` in u-v, and 4 interior points): of 1,008,724
+  contained points, 118,093 outside the cap bound and 36,315 outside the rectangle bound, every
+  one beyond the cell's u-v bound; the 240,000 points on or inside it all lie in both bounds.
+- **s2rst:** keeps upstream's bounds (the maintainer's choice, 2026-10-30): `Cell::contains_point`,
+  `cap_bound` and `rect_bound` document that the bounds hold the cell's own points but not every
+  point of the margin, and `CORE_TRAITS.md` names the exception. `cell_tests::bounds_miss_the_margin`
+  pins both inputs. Candidate, not reported.
+- **Follow-up:** `specs/012-formal-verify-cell-bounds-adaptors/tasks.md` T005; the spec-012 part
+  of `verify/values/EVALUATION.md`.
 
 ## Upstream behaviours s2rst does not follow
 

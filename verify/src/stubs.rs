@@ -49,7 +49,7 @@ use std::sync::Mutex;
 
 /// Slots per table. A harness's statement touches at most a handful of keys; an eleventh key
 /// gets a fresh, unrecorded value (only more behaviours, research R6).
-const SLOTS: usize = 10;
+pub(crate) const SLOTS: usize = 10;
 
 /// A pure function's memory: up to [`SLOTS`] keys of `K` 64-bit words and their values.
 pub struct Table<const K: usize> {
@@ -59,7 +59,7 @@ pub struct Table<const K: usize> {
 }
 
 impl<const K: usize> Table<K> {
-    const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Table {
             keys: [[0; K]; SLOTS],
             vals: [0; SLOTS],
@@ -67,12 +67,12 @@ impl<const K: usize> Table<K> {
         }
     }
 
-    fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.used = 0;
     }
 
     /// The value stored for `key`, or `fresh()`, stored if a slot is free, and returned.
-    fn get(&mut self, key: [u64; K], fresh: impl FnOnce() -> u64) -> u64 {
+    pub(crate) fn get(&mut self, key: [u64; K], fresh: impl FnOnce() -> u64) -> u64 {
         for i in 0..SLOTS {
             if i < self.used {
                 let mut eq = true;
@@ -105,6 +105,31 @@ static VERTS: Mutex<[[u64; 3]; 4]> = Mutex::new([[0; 3]; 4]);
 static PAIR_VERTS: Mutex<[[[u64; 3]; 4]; 2]> = Mutex::new([[[0; 3]; 4]; 2]);
 static PAIR_IDS: Mutex<([u64; 2], usize)> = Mutex::new(([0; 2], 0));
 static EDGES: Mutex<[[u64; 3]; 4]> = Mutex::new([[0; 3]; 4]);
+// Spec 010: the pure contracts and the stubs of `LatLng::from_point` and `Cell::rect_bound`.
+static SIN: Mutex<Table<1>> = Mutex::new(Table::new());
+static COS: Mutex<Table<1>> = Mutex::new(Table::new());
+static ASIN: Mutex<Table<1>> = Mutex::new(Table::new());
+static SQRT: Mutex<Table<1>> = Mutex::new(Table::new());
+static ATAN2: Mutex<Table<2>> = Mutex::new(Table::new());
+static SIN_COS_S: Mutex<Table<1>> = Mutex::new(Table::new());
+static SIN_COS_C: Mutex<Table<1>> = Mutex::new(Table::new());
+static FP_LAT: Mutex<Table<3>> = Mutex::new(Table::new());
+static FP_LNG: Mutex<Table<3>> = Mutex::new(Table::new());
+static CELL_BOUND: Mutex<Table<1>> = Mutex::new(Table::new());
+static CELL_BOUNDS: Mutex<[[u64; 4]; SLOTS]> = Mutex::new([[0; 4]; SLOTS]);
+static ANGLE_DEG: Mutex<Table<1>> = Mutex::new(Table::new());
+static ANGLE_E5: Mutex<Table<1>> = Mutex::new(Table::new());
+static ANGLE_E6: Mutex<Table<1>> = Mutex::new(Table::new());
+static ANGLE_E7: Mutex<Table<1>> = Mutex::new(Table::new());
+static ANGLE_UE6: Mutex<Table<1>> = Mutex::new(Table::new());
+static ANGLE_UE7: Mutex<Table<1>> = Mutex::new(Table::new());
+// Spec 011: the pure `CellId::from_point`, the cells' cap bounds, areas and average areas.
+static LEAF: Mutex<Table<3>> = Mutex::new(Table::new());
+static CELL_CAP: Mutex<Table<1>> = Mutex::new(Table::new());
+static CELL_CAPS: Mutex<[[u64; 4]; SLOTS]> = Mutex::new([[0; 4]; SLOTS]);
+static CELL_AREA: Mutex<Table<1>> = Mutex::new(Table::new());
+static AVG_AREA: Mutex<Table<1>> = Mutex::new(Table::new());
+static CELL_CONTAINS: Mutex<Table<4>> = Mutex::new(Table::new());
 
 /// Clears every table. Kani runs each harness from a fresh state; a harness that uses a lemma
 /// stub calls this first anyway, so the intent is explicit (contracts/harness-conventions.md).
@@ -115,9 +140,29 @@ pub fn reset() {
     APPROX.lock().unwrap().clear();
     FROM_ANGLE.lock().unwrap().clear();
     *NORMALIZE_USED.lock().unwrap() = 0;
+    SIN.lock().unwrap().clear();
+    COS.lock().unwrap().clear();
+    ASIN.lock().unwrap().clear();
+    SQRT.lock().unwrap().clear();
+    ATAN2.lock().unwrap().clear();
+    SIN_COS_S.lock().unwrap().clear();
+    SIN_COS_C.lock().unwrap().clear();
+    FP_LAT.lock().unwrap().clear();
+    FP_LNG.lock().unwrap().clear();
+    CELL_BOUND.lock().unwrap().clear();
+    LEAF.lock().unwrap().clear();
+    CELL_CAP.lock().unwrap().clear();
+    CELL_AREA.lock().unwrap().clear();
+    AVG_AREA.lock().unwrap().clear();
+    CELL_CONTAINS.lock().unwrap().clear();
+    for t in [
+        &ANGLE_DEG, &ANGLE_E5, &ANGLE_E6, &ANGLE_E7, &ANGLE_UE6, &ANGLE_UE7,
+    ] {
+        t.lock().unwrap().clear();
+    }
 }
 
-fn bits3(p: Point) -> [u64; 3] {
+pub(crate) fn bits3(p: Point) -> [u64; 3] {
     [p.0.x.to_bits(), p.0.y.to_bits(), p.0.z.to_bits()]
 }
 
@@ -431,7 +476,7 @@ pub fn pure_approx_eq_angle(a: Point, b: Point, eps: s2rst::s1::Angle) -> bool {
 // ---- the abstract cell (research R7)
 // -------------------------------------------------------------
 
-fn any_box_point() -> Point {
+pub(crate) fn any_box_point() -> Point {
     let (x, y, z): (f64, f64, f64) = (kani::any(), kani::any(), kani::any());
     kani::assume(x.abs() <= 1.0 && y.abs() <= 1.0 && z.abs() <= 1.0);
     Point(Vector { x, y, z })
@@ -529,4 +574,332 @@ pub fn any_uv_bound(_i: i32, _j: i32, _level: s2rst::s2::Level) -> s2rst::r2::Re
         x: s2rst::r1::Interval { lo: b[0], hi: b[1] },
         y: s2rst::r1::Interval { lo: b[2], hi: b[3] },
     }
+}
+
+// ---- spec 010: sqrt's contract and the pure contracts (research R5) ----------------------------
+
+/// `sqrt`'s contract: NaN for NaN and for `x < 0`; `x` itself for ±0 and +∞; otherwise a positive
+/// finite value, at most 1 when `x ≤ 1` and at least 1 when `x ≥ 1`. IEEE-754's `sqrt` is
+/// correctly rounded, so the real one satisfies it (checked by `libm_contracts::sqrt`). The
+/// checker models `sqrt` itself, but not as one value per input (memory "CBMC sqrt is
+/// nondeterministic"), so a restatement that takes a root again needs [`pure_sqrt`].
+pub fn sqrt_contract(x: f64) -> f64 {
+    if x.is_nan() || x < 0.0 {
+        return f64::NAN;
+    }
+    if x == 0.0 || x == f64::INFINITY {
+        return x;
+    }
+    let r: f64 = kani::any();
+    kani::assume(r > 0.0 && r.is_finite());
+    if x <= 1.0 {
+        kani::assume(r <= 1.0);
+    }
+    if x >= 1.0 {
+        kani::assume(r >= 1.0);
+    }
+    r
+}
+
+/// One value per input: the stored one, or `fresh()`'s, stored.
+fn pure1(t: &Mutex<Table<1>>, x: f64, fresh: impl FnOnce() -> f64) -> f64 {
+    f64::from_bits(t.lock().unwrap().get([x.to_bits()], || fresh().to_bits()))
+}
+
+/// `sin`, pure: [`sin_contract`]'s values, one per input (spec 010 research R5: a restatement
+/// that calls `sin` again gets the library's value). The C library's functions are
+/// deterministic (`TRUSTED_BASE.md`), so the real `sin` is one such function.
+pub fn pure_sin(x: f64) -> f64 {
+    pure1(&SIN, x, || sin_contract(x))
+}
+
+/// `cos`, pure: [`cos_contract`]'s values, one per input.
+pub fn pure_cos(x: f64) -> f64 {
+    pure1(&COS, x, || cos_contract(x))
+}
+
+/// `asin`, pure: [`asin_contract`]'s values, one per input.
+pub fn pure_asin(x: f64) -> f64 {
+    pure1(&ASIN, x, || asin_contract(x))
+}
+
+/// `sqrt`, pure: [`sqrt_contract`]'s values, one per input.
+pub fn pure_sqrt(x: f64) -> f64 {
+    pure1(&SQRT, x, || sqrt_contract(x))
+}
+
+/// `atan2`, pure: [`atan2_contract`]'s values, one per pair.
+pub fn pure_atan2(y: f64, x: f64) -> f64 {
+    let v = ATAN2.lock().unwrap().get([y.to_bits(), x.to_bits()], || {
+        atan2_contract(y, x).to_bits()
+    });
+    f64::from_bits(v)
+}
+
+/// `sin_cos`, pure: [`sin_cos_contract`]'s pairs, one per input.
+pub fn pure_sin_cos(x: f64) -> (f64, f64) {
+    let (s, c) = sin_cos_contract(x);
+    let s = pure1(&SIN_COS_S, x, || s);
+    let c = pure1(&SIN_COS_C, x, || c);
+    (s, c)
+}
+
+// ---- spec 010: `LatLng::from_point` and `Cell::rect_bound` (research R6) -----------------------
+
+/// `LatLng::from_point`, pure: for a point without a NaN coordinate any valid `LatLng`
+/// (P-LLFP-02), for one with a NaN coordinate any pair with a NaN coordinate (the real function's
+/// latitude or longitude is NaN there); one value per point.
+pub fn pure_from_point(p: Point) -> s2rst::s2::LatLng {
+    let k = bits3(p);
+    let nan = p.0.x.is_nan() || p.0.y.is_nan() || p.0.z.is_nan();
+    let lat = f64::from_bits(FP_LAT.lock().unwrap().get(k, || {
+        let v: f64 = kani::any();
+        kani::assume(nan || v.abs() <= FRAC_PI_2);
+        v.to_bits()
+    }));
+    let lng = f64::from_bits(FP_LNG.lock().unwrap().get(k, || {
+        let v: f64 = kani::any();
+        kani::assume(if nan {
+            lat.is_nan() || v.is_nan()
+        } else {
+            v.abs() <= PI
+        });
+        v.to_bits()
+    }));
+    s2rst::s2::LatLng::from_radians(lat, lng)
+}
+
+/// The stored bound of cell `c`, or `fresh()`'s, stored.
+fn cell_bound(c: Cell, fresh: impl FnOnce() -> s2rst::s2::Rect) -> s2rst::s2::Rect {
+    let mut t = CELL_BOUND.lock().unwrap();
+    let used = t.used;
+    let slot = t.get([c.id().id()], || used as u64) as usize;
+    let mut b = CELL_BOUNDS.lock().unwrap();
+    if slot == used && used < SLOTS {
+        let r = fresh();
+        b[slot] = [
+            r.lat.lo.to_bits(),
+            r.lat.hi.to_bits(),
+            r.lng.lo.to_bits(),
+            r.lng.hi.to_bits(),
+        ];
+        return r;
+    }
+    if slot >= SLOTS {
+        return fresh();
+    }
+    let v = b[slot];
+    s2rst::s2::Rect {
+        lat: s2rst::r1::Interval {
+            lo: f64::from_bits(v[0]),
+            hi: f64::from_bits(v[1]),
+        },
+        lng: s2rst::s1::Interval {
+            lo: f64::from_bits(v[2]),
+            hi: f64::from_bits(v[3]),
+        },
+    }
+}
+
+/// Any rectangle `crate::rect_spec` accepts.
+pub(crate) fn any_valid_rect() -> s2rst::s2::Rect {
+    let r = s2rst::s2::Rect {
+        lat: s2rst::r1::Interval {
+            lo: kani::any(),
+            hi: kani::any(),
+        },
+        lng: s2rst::s1::Interval {
+            lo: kani::any(),
+            hi: kani::any(),
+        },
+    };
+    kani::assume(crate::rect_spec::valid(r));
+    r
+}
+
+/// `Cell::rect_bound`, pure: one valid, non-empty rectangle per cell (L-LL-01: the real bound of
+/// every valid cell is one).
+pub fn any_cell_bound(c: Cell) -> s2rst::s2::Rect {
+    cell_bound(c, || {
+        let r = any_valid_rect();
+        kani::assume(!crate::rect_spec::empty(r));
+        r
+    })
+}
+
+/// `Cell::rect_bound`'s contract (spec 010 research R6): one valid rectangle per cell that
+/// contains the `LatLng` of each of the cell's four vertices, as [`fixed_vertex`] and
+/// [`pure_from_point`] give them. The real bound contains its cell's vertices (upstream's
+/// conservative bound); `libm_contracts::cell_rect_bound` checks it on every cell to level 5
+/// and 10⁶ random cells, with the real `from_point` of the real vertices. A harness using it
+/// draws the abstract cell first.
+pub fn cell_rect_bound_contract(c: Cell) -> s2rst::s2::Rect {
+    cell_bound(c, || {
+        let r = any_valid_rect();
+        for k in CellVertex::ALL {
+            let ll = pure_from_point(fixed_vertex(c, k));
+            kani::assume(crate::rect_spec::member(
+                r,
+                ll.lat.radians(),
+                ll.lng.radians(),
+            ));
+        }
+        r
+    })
+}
+
+// ---- spec 010: `Angle`'s constructors, uninterpreted --------------------------------------------
+
+/// One angle per key from `t`: any `f64`, the same for the same key. An uninterpreted function:
+/// it allows every behaviour of the real constructor (whose meaning spec 007 proves, P-AGCNV-01,
+/// P-AGEF-01), so a statement proven with it holds for the real one, and it spares the checker
+/// two copies of the constructor's arithmetic when a statement compares `LatLng`'s constructors
+/// with `Angle`'s (P-LLCON-01).
+fn pure_angle(t: &Mutex<Table<1>>, key: u64) -> s2rst::s1::Angle {
+    s2rst::s1::Angle::from_radians(f64::from_bits(
+        t.lock()
+            .unwrap()
+            .get([key], || kani::any::<f64>().to_bits()),
+    ))
+}
+
+/// `Angle::from_degrees`, uninterpreted.
+pub fn pure_angle_from_degrees(x: f64) -> s2rst::s1::Angle {
+    pure_angle(&ANGLE_DEG, x.to_bits())
+}
+
+/// `Angle::from_e5`, uninterpreted.
+pub fn pure_angle_from_e5(e: i32) -> s2rst::s1::Angle {
+    pure_angle(&ANGLE_E5, u64::from(e.cast_unsigned()))
+}
+
+/// `Angle::from_e6`, uninterpreted.
+pub fn pure_angle_from_e6(e: i32) -> s2rst::s1::Angle {
+    pure_angle(&ANGLE_E6, u64::from(e.cast_unsigned()))
+}
+
+/// `Angle::from_e7`, uninterpreted.
+pub fn pure_angle_from_e7(e: i32) -> s2rst::s1::Angle {
+    pure_angle(&ANGLE_E7, u64::from(e.cast_unsigned()))
+}
+
+/// `Angle::from_unsigned_e6`, uninterpreted.
+pub fn pure_angle_from_unsigned_e6(e: u32) -> s2rst::s1::Angle {
+    pure_angle(&ANGLE_UE6, u64::from(e))
+}
+
+/// `Angle::from_unsigned_e7`, uninterpreted.
+pub fn pure_angle_from_unsigned_e7(e: u32) -> s2rst::s1::Angle {
+    pure_angle(&ANGLE_UE7, u64::from(e))
+}
+
+// ---- spec 011: `PointRegion` and `CellUnion`'s floating-point methods (research R5) -----------
+
+/// `sqrt_contract`, and the root lies between `x` and 1: true of the correctly rounded root, since
+/// `x` and 1 are representable and the exact root lies between them (checked by
+/// `libm_contracts::sqrt`). Spec 011 R0: `sqrt_contract` alone lets the root of `1 + u² + v²` be
+/// 10³⁰⁰, so the normalised cell vertex underflows and leaves its cell, which the real one never
+/// does.
+pub fn sqrt_between(x: f64) -> f64 {
+    let r = sqrt_contract(x);
+    if x.is_finite() && x > 0.0 {
+        kani::assume(if x >= 1.0 { r <= x } else { r >= x });
+    }
+    r
+}
+
+/// `CellId::from_point`, pure: one valid leaf cell per point (L-PR-01: the real function returns a
+/// valid leaf wherever it returns; its debug-build panics, spec 011 K4, are its own crash proof's).
+/// The covering law and the union's point test call it twice on one point, and its projection
+/// takes a square root, which is not one value per input to the checker (KI-007).
+pub fn pure_leaf(p: &Point) -> s2rst::s2::CellId {
+    s2rst::s2::CellId(
+        LEAF.lock()
+            .unwrap()
+            .get(bits3(*p), || crate::domain::any_valid_at(30).0.id()),
+    )
+}
+
+/// `Cell::cap_bound`, pure: one non-empty cap per cell, its centre in the unit box and its
+/// squared radius in [0, 4]. The real bound's centre is a normalised point and its radius a chord
+/// length (`libm_contracts::cell_cap_bound` checks both on every cell to level 5 and 10⁶ random
+/// cells).
+pub fn pure_cell_cap(c: Cell) -> Cap {
+    let mut t = CELL_CAP.lock().unwrap();
+    let used = t.used;
+    let slot = t.get([c.id().id()], || used as u64) as usize;
+    let mut caps = CELL_CAPS.lock().unwrap();
+    if slot == used && used < SLOTS {
+        let cap = Cap::from_center_chord_angle(any_box_point(), any_chord_len());
+        let p = cap.center();
+        caps[slot] = [
+            p.0.x.to_bits(),
+            p.0.y.to_bits(),
+            p.0.z.to_bits(),
+            cap.chord_radius().length2().to_bits(),
+        ];
+        return cap;
+    }
+    if slot >= SLOTS {
+        return Cap::from_center_chord_angle(any_box_point(), any_chord_len());
+    }
+    let v = caps[slot];
+    Cap::from_center_chord_angle(
+        from3([v[0], v[1], v[2]]),
+        ChordAngle::from_length2(f64::from_bits(v[3])),
+    )
+}
+
+/// A chord length in [0, 4].
+fn any_chord_len() -> ChordAngle {
+    let l: f64 = kani::any();
+    kani::assume((0.0..=4.0).contains(&l));
+    ChordAngle::from_length2(l)
+}
+
+/// `CellId::to_point`, abstracted: any point in the unit box (the real centre is a normalised
+/// point; `libm_contracts::cell_cap_bound` checks it).
+pub fn any_center(_id: s2rst::s2::CellId) -> Point {
+    any_box_point()
+}
+
+/// `Cell::approx_area` or `Cell::exact_area`, pure and uninterpreted: one finite non-negative
+/// value per cell. The statements that use it are about the union's sum, not the values.
+pub fn pure_cell_area(c: Cell) -> f64 {
+    f64::from_bits(CELL_AREA.lock().unwrap().get([c.id().id()], || {
+        let a: f64 = kani::any();
+        kani::assume(a.is_finite() && a >= 0.0);
+        a.to_bits()
+    }))
+}
+
+/// `Cell::average_area_for_level`, pure and uninterpreted: one positive finite value per level.
+/// The real function's `powi` is not one value per input to the checker (KI-013), so a statement
+/// that compares two of its results needs this; P-UAREA-04 pins the real function to upstream's
+/// `ldexp` by enumeration.
+pub fn pure_avg_area(level: s2rst::s2::Level) -> f64 {
+    f64::from_bits(
+        AVG_AREA
+            .lock()
+            .unwrap()
+            .get([u64::from(level.as_u8())], || {
+                let a: f64 = kani::any();
+                kani::assume(a.is_finite() && a > 0.0);
+                a.to_bits()
+            }),
+    )
+}
+
+/// `Cell::contains_point`, pure and uninterpreted: one answer per cell and point. A statement
+/// that a method answers as `contains_point` does (P-PRCEL-02) is then about the method's code,
+/// not two copies of the projection's divisions, which time out (spec 011, 2026-10-28).
+pub fn pure_cell_contains(c: Cell, p: Point) -> bool {
+    let b = bits3(p);
+    CELL_CONTAINS
+        .lock()
+        .unwrap()
+        .get([c.id().id(), b[0], b[1], b[2]], || {
+            u64::from(kani::any::<bool>())
+        })
+        == 1
 }

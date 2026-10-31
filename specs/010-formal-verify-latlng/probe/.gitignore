@@ -1,0 +1,4 @@
+# The full outputs (3.8 MB each) regenerate deterministically; compare.txt and the
+# stderr summaries are the committed evidence (README.md).
+rust/survey_rust.txt
+cpp/survey_cpp.txt

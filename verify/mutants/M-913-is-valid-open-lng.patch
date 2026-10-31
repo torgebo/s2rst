@@ -1,0 +1,17 @@
+Mutant: M-913
+Targets: P-LLVAL-01
+Expect-Fail: ll_val::p_llval_01
+Defect: `is_valid` excludes the longitudes ±π
+
+diff --git a/core/src/s2/latlng.rs b/core/src/s2/latlng.rs
+--- a/core/src/s2/latlng.rs
++++ b/core/src/s2/latlng.rs
+@@ -166,7 +166,7 @@
+     /// in [-π, π].
+     #[inline]
+     pub fn is_valid(self) -> bool {
+-        self.lat.radians().abs() <= FRAC_PI_2 && self.lng.radians().abs() <= PI
++        self.lat.radians().abs() <= FRAC_PI_2 && self.lng.radians().abs() < PI
+     }
+ 
+     /// Clamps the latitude to [-π/2, π/2] and reduces the longitude to

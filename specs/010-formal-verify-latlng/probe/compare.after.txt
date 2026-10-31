@@ -1,0 +1,18 @@
+N: 0 of 12014 differ
+NL: 0 of 6 differ
+P: 0 of 20000 differ
+PS: 0 of 4 differ
+L: 0 of 20000 differ
+LS: 0 of 9 differ
+D: 0 of 20000 differ
+DS: 0 of 6 differ
+S: 0 of 5 differ
+R: 0 of 20000 differ
+G: 66 of 20000 differ
+V: 0 of 20000 differ
+N detail: 0 library results outside [-pi, pi]; 0 +pi/-pi flips; 0 differ only in the sign of zero; 0 other values
+  lib G 127 11111111111111 | c++ G 127 11101110111111
+  lib G 321 11111111111111 | c++ G 321 10111011111111
+  lib G 710 11111111111111 | c++ G 710 10111011111111
+  lib G 737 11111111111111 | c++ G 737 11111011111111
+  lib G 996 11111111111111 | c++ G 996 10111011111111

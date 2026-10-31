@@ -552,3 +552,97 @@ measurements and the tool limits are in `verify/COVERAGE.md`; what the proofs tr
 
 `expanded_by_distance` counts as weekly: its shrinking branch proves per change, its growing one
 weekly. `Display` (9 rows) stays out (gap 3).
+
+## 12. `s2::LatLng` (33 entries)
+
+Spec 010 (`specs/010-formal-verify-latlng/data-model.md` §5). The 19 inherent operations; the
+operators `Add`, `Sub`, `Mul<LatLng> for f64`, `Mul<f64> for LatLng`; `Default`, `Display`,
+`PartialEq`; `From<Point> for LatLng` and `From<LatLng> for Point`; the derived `Deserialize`;
+the four `geo-types` conversions (an optional integration). The derived `Clone`, `Copy`, `Debug`
+and `Serialize` are not entries. A `LatLng` has no validity invariant, so most domains are every
+pair of `f64` (`AnyLatLng2`), narrowed only where an operation makes a new NaN (`∞ − ∞`, `0 · ∞`)
+or by a documented precondition.
+
+Statuses as section 9's. The rows group the entries.
+
+**Summary** (T020, 2026-10-28): 31 in scope, 2 excluded (`Display`, and
+`to_string_in_degrees`' formatting). 26 entries have Kani crash proofs over their whole
+documented domains, every one `SUCCESSFUL` with its covers satisfied: 5 rows on the real code
+and 3 under the function contracts (`atan2`, `sin_cos`, `sin`, `cos`, `asin`; `sqrt` too outside
+`get_distance`'s domain), 9 harnesses, 35.5 s of harness time (`make verify-values P=latlng`).
+The four `geo-types` conversions are crash-free by composition, `Deserialize` is tested. No
+undocumented precondition was needed: `to_point`'s finite coordinates and `get_distance`'s
+normalised inputs were documented already, and the proofs show what happens outside them (NaN,
+no panic; FR-004, SC-010). `o_get_distance` first failed on CBMC's built-in `sqrt`, which
+computes the NaN of a negative argument through a division its NaN check reports; under
+`sqrt_contract` it proves.
+
+| # | entries | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|---------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `s2::LatLng::new`, `from_radians`, `from_degrees`, `invalid`, `is_valid`, `Default`, `PartialEq` | in scope |  | `AnyF64²` |  | `ll_crash::c_construction` (0.3 s) | proven |
+| 2 | `s2::LatLng::from_e5`, `from_e6`, `from_e7`, `from_unsigned_e6`, `from_unsigned_e7` | in scope |  | `AnyI32²`, `AnyU32²` |  | `ll_crash::c_e_forms` (0.3 s) | proven |
+| 3 | `s2::LatLng::latitude`, `longitude`, `from_point`, `From<Point> for LatLng` | in scope (under contract) |  | `AnyTriple` |  | `ll_crash::c_from_point` (10.7 s; `atan2_contract`) | proven-under-contract |
+| 4 | `s2::LatLng::to_point`, `From<LatLng> for Point` | in scope (under contract) |  | `AnyLatLng2` | finite coordinates for a meaningful result (upstream's debug check; documented): outside it the coordinates are NaN, no panic | `ll_crash::c_to_point` (0.4 s; `sin_cos_contract`) | proven-under-contract |
+| 5 | `s2::LatLng::normalized` | in scope |  | `AnyLatLng2` |  | `ll_crash::c_normalized` (0.9 s; independent of `%`'s value) | proven |
+| 6 | `s2::LatLng::get_distance` | in scope (under contract) |  | `ValidLatLng²`; outside it every pair without an infinite coordinate (`o_get_distance`) | both normalised (documented; upstream logs) | `ll_crash::c_get_distance` (14.7 s; `sin_contract`, `cos_contract`, `asin_contract`), `ll_crash::o_get_distance` (7.2 s; also `sqrt_contract`) | proven-under-contract |
+| 7 | `s2::LatLng::approx_eq`, `approx_eq_with` | in scope |  | `AnyLatLng2²` without `∞ − ∞` × `AnyF64` |  | `ll_crash::c_approx_eq` (0.4 s) | proven |
+| 8 | `Add`, `Sub`, `Mul<LatLng> for f64`, `Mul<f64> for LatLng` | in scope |  | `AnyLatLng2²` without `∞ − ∞`; every factor without `0 · ∞` |  | `ll_crash::c_arithmetic` (0.6 s) | proven |
+| 9 | `s2::LatLng::to_string_in_degrees` | excluded | `core::fmt` is too slow for Kani, as every type's text; its normalisation is row 5's, and the `LATLNG_STR` rows check the string |  |  |  | — |
+| 10 | `Display for LatLng` | excluded | `core::fmt` |  |  |  | — |
+| 11 | `Deserialize for LatLng` (derived) | in scope (tested) |  | every serialised `LatLng` |  | `latlng_tests::prop_serde_accepts_every_pair` (not a Kani entry) | tested |
+| 12 | `From<Coord> for LatLng`, `From<LatLng> for Coord`, `From<geo_types::Point> for LatLng`, `From<LatLng> for geo_types::Point` | in scope (by composition) |  | every `f64` pair |  | each is one `from_degrees` or two `degrees` calls (`geo_types_interop.rs:114–155`), crash-free for every `f64` by `ag_crash::c_construction_and_accessors` (spec 007); the verification crate does not enable `geo-types` | proven-by-composition |
+
+## 13. `PointRegion` (12 entries)
+
+Spec 011 (`specs/011-formal-verify-point-region-cell-union/data-model.md` §5.1). `new`, `point`,
+the six `Region` methods, the derived `PartialEq`, the hand-written `Deserialize` (spec 011
+FR-019), the derived `Debug` and `Serialize` (the latter not an entry). `new` takes any point
+(upstream's unit-length precondition is documented, not checked: spec 011 K3), so the domains are
+every triple of `f64`, narrowed only by the documented debug-build checks of the functions the
+methods call (spec 011 K4), which the `n_*` harnesses prove exact and the `r_*` ones show a
+release build skips.
+
+Statuses as section 9's. The rows group the entries.
+
+**Summary** (T021, 2026-10-28): 11 in scope, 1 excluded (`Debug`). The 10 entries of rows 1–4
+have Kani crash proofs, every one `SUCCESSFUL` with its covers satisfied: rows 1 and 3 on the
+real code, row 2 under `atan2_contract`, row 4 under `pure_leaf` and `asin_contract` (weekly).
+Per change: 5 harnesses, 64.7 s of harness time (`make verify-values P=regions`). `Deserialize`
+is tested. The proofs needed no precondition beyond K4's, which FR-019 documented.
+
+| # | entries | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|---------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `PointRegion::new`, `point`, `Region::cap_bound`, `Region::contains_cell`, `Region::contains_point`, `PartialEq` | in scope |  | `AnyTriple` (× `ValidCell`, `AnyTriple`) | a unit point for the `Region` laws (upstream's `DCHECK`; documented, not needed for crash freedom) | `pr_crash::c_basic` (5.6 s) | proven |
+| 2 | `Region::rect_bound` | in scope (under contract) |  | `PlainTriple`; a NaN `x` or `y` panics in debug builds (documented, FR-019): `n_rect_bound_nan` (1.3 s); a release build returns for every triple: `r_rect_bound` | upstream's `S1Interval` `DCHECK` | `pr_crash::c_rect_bound` (2.3 s; `atan2_contract`) | proven-under-contract |
+| 3 | `Region::intersects_cell` | in scope |  | `BoxPoint × ValidCell` (`Cell::contains_point`'s proven domain); a NaN on the cell face's axis, or on the face's side with another coordinate NaN, panics in debug builds: `n_intersects_cell` (7.1 s); with another coordinate infinite too, shown natively (`cell_tests`); a release build returns for every triple: `r_intersects_cell` | upstream's `ValidFaceXYZtoUV` `DCHECK` (documented, FR-019) | `pr_crash::c_intersects_cell` (48.4 s; `any_uv_bound`) | proven |
+| 4 | `Region::cell_union_bound` | in scope (under contract) |  | `AnyTriple`; `CellId::from_point`'s documented debug panics (the zero vector, NaN, two infinite coordinates) are its own (`cl_crash::n_from_point`, the native tests) | — | `pr_crash::c_cell_union_bound` (weekly; `pure_leaf`, `asin_contract`) with `cl_crash::c_fg_from_point` by composition | proven-under-contract |
+| 5 | `Deserialize for PointRegion` (hand-written, FR-019) | in scope (tested) |  | every serialised `PointRegion` |  | `point_region_tests::deserialise_rejects_points_off_unit_length` (not a Kani entry) | tested |
+| 6 | `Debug for PointRegion` (derived) | excluded | `core::fmt`, as every type's text |  |  |  | — |
+
+## 14. `RegionUnion` and `RegionIntersection` (18 entries)
+
+Spec 012 (`specs/012-formal-verify-cell-bounds-adaptors/data-model.md` §5). `RegionUnion`'s `new`,
+`from_regions`, `add`, `len`, `is_empty`, `iter`, both `IntoIterator`s and `Default`;
+`RegionIntersection`'s `new`, `from_regions`, `num_regions`, `region` and `Default`; the six
+`Region` methods of each (counted as one entry per adaptor for the tests and one for the bounds);
+the derived `Debug`s. The members are abstract regions (`any_region`): any answers, one per input,
+so a crash proof covers any members whose own methods do not panic on the arguments. Member
+counts are concrete, 0 to 3 (`__n<k>`).
+
+**Summary** (T008, 2026-10-30): 16 in scope, 2 excluded (`Debug`). Every in-scope entry has a Kani
+crash proof, `SUCCESSFUL` with its covers satisfied: the API and the tests per change for up to 3
+members, the bounds per change for the empty adaptors and weekly for 1 and 2 members (under
+`atan2`'s and `asin`'s contracts, through `Rect::cap_bound`); `cell_union_bound` is the cap
+bound's `Cap::cell_union_bound`, spec 008's tool limit, inherited. `region(i)`'s panic past the
+end is proven exact (`n_region_past_end`, every build; documented by FR-017).
+
+| # | entries | status | exclusion reason | domain | preconditions (source) | crash harness | crash status |
+|---|---------|--------|------------------|--------|------------------------|---------------|--------------|
+| 1 | `RegionUnion::new`, `from_regions`, `add`, `len`, `is_empty`, `iter`, `IntoIterator` (both), `Default` | in scope |  | 0–3 abstract members |  | `ad_crash::c_union_api__n{0..3}` (3.3–4.4 s) | proven-within-bounds |
+| 2 | `RegionIntersection::new`, `from_regions`, `num_regions`, `region`, `Default` | in scope |  | 0–3 abstract members; `region(i)` for `i` below `num_regions` | `i < num_regions` (documented, FR-017; upstream has no check) | `ad_crash::c_intersection_api__n{0..3}` (1.6–2.7 s), `n_region_past_end` (2.6 s) | proven-within-bounds |
+| 3 | `Region for RegionUnion`: `contains_cell`, `intersects_cell`, `contains_point` | in scope |  | 0–3 abstract members × `ValidCell` × `AnyTriple` |  | `ad_crash::c_tests__ru__n{0..3}` (6.7–19.9 s) | proven-within-bounds |
+| 4 | `Region for RegionIntersection`: the same | in scope |  | as row 3 |  | `ad_crash::c_tests__ri__n{0..3}` (5.5–22.2 s) | proven-within-bounds |
+| 5 | `Region for RegionUnion`: `rect_bound`, `cap_bound` | in scope (under contract) |  | 0–2 abstract members |  | `ad_crash::c_bounds__ru__n0` (1.7 s), `__n1` (124.1 s), `__n2` (188.6 s) weekly (`atan2_contract`, `asin_contract`) | proven-within-bounds |
+| 6 | `Region for RegionIntersection`: the same | in scope (under contract) |  | as row 5 |  | `ad_crash::c_bounds__ri__n0` (13.3 s), `__n1` (119.6 s), `__n2` (235.5 s) weekly | proven-within-bounds |
+| 7 | `Region::cell_union_bound` for both | excluded | tool-limit (inherited): `Cap::cell_union_bound` of the cap bound, spec 008's timeout | | | covered by the C++ rows (`REGION_UNION`, `REGION_INTERSECTION`, the covering's size) | — |
+| 8 | `Debug` for both (derived) | excluded | `core::fmt` |  |  |  | — |
