@@ -62,3 +62,14 @@ The decoding suite's inventory, catalogue (P-FX-11 … 14) and evaluation (a spe
 index by kind; `MUTANTS.md`; `VERIFIED_TYPES.md` (§2.15 and the `S2Encode`/`S2Decode`
 implementors); `CORE_TRAITS.md` (the codec law's implementors). CI's decoding `codecs` leg runs
 `cd_fx` already; `core/src/s2/encoding.rs` is in the path filters.
+
+## R7: Measured in implementation (2026-11-01)
+
+- The 51 new harnesses: 136 s of solver time in all, the longest about 13 s. `pure_is_unit`'s
+  table needs an unwind of 11 in the harnesses that reach the unit check (`p_fx_11`,
+  `p_fx_13__b25`, `__b26`); the first run failed on the unwinding assertion at 5 and 9.
+- The `codecs` leg rose from 8.2 min (142 harnesses, 3 jobs, spec 003) to 11.0 min (197, 4
+  jobs): over SC-004's budget. It is split into `P=codecs` (101 harnesses, 400 s) and `P=fixed`
+  (96, 385 s), with a `decoding-fixed` CI leg in both the per-change and the weekly matrix.
+- The C++ rows: 240 new, all matched; the 4,715 earlier rows unchanged.
+- Mutants `M-993` … `M-998`: all killed.

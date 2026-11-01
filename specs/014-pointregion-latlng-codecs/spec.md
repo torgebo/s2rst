@@ -4,7 +4,11 @@
 
 **Created**: 2026-11-01
 
-**Status**: Draft
+**Status**: Implemented 2026-11-01. No clarification beyond the maintainer's scope choice. Both
+codecs are upstream's byte for byte and proven (P-FX-11 … 14); every C++ row matches. The
+decoding suite's `codecs` CI leg was split in two to stay under 10 minutes. SC-004 on a hosted
+runner needs a push (tasks T014). Evaluation: the spec-014 part of
+`verify/decoding/EVALUATION.md`.
 
 **Input**: User description: "continue with next" — scope chosen by the maintainer on 2026-11-01:
 "Missing codecs: add upstream's S2PointRegion and S2LatLng encodings to the library and prove
