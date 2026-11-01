@@ -1,0 +1,17 @@
+Mutant: M-993
+Targets: P-FX-13
+Expect-Fail: cd_fx::p_fx_13__b25
+Defect: `PointRegion`'s decoder rejects version 1, its own
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -1072,7 +1072,7 @@
+     fn decode(r: &mut dyn Read) -> io::Result<Self> {
+         let version = read_u8(r)?;
+         let point = Point::decode(r)?;
+-        if version > ENCODING_VERSION {
++        if version > 0 {
+             return Err(io::Error::new(
+                 io::ErrorKind::InvalidData,
+                 "unsupported point region encoding version",

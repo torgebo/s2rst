@@ -1,0 +1,17 @@
+Mutant: M-996
+Targets: P-FX-11
+Expect-Fail: cd_fx::p_fx_11_enc
+Defect: `PointRegion`'s encoder writes version 0 (upstream reads it, but writes 1)
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -1055,7 +1055,7 @@
+ /// not ([`PointRegion::new`] accepts any point); a point that is not unit length does not decode.
+ impl S2Encode for PointRegion {
+     fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+-        w.write_all(&[ENCODING_VERSION])?;
++        w.write_all(&[0])?;
+         self.point().encode(w)
+     }
+ }

@@ -541,3 +541,47 @@ T073, on the final tree (2026-10-06).
   `M-254`, `M-731`) and five after this change (`M-202`, `M-219`, `M-701`, `M-702`, `M-707`).
   Each was regenerated with the same mutation and checked on the working tree (the patch
   applied, its harnesses and tests run, the patch reversed): all ten killed.
+
+# Spec 014: The `PointRegion` and `LatLng` codecs (2026-11-01)
+
+## Summary (spec 014)
+
+Spec 014 added upstream's two missing standalone encodings to the library and verified them as
+this suite verified the other fixed-size codecs. The maintainer chose it over spec 013's
+accuracy-contract research.
+
+- **The codecs:** `S2Encode`/`S2Decode` for `PointRegion` (version byte 1 and three
+  little-endian doubles, 25 bytes; decoding accepts versions 0 and 1, as upstream's
+  `version > 1` check does, and rejects a point off unit length) and `LatLng` (latitude and
+  longitude as two doubles, 16 bytes; any 16 bytes decode, invalid values included, as upstream).
+  Byte for byte upstream's; no other library change.
+- **Proven** (P-FX-11 … 14): both round trips (every unit point; every bit pattern), the
+  canonical encoders, agreement with `wire_spec` on every input up to 26 and 17 bytes, and crash
+  freedom of all four operations (`c_encode_point_region`, `c_encode_latlng`, the agreement
+  harnesses). `PointRegion`'s unit check is stated relative to `Point::is_unit`, stubbed by
+  spec 008's `pure_is_unit` (R18's fallback, as for `Cap`); `wire_spec::point_unit` restates
+  upstream's `IsUnitLength`, and `wire_spec_vs_cpp` checks it on the C++ rows.
+- **Tested:** 240 new C++ rows, appended to `cpp_coding_vectors.csv` after every existing row
+  (the 4,715 earlier rows unchanged): every prefix and a trailing byte, versions 0, 1, 2 and 255,
+  points at `IsUnitLength`'s `5ε` edge, zero, NaN and infinite coordinates, invalid and special
+  latitude–longitudes. All match, in the library and in the reference description. Twins and
+  `decoder_robustness`'s fuzzing cover both decoders.
+- **One caveat recorded:** `Point::is_unit` computes `x·x + y·y + z·z` unfused on the default
+  target, as upstream's `Norm2`; a build with `target_feature = "fma"` fuses it
+  (`r3::Vector::dot`), so a point within an ulp of the `5ε` edge could be judged differently there.
+- **Non-vacuity:** 6 mutants `M-993` … `M-998` (the version check, the unit check dropped and
+  inverted, the encoder's version, `LatLng`'s fields swapped on encoding and duplicated on
+  decoding), all killed.
+- **CI:** the `codecs` leg went over 10 minutes with the 51 new harnesses (11.0 min at 4 jobs);
+  part of the fixed-size codecs' properties (`cd_fx`: the round trips, P-FX-08 and P-FX-10 … 14)
+  is now its own leg, `P=fixed`, and `P=codecs` keeps the vectors, the crash proofs and P-FX-06,
+  -07 and -09. Measured at 4 jobs, build and sanity tests included: codecs 101 harnesses in
+  400 s, fixed 96 in 385 s, all successful with every cover satisfied.
+
+## Recommendations (spec 014)
+
+1. `S2LatLngRect::Intersects(const S2Cell&)`, the exact cell test still missing from the
+   library (edge geometry: research first).
+2. The shape-backed regions (`Loop`, `Polygon`, `Polyline`, the shape-index regions).
+3. Spec 013's accuracy contracts for `atan2` and `sin_cos`, if a deductive tool with real
+   arithmetic becomes available; the model checker cannot state them.

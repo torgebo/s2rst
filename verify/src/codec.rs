@@ -35,7 +35,8 @@ use s2rst::s2::encoded_uint_vector::{
     decode_uint_vector_u32, decode_uint_vector_u64, encode_uint_vector_u32, encode_uint_vector_u64,
 };
 use s2rst::s2::encoding::{S2Decode, S2Encode};
-use s2rst::s2::{Cap, Cell, CellId, Point, Rect};
+use s2rst::s2::point_region::PointRegion;
+use s2rst::s2::{Cap, Cell, CellId, LatLng, Point, Rect};
 use s2rst::{r1, s1};
 
 use crate::wire_domain::{
@@ -48,6 +49,7 @@ use crate::wire_spec::{
     enc_uint_vector, lib_cell, lib_cell_id, lib_cellid_vector, lib_point_vector, lib_string_vector,
     lib_uint_vector, put_string_vector, rect_valid, ref_point, ref_rect,
 };
+use crate::wire_spec::{enc_latlng, enc_point_region, ref_latlng};
 
 /// The writer's capacity in the encoder harnesses: above the longest canonical encoding any of
 /// them produces (49 bytes, two uncompressed points), so the writer never reallocates.
@@ -203,6 +205,10 @@ pub struct PointC;
 pub struct CapC;
 /// `RectC`: `impl S2Encode/S2Decode for Rect`.
 pub struct RectC;
+/// `PointRegionC`: `impl S2Encode/S2Decode for PointRegion` (spec 014).
+pub struct PointRegionC;
+/// `LatLngC`: `impl S2Encode/S2Decode for LatLng` (spec 014).
+pub struct LatLngC;
 /// `CellC`: `impl S2Encode/S2Decode for Cell`. Its value is the cell's identifier: a `Cell`'s
 /// other fields are computed from it by `Cell::from`, which both sides call.
 pub struct CellC;
@@ -589,5 +595,80 @@ impl Codec for CellC {
     }
     fn same<const MAX: usize>(a: &CellId, b: &CellId) -> bool {
         a.0 == b.0
+    }
+}
+
+/// `PointRegionC` uses research R18's fallback, as `CapC` does (spec 014 research R1): acceptance
+/// is stated relative to the library's own `Point::is_unit`, which the harnesses stub with
+/// `stubs::pure_is_unit` (one answer per point), so the decoder's float check is not compared
+/// against a restated copy of itself. The length, the version, the fields and the consumption are
+/// still the reference's; `wire_spec::point_unit` restates the check, and `wire_spec_vs_cpp`
+/// tests it against upstream's `IsUnitLength`.
+impl Codec for PointRegionC {
+    type Value = PointRegion;
+    fn any_value<const N: usize>() -> PointRegion {
+        PointRegion::new(any_point())
+    }
+    fn encodable(v: &PointRegion) -> bool {
+        v.point().is_unit()
+    }
+    fn encode(v: &PointRegion, w: &mut Vec<u8>) {
+        assert!(v.encode(w).is_ok());
+    }
+    fn decode(r: &mut &[u8]) -> io::Result<PointRegion> {
+        PointRegion::decode(r)
+    }
+    fn reference_encode(v: &PointRegion) -> Vec<u8> {
+        enc_point_region(point_bits(&v.point()))
+    }
+    fn reference_decode(b: &[u8]) -> Option<(PointRegion, usize)> {
+        if b.len() < 25 || b[0] > 1 {
+            return None;
+        }
+        let (p, _) = ref_point(&b[1..])?;
+        let p = point_of(p);
+        if p.is_unit() {
+            Some((PointRegion::new(p), 25))
+        } else {
+            None
+        }
+    }
+    fn same<const MAX: usize>(a: &PointRegion, b: &PointRegion) -> bool {
+        same_point(&a.point(), &b.point())
+    }
+}
+
+/// A `LatLng`'s two angles as bit patterns.
+fn latlng_bits(v: &LatLng) -> [u64; 2] {
+    [v.lat.radians().to_bits(), v.lng.radians().to_bits()]
+}
+
+impl Codec for LatLngC {
+    type Value = LatLng;
+    fn any_value<const N: usize>() -> LatLng {
+        LatLng::from_radians(kani::any(), kani::any())
+    }
+    fn encodable(_: &LatLng) -> bool {
+        true
+    }
+    fn encode(v: &LatLng, w: &mut Vec<u8>) {
+        assert!(v.encode(w).is_ok());
+    }
+    fn decode(r: &mut &[u8]) -> io::Result<LatLng> {
+        LatLng::decode(r)
+    }
+    fn reference_encode(v: &LatLng) -> Vec<u8> {
+        enc_latlng(latlng_bits(v))
+    }
+    fn reference_decode(b: &[u8]) -> Option<(LatLng, usize)> {
+        ref_latlng(b).map(|(l, n)| {
+            (
+                LatLng::from_radians(f64::from_bits(l[0]), f64::from_bits(l[1])),
+                n,
+            )
+        })
+    }
+    fn same<const MAX: usize>(a: &LatLng, b: &LatLng) -> bool {
+        same_bits(latlng_bits(a), latlng_bits(b))
     }
 }

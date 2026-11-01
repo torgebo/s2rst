@@ -55,13 +55,18 @@ names three harnesses.
 | P-FX-08 | `CapC` agreement, every input up to 33 bytes (FR-022 deviation: invalid caps rejected; D-004 open; spec 007 FR-017 deviation: a negative length² other than −1 decodes as −1, `wire_spec::lib_cap`) | `S2Cap::Decode`, `s2cap.cc:340–353`; `FromLength2`, `s1chord_angle.h:365–367` | `Bytes(L)` | K | `cd_fx::p_fx_08__b0 … __b33` (`__b32`, `__b33` weekly); R18's fallback | proven |  | the whole domain, acceptance relative to `Cap::is_valid`; `__b32` and `__b33` re-proven 2026-10-19 (711.9 s, 743.0 s) after `CapC`'s reference decoder took over D-004's NaN rejection (spec 007 FR-018) | M-210 |
 | P-FX-09 | `RectC` agreement, every input up to 34 bytes | `S2LatLngRect::Decode`, `s2latlng_rect.cc:372–392` | `Bytes(L)` | K | `cd_fx::p_fx_09__b0 … __b34` | proven |  | the whole domain | M-209 |
 | P-FX-10 | `CellC` agreement, every input up to 9 bytes (invalid ids rejected; upstream undefined, U-004) | `S2Cell::Decode`, `s2cell.cc:326–332` | `Bytes(L)` | K | `cd_fx::p_fx_10__b0 … __b9` | proven |  | the whole domain (invalid ids rejected; U-004) | M-213 |
+| P-FX-11 | `PointRegionC` round trip, bit-exact for every unit point; the encoder writes upstream's 25 bytes (spec 014) | `S2PointRegion::Encode`/`Decode`, `s2point_region.cc:55–78` | unit points (`Point::is_unit`) | K | `cd_fx::p_fx_11`, `p_fx_11_enc`; `Point::is_unit` stubbed by `pure_is_unit` (spec 014 research R1) | proven |  | whole domain (relative to `Point::is_unit`) | M-995, M-996 |
+| P-FX-12 | `LatLngC` round trip, bit-exact for every bit pattern; the encoder writes upstream's 16 bytes (spec 014) | `S2LatLng::Encode`/`Init`, `s2latlng.cc:38–54` | any bits | K | `cd_fx::p_fx_12`, `p_fx_12_enc` | proven |  | whole domain | M-997, M-998 |
+| P-FX-13 | `PointRegionC` agreement, every input up to 26 bytes: versions 0 and 1 accepted, a point off unit length rejected (spec 014) | `S2PointRegion::Decode`, `s2point_region.cc:65–78`; `S2::IsUnitLength`, `s2pointutil.cc:32–40` | `Bytes(L)` | K | `cd_fx::p_fx_13__b0 … __b26`; acceptance relative to `Point::is_unit` (R18's fallback), whose formula `wire_spec_vs_cpp` checks against `IsUnitLength` on the C++ rows | proven |  | the whole domain, relative to `Point::is_unit` | M-993, M-994 |
+| P-FX-14 | `LatLngC` agreement, every input up to 17 bytes: any 16 bytes accepted (spec 014) | `S2LatLng::Init`, `s2latlng.cc:44–54` | `Bytes(L)` | K | `cd_fx::p_fx_14__b0 … __b17` | proven |  | the whole domain | M-997, M-998 |
 | P-PAR-01 | the reference description agrees with every row of `cpp_coding_vectors.csv`, and the library description gives the documented answer on every row except the counted D-003/D-004 rows | the generator `tools/refgen-cpp/generate_coding.cc` | 4,714 rows | test | `verify/tests/wire_spec_vs_cpp.rs` | passing | | every row | |
 
 ## Coverage (SC-003, SC-004)
 
-**SC-003.** 31 entries count (P-PAR-01 is a test). Two have an operation outside the scope:
-P-SV-01 and P-SV-02 use `decode_string_vector`, a tool limit (INVENTORY row 11). Of the other
-29, 28 are proven by at least one track: 96.6 %, against the target of 90 %. The exception is
+**SC-003.** 35 entries count (P-PAR-01 is a test; spec 014 added P-FX-11 … 14). Two have an
+operation outside the scope: P-SV-01 and P-SV-02 use `decode_string_vector`, a tool limit
+(INVENTORY row 11). Of the other 33, 32 are proven by at least one track: 97.0 %, against the
+target of 90 %. The exception is
 P-PV-03, the point vector's compact branch, a tool limit from 2 bytes (T029). Both string
 vector entries are proven on the V track for every length.
 

@@ -402,3 +402,9 @@ Each mutant injects one defect into `core/`; every listed harness must fail on i
 | M-990 | `Cell::rect_bound`'s first longitude corner moves to the other v edge (on a polar face, where the longitude depends on v) | P-CREG-02 | `cr_reg::p_creg_02__lng_f2` | killed |
 | M-991 | `Cell::rect_bound` drops `polar_closure`, so a cell with a pole corner gets two corners' longitudes only | P-CREG-02 | `cr_reg::p_creg_02__lng_f2` | killed |
 | M-992 | face 1's fixed longitude bound starts at π/2 | P-CREG-02 | `cr_reg::p_creg_02__l0` | killed |
+| M-993 | `PointRegion`'s decoder rejects version 1, its own | P-FX-13 | `cd_fx::p_fx_13__b25` | killed |
+| M-994 | `PointRegion`'s decoder accepts a point off unit length | P-FX-13 | `cd_fx::p_fx_13__b25` | killed |
+| M-995 | `PointRegion`'s decoder rejects exactly the unit points | P-FX-11 | `cd_fx::p_fx_11` | killed |
+| M-996 | `PointRegion`'s encoder writes version 0 (upstream reads it, but writes 1) | P-FX-11 | `cd_fx::p_fx_11_enc` | killed |
+| M-997 | `LatLng`'s encoder writes the longitude first | P-FX-12 | `cd_fx::p_fx_12_enc` | killed |
+| M-998 | `LatLng`'s decoder puts the longitude in both fields | P-FX-12 | `cd_fx::p_fx_12` | killed |

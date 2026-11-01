@@ -1,0 +1,17 @@
+Mutant: M-998
+Targets: P-FX-12
+Expect-Fail: cd_fx::p_fx_12
+Defect: `LatLng`'s decoder puts the longitude in both fields
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -1110,7 +1110,7 @@
+     fn decode(r: &mut dyn Read) -> io::Result<Self> {
+         let lat = read_f64(r)?;
+         let lng = read_f64(r)?;
+-        Ok(LatLng::from_radians(lat, lng))
++        Ok(LatLng::from_radians(lng, lng))
+     }
+ }
+ 

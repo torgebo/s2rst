@@ -10,7 +10,7 @@
 # Four jobs, each one Makefile target, so CI runs exactly what a developer runs locally:
 #
 # - `verify` (per change): parallel legs, `make verify-cellid`, `make verify-union`, the
-#   three parts of `make verify-decoding` (P=vectors, links, codecs) and the eight parts of
+#   four parts of `make verify-decoding` (P=vectors, links, codecs, fixed) and the eight parts of
 #   `make verify-values` (P=cell, interval, real, rect, uvrect, point, chord, angle, cap), each
 #   the models' sanity tests (for P=angle also the E-form enumeration, spec 007 R12) and
 #   that suite's proof harnesses
@@ -24,8 +24,8 @@
 #   minutes per harness; spec FR-012 and SC-005). Several CPU-hours in all, so it runs as a
 #   matrix: one leg per cube face (F=0…5), one for the vertex crash proof, one for the
 #   CellUnion suite with its slow-tier members (F=union, 8 GB per harness, one at a time),
-#   three for the decoding suite with its slow-tier members (F=decoding with P=vectors,
-#   links, codecs; 8 GB per harness, one at a time), and eight for the value-type suite's
+#   four for the decoding suite with its slow-tier members (F=decoding with P=vectors,
+#   links, codecs, fixed; 8 GB per harness, one at a time), and eight for the value-type suite's
 #   weekly members (F=values, specs 004–006; 8 GB and 60 minutes per harness, one at a time).
 # - `mutants` (weekly): `make verify-mutants`, the non-vacuity campaign, one leg per spec.
 #   Every mutant in verify/mutants/ must make its target harnesses fail, except those whose
@@ -148,7 +148,7 @@ jobs:
         # The decoding suite runs as three parts, so each leg stays under SC-006's 10 minutes,
         # and the value types as four (spec 004 research R12, spec 005 research R8).
         # `release` is the documented panics' release pass (`make verify-release`).
-        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap, values-latlng, values-pointregion, values-unionfloat, values-adaptors, values-cellrect, release]
+        suite: [cellid, union, decoding-vectors, decoding-links, decoding-codecs, decoding-fixed, values-cell, values-interval, values-real, values-rect, values-uvrect, values-point, values-chord, values-angle, values-cap, values-latlng, values-pointregion, values-unionfloat, values-adaptors, values-cellrect, release]
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -242,7 +242,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: ['0', '1', '2', '3', '4', '5', vertex, union, decoding-vectors, decoding-links, decoding-codecs,
+        part: ['0', '1', '2', '3', '4', '5', vertex, union, decoding-vectors, decoding-links, decoding-codecs, decoding-fixed,
                values-cell-a, values-cell-b, values-interval-rect, values-uvrect-point, values-chord-angle,
                values-cap, values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e,
                values-limits-f, values-limits-g, values-limits-h, values-fg-a, values-fg-b, values-latlng, values-regions, values-adaptors, values-cellrect]

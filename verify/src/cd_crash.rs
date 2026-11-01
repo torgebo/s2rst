@@ -133,6 +133,24 @@ fn c_encode_point() {
     kani::cover!(w.len() == 24, "24 bytes written");
 }
 
+/// C-impl S2Encode for PointRegion: every point, unit length or not (spec 014).
+#[kani::proof]
+fn c_encode_point_region() {
+    let mut w = Vec::with_capacity(40);
+    let r = s2rst::s2::point_region::PointRegion::new(any_point());
+    assert!(r.encode(&mut w).is_ok());
+    kani::cover!(w.len() == 25, "25 bytes written");
+}
+
+/// C-impl S2Encode for LatLng: every pair of bit patterns (spec 014).
+#[kani::proof]
+fn c_encode_latlng() {
+    let mut w = Vec::with_capacity(40);
+    let ll = s2rst::s2::LatLng::from_radians(kani::any(), kani::any());
+    assert!(ll.encode(&mut w).is_ok());
+    kani::cover!(w.len() == 16, "16 bytes written");
+}
+
 /// C-impl S2Encode for Cap: `Cap::from_center_chord_angle` of any bits.
 #[kani::proof]
 fn c_encode_cap() {
