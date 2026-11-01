@@ -1809,6 +1809,50 @@ fn prop_rect_encode_decode_roundtrip(lat0: i32, lng0: i32, lat1: i32, lng1: i32)
     r == decoded
 }
 
+/// `PointRegion` encode/decode round trip for unit points, bit for bit (spec 014).
+#[quickcheck]
+fn prop_point_region_encode_decode_roundtrip(lat: i32, lng: i32) -> bool {
+    use s2rst::s2::point_region::PointRegion;
+    let p = make_latlng(lat, lng).to_point();
+    let mut buf = Vec::new();
+    PointRegion::new(p).encode(&mut buf).unwrap();
+    let back = PointRegion::decode(&mut &buf[..]).unwrap().point();
+    buf.len() == 25
+        && [back.x(), back.y(), back.z()].map(f64::to_bits)
+            == [p.x(), p.y(), p.z()].map(f64::to_bits)
+}
+
+/// `PointRegion`'s decoder on any 25 bytes: it accepts exactly a version of at most 1 and a unit
+/// point, as upstream's `S2PointRegion::Decode` (spec 014).
+#[quickcheck]
+fn prop_point_region_decode_any_bytes(version: u8, x: u64, y: u64, z: u64, unit: bool) -> bool {
+    use s2rst::s2::point_region::PointRegion;
+    let p = if unit {
+        make_latlng(x as i32, y as i32).to_point()
+    } else {
+        Point(s2rst::r3::Vector {
+            x: f64::from_bits(x),
+            y: f64::from_bits(y),
+            z: f64::from_bits(z),
+        })
+    };
+    let mut b = vec![version % 4];
+    for c in [p.x(), p.y(), p.z()] {
+        b.extend_from_slice(&c.to_le_bytes());
+    }
+    PointRegion::decode(&mut &b[..]).is_ok() == (b[0] <= 1 && p.is_unit())
+}
+
+/// `LatLng` encode/decode round trip for any bits, bit for bit (spec 014).
+#[quickcheck]
+fn prop_latlng_encode_decode_roundtrip(lat: u64, lng: u64) -> bool {
+    let ll = LatLng::from_radians(f64::from_bits(lat), f64::from_bits(lng));
+    let mut buf = Vec::new();
+    ll.encode(&mut buf).unwrap();
+    let back = LatLng::decode(&mut &buf[..]).unwrap();
+    buf.len() == 16 && back.lat.radians().to_bits() == lat && back.lng.radians().to_bits() == lng
+}
+
 /// Loop encode/decode preserves area.
 #[quickcheck]
 fn prop_loop_encode_decode_area(

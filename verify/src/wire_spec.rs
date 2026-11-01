@@ -665,6 +665,54 @@ pub fn lib_cell(b: &[u8]) -> Option<(u64, usize)> {
     lib_cell_id(b)
 }
 
+/// Upstream `S2PointRegion::Decode` (`s2point_region.cc:65–78`, spec 014): at least 25 bytes, a
+/// version byte of at most 1 (so 0 too), three doubles, and a unit-length point
+/// ([`point_unit`]).
+pub fn ref_point_region(b: &[u8]) -> Option<(PointBits, usize)> {
+    if b.len() < 25 || b[0] > 1 {
+        return None;
+    }
+    let (p, _) = ref_point(&b[1..])?;
+    if point_unit(p) { Some((p, 25)) } else { None }
+}
+
+/// Upstream `S2::IsUnitLength` (`s2pointutil.cc:32–40`): `|x² + y² + z² − 1| ≤ 5ε`, with
+/// `S2Point::Norm2`'s order of operations. NaN fails it.
+pub fn point_unit(p: PointBits) -> bool {
+    let [x, y, z] = p.map(f64::from_bits);
+    ((x * x + y * y + z * z) - 1.0).abs() <= 5.0 * f64::EPSILON
+}
+
+/// Upstream `S2PointRegion::Encode` (`s2point_region.cc:55–63`): version 1, then the point.
+pub fn enc_point_region(p: PointBits) -> Vec<u8> {
+    let mut out = Vec::with_capacity(25);
+    out.push(1u8);
+    out.extend_from_slice(&enc_point(p));
+    out
+}
+
+/// A latitude–longitude as the bit patterns of its two angles in radians.
+pub type LatLngBits = [u64; 2];
+
+/// Upstream `S2LatLng::Init(Decoder*)` (`s2latlng.cc:44–54`, spec 014): at least 16 bytes, the
+/// latitude and the longitude as doubles, any bits.
+pub fn ref_latlng(b: &[u8]) -> Option<(LatLngBits, usize)> {
+    if b.len() < 16 {
+        return None;
+    }
+    let f = |k: usize| ref_fixed(&b[8 * k..], 8).map_or(0, |(v, _)| v);
+    Some(([f(0), f(1)], 16))
+}
+
+/// Upstream `S2LatLng::Encode` (`s2latlng.cc:38–42`): the latitude, then the longitude.
+pub fn enc_latlng(ll: LatLngBits) -> Vec<u8> {
+    let mut out = Vec::with_capacity(16);
+    for k in 0..2 {
+        put_fixed(&mut out, ll[k], 8);
+    }
+    out
+}
+
 #[cfg(test)]
 #[path = "wire_spec_tests.rs"]
 mod wire_spec_tests;

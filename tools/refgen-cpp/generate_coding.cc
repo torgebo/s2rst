@@ -57,7 +57,9 @@
 #include "s2/s2cell_id.h"
 #include "s2/s2latlng.h"
 #include "s2/s2latlng_rect.h"
+#include "s2/s2error.h"
 #include "s2/s2point.h"
+#include "s2/s2point_region.h"
 #include "s2/util/coding/coder.h"
 
 namespace {
@@ -569,6 +571,82 @@ void Fixed() {
 
 }  // namespace
 
+// ---- spec 014: S2PointRegion and S2LatLng --------------------------------------------------
+// Appended after every other section, so the rows above (one seeded generator) are unchanged.
+
+void PointRegionDecode(const std::string& s) {
+  Decoder d(s.data(), s.size());
+  S2PointRegion pr(S2Point(1, 0, 0));
+  if (!pr.Decode(&d)) {
+    Row("POINT_REGION_DECODE", HexBytes(s), "reject");
+  } else {
+    Row("POINT_REGION_DECODE", HexBytes(s), Ok(s.size() - d.avail(), 1, PointText(pr.point())));
+  }
+}
+
+// The 25 bytes of a point region: `version`, then the point, written by hand.
+std::string PointRegionBytes(uint8_t version, const S2Point& p) {
+  Encoder e;
+  e.Ensure(1 + 3 * sizeof(double));
+  e.put8(version);
+  e.putdouble(p.x());
+  e.putdouble(p.y());
+  e.putdouble(p.z());
+  return Bytes(e);
+}
+
+std::string LatLngText(const S2LatLng& ll) {
+  return Hex64(Bits(ll.lat().radians())) + ":" + Hex64(Bits(ll.lng().radians()));
+}
+
+void LatLngDecode(const std::string& s) {
+  Decoder d(s.data(), s.size());
+  S2LatLng ll;
+  S2Error error;
+  if (!ll.Init(&d, error)) {
+    Row("LATLNG_DECODE", HexBytes(s), "reject");
+  } else {
+    Row("LATLNG_DECODE", HexBytes(s), Ok(s.size() - d.avail(), 1, LatLngText(ll)));
+  }
+}
+
+void PointRegionsAndLatLngs() {
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double inf = std::numeric_limits<double>::infinity();
+  const double eps = std::numeric_limits<double>::epsilon();
+  // Encoder rows: unit points, and a point that is not unit length (written as held).
+  for (const S2Point& p : {RandUnit(), RandUnit(), S2Point(0, 0, 1), S2Point(-0.0, 0, -1),
+                           S2Point(3, 4, 12)}) {
+    Encoder e;
+    S2PointRegion(p).Encode(&e);
+    const std::string bytes = Bytes(e);
+    Row("POINT_REGION_ENCODE", PointText(p), HexBytes(bytes));
+    for (const std::string& s : WithPrefixes(bytes)) PointRegionDecode(s);
+    PointRegionDecode(bytes + "\x05");  // a trailing byte is left unread
+  }
+  // Decoder rows: every version class, and points at `IsUnitLength`'s edge and beyond.
+  const S2Point unit = RandUnit();
+  for (int version : {0, 1, 2, 255}) PointRegionDecode(PointRegionBytes(version, unit));
+  for (const S2Point& p : {S2Point(1 + 2 * eps, 0, 0), S2Point(1 + 3 * eps, 0, 0),
+                           S2Point(1 - eps, 0, 0), S2Point(1 - 3 * eps, 0, 0),
+                           S2Point(0, 0, 0), S2Point(nan, 0, 1), S2Point(inf, 0, 0),
+                           S2Point(0.6, 0.8, 0), S2Point(0.6, 0.8, eps)}) {
+    PointRegionDecode(PointRegionBytes(1, p));
+  }
+  // LatLng: encoder rows for valid, invalid and special pairs, each decoded with its prefixes.
+  for (const S2LatLng& ll :
+       {S2LatLng::FromDegrees(37.7749, -122.4194), S2LatLng::FromDegrees(-90, 180),
+        S2LatLng::Invalid(), S2LatLng::FromRadians(nan, 1), S2LatLng::FromRadians(-0.0, inf),
+        S2LatLng::FromRadians(2, -7), S2LatLng(RandUnit())}) {
+    Encoder e;
+    ll.Encode(&e);
+    const std::string bytes = Bytes(e);
+    Row("LATLNG_ENCODE", LatLngText(ll), HexBytes(bytes));
+    for (const std::string& s : WithPrefixes(bytes)) LatLngDecode(s);
+    LatLngDecode(bytes + "\x05");
+  }
+}
+
 int main() {
   std::printf("kind,input,expected,note\n");
   Varints();
@@ -578,5 +656,6 @@ int main() {
   StringVectors();
   PointVectors();
   Fixed();
+  PointRegionsAndLatLngs();
   return 0;
 }
