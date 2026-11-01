@@ -1,0 +1,20 @@
+Spec 013 R0 (2026-11-01), Kani 0.68.0, run-verify.sh, 12-minute limit, 2-3 jobs.
+r0::r0_uv_quadrant                           TIMEOUT
+r0::r0_creg02_dir_l0                         SUCCESSFUL   103.9s
+r0::r0_creg02_dir                            TIMEOUT
+r0::r0_creg02__f0_lat                        TIMEOUT
+r0::r0_creg02__f0_lng                        SUCCESSFUL   526.5s
+r0::r0_creg02__f2_lat                        TIMEOUT
+r0::r0_creg02__f2_lng                        SUCCESSFUL   691.6s
+r0::r0_creg02l__f0                           SUCCESSFUL   205.0s
+r0::r0_creg02l__f2                           SUCCESSFUL   194.9s
+r0::r0_square_monotone                       TIMEOUT
+r0::r0_sumsq_monotone                        TIMEOUT
+r0::r0_creg02_norm                           FAILED       358.8s (playback: out of memory)
+r0::r0_lreg03                                FAILED       400.1s
+r0::r0_ptdst02 (pure atan2)                  FAILED       541.0s
+r0::r0_ptdst02 (pure atan2, pure sqrt)       TIMEOUT
+r0::r0_creg02c__all_lat                      SUCCESSFUL   260.6s
+r0::r0_creg02c__all_lng                      TIMEOUT
+r0::r0_creg02c__f0_lng                       SUCCESSFUL   341.4s
+r0::r0_creg02c__f2_lng                       SUCCESSFUL   374.5s
