@@ -35,6 +35,7 @@ use s2rst::s2::lax_polyline::LaxPolyline;
 use s2rst::s2::point_compression::{
     decode_points_compressed, encode_points_compressed, points_to_xyz_face_si_ti,
 };
+use s2rst::s2::point_region::PointRegion;
 use s2rst::s2::point_vector::PointVector;
 use s2rst::s2::polyline::Polyline;
 use s2rst::s2::shape_index::ShapeIndex;
@@ -213,6 +214,12 @@ fn for_each_decoder(mut f: impl FnMut(&str, &dyn Fn(&[u8]))) {
     });
     f("s2point_vector", &|b| {
         no_panic("s2point_vector", |r| decode_s2point_vector(r), b);
+    });
+    f("point_region", &|b| {
+        no_panic("point_region", |r| PointRegion::decode(r), b);
+    });
+    f("latlng", &|b| {
+        no_panic("latlng", |r| LatLng::decode(r), b);
     });
 }
 

@@ -103,7 +103,7 @@ LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_coding > ../../core/tests/d
 
 Every row is `kind,input,expected,note`. Bytes are lowercase hex. Lists are `;`-separated. A
 point is `x:y:z`, each coordinate the 16-hex-digit bit pattern of the double. A cap adds
-`:length2`, and a rectangle is `lat_lo:lat_hi:lng_lo:lng_hi`. A decode's `expected` is
+`:length2`, a rectangle is `lat_lo:lat_hi:lng_lo:lng_hi`, and a latitude–longitude is `lat:lng`. A decode's `expected` is
 `reject`, or `ok|<bytes consumed>|<item count>|<items>`. `note` is `deviation:reject` where
 the library documents that it rejects an input C++ accepts (spec 003 FR-022), and
 `deviation:negative-canonical` on a `CAP_DECODE` row whose negative `length2` (other than −1)
@@ -118,6 +118,7 @@ C++ keeps and the library decodes as −1 (spec 007 FR-017).
 | `STRING_VECTOR_ENCODE` / `_DECODE` | string lists (the encode input is the count, a bar, then the items); corrupt offsets (`[5, 2, 6]`); the K2 input | bytes; strings or reject | `StringVectorEncoder::Encode`; `EncodedStringVector` (v0.14's lazy rule) |
 | `POINT_VECTOR_ENCODE` / `_DECODE` | FAST point lists, NaN and non-unit included; tags 2–7; the K2 header | bytes; points or reject | `EncodeS2PointVector(…, FAST)`; `EncodedS2PointVector` |
 | `CELLID_*`, `POINT_*`, `CAP_*`, `RECT_*`, `CELL_*` | fixed-size values and every prefix of their encodings; `Rect` versions 0 and 2 | bytes; value or reject | `S2CellId`, `S2Cap`, `S2LatLngRect`, `S2Cell` `Encode`/`Decode`; three `putdouble`s for a point |
+| `POINT_REGION_*`, `LATLNG_*` (spec 014, appended after every other section, so the earlier rows are unchanged) | unit and non-unit points, every prefix and a trailing byte; versions 0, 1, 2, 255; points at `IsUnitLength`'s `5ε` edge, zero, NaN, infinite; latitude–longitudes valid, invalid, NaN, ±0, ±∞ | bytes; value or reject | `S2PointRegion::Encode`/`Decode`; `S2LatLng::Encode`/`Init` |
 
 Left out on purpose: `S2Cell::Decode` of an invalid id (undefined behaviour in C++,
 candidate upstream finding U-004), and vectors above the library's count limits (rows would

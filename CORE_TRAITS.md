@@ -244,6 +244,10 @@ deviation (`UPSTREAM.md` U-016, spec 010 FR-019).
 - **Round-trip.** For every value `v: T` where `T: S2Encode + S2Decode`, decoding the bytes produced by `v.encode(&mut buf)` yields a value equal (by the type's domain equality, e.g., set-equality for `CellUnion`) to `v`.
 - **Decode rejects empty/truncated input** by returning `Err`.
 
+Proven for `CellId`, `Point`, `Cap`, `Rect`, `Cell` (spec 003), `CellUnion` (002), and
+`PointRegion` (unit points) and `LatLng` (every bit pattern), whose codecs spec 014 added in
+upstream's formats.
+
 **Proven instances (Kani):** the round trip of every codec of spec 003 (`verify/decoding/`),
 bytes for bytes; for `Cap`, also under `Cap`'s own equality (P-CPCOD-01, spec 008).
 

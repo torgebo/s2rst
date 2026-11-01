@@ -14,7 +14,10 @@
 
 #[cfg(feature = "slow")]
 use crate::codec::check_model_round_trip;
-use crate::codec::{CapC, CellC, CellIdC, Codec, PointC, RectC, check_agreement, check_encoder};
+use crate::codec::{
+    CapC, CellC, CellIdC, Codec, LatLngC, PointC, PointRegionC, RectC, check_agreement,
+    check_encoder,
+};
 
 /// One agreement member per `name = length, unwind => |input, accepted| covers`.
 macro_rules! agreement {
@@ -481,6 +484,248 @@ agreement!(CellC, "P-FX-10 (exact input): the `Cell` decoder reads a cell id and
         kani::cover!(!accepted, "an invalid id rejected (U-004)");
     },
     p_fx_10__b9 = 9, 32 => |_b, accepted| {
+        kani::cover!(accepted, "one byte left unread");
+    },
+);
+
+// ---- spec 014: `PointRegion` and `LatLng` --------------------------------------------------------
+
+/// P-FX-11 (round trip): every unit-length `PointRegion` round-trips through its 25-byte
+/// encoding, bit for bit, leaving a following byte unread.
+///
+/// Every point that `Point::is_unit` accepts. Under `pure_is_unit` (spec 008, L-CP-04, -07): the
+/// encoder's domain and the decoder's check read one answer per point (research R1).
+#[kani::proof]
+#[kani::unwind(11)]
+#[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+fn p_fx_11() {
+    crate::stubs::reset();
+    round_trip::<PointRegionC, 25>();
+}
+
+/// P-FX-11 (round trip), the encoder: for every unit-length `PointRegion`, the library writes
+/// upstream's 25 bytes (version 1, then the point).
+#[kani::proof]
+#[kani::unwind(26)]
+#[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+fn p_fx_11_enc() {
+    crate::stubs::reset();
+    check_encoder::<PointRegionC, 1, 25>();
+}
+
+/// P-FX-12 (round trip): every `LatLng`, any bit patterns, round-trips through its 16-byte
+/// encoding, bit for bit, leaving a following byte unread.
+///
+/// Every pair of `f64`.
+#[kani::proof]
+#[kani::unwind(9)]
+fn p_fx_12() {
+    round_trip::<LatLngC, 16>();
+}
+
+/// P-FX-12 (round trip), the encoder: for every `LatLng`, the library writes upstream's 16 bytes
+/// (the latitude, then the longitude).
+#[kani::proof]
+#[kani::unwind(17)]
+fn p_fx_12_enc() {
+    check_encoder::<LatLngC, 1, 16>();
+}
+
+agreement!(PointRegionC, "P-FX-13 (exact input): the `PointRegion` decoder reads a version byte \
+                          of at most 1 and three 8-byte floats, and rejects a point that is not \
+                          unit length (relative to `Point::is_unit`, under `pure_is_unit`).";
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b0 = 0, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b1 = 1, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b2 = 2, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b3 = 3, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b4 = 4, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b5 = 5, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b6 = 6, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b7 = 7, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b8 = 8, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b9 = 9, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b10 = 10, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b11 = 11, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b12 = 12, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b13 = 13, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b14 = 14, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b15 = 15, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b16 = 16, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b17 = 17, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b18 = 18, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b19 = 19, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b20 = 20, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b21 = 21, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b22 = 22, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b23 = 23, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b24 = 24, 5 => |b, accepted| {
+        let _ = b;
+        kani::cover!(!accepted, "truncated");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b25 = 25, 11 => |b, accepted| {
+        kani::cover!(accepted && b[0] == 0, "version 0 accepted");
+        kani::cover!(accepted && b[0] == 1, "version 1 accepted");
+        kani::cover!(!accepted && b[0] >= 2, "version 2 or above rejected");
+        kani::cover!(!accepted && b[0] <= 1, "a point off unit length rejected");
+    },
+    #[kani::stub(s2rst::s2::Point::is_unit, crate::stubs::pure_is_unit)]
+    p_fx_13__b26 = 26, 11 => |b, accepted| {
+        let _ = b;
+        kani::cover!(accepted, "one byte left unread");
+    },
+);
+
+agreement!(LatLngC, "P-FX-14 (exact input): the `LatLng` decoder reads two 8-byte floats, any bits.";
+    p_fx_14__b0 = 0, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b1 = 1, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b2 = 2, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b3 = 3, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b4 = 4, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b5 = 5, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b6 = 6, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b7 = 7, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b8 = 8, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b9 = 9, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b10 = 10, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b11 = 11, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b12 = 12, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b13 = 13, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b14 = 14, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b15 = 15, 5 => |_b, accepted| {
+        kani::cover!(!accepted, "truncated");
+    },
+    p_fx_14__b16 = 16, 5 => |_b, accepted| {
+        kani::cover!(accepted, "accepted");
+    },
+    p_fx_14__b17 = 17, 5 => |_b, accepted| {
         kani::cover!(accepted, "one byte left unread");
     },
 );

@@ -1,0 +1,17 @@
+Mutant: M-994
+Targets: P-FX-13
+Expect-Fail: cd_fx::p_fx_13__b25
+Defect: `PointRegion`'s decoder accepts a point off unit length
+
+diff --git a/core/src/s2/encoding.rs b/core/src/s2/encoding.rs
+--- a/core/src/s2/encoding.rs
++++ b/core/src/s2/encoding.rs
+@@ -1078,7 +1078,7 @@
+                 "unsupported point region encoding version",
+             ));
+         }
+-        if !point.is_unit() {
++        if false && !point.is_unit() {
+             return Err(io::Error::new(
+                 io::ErrorKind::InvalidData,
+                 "point region's point is not unit length",

@@ -8,7 +8,8 @@
 //! The vectors in `data/cpp_coding_vectors.csv` come from `tools/refgen-cpp/generate_coding`,
 //! with the C++ S2 library as an independent oracle. They cover:
 //! - the integer, cell-id, string and point vectors;
-//! - the `CellId`, `Point`, `Cap`, `Rect` and `Cell` codecs;
+//! - the `CellId`, `Point`, `Cap`, `Rect` and `Cell` codecs, and spec 014's `PointRegion` and
+//!   `LatLng` codecs;
 //! - every prefix of every encoding;
 //! - the survey's K2, K3 and K4 inputs.
 //!
@@ -31,7 +32,8 @@ use s2rst::s2::encoded_uint_vector::{
     decode_uint_vector_u32, decode_uint_vector_u64, encode_uint_vector_u32, encode_uint_vector_u64,
 };
 use s2rst::s2::encoding::{S2Decode, S2Encode};
-use s2rst::s2::{Cap, Cell, CellId, Point, Rect};
+use s2rst::s2::point_region::PointRegion;
+use s2rst::s2::{Cap, Cell, CellId, LatLng, Point, Rect};
 
 const CSV: &str = include_str!("data/cpp_coding_vectors.csv");
 
@@ -166,6 +168,10 @@ fn decode_row(r: &Row) -> String {
             ])
         }),
         "CELL_DECODE" => one::<Cell>(&b, |c| format!("{:016x}", c.id().0)),
+        "POINT_REGION_DECODE" => one::<PointRegion>(&b, |p| bits_text(&point_bits(&p.point()))),
+        "LATLNG_DECODE" => one::<LatLng>(&b, |ll| {
+            bits_text(&[ll.lat.radians().to_bits(), ll.lng.radians().to_bits()])
+        }),
         k => panic!("line {}: unknown decode kind {k}", r.line),
     }
 }
@@ -231,6 +237,15 @@ fn encode_row(r: &Row) -> String {
             .unwrap();
         }
         "CELL_ENCODE" => Cell::from(CellId(hex64(r.input))).encode(&mut w).unwrap(),
+        "POINT_REGION_ENCODE" => PointRegion::new(point_of(r.input)).encode(&mut w).unwrap(),
+        "LATLNG_ENCODE" => {
+            let f: Vec<f64> = r
+                .input
+                .split(':')
+                .map(|x| f64::from_bits(hex64(x)))
+                .collect();
+            LatLng::from_radians(f[0], f[1]).encode(&mut w).unwrap();
+        }
         k => panic!("line {}: unknown encode kind {k}", r.line),
     }
     hex(&w)

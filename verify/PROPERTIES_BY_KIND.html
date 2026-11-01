@@ -46,7 +46,7 @@ undefined behaviour or a hang, whatever its input</td>
 <tr class="odd">
 <td><a href="#round-trip">Round trip</a></td>
 <td>converting a value there and back gives the original</td>
-<td>17</td>
+<td>19</td>
 </tr>
 <tr class="even">
 <td><a href="#exact-output">Exact output</a></td>
@@ -58,7 +58,7 @@ prescribes</td>
 <td><a href="#exact-input">Exact input</a></td>
 <td>a decoder or parser accepts exactly the well-formed inputs, returns
 what they say, consumes exactly them and rejects the rest</td>
-<td>17</td>
+<td>19</td>
 </tr>
 <tr class="even">
 <td><a href="#validity">Validity</a></td>
@@ -179,7 +179,7 @@ href="cell_union/INVENTORY.md"><code>cell_union/INVENTORY.md</code></a></td>
 </tr>
 <tr class="odd">
 <td>Decoding layer</td>
-<td>all 22 in-scope encoders and decoders: 13 over every input, 9 within
+<td>all 26 in-scope encoders and decoders: 17 over every input, 9 within
 bounds (the string vector decoder is a tool limit)</td>
 <td><code>cd_crash::c_*</code>, and the agreement harnesses of
 <code>cd_fw</code>, <code>cd_uv</code>, <code>cd_cv</code>,
@@ -2443,6 +2443,22 @@ weekly)</td>
 <td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_05</code></a></td>
 <td>every cell</td>
 </tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FX-11</a></td>
+<td>Every unit-length <code>PointRegion</code> round-trips through
+upstream’s encoding, bit for bit.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_11</code>,
+<code>p_fx_11_enc</code></a></td>
+<td>every unit point (spec 014)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-12</a></td>
+<td>Every <code>LatLng</code> round-trips through upstream’s encoding,
+bit for bit.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_12</code>,
+<code>p_fx_12_enc</code></a></td>
+<td>every bit pattern (spec 014)</td>
+</tr>
 </tbody>
 </table>
 <h2 id="exact-output">Exact output</h2>
@@ -2849,6 +2865,21 @@ and rejects rectangles that are not valid, as upstream does.</td>
 are not valid cells.</td>
 <td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_10__b*</code></a></td>
 <td>every input</td>
+</tr>
+<tr class="even">
+<td><a href="decoding/PROPERTIES.md">P-FX-13</a></td>
+<td>The <code>PointRegion</code> decoder reads a version of at most 1
+and a point, and rejects a point that is not unit length, as upstream
+does.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_13__b*</code></a></td>
+<td>every input (spec 014)</td>
+</tr>
+<tr class="odd">
+<td><a href="decoding/PROPERTIES.md">P-FX-14</a></td>
+<td>The <code>LatLng</code> decoder reads two floats, any bits, as
+upstream does.</td>
+<td><a href="src/cd_fx.rs"><code>cd_fx::p_fx_14__b*</code></a></td>
+<td>every input (spec 014)</td>
 </tr>
 </tbody>
 </table>

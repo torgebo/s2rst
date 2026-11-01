@@ -14,9 +14,9 @@ inventories carry the crash-freedom proofs.
 |------|---------------------|---------|
 | [Never crashes](#never-crashes) | an operation finishes without a panic, an arithmetic overflow, undefined behaviour or a hang, whatever its input | every in-scope operation, plus 2 |
 | [Correct result](#correct-result) | an operation returns what the model says it should | 181 |
-| [Round trip](#round-trip) | converting a value there and back gives the original | 17 |
+| [Round trip](#round-trip) | converting a value there and back gives the original | 19 |
 | [Exact output](#exact-output) | an encoder or printer writes exactly the bytes or text the format prescribes | 28 |
-| [Exact input](#exact-input) | a decoder or parser accepts exactly the well-formed inputs, returns what they say, consumes exactly them and rejects the rest | 17 |
+| [Exact input](#exact-input) | a decoder or parser accepts exactly the well-formed inputs, returns what they say, consumes exactly them and rejects the rest | 19 |
 | [Validity](#validity) | a validity check answers exactly, and results are well formed | 16 |
 | [Laws](#laws) | operations relate to each other as they must: symmetry, idempotence, order independence, partition, consistency | 68 |
 | [Model checks](#model-checks) | the models and restated copies that the proofs compare against are themselves right | 5, plus the links |
@@ -71,7 +71,7 @@ inventories say which harness discharges each operation.
 |------|----------------|-----------|--------|
 | `CellId` | all 48 in-scope operations, over every input in their domain (the three text parsers up to 17 or 33 bytes, beyond which the length check rejects before any loop); since 2026-10-27 also 7 floating-point ones (`from_point`, `from_lat_lng`, `to_point`, `to_point_raw`, `size_st` and the two `From`s), run by the `Cell` harnesses | `crash::c_*`; the parsers by `enc::p_enc_06`, `p_enc_09`, `p_enc_10`; `cl_crash::c_fg_*` (shared) | [`INVENTORY.md`](INVENTORY.md) |
 | `CellUnion` | all 33 in-scope operations, within each one's union-size bound: the 27 of spec 002, and since spec 011 six floating-point ones (the point tests, the average-based and approximate areas, the cap and rectangle bounds), given the crash proofs of the `Cell` functions they call; `exact_area`, `cell_union_bound` and `expand_by_radius` inherit a tool limit | `cu_crash::c_*`, `uf_crash::c_*`, and the property harnesses the inventory names | [`cell_union/INVENTORY.md`](cell_union/INVENTORY.md) |
-| Decoding layer | all 22 in-scope encoders and decoders: 13 over every input, 9 within bounds (the string vector decoder is a tool limit) | `cd_crash::c_*`, and the agreement harnesses of `cd_fw`, `cd_uv`, `cd_cv`, `cd_pv`, `cd_fx` | [`decoding/INVENTORY.md`](decoding/INVENTORY.md) |
+| Decoding layer | all 26 in-scope encoders and decoders: 17 over every input, 9 within bounds (the string vector decoder is a tool limit) | `cd_crash::c_*`, and the agreement harnesses of `cd_fw`, `cd_uv`, `cd_cv`, `cd_pv`, `cd_fx` | [`decoding/INVENTORY.md`](decoding/INVENTORY.md) |
 | `Cell` | 40 of the 52 operations: the 21 integer and stored-bound ones over every valid cell (and every edge, face, position and level), with no size bound; since 2026-10-27, 19 floating-point ones (vertices, edges, centre, areas but the exact one, containment, both bounds, `from_point`, `from_lat_lng`), 10 per change and 9 weekly, under contracts and with the abstract u-v bound. The exact area and the distances to an edge or a cell run out of memory; the distances to a point fail the NaN check off the unit sphere | `cl_crash::c_*`, `cl_crash::c_fg_*`, and the property harnesses the inventory names | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `s1::Interval` | all 30 in-scope operations, over every valid pair of `f64` bounds, every point in [−π, π] and every margin but NaN, with no size bound | `iv_crash::c_*` | [`values/INVENTORY.md`](values/INVENTORY.md) |
 | `r1::Interval` | all 26 in-scope operations, over every pair of non-NaN bounds (infinities and empty intervals included) and every non-NaN number; the arithmetic ones except exactly their documented `∞ − ∞` corners; `project` on every non-empty interval | `ri_crash::c_*` | [`values/INVENTORY.md`](values/INVENTORY.md) |
@@ -423,6 +423,8 @@ decoder inverts its encoder), so those entries name three harness families.
 | [P-FX-03](decoding/PROPERTIES.md) | Every valid `Cap` round-trips through its encoding. | [`cd_fx::p_fx_03_enc`, `p_fx_08__b33`, `p_fx_03_mrt`](src/cd_fx.rs) (the last two weekly) | every valid cap |
 | [P-FX-04](decoding/PROPERTIES.md) | Every valid `Rect` round-trips through its encoding. | [`cd_fx::p_fx_04`](src/cd_fx.rs) | every valid rectangle |
 | [P-FX-05](decoding/PROPERTIES.md) | Every `Cell` round-trips through its encoding. | [`cd_fx::p_fx_05`](src/cd_fx.rs) | every cell |
+| [P-FX-11](decoding/PROPERTIES.md) | Every unit-length `PointRegion` round-trips through upstream's encoding, bit for bit. | [`cd_fx::p_fx_11`, `p_fx_11_enc`](src/cd_fx.rs) | every unit point (spec 014) |
+| [P-FX-12](decoding/PROPERTIES.md) | Every `LatLng` round-trips through upstream's encoding, bit for bit. | [`cd_fx::p_fx_12`, `p_fx_12_enc`](src/cd_fx.rs) | every bit pattern (spec 014) |
 
 ## Exact output
 
@@ -486,6 +488,8 @@ consumes exactly their bytes, and rejects everything else with an error (never a
 | [P-FX-08](decoding/PROPERTIES.md) | The `Cap` decoder reads a centre and a radius, and rejects caps that are not valid (a stricter check than upstream's). | [`cd_fx::p_fx_08__b*`](src/cd_fx.rs) (32, 33 weekly) | every input |
 | [P-FX-09](decoding/PROPERTIES.md) | The `Rect` decoder reads a version byte and four bounds, and rejects rectangles that are not valid, as upstream does. | [`cd_fx::p_fx_09__b*`](src/cd_fx.rs) | every input |
 | [P-FX-10](decoding/PROPERTIES.md) | The `Cell` decoder reads a cell id and rejects ids that are not valid cells. | [`cd_fx::p_fx_10__b*`](src/cd_fx.rs) | every input |
+| [P-FX-13](decoding/PROPERTIES.md) | The `PointRegion` decoder reads a version of at most 1 and a point, and rejects a point that is not unit length, as upstream does. | [`cd_fx::p_fx_13__b*`](src/cd_fx.rs) | every input (spec 014) |
+| [P-FX-14](decoding/PROPERTIES.md) | The `LatLng` decoder reads two floats, any bits, as upstream does. | [`cd_fx::p_fx_14__b*`](src/cd_fx.rs) | every input (spec 014) |
 
 ## Validity
 

@@ -213,12 +213,15 @@ verify-union: verify-kani-check ## Run the CellUnion proofs only (spec 002)
 # The decoding suite (spec 003), whole or one part (CI runs the parts as parallel legs, so
 # each stays under SC-006's 10 minutes): P=vectors the fixed-width and integer vector
 # properties, P=links the bounded agreement with the restated codecs and the string vector,
-# P=codecs the cell-id and point vectors, the fixed-size codecs and the remaining crash
-# proofs. The parts are balanced on harness time plus about 5 s of Kani set-up per harness.
-DECODING_HARNESSES = $(if $(filter vectors,$(P)),--harness cd_fw:: --harness cd_uv::,$(if $(filter links,$(P)),--harness cd_agree:: --harness cd_sv::,$(if $(filter codecs,$(P)),--harness cd_cv:: --harness cd_pv:: --harness cd_fx:: --harness cd_crash::,--harness cd_)))
+# P=codecs the cell-id and point vectors, the remaining crash proofs and the agreement of the
+# CellId, Point and Rect codecs (P-FX-06, -07, -09), P=fixed the other fixed-size codec
+# properties (cd_fx; split from P=codecs when spec 014's two codecs took it over 10 minutes,
+# 2026-11-01). Every cd_fx family is in exactly one of the two. The parts are balanced on
+# harness time plus about 5 s of Kani set-up per harness.
+DECODING_HARNESSES = $(if $(filter vectors,$(P)),--harness cd_fw:: --harness cd_uv::,$(if $(filter links,$(P)),--harness cd_agree:: --harness cd_sv::,$(if $(filter codecs,$(P)),--harness cd_cv:: --harness cd_pv:: --harness cd_crash:: --harness cd_fx::p_fx_06 --harness cd_fx::p_fx_07 --harness cd_fx::p_fx_09,$(if $(filter fixed,$(P)),--harness cd_fx::p_fx_01 --harness cd_fx::p_fx_02 --harness cd_fx::p_fx_03 --harness cd_fx::p_fx_04 --harness cd_fx::p_fx_05 --harness cd_fx::p_fx_08 --harness cd_fx::p_fx_1,--harness cd_))))
 
 .PHONY: verify-decoding
-verify-decoding: verify-kani-check ## Run the decoding-layer proofs only (spec 003) [P=<vectors|links|codecs>]
+verify-decoding: verify-kani-check ## Run the decoding-layer proofs only (spec 003) [P=<vectors|links|codecs|fixed>]
 	cd verify && cargo test
 	cd verify/deductive && cargo test
 	cd verify && ./run-verify.sh $(DECODING_HARNESSES)
@@ -298,7 +301,7 @@ verify-mutants: verify-kani-check ## Run the mutant (non-vacuity) campaign under
 # slow-tier members (spec 002): the larger property members and the 25-byte decode proofs,
 # which need an 8G ceiling. F=decoding runs the whole decoding suite (spec 003) with its
 # slow-tier members, the cell-id vector encoder at one and two ids, at an 8G ceiling; with
-# P=vectors|links|codecs, only that part, as for verify-decoding (CI runs the three as legs).
+# P=vectors|links|codecs|fixed, only that part, as for verify-decoding (CI runs the four as legs).
 # F=values runs the value-type suite (specs 004–006) with its slow-tier members, the deeper
 # levels of the Cell bound families, any split interval member, the rectangle's expansion
 # containment, the u-v rectangle's costlier members and the point's geometry, at an 8G
@@ -318,7 +321,7 @@ SLOW_HARNESSES = $(if $(F),$(if $(filter vertex,$(F)),--exact --harness crash::c
 SLOW_ENV = $(if $(filter union decoding values,$(F)),VERIFY_MEM_PER_HARNESS=$${VERIFY_MEM_PER_HARNESS:-8G})
 
 .PHONY: verify-slow
-verify-slow: verify-kani-check ## Run the weekly slow-tier proofs, one at a time, 60 min per harness [F=<0-5|vertex|union|decoding|values>] [P=<vectors|links|codecs> with F=decoding, <cell|interval|real|rect|uvrect|point|module::prefix ...> with F=values]
+verify-slow: verify-kani-check ## Run the weekly slow-tier proofs, one at a time, 60 min per harness [F=<0-5|vertex|union|decoding|values>] [P=<vectors|links|codecs|fixed> with F=decoding, <cell|interval|real|rect|uvrect|point|module::prefix ...> with F=values]
 	cd verify && $(SLOW_ENV) VERIFY_JOBS=$${VERIFY_JOBS:-1} VERIFY_HARNESS_TIMEOUT=$${VERIFY_HARNESS_TIMEOUT:-60m} ./run-verify.sh --features slow $(SLOW_HARNESSES)
 
 # The xlarge tier (spec 003): the decoding members over the weekly budget, for a separate

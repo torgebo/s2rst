@@ -45,6 +45,10 @@ within bounds.
 | 22 | `impl S2Decode for Rect` | decoder | in-scope | | `Bytes(L)` | | `cd_fx::p_fx_09__b0 … __b34` (P-FX-09) | `L ≤ 34`: whole domain | proven | n/a | |
 | 23 | `impl S2Encode for Cell` | encoder | in-scope | | `ValidId` (a `Cell` exists only for a valid id) | | `cd_crash::c_encode_cell` | whole domain (every valid id) | proven | n/a | |
 | 24 | `impl S2Decode for Cell` | decoder | in-scope | | `Bytes(L)` | | `cd_fx::p_fx_10__b0 … __b9` (P-FX-10) | `L ≤ 9`: whole domain | proven | n/a | |
+| 25 | `impl S2Encode for PointRegion` (spec 014) | encoder | in-scope | | any point (`PointRegion::new` accepts any) | | `cd_crash::c_encode_point_region` | whole domain | proven | n/a | |
+| 26 | `impl S2Decode for PointRegion` (spec 014) | decoder | in-scope | | `Bytes(L)` | | `cd_fx::p_fx_13__b0 … __b26` (P-FX-13), under `pure_is_unit` | `L ≤ 26`: whole domain | proven | n/a | |
+| 27 | `impl S2Encode for LatLng` (spec 014) | encoder | in-scope | | any bits | | `cd_crash::c_encode_latlng` | whole domain | proven | n/a | |
+| 28 | `impl S2Decode for LatLng` (spec 014) | decoder | in-scope | | `Bytes(L)` | | `cd_fx::p_fx_14__b0 … __b17` (P-FX-14) | `L ≤ 17`: whole domain | proven | n/a | |
 
 ## 2. Outside the domain: the documented panics (2026-10-26)
 

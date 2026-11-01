@@ -135,6 +135,8 @@ fn upstream(r: &Row) -> String {
         // Upstream S2Cell::Decode on an invalid id is undefined; the generator emits valid ids
         // only, where upstream and the library agree.
         "CELL_DECODE" => one(wire_spec::lib_cell(&b), |v| format!("{v:016x}")),
+        "POINT_REGION_DECODE" => one(wire_spec::ref_point_region(&b), |p| bits_text(p)),
+        "LATLNG_DECODE" => one(wire_spec::ref_latlng(&b), |l| bits_text(l)),
         k => panic!("line {}: unknown kind {k}", r.line),
     }
 }
@@ -173,6 +175,8 @@ fn encode(r: &Row) -> String {
         "POINT_ENCODE" => wire_spec::enc_point(bits_of::<3>(r.input)),
         "CAP_ENCODE" => wire_spec::enc_cap(bits_of::<4>(r.input)),
         "RECT_ENCODE" => wire_spec::enc_rect(bits_of::<4>(r.input)),
+        "POINT_REGION_ENCODE" => wire_spec::enc_point_region(bits_of::<3>(r.input)),
+        "LATLNG_ENCODE" => wire_spec::enc_latlng(bits_of::<2>(r.input)),
         k => panic!("line {}: unknown kind {k}", r.line),
     };
     hex(&out)
@@ -196,6 +200,8 @@ fn library(r: &Row) -> Option<String> {
         "CAP_DECODE" => one(wire_spec::lib_cap(&b), |c| bits_text(c)),
         "RECT_DECODE" => one(wire_spec::ref_rect(&b), |r| bits_text(r)),
         "CELL_DECODE" => one(wire_spec::lib_cell(&b), |v| format!("{v:016x}")),
+        "POINT_REGION_DECODE" => one(wire_spec::ref_point_region(&b), |p| bits_text(p)),
+        "LATLNG_DECODE" => one(wire_spec::ref_latlng(&b), |l| bits_text(l)),
         k => panic!("line {}: unknown kind {k}", r.line),
     })
 }

@@ -27,8 +27,9 @@ use std::io::{self, Read, Write};
 
 use crate::r1;
 use crate::s1::{self, ChordAngle};
+use crate::s2::point_region::PointRegion;
 use crate::s2::region::Region;
-use crate::s2::{Cap, Cell, CellId, CellUnion, Loop, Point, Polygon, Rect};
+use crate::s2::{Cap, Cell, CellId, CellUnion, LatLng, Loop, Point, Polygon, Rect};
 
 /// Lossless encoding version used for most types (C++ `kCurrentLosslessEncodingVersionNumber`).
 const ENCODING_VERSION: u8 = 1;
@@ -1047,13 +1048,169 @@ impl S2Decode for Cell {
     }
 }
 
+// ─── PointRegion ────────────────────────────────────────────────────────
+
+/// Writes upstream's `S2PointRegion::Encode` format: the version byte 1, then the point's three
+/// coordinates as little-endian `f64`, 25 bytes. The point is written as held, unit length or
+/// not ([`PointRegion::new`] accepts any point); a point that is not unit length does not decode.
+impl S2Encode for PointRegion {
+    fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+        w.write_all(&[ENCODING_VERSION])?;
+        self.point().encode(w)
+    }
+}
+
+/// Decodes upstream's `S2PointRegion::Decode` format: a version byte (0 or 1, as upstream accepts
+/// any version up to its own) and three little-endian `f64`. Bytes after the 25 are not read.
+///
+/// # Errors
+///
+/// [`io::ErrorKind::UnexpectedEof`] if fewer than 25 bytes are left, and
+/// [`io::ErrorKind::InvalidData`] for a version above 1 or a point that is not unit length
+/// ([`Point::is_unit`], upstream's `S2::IsUnitLength`; a NaN or infinite coordinate fails it).
+impl S2Decode for PointRegion {
+    fn decode(r: &mut dyn Read) -> io::Result<Self> {
+        let version = read_u8(r)?;
+        let point = Point::decode(r)?;
+        if version > ENCODING_VERSION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unsupported point region encoding version",
+            ));
+        }
+        if !point.is_unit() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "point region's point is not unit length",
+            ));
+        }
+        Ok(PointRegion::new(point))
+    }
+}
+
+// ─── LatLng ─────────────────────────────────────────────────────────────
+
+/// Writes upstream's `S2LatLng::Encode` format: the latitude, then the longitude, in radians, as
+/// little-endian `f64`, 16 bytes.
+impl S2Encode for LatLng {
+    fn encode(&self, w: &mut dyn Write) -> io::Result<()> {
+        write_f64(w, self.lat.radians())?;
+        write_f64(w, self.lng.radians())
+    }
+}
+
+/// Decodes upstream's `S2LatLng::Init(Decoder*)` format: two little-endian `f64`, the latitude
+/// and the longitude in radians, kept as read. Any 16 bytes decode, as upstream: a `LatLng` may be
+/// invalid (out of range, NaN), and [`LatLng::is_valid`] tells. Bytes after the 16 are not read.
+///
+/// # Errors
+///
+/// [`io::ErrorKind::UnexpectedEof`] if fewer than 16 bytes are left.
+impl S2Decode for LatLng {
+    fn decode(r: &mut dyn Read) -> io::Result<Self> {
+        let lat = read_f64(r)?;
+        let lng = read_f64(r)?;
+        Ok(LatLng::from_radians(lat, lng))
+    }
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::s2::Face;
-    use crate::s2::LatLng;
+
+    /// A point region's 25 bytes: `version`, then `(x, y, z)`.
+    fn point_region_bytes(version: u8, x: f64, y: f64, z: f64) -> Vec<u8> {
+        let mut b = vec![version];
+        for c in [x, y, z] {
+            b.extend_from_slice(&c.to_le_bytes());
+        }
+        b
+    }
+
+    #[test]
+    fn point_region_codec_is_upstreams() {
+        let p = LatLng::from_degrees(37.7749, -122.4194).to_point();
+        let mut buf = Vec::new();
+        PointRegion::new(p).encode(&mut buf).unwrap();
+        assert_eq!(buf, point_region_bytes(1, p.x(), p.y(), p.z()));
+        // Round trip, leaving a following byte unread.
+        buf.push(0xAB);
+        let mut r = buf.as_slice();
+        assert_eq!(PointRegion::decode(&mut r).unwrap(), PointRegion::new(p));
+        assert_eq!(r, [0xAB]);
+        // Version 0 is accepted, as upstream's `version > 1` check allows; 2 and 255 are not.
+        let v0 = point_region_bytes(0, 0.0, 0.0, 1.0);
+        assert!(PointRegion::decode(&mut v0.as_slice()).is_ok());
+        for v in [2, 255] {
+            let e = PointRegion::decode(&mut point_region_bytes(v, 0.0, 0.0, 1.0).as_slice());
+            assert_eq!(e.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        }
+    }
+
+    #[test]
+    fn point_region_decode_rejects_non_unit_points_and_short_input() {
+        for (x, y, z) in [
+            (0.0, 0.0, 0.0),
+            (2.0, 0.0, 0.0),
+            (f64::NAN, 0.0, 1.0),
+            (f64::INFINITY, 0.0, 0.0),
+            (1.0 + 4.0 * f64::EPSILON, 0.0, 0.0),
+        ] {
+            let e = PointRegion::decode(&mut point_region_bytes(1, x, y, z).as_slice());
+            assert_eq!(
+                e.unwrap_err().kind(),
+                io::ErrorKind::InvalidData,
+                "({x}, {y}, {z})"
+            );
+        }
+        // Within `5ε` of unit squared length: accepted as written.
+        let near = 1.0 + 2.0 * f64::EPSILON;
+        let d = PointRegion::decode(&mut point_region_bytes(1, near, 0.0, 0.0).as_slice());
+        assert_eq!(d.unwrap().point().x().to_bits(), near.to_bits());
+        let full = point_region_bytes(1, 1.0, 0.0, 0.0);
+        for n in 0..25 {
+            let e = PointRegion::decode(&mut &full[..n]);
+            assert_eq!(
+                e.unwrap_err().kind(),
+                io::ErrorKind::UnexpectedEof,
+                "{n} bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn latlng_codec_is_upstreams() {
+        let ll = LatLng::from_degrees(-33.8688, 151.2093);
+        let mut buf = Vec::new();
+        ll.encode(&mut buf).unwrap();
+        let mut want = ll.lat.radians().to_le_bytes().to_vec();
+        want.extend_from_slice(&ll.lng.radians().to_le_bytes());
+        assert_eq!(buf, want);
+        buf.push(7);
+        let mut r = buf.as_slice();
+        assert_eq!(LatLng::decode(&mut r).unwrap(), ll);
+        assert_eq!(r, [7]);
+        // Any 16 bytes decode, invalid and NaN included, bit for bit.
+        for (a, b) in [(f64::NAN, 4.0), (-0.0, f64::INFINITY), (2.0, -7.0)] {
+            let mut bytes = a.to_le_bytes().to_vec();
+            bytes.extend_from_slice(&b.to_le_bytes());
+            let d = LatLng::decode(&mut bytes.as_slice()).unwrap();
+            assert_eq!(d.lat.radians().to_bits(), a.to_bits());
+            assert_eq!(d.lng.radians().to_bits(), b.to_bits());
+            assert!(!d.is_valid() || a == -0.0);
+        }
+        for n in 0..16 {
+            let e = LatLng::decode(&mut &want[..n]);
+            assert_eq!(
+                e.unwrap_err().kind(),
+                io::ErrorKind::UnexpectedEof,
+                "{n} bytes"
+            );
+        }
+    }
 
     fn roundtrip_encode_decode<T: S2Encode + S2Decode + std::fmt::Debug>(val: &T) -> T {
         let mut buf = Vec::new();
