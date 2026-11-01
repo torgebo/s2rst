@@ -1,0 +1,17 @@
+Mutant: M-975
+Targets: P-ADTST-01
+Expect-Fail: ad_mean::p_adtst_01__n1
+Defect: `RegionUnion::intersects_cell` asks `contains_cell`
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -114,7 +114,7 @@
+ 
+     fn intersects_cell(&self, cell: &Cell) -> bool {
+         for region in &self.regions {
+-            if region.intersects_cell(cell) {
++            if region.contains_cell(cell) {
+                 return true;
+             }
+         }

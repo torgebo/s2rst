@@ -503,6 +503,11 @@ impl Cell {
     /// The cell is treated as a closed set (boundary points belong to
     /// both adjacent cells).
     ///
+    /// As upstream's `S2Cell::Contains`, the test accepts points up to `(5/3)·ε` outside the cell
+    /// in u-v, so that the leaf cell of a point always contains it. [`cap_bound`](Self::cap_bound)
+    /// and [`rect_bound`](Self::rect_bound) contain the cell's own points, not every point of that
+    /// margin, as upstream's do (`UPSTREAM.md` U-017, spec 012).
+    ///
     /// # Panics
     ///
     /// In debug builds, panics if `p`'s coordinate on the axis of the cell's face is NaN, or if
@@ -536,7 +541,10 @@ impl Cell {
 
     // --- Bounding ---
 
-    /// Returns the bounding cap of this cell.
+    /// Returns the bounding cap of this cell: the cap around the u-v centre that holds the four
+    /// vertices, as upstream's `GetCapBound`. It contains the cell's own points; a point that
+    /// [`contains_point`](Self::contains_point) accepts in its margin outside the cell can lie
+    /// outside it, as upstream (`UPSTREAM.md` U-017).
     pub fn cap_bound(self) -> Cap {
         let uv_center = self.uv.center();
         let cap_center = Point(face_uv_to_xyz(self.face, uv_center.x, uv_center.y).normalize());
@@ -547,7 +555,10 @@ impl Cell {
         cap
     }
 
-    /// Returns the bounding lat-lng rectangle of this cell.
+    /// Returns the bounding lat-lng rectangle of this cell, as upstream's `GetRectBound`. It
+    /// contains the cell's own points; a point that [`contains_point`](Self::contains_point)
+    /// accepts in its margin outside the cell can lie outside it, as upstream (`UPSTREAM.md`
+    /// U-017).
     pub fn rect_bound(self) -> Rect {
         if self.level > Level::MIN {
             let u = self.uv.x.lo + self.uv.x.hi;

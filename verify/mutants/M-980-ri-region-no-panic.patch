@@ -1,0 +1,18 @@
+Mutant: M-980
+Targets: N-RegionIntersection::region
+Expect-Fail: ad_crash::n_region_past_end
+Test: core --lib s2::region_intersection::tests::region_panics_past_the_end
+Defect: `region(i)` returns the first member past the end
+
+diff --git a/core/src/s2/region_intersection.rs b/core/src/s2/region_intersection.rs
+--- a/core/src/s2/region_intersection.rs
++++ b/core/src/s2/region_intersection.rs
+@@ -48,7 +48,7 @@
+     /// Panics if `i` is at least [`num_regions`](Self::num_regions). Upstream's `region(i)`
+     /// indexes without a check (spec 012 K2).
+     pub fn region(&self, i: usize) -> &dyn Region {
+-        self.regions[i].as_ref()
++        self.regions.get(i).unwrap_or(&self.regions[0]).as_ref()
+     }
+ }
+ 

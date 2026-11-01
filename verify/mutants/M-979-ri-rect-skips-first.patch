@@ -1,0 +1,18 @@
+Mutant: M-979
+Targets: P-ADBND-01
+Expect-Fail: 
+Test: core --all-features --test cpp_cell_bounds_diff
+Defect: `RegionIntersection::rect_bound` skips the first member (a larger rectangle still holds every common point, which P-ADBND-01 states since R0c; the C++ rows compare the bound bit for bit)
+
+diff --git a/core/src/s2/region_intersection.rs b/core/src/s2/region_intersection.rs
+--- a/core/src/s2/region_intersection.rs
++++ b/core/src/s2/region_intersection.rs
+@@ -65,7 +65,7 @@
+ 
+     fn rect_bound(&self) -> Rect {
+         let mut result = Rect::full();
+-        for region in &self.regions {
++        for region in self.regions.iter().skip(1) {
+             result = result.intersection(region.rect_bound());
+         }
+         result

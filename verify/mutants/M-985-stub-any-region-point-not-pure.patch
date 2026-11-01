@@ -1,0 +1,23 @@
+Mutant: M-985
+Targets: P-ADTST-01
+Expect-Fail: ad_mean::p_adtst_01__n1
+Defect: stub mutant: the abstract region answers `contains_point` afresh on every call
+
+diff --git a/verify/src/any_region.rs b/verify/src/any_region.rs
+--- a/verify/src/any_region.rs
++++ b/verify/src/any_region.rs
+@@ -116,12 +116,8 @@
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {
+-        let b = bits3(*p);
+-        CONTAINS_POINT
+-            .lock()
+-            .unwrap()
+-            .get([u64::from(self.id), b[0], b[1], b[2]], any_bool)
+-            == 1
++        let _ = (bits3(*p), &CONTAINS_POINT);
++        any_bool() == 1
+     }
+ }
+ 

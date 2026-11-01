@@ -323,3 +323,26 @@ LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_region > ../../core/tests/d
 | `CELL_FACE_RECT` | 6 | `Cell::rect_bound` of the face cells (spec 011 FR-017) | `GetRectBound` |
 
 There is no deviation: every row matches bit for bit.
+
+## Cell-bounds and region-adaptor oracle (`generate_cell_bounds`)
+
+`generate_cell_bounds` writes
+[`core/tests/data/cpp_cell_bounds_vectors.csv`](../../core/tests/data/cpp_cell_bounds_vectors.csv)
+(3.4 MB), which [`core/tests/cpp_cell_bounds_diff.rs`](../../core/tests/cpp_cell_bounds_diff.rs)
+diffs `Cell`'s bounds and the region adaptors against (spec 012, FR-018, research R6).
+
+```sh
+cmake --build build --target generate_cell_bounds
+LD_LIBRARY_PATH=/tmp/s2-install/lib ./build/generate_cell_bounds > ../../core/tests/data/cpp_cell_bounds_vectors.csv
+```
+
+| Section | Rows | Library operations checked | Oracle |
+|---------|------|----------------------------|--------|
+| `CELL_BOUNDS` | 1,008: the six faces, U-017's two cells, 1,000 random cells of every level | `Cell::cap_bound`, `rect_bound` | `GetCapBound`, `GetRectBound` |
+| `CELL_BOUND_POINTS` | 26,208: each cell's u-v corners and edge midpoints moved outward by 0, 1 and 5/3 − 0.001 `DBL_EPSILON`, and two interior points | `contains_point`, the bounds' `contains_point` | `Contains(p)`, the bounds' `Contains(p)` |
+| `REGION_UNION`, `REGION_INTERSECTION` | 2,000 each: 0 to 4 members (cap, rectangle, cell, point region), a cell and a point | every `Region` method | the same |
+
+The adaptors' cap radii are spec 010's documented deviation (`Rect::cap_bound`'s widening): the
+diff test checks the centre bit for bit and the radius as upstream's widened by the rule. The
+`CELL_BOUND_POINTS` rows pin U-017: of 25,469 contained points, 2,371 lie outside the cap bound
+and 840 outside the rectangle bound, in C++ and the library alike.

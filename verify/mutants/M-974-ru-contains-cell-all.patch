@@ -1,0 +1,19 @@
+Mutant: M-974
+Targets: P-ADTST-01
+Expect-Fail: ad_mean::p_adtst_01__n1
+Defect: `RegionUnion::contains_cell` is `all`-like: false at the first member that does not contain
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -105,8 +105,8 @@
+ 
+     fn contains_cell(&self, cell: &Cell) -> bool {
+         for region in &self.regions {
+-            if region.contains_cell(cell) {
+-                return true;
++            if !region.contains_cell(cell) {
++                return false;
+             }
+         }
+         false

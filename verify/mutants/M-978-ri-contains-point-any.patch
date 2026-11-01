@@ -1,0 +1,17 @@
+Mutant: M-978
+Targets: P-ADTST-01
+Expect-Fail: ad_mean::p_adtst_01__n2
+Defect: `RegionIntersection::contains_point` is `any`
+
+diff --git a/core/src/s2/region_intersection.rs b/core/src/s2/region_intersection.rs
+--- a/core/src/s2/region_intersection.rs
++++ b/core/src/s2/region_intersection.rs
+@@ -84,7 +84,7 @@
+     }
+ 
+     fn contains_point(&self, p: &Point) -> bool {
+-        self.regions.iter().all(|r| r.contains_point(p))
++        self.regions.iter().any(|r| r.contains_point(p))
+     }
+ }
+ 

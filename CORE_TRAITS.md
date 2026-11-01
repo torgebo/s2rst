@@ -153,8 +153,8 @@ Internal (non-public):
 - `fn contains_point(&self, p: &Point) -> bool`
 
 **Invariants (verified by generic properties):**
-- **Bounding cap contains contained points.** If `contains_point(p)` is `true`, then `cap_bound().contains_point(p)` is `true`.
-- **Bounding rect contains contained points.** If `contains_point(p)` is `true`, then `rect_bound().contains_latlng(LatLng::from_point(p))` is `true`.
+- **Bounding cap contains contained points.** If `contains_point(p)` is `true`, then `cap_bound().contains_point(p)` is `true`. *Exception:* `Cell`, whose `contains_point` accepts a `(5/3)·ε` u-v margin outside the cell that its bounds do not cover, as upstream's (`UPSTREAM.md` U-017, spec 012); the law holds there for the cell's own points.
+- **Bounding rect contains contained points.** If `contains_point(p)` is `true`, then `rect_bound().contains_latlng(LatLng::from_point(p))` is `true`. *Exception:* `Cell`'s margin, as above (U-017).
 - **Cell-union cover covers the region.** Every cell in `cell_union_bound()` either intersects the region or is redundant; taken together, they cover every contained point. Stated generically (spec 011) as "some cell of the covering contains the point's leaf", which holds for the regions whose point test is by leaf (`PointRegion`, `CellUnion`) and for points inside a closed region; at a closed region's boundary only the closed form holds (some covering cell contains the point): a `Cell` contains its own vertices, whose leaves lie in a neighbour.
 - **Containment implies intersection.** `contains_cell(c) ⇒ intersects_cell(c)` for all cells `c`.
 - **Non-intersection implies non-containment.** If `!intersects_cell(c)`, then `!contains_cell(c)`. For a region whose cell test checks the vertices first (`Cap`, `Rect`), also `!contains_point(&v)` for every vertex `v` of `c`; this second part does not hold for `Cell`, whose `intersects_cell` compares ids while its closed region contains the shared vertices of a neighbour (as upstream's `S2Cell`; spec 008 T022), nor for `CellUnion`, whose cell test is by id and point test by leaf (the union of cell `14` contains a vertex of its neighbour `1c`, upstream too; spec 011 P-UREG-03). It holds for `PointRegion` on every case tested (a cell contains its own vertices: 80,000 of 80,000).
@@ -171,7 +171,10 @@ needs the values of `atan2` and `sin_cos`; for `CellUnion`, P-UREG-04, it waits 
 law); the bounding rect for `PointRegion` (P-PRREG-05; for `CellUnion` not proven, P-UREG-05);
 the cell-union cover for `Cell` (P-CCNT-03) and `PointRegion` (P-PRREG-02, vacuous, and P-PRREG-06
 for its point) (for `Cap`, `Rect` and `CellUnion` not proven, P-CPREG-04, P-LREG-04, P-UREG-02,
--06: the covering's level needs `asin`'s value). Every invariant
+-06: the covering's level needs `asin`'s value). Spec 012 proves that `RegionUnion` and
+`RegionIntersection` preserve containment implies intersection (P-ADREG-01), the vertex law
+(P-ADREG-02) and the bounding rect (P-ADREG-03) for any members that satisfy them, over abstract
+members; `Cell`'s bounding laws for its own points are not proven (P-CREG-01, -02). Every invariant
 also has quickcheck instances (below). Upstream's `S2LatLngRect::GetCapBound` breaks the
 bounding-cap invariant near a rectangle's boundary; `Rect::cap_bound` widens it, a documented
 deviation (`UPSTREAM.md` U-016, spec 010 FR-019).

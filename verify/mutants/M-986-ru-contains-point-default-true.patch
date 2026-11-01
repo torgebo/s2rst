@@ -1,0 +1,17 @@
+Mutant: M-986
+Targets: P-ADREG-02
+Expect-Fail: ad_reg::p_adreg_02__n1
+Defect: `RegionUnion::contains_point` is true when no member contains the point
+
+diff --git a/core/src/s2/region_union.rs b/core/src/s2/region_union.rs
+--- a/core/src/s2/region_union.rs
++++ b/core/src/s2/region_union.rs
+@@ -127,7 +127,7 @@
+                 return true;
+             }
+         }
+-        false
++        true
+     }
+ }
+ 
