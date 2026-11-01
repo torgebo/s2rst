@@ -143,3 +143,15 @@ The margin (U-017) stays excepted. P-UREG-04 waits on P-CREG-01.
   `TRUSTED_BASE.md` (the order contracts, the lemma, the premise); `MUTANTS.md`,
   `VERIFIED_TYPES.md` §2.14, `CORE_TRAITS.md`; the evaluation's spec-013 part. No inventory
   change (no new operation). `COVERAGE.md` unaffected (crash freedom unchanged).
+
+## R10: Measured in implementation (2026-11-01)
+
+- `P=cellrect`: `p_creg_02__l0` 109.2 s, `__lat` 259.2 s (covers 2/2, 3/3), 314 s wall with the
+  crate tests and build. Weekly: `__lng_f0` … `__lng_f5` 362.6, 205.1, 326.2, 191.4, 213.8,
+  349.1 s, 893 s with 2 jobs. Through the latitude lemma the longitude members ran faster than
+  R0's (341–375 s for faces 0 and 2).
+- The native tests: the order contract on ten million pairs per quadrant rule and the lemma on
+  ten million pairs, 5 s in release; the quadrant premise over the 2³⁰ + 1 edge values, 5 s.
+- Mutants `M-988` … `M-992`: all killed. M-990 was retargeted from face 0 to face 2 before the
+  run: on the equatorial faces the longitude does not depend on v, so the mutant is equivalent
+  there.

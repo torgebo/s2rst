@@ -4,7 +4,12 @@
 
 **Created**: 2026-11-01
 
-**Status**: Draft
+**Status**: Implemented 2026-11-01. No clarification was needed. P-CREG-02 is proven for the
+cell's points as directions, under a tested order contract for `atan2`; `CellUnion`'s P-UREG-05
+follows by composition. P-LREG-03, P-ADREG-04, P-PTDST-02 and the normalised point are recorded
+with sharpened reasons, as SC-003 and SC-004 allow. Every success criterion is met on the
+workstation; SC-006 on a hosted runner needs a push (tasks T015). Evaluation: the spec-013 part
+of `verify/values/EVALUATION.md`.
 
 **Input**: User description: "next features to verify: spec 012's recommendation 1, a tested
 monotonicity contract for atan2 (and what else it needs, e.g. sin_cos) to open Rect's
