@@ -806,7 +806,7 @@ rows of `PROPERTIES.md` §1, and the spec-012 part of `values/EVALUATION.md`.
 ### The abstract region (research R4)
 
 `any_region::AnyRegion` is the adaptors' members: a `Region` whose every answer is any value, one
-per input and region, from `static Mutex` tables of ten slots (`stubs::Table`). It is not a stub
+per input and region (its cap bound and covering are fixed: the adaptors never read them), from `static Mutex` tables of ten slots (`stubs::Table`). It is not a stub
 of library code: it stands for "any implementor". A preservation statement reads each member's
 answers through the methods the adaptor calls, assumes a law of them, and asserts it of the
 adaptor; the tables make the two reads one value. What it trusts: nothing beyond the checker, but a
@@ -815,10 +815,14 @@ never a false proof), which is why member counts stay at 3 (2 for the vertex law
 
 ### The argument for any number of members
 
-The proofs cover up to three members. An adaptor's answers are associative folds (`any`, `all`,
-`Rect::union` from the empty rectangle, `Rect::intersection` from the full one), and each law is a
-statement about one member's answers, so a law for `n + 1` members follows by induction from the
-proofs at 1 and 2 members and spec 005's P-LSET-01 and P-LSET-02. Written in `ad_reg.rs`.
+The proofs cover up to three members. An adaptor's answers are left folds over its members
+(`any`, `all`, `Rect::union` from the empty rectangle, `Rect::intersection` from the full one). The
+rectangle folds are not associative over circular intervals, and the argument does not need them
+to be: the tests' laws are implications between one member's answers to the same input, which pass
+through `any` and `all` for every number at once, and the bounding-rectangle law follows by
+induction over the fold from one invariant per step, spec 005's P-LSET-01 (each `union` contains
+both operands) and P-LSET-02 (each `intersection` holds every common point). Written in
+`ad_reg.rs`.
 
 ### Bounds and gaps
 

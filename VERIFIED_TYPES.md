@@ -32,7 +32,7 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 | Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for `CellUnion` (the cell tests, 002; the point test, both bounds' containment of each cell's bound and containment implies intersection, 011) and the generic laws for `Cell`, `Cap` (three of four, with lemma stubs), `Rect` (two of four, under contract, spec 010) and `PointRegion` (five of six, spec 011, with the two new laws of the bounding rectangle and the covering); and, by preservation over any members, `RegionUnion` and `RegionIntersection` (three of six, spec 012); the codec round trip under `Cap`'s own equality; the equality laws for the ten value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
 | Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45), plus 27 from spec 010 (24 `ll_*`, 3 `ll_reg`) and 42 from spec 011 (15 `pr_*`, 27 `uf_*`) and 32 from spec 012 (`ad_*`); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`), plus 2 from spec 010, 21 from spec 011 and 8 from spec 012; 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
 | Verus | 5 restated codecs, 132 obligations, 17 s |
-| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008, 37 `M-901` … `M-937` for spec 010 24 `M-950` … `M-973` for spec 011 and 14 `M-974` … `M-987` for spec 012, all killed |
+| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008, 37 `M-901` … `M-937` for spec 010, 24 `M-950` … `M-973` for spec 011 and 14 `M-974` … `M-987` for spec 012, all killed |
 
 ## 2. Types with proofs
 
@@ -325,7 +325,7 @@ and M-811 (each `try_from` accepting one value too many). The proofs take under 
 ### 2.13 `Cell`'s bounding laws, and the region adaptors (spec 012)
 
 - **Scope:** `Cell`'s bounding-cap and bounding-rectangle laws for its own points, and its
-  covering law; `RegionUnion` and `RegionIntersection` (18 entries) and their `Region` laws.
+  covering law; `RegionUnion` and `RegionIntersection` (28 entries) and their `Region` laws.
 - **Found (U-017):** `Cell::contains_point` accepts points up to `(5/3)·ε` outside the cell in u-v
   (upstream's, so a point's leaf cell contains it), and the cap and rectangle bounds cover the cell
   alone, upstream too: 118,093 and 36,315 of 1,008,724 contained adversarial points lie outside
@@ -333,7 +333,7 @@ and M-811 (each `try_from` accepting one value too many). The proofs take under 
   documented; the laws are stated for the cell's own points. `RegionIntersection::region(i)`'s
   panic past the end is documented (K2). New C++ vectors (`cpp_cell_bounds_vectors.csv`, 31,216
   rows) match every row but spec 010's documented cap radii.
-- **Proven:** the adaptors' crash freedom (16 entries, over abstract members: any answers, so any
+- **Proven:** the adaptors' crash freedom (24 entries, over abstract members: any answers, so any
   members), their meaning, and the preservation of three `Region` laws (containment implies
   intersection, the vertex law, the bounding rectangle), for up to 3 members (2 for the vertex
   law) and any number by a written argument; `Cell`'s covering law by composition.

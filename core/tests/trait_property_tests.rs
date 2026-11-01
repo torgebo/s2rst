@@ -1835,8 +1835,8 @@ fn law_member(kind: u8, lat: i32, lng: i32, r: u16) -> Box<dyn Region> {
 }
 
 /// The adaptors preserve containment implies intersection, the vertex law and the bounding
-/// rectangle, for mixed members and an adaptor nested in another (the Kani statements are spec
-/// 012's `ad_reg`, over abstract members).
+/// rectangle, for three mixed members, or two nested in an adaptor of the same kind beside the
+/// third (the Kani statements are spec 012's `ad_reg`, over abstract members).
 #[quickcheck]
 fn region_adaptors_preserve_laws(
     kinds: (u8, u8, u8),
@@ -1847,12 +1847,13 @@ fn region_adaptors_preserve_laws(
     nest: bool,
 ) -> bool {
     let members = |union: bool| -> Vec<Box<dyn Region>> {
-        let ms = vec![
+        let mut ms = vec![
             law_member(kinds.0, a.0, a.1, a.2),
             law_member(kinds.1, b.0, b.1, b.2),
         ];
         let third = law_member(kinds.2, c.0, c.1, c.2);
         if !nest {
+            ms.push(third);
             return ms;
         }
         let inner: Box<dyn Region> = if union {

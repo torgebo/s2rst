@@ -476,7 +476,7 @@ pub fn pure_approx_eq_angle(a: Point, b: Point, eps: s2rst::s1::Angle) -> bool {
 // ---- the abstract cell (research R7)
 // -------------------------------------------------------------
 
-pub(crate) fn any_box_point() -> Point {
+fn any_box_point() -> Point {
     let (x, y, z): (f64, f64, f64) = (kani::any(), kani::any(), kani::any());
     kani::assume(x.abs() <= 1.0 && y.abs() <= 1.0 && z.abs() <= 1.0);
     Point(Vector { x, y, z })

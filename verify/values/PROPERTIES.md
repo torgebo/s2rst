@@ -413,9 +413,10 @@ some member contains, an intersection what every member contains. The members ar
 (`verify/src/any_region.rs`): any answers, one per input and region, so a statement holds for every
 implementor. The preservation laws assume a law of each member's answers (read through the methods
 the adaptor calls) and assert it of the adaptor. **Any number of members**: every adaptor answer is
-an associative fold over the members, and each law is about one member's answers, so the proofs
-for up to 3 members (2 for the vertex law) give every number by induction, with spec 005's
-P-LSET-01 and P-LSET-02 for the rectangle folds (`ad_reg.rs`). **SC-003 (spec 012)**: 8 counted
+a left fold over the members; the tests' laws pass through `any` and `all` for every number at
+once, and the bounding-rectangle law follows by induction over the fold from spec 005's P-LSET-01
+and P-LSET-02, one invariant per step (no associativity: the rectangle folds are not associative
+over circular intervals; `ad_reg.rs`). **SC-003 (spec 012)**: 8 counted
 entries (P-ADREG-04, -05 need laws of `Rect` and `Cap` that are not proven).
 
 | ID | Kind | Statement | Upstream source (`v0.14.0-40`) | Domain | Harness | Status | Bound | Mutants |

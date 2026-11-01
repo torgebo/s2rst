@@ -44,12 +44,13 @@ in [research.md](research.md).
 | P-ADREG-04 | law | the bounding-cap law holds when the members satisfy the rectangle law | — | — | not proven: by composition it needs `Rect`'s bounding-cap law (spec 010's P-LREG-03, not proven) |
 | P-ADREG-05 | law | the covering laws | — | — | not proven: `Cap`'s covering law (spec 008's P-CPREG-04) |
 
-**The argument for any `N`:** every adaptor answer is a fold over the members (`any`, `all`,
-`Rect::union` from the empty rectangle, `Rect::intersection` from the full one), and the folds
-are associative; spec 005 proves that `Rect::union` contains both operands (P-LSET-01) and that
-`Rect::intersection` holds every common point (P-LSET-02). A law for `N + 1` members is the law for an adaptor of `N`
-members, which the induction gives, combined with one more member, which the `N = 1, 2` proofs
-cover.
+**The argument for any `N`:** every adaptor answer is a left fold over the members (`any`,
+`all`, `Rect::union` from the empty rectangle, `Rect::intersection` from the full one). The
+rectangle folds are not associative over circular intervals (corrected 2026-11-01 after review),
+and the argument does not use it: the tests' laws are implications between one member's answers
+to one input, which pass through `any` and `all`; the bounding-rectangle law follows by induction
+over the fold, since spec 005 proves that each `Rect::union` contains both operands (P-LSET-01)
+and each `Rect::intersection` holds every common point (P-LSET-02). See `verify/src/ad_reg.rs`.
 
 ### 4.2 `Cell`'s bounding laws (`verify/values/PROPERTIES.md` §2)
 

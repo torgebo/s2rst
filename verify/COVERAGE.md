@@ -268,7 +268,7 @@ rows.
 - **Gap 1 (the documented panics):** `RegionIntersection::region(i)` panicked past the end without
   saying so (spec 012 K2); it is documented, and `ad_crash::n_region_past_end` proves the panic
   exact in every build.
-- **Gap 2 (floating-point geometry):** the adaptors' 16 in-scope entries have crash proofs over
+- **Gap 2 (floating-point geometry):** the adaptors' 24 in-scope entries have crash proofs over
   abstract members, the bounds under `atan2`'s and `asin`'s contracts; `cell_union_bound` inherits
   `Cap::cell_union_bound`'s limit. `values/INVENTORY.md` section 14 has the rows.
 

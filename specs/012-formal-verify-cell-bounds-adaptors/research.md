@@ -25,8 +25,9 @@ the twelve vertex keys of three members timed out. Member counts are chosen so t
 
 **Any number of members:** the adaptors' answers are `any`/`all` folds and their rectangle a
 fold of `union`/`intersection`; each preservation statement is a conjunction over the members of
-one member's law. The proofs at `n ≤ 3` (2 for the vertex law) and the fold's associativity give
-every `n` by a written argument (data-model §4), as spec 002's leaf count did.
+one member's law. The proofs at `n ≤ 3` (2 for the vertex law) and an induction over the
+fold give every `n` by a written argument (data-model §4; not the fold's associativity, which the
+rectangle folds lack, as corrected after review on 2026-11-01).
 
 ## R1: Upstream, read and run (v0.14.0-40-g37a4501)
 

@@ -1787,7 +1787,7 @@ adversarial points each, 10,000 adaptors) found U-017 first.
   which no contract gives. The survey's 240,000 own points and the C++ rows find no miss. The
   covering law holds in its closed form by composition. `CellUnion`'s bounding laws keep their
   reason.
-- **The adaptors:** all 16 in-scope entries proven crash-free over abstract members (any answers,
+- **The adaptors:** all 24 in-scope entries proven crash-free over abstract members (any answers,
   so any members whose methods do not panic), `region(i)`'s panic proven exact and now documented
   (K2). 8 counted catalogue entries, all proven: their meaning (`any`/`all` folds, the rectangle
   bounds, the empty adaptors, the cap and covering through the rectangle by a drift guard), and
@@ -1884,8 +1884,8 @@ Ranked:
 
 | Criterion | Outcome | Evidence |
 |-----------|---------|----------|
-| SC-001 the adaptors' crash freedom; `region(i)` exact | met | 16 entries over abstract members, up to 3 members (the bounds 2); `n_region_past_end` (INVENTORY §14). |
-| SC-002 every entry proven or excluded | met | 16 proven, 2 excluded (`Debug`), `cell_union_bound` an inherited limit; no new contract. |
+| SC-001 the adaptors' crash freedom; `region(i)` exact | met | 24 entries over abstract members, up to 3 members (the bounds 2); `n_region_past_end` (INVENTORY §14). |
+| SC-002 every entry proven or excluded | met | 24 proven, 4 excluded (the `Debug`s, and the `cell_union_bound`s: `Cap`'s inherited limit); no new contract. |
 | SC-003 at least 90% of the counted entries | met (100%) | 8 of 8 (§13). |
 | SC-004 the laws | met | Three laws preserved, proven; P-ADREG-04, -05 with reasons; `Cell`'s P-CREG-01, -02 with reasons (tool limit, `atan2`'s values), P-CREG-03 by composition, the margin exception recorded with its counterexample (P-CREG-04). |
 | SC-005 non-vacuity | met | 14 mutants, all killed; every proven entry and law instance has one; every crash harness satisfies its covers. |

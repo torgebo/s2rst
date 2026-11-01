@@ -13,6 +13,9 @@
 //! and its radius as upstream's widened by the documented rule. The `CELL_BOUND_POINTS` rows pin
 //! U-017: upstream's bounds miss points of `contains_point`'s margin, and so do the library's.
 
+mod common;
+use common::widened;
+
 use s2rst::r1;
 use s2rst::r3::Vector;
 use s2rst::s1::{self, Angle, ChordAngle};
@@ -70,19 +73,6 @@ fn cap_s(c: Cap) -> [String; 4] {
 
 fn rect_s(r: Rect) -> [String; 4] {
     [d(r.lat.lo), d(r.lat.hi), d(r.lng.lo), d(r.lng.hi)]
-}
-
-/// Spec 010's widening of `Rect::cap_bound` (FR-019), from upstream's cap.
-fn widened(up: Cap) -> Cap {
-    if up.is_empty() {
-        return up;
-    }
-    let wide = up.expanded(Angle::from_radians(1e-15));
-    let radius = wide.chord_radius();
-    Cap::from_center_chord_angle(
-        wide.center(),
-        radius.plus_error(8.0 * f64::EPSILON * radius.length2()),
-    )
 }
 
 #[test]
@@ -152,11 +142,12 @@ fn check_adaptor(name: &str, build: impl Fn(Vec<Box<dyn Region>>) -> Box<dyn Reg
             "{name} cap radius, the documented widening {r:?}"
         );
         assert_eq!(rect_s(a.rect_bound()), r[9..13], "{name} rect_bound {r:?}");
-        assert_eq!(
-            a.cell_union_bound().len().to_string(),
-            r[13],
-            "{name} cover {r:?}"
-        );
+        let cover: Vec<String> = a
+            .cell_union_bound()
+            .iter()
+            .map(|id| format!("{:016x}", id.0))
+            .collect();
+        assert_eq!(cover.join(";"), r[13], "{name} cell_union_bound {r:?}");
         assert_eq!(b(a.contains_cell(&c)), r[14], "{name} contains_cell {r:?}");
         assert_eq!(
             b(a.intersects_cell(&c)),

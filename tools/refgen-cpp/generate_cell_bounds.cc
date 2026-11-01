@@ -24,8 +24,8 @@
 //   members,cell,x,y,z,cx,cy,cz,length2,latlo,lathi,lnglo,lnghi,cover,contains,may_intersect,contains_point
 //   members is ';'-separated, each one of `c:x:y:z:radians` (an S2Cap from an S1ChordAngle of the
 //   radians), `r:latlo:lathi:lnglo:lnghi` (an S2LatLngRect), `e:cell` (an S2Cell) or `p:x:y:z`
-//   (an S2PointRegion); cover is GetCellUnionBound()'s size; the tests are on S2Cell(cell) and
-//   (x, y, z).
+//   (an S2PointRegion); cover is GetCellUnionBound()'s cell ids, ';'-separated (empty for an
+//   empty covering); the tests are on S2Cell(cell) and (x, y, z).
 
 #include <algorithm>
 #include <cfloat>
@@ -191,9 +191,14 @@ void Adaptors(bool is_union) {
     S2Cell cell(cell_id);
     std::vector<S2CellId> cover;
     r->GetCellUnionBound(&cover);
-    std::printf("%s,%s,%s,%s,%s,%zu,%s,%s,%s\n", members.c_str(), Hex64(cell_id.id()).c_str(),
+    std::string ids;
+    for (size_t k = 0; k < cover.size(); ++k) {
+      if (k > 0) ids += ";";
+      ids += Hex64(cover[k].id());
+    }
+    std::printf("%s,%s,%s,%s,%s,%s,%s,%s,%s\n", members.c_str(), Hex64(cell_id.id()).c_str(),
                 P(p).c_str(), Cap(r->GetCapBound()).c_str(), Rect(r->GetRectBound()).c_str(),
-                cover.size(), B(r->Contains(cell)).c_str(), B(r->MayIntersect(cell)).c_str(),
+                ids.c_str(), B(r->Contains(cell)).c_str(), B(r->MayIntersect(cell)).c_str(),
                 B(r->Contains(p)).c_str());
   }
 }

@@ -13,6 +13,9 @@
 //!   point the rectangle contains, where upstream's misses 993 of the 5,552 contained points
 //!   (pinned).
 
+mod common;
+use common::widened;
+
 use s2rst::r1;
 use s2rst::r3::Vector;
 use s2rst::s1::{self, Angle, ChordAngle};
@@ -166,19 +169,6 @@ fn rect_cell_tests_match_cpp() {
         );
     }
     assert_eq!(rows.len(), 10_000);
-}
-
-/// Upstream's cap, widened as `Rect::cap_bound` documents (FR-019).
-fn widened(up: Cap) -> Cap {
-    if up.is_empty() {
-        return up;
-    }
-    let wide = up.expanded(Angle::from_radians(1e-15));
-    let radius = wide.chord_radius();
-    Cap::from_center_chord_angle(
-        wide.center(),
-        radius.plus_error(8.0 * f64::EPSILON * radius.length2()),
-    )
 }
 
 #[test]

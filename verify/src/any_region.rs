@@ -12,21 +12,21 @@
 //! - `contains_cell`, `intersects_cell`: one boolean per cell id;
 //! - `contains_point`: one boolean per point;
 //! - `rect_bound`: one valid rectangle (`rect_spec::valid`) per region;
-//! - `cap_bound`: one cap with a centre in the unit box per region;
-//! - `cell_union_bound`: empty (the adaptors never read their members' coverings).
+//! - `cap_bound`, `cell_union_bound`: the full cap and the empty covering, fixed: the adaptors
+//!   never read their members' caps or coverings (both derive theirs from their own rectangle,
+//!   P-ADBND-02 and its drift guard), so any answer would do.
 //!
 //! The tables are `static Mutex` tables of ten slots, as `stubs`'; `reset` clears them.
 
 use s2rst::s2::{Cap, Cell, CellId, Point, Rect, Region};
 use std::sync::Mutex;
 
-use crate::stubs::{SLOTS, Table, any_box_point, any_valid_rect, bits3};
+use crate::stubs::{SLOTS, Table, any_valid_rect, bits3};
 
 static CONTAINS_CELL: Mutex<Table<2>> = Mutex::new(Table::new());
 static INTERSECTS_CELL: Mutex<Table<2>> = Mutex::new(Table::new());
 static CONTAINS_POINT: Mutex<Table<4>> = Mutex::new(Table::new());
 static RECTS: Mutex<([[u64; 4]; 4], [bool; 4])> = Mutex::new(([[0; 4]; 4], [false; 4]));
-static CAPS: Mutex<([[u64; 4]; 4], [bool; 4])> = Mutex::new(([[0; 4]; 4], [false; 4]));
 
 /// Clears every table: a harness calls it first.
 pub fn reset() {
@@ -34,7 +34,6 @@ pub fn reset() {
     INTERSECTS_CELL.lock().unwrap().clear();
     CONTAINS_POINT.lock().unwrap().clear();
     *RECTS.lock().unwrap() = ([[0; 4]; 4], [false; 4]);
-    *CAPS.lock().unwrap() = ([[0; 4]; 4], [false; 4]);
 }
 
 /// A region with any answers, one per input; `id` (0 to 3) tells regions apart.
@@ -49,29 +48,7 @@ fn any_bool() -> u64 {
 
 impl Region for AnyRegion {
     fn cap_bound(&self) -> Cap {
-        let k = usize::from(self.id & 3);
-        let mut t = CAPS.lock().unwrap();
-        if !t.1[k] {
-            let p = any_box_point();
-            let l: f64 = kani::any();
-            kani::assume((0.0..=4.0).contains(&l));
-            t.0[k] = [
-                p.0.x.to_bits(),
-                p.0.y.to_bits(),
-                p.0.z.to_bits(),
-                l.to_bits(),
-            ];
-            t.1[k] = true;
-        }
-        let v = t.0[k];
-        Cap::from_center_chord_angle(
-            Point(s2rst::r3::Vector {
-                x: f64::from_bits(v[0]),
-                y: f64::from_bits(v[1]),
-                z: f64::from_bits(v[2]),
-            }),
-            s2rst::s1::ChordAngle::from_length2(f64::from_bits(v[3])),
-        )
+        Cap::full()
     }
 
     fn rect_bound(&self) -> Rect {

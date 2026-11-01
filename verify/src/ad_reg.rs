@@ -8,14 +8,24 @@
 //! the law of the union and of the intersection. Since every implementor's answers are among the
 //! abstract region's, the law holds for an adaptor of any members that satisfy it.
 //!
-//! **Any number of members.** Each adaptor answer is a fold over its members (`any`, `all`,
-//! `Rect::union` from the empty rectangle, `Rect::intersection` from the full one), each fold
-//! associative, and each law a statement about one member's answers. The proofs cover up to three
-//! members (two for the vertex law, whose four vertices per member must fit the abstract region's
-//! ten table slots); a law for `n + 1` members follows from the law for an adaptor of `n` (by
-//! induction) combined with one more member, which the two-member proofs cover, with spec 005's
-//! P-LSET-01 (`union` contains both) and P-LSET-02 (`intersection` holds every common point) for
-//! the rectangles.
+//! **Any number of members.** The proofs cover up to three members (two for the vertex law, whose
+//! four vertices per member must fit the abstract region's ten table slots); every number follows
+//! by the argument below, which does not need the folds to be associative (the rectangle folds are
+//! not: over circular intervals `union` picks the shorter gap and `intersection` keeps the shorter
+//! operand of a two-piece overlap, `ad_mean`'s P-ADBND-01). Each adaptor answer is a left fold over
+//! its members in order.
+//! - **P-ADREG-01, -02.** The cell and point tests are `any` (union) and `all` (intersection) of the
+//!   members' answers to the same input, and each law is an implication between one member's
+//!   answers to that input; it passes through `any` and `all` for every `n` at once.
+//! - **P-ADREG-03.** For a point the adaptor contains, each step of the rectangle fold keeps an
+//!   invariant, by induction over the members folded so far. The union's accumulator, from the
+//!   empty rectangle, contains every member rectangle folded so far, since each step contains both
+//!   its operands (spec 005's P-LSET-01); the member that contains the point has it in its
+//!   rectangle (the member's law), so the result holds it. The intersection's accumulator, from the
+//!   full rectangle, holds every point that all the members folded so far hold, since each step
+//!   holds every common point (P-LSET-02); every member contains the point, so the result holds it.
+//!
+//! The proofs at small `n` check that the code is these folds, over abstract members.
 //!
 //! **Not proven:**
 //! - **P-ADREG-04**, the bounding cap: the adaptors' cap bound is their rectangle's `cap_bound`,

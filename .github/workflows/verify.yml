@@ -246,9 +246,11 @@ jobs:
                values-cell-a, values-cell-b, values-interval-rect, values-uvrect-point, values-chord-angle,
                values-cap, values-limits-a, values-limits-b, values-limits-c, values-limits-d, values-limits-e,
                values-limits-f, values-limits-g, values-limits-h, values-fg-a, values-fg-b, values-latlng, values-regions, values-adaptors]
-        # The value-type suite's 87 weekly members take about 34 hours one at a time on the
-        # workstation (2026-10-14, 2026-10-18, 2026-10-25), so they run as thirteen legs of
-        # `make verify-slow F=values`, each a list of harness filters. The first six hold the
+        # The value-type suite's weekly members run as the nineteen `values-*` legs below, each
+        # `make verify-slow F=values` over a list of harness filters. Through spec 008 they were
+        # 87 members, about 34 hours one at a time on the workstation (2026-10-14, 2026-10-18,
+        # 2026-10-25), in the first fourteen legs; the coverage review and specs 010 to 012 added
+        # the last five, each with its times in its comment. The first six hold the
         # members that prove; their longest, `iv_mea::p_imea_06_range__ynoninv_xnoninv`, took 44
         # minutes there. The `limits` legs hold the 24 members that time out at 60 minutes (tool
         # limits, listed in verify/known-timeouts.txt), at most four to a leg, so each leg stays
