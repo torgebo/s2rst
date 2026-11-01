@@ -1,0 +1,17 @@
+Mutant: M-988
+Targets: P-CREG-02
+Expect-Fail: cr_reg::p_creg_02__lat
+Defect: `Cell::rect_bound` picks the u-axis corner the wrong way round
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -565,7 +565,7 @@
+             let v = self.uv.y.lo + self.uv.y.hi;
+ 
+             let i = if get_u_axis(self.face).z == 0.0 {
+-                if u < 0.0 { 1 } else { 0 }
++                if u < 0.0 { 0 } else { 1 }
+             } else if u > 0.0 {
+                 1
+             } else {

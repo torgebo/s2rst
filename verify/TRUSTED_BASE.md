@@ -835,6 +835,50 @@ both operands) and P-LSET-02 (each `intersection` holds every common point). Wri
 - **Under the range contracts** the full rectangle's cap bound is not fixed to the full cap
   (P-ADBND-03's cap half is a native test).
 
+## The order contracts and `Cell`'s bounding rectangle (spec 013)
+
+Design: `specs/013-formal-verify-atan2-monotone/` (research R1–R3). Records: section 14 and the
+P-CREG-02 row of `values/PROPERTIES.md`, and the spec-013 part of `values/EVALUATION.md`.
+
+### What is assumed, and why
+
+- **`atan2` keeps its arguments' angle order** (`stubs::atan2_order`). Within a closed quadrant
+  (by sign bits), a pair whose arguments dominate another's (in the first quadrant `y` at least
+  as large and `x` at most as large; the mirror images elsewhere) has a result at least as large;
+  results are one per argument pair; the axes take C11's exact values; a negative `x` gives
+  `|r| ≥ π/2`; six anchors take their exact values (`π/4`, `3π/4`, `POLE_MIN_LAT` and their
+  negatives). Dominance implies the exact angle order, so a monotone `atan2` satisfies it. **This
+  is an assumption about the platform:** no standard requires `atan2` to be monotone (a correctly
+  rounded one is; glibc's is accurate to within an ulp). It is tested on x86-64 glibc: the survey
+  found no pair out of order among 20,000,000 near ties (their exact order decided in big
+  integers) and 8,335,328 dominance pairs, and `tests/libm_contracts.rs` checks ten million pairs
+  per quadrant rule in release (200,000 in every build) and the anchors bit for bit. On another
+  platform the tests must be re-run before the proofs are believed.
+- **`sqrt` keeps order** (`stubs::sqrt_order`), and `sqrt(2)` is `SQRT_2`: IEEE-754's `sqrt` is
+  correctly rounded, hence monotone. Tested (`sqrt_is_monotone`).
+- **The library's `x·x + y·y` is monotone in `|x|` and `|y|`** on [−1, 1] (lemma L-CR-01,
+  `stubs::sumsq` inside `stubs::latitude_lemma`). IEEE-754's `×` and `+` are correctly rounded and
+  rounding to nearest is monotone, so this is a theorem of the standard; the checker times out on
+  two symbolic squares (R0), so it is trusted, with `sum_of_squares_is_monotone` (10⁶ pairs, 10⁷
+  in release) and the drift guard `latitude_is_the_librarys` pinning the restated text.
+- **The quadrant premise** (lemma L-CR-02, `stubs::quadrant_uv_bound`) is not assumed: it is
+  proven by exhaustion over the 2³⁰ + 1 edge values in `tests/uv_projection.rs`, with the integer
+  fact that a cell below level 0 has both edges on one side of 2²⁹.
+
+### What the logs trust
+
+Each order contract keeps a log of ten calls per proof (`stubs::Log`); `stubs::reset` clears it.
+An eleventh call is answered by the base contract alone, unrelated to the others: more behaviours,
+never a false proof. A cell bound and a point take six `atan2` calls.
+
+### Bounds and gaps
+
+- **The normalised point** is not covered: normalising rounds each coordinate separately, so its
+  arguments need not dominate the corners'. The bound's `2ε` expansion absorbs that in practice
+  (the survey's 5,200,000 normalised points), but an order contract cannot say so.
+- **`Rect`'s bounding cap** (P-LREG-03) needs `sin_cos` related to `atan2` (an accuracy contract),
+  which these contracts do not give.
+
 ## The documented panics (2026-10-26)
 
 The `n_*`, `r_*` and `o_*` harnesses of the crash modules (inventories: 001 section 3,

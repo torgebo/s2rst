@@ -10,7 +10,8 @@ of specs 004–006 added on 2026-10-14 (sections 2.4–2.6) and spec 007's two o
 spec 008's `Cap` on 2026-10-25 (section 2.9), spec 009's bounded types on 2026-10-27 (section
 2.10), spec 010's `LatLng`, with `Rect`'s `Region` laws, on 2026-10-28 (section 2.11), and spec 011's
 `PointRegion`, with `CellUnion`'s floating-point methods, on 2026-10-28 (section 2.12), and spec
-012's region adaptors and `Cell`'s bounding laws on 2026-10-30 (section 2.13). Sources: the inventories (`verify/INVENTORY.md`,
+012's region adaptors and `Cell`'s bounding laws on 2026-10-30 (section 2.13), and spec 013's
+order contract for `atan2` and `Cell`'s bounding rectangle on 2026-11-01 (section 2.14). Sources: the inventories (`verify/INVENTORY.md`,
 `verify/cell_union/INVENTORY.md`, `verify/decoding/INVENTORY.md`, `verify/values/INVENTORY.md`),
 their property catalogues and evaluations, and `cargo kani list` on the current tree.
 
@@ -30,9 +31,9 @@ differential vectors are evidence, not proofs; section 4 lists them for the unco
 | Types with their own proof suite | `CellId` (spec 001), `CellUnion` (spec 002), the decoding layer (spec 003), `Cell` and `s1::Interval` (spec 004, section 2.4), `r1::Interval` and `s2::Rect` (spec 005, section 2.5), `r2::Rect` and `s2::Point` (spec 006, section 2.6), `s1::ChordAngle` and `s1::Angle` (spec 007, section 2.7), `s2::Cap` (spec 008, section 2.9), `s2::LatLng` (spec 010, section 2.11), `PointRegion` (spec 011, section 2.12), `RegionUnion` and `RegionIntersection` (spec 012, section 2.13) |
 | Types reached only through other proofs | `Level`, `Face` (section 2.8) |
 | Traits with proofs | `S2Encode`/`S2Decode` for 6 of 12 implementors; `Region` for `CellUnion` (the cell tests, 002; the point test, both bounds' containment of each cell's bound and containment implies intersection, 011) and the generic laws for `Cell`, `Cap` (three of four, with lemma stubs), `Rect` (two of four, under contract, spec 010) and `PointRegion` (five of six, spec 011, with the two new laws of the bounding rectangle and the covering); and, by preservation over any members, `RegionUnion` and `RegionIntersection` (three of six, spec 012); the codec round trip under `Cap`'s own equality; the equality laws for the ten value types, and the order laws for `Point`, `ChordAngle` and `Angle` |
-| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45), plus 27 from spec 010 (24 `ll_*`, 3 `ll_reg`) and 42 from spec 011 (15 `pr_*`, 27 `uf_*`) and 32 from spec 012 (`ad_*`); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`), plus 2 from spec 010, 21 from spec 011 and 8 from spec 012; 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
+| Kani harnesses | 557 per change (`CellId` 196, `CellUnion` 120, decoding 241) and 272 for the value types (spec 007 adds 36, spec 008 45), plus 27 from spec 010 (24 `ll_*`, 3 `ll_reg`) and 42 from spec 011 (15 `pr_*`, 27 `uf_*`), 32 from spec 012 (`ad_*`) and 2 from spec 013 (`cr_reg`); 173 more weekly (91, 45, 37) and 87 for the value types (spec 007 adds 10, spec 008 13 and removes 006's `p_ptdst_01__symmetric`), plus 2 from spec 010, 21 from spec 011, 8 from spec 012 and 6 from spec 013; 16 xlarge (decoding, never run). Spec 007 also proves 4 statements by enumerating every `i32` natively (`verify/tests/angle_enumeration.rs`) |
 | Verus | 5 restated codecs, 132 obligations, 17 s |
-| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008, 37 `M-901` … `M-937` for spec 010, 24 `M-950` … `M-973` for spec 011 and 14 `M-974` … `M-987` for spec 012, all killed |
+| Mutants | 38 `M-0NN`, 25 `M-1NN`, 35 `M-2NN`, 10 `V-NNN`; all killed except `M-222`, whose target is xlarge. For the value types 45 `M-3NN`, 43 `M-4NN`, 40 `M-5NN`: all killed except `M-344`, `M-345` and `M-539`, whose targets time out (no verdict); 39 `M-6NN` for spec 007, 41 `M-7NN` for spec 008, 37 `M-901` … `M-937` for spec 010, 24 `M-950` … `M-973` for spec 011, 14 `M-974` … `M-987` for spec 012 and 5 `M-988` … `M-992` for spec 013, all killed |
 
 ## 2. Types with proofs
 
@@ -346,12 +347,35 @@ and M-811 (each `try_from` accepting one value too many). The proofs take under 
   spec-012 part of `EVALUATION.md`, `TRUSTED_BASE.md`, `MUTANTS.md` (`M-974` … `M-987`),
   `UPSTREAM.md` (U-017).
 
+### 2.14 An order contract for `atan2`, and `Cell`'s bounding rectangle (spec 013)
+
+- **Scope:** spec 012's first recommendation: a tested monotonicity contract for `atan2`, and the
+  laws it opens: `Cell`'s bounding-rectangle law (P-CREG-02), `Rect`'s bounding-cap law
+  (P-LREG-03) and with it the adaptors' (P-ADREG-04), and P-PTDST-02.
+- **The contract:** `atan2`'s results ordered by *dominance* within a closed quadrant (in the
+  first, `y₁ ≤ y₂ ∧ x₁ ≥ x₂ ⇒ r₁ ≤ r₂`, and the mirror images), across a proof's calls and against
+  six exact anchors. An assumption about the platform's `atan2`, tested: no counterexample in 28
+  million adversarial pairs (the survey) and ten million per rule (`libm_contracts`). With it,
+  `sqrt`'s order and the monotone sum of squares (IEEE-754's correct rounding; the latter trusted,
+  since the checker times out on it, and tested).
+- **Proven:** `Cell`'s bounding rectangle contains every point of every cell, as the direction
+  `face_uv_to_xyz(face, u, v)`, under these contracts (level 0 and the latitude per change, the
+  longitude per face weekly); `CellUnion`'s bounding rectangle for its cells' points, by
+  composition. The quadrant premise (no cell below level 0 crosses a u-v axis) by exhaustion.
+- **Not proven:** the normalised point (an accuracy contract would be needed; none of 5,200,000
+  surveyed points is outside); `Rect`'s P-LREG-03 and the adaptors' P-ADREG-04 (`sin_cos` must be
+  related to `atan2`); P-PTDST-02 (still times out). No library change, no defect, no upstream
+  finding.
+- **Records:** `verify/values/PROPERTIES.md` §1 (P-CREG-02), §14 (the lemmas), the rows of
+  P-LREG-03, P-PTDST-02 and P-ADREG-04, `cell_union/PROPERTIES.md` (P-UREG-05), the spec-013 part
+  of `EVALUATION.md`, `TRUSTED_BASE.md`, `MUTANTS.md` (`M-988` … `M-992`).
+
 ## 3. Traits
 
 | Trait | Implementors | With proofs | Without |
 |-------|--------------|-------------|---------|
 | `S2Encode` / `S2Decode` | 12 | `CellId`, `Point`, `Cap`, `Rect`, `Cell` (003), with `Cap`'s round trip also under its own equality (008); `CellUnion` (002) | `Polyline`, `Loop`, `Polygon`, `LaxPolyline`, `LaxPolygon`, `PointVector` |
-| `Region` | 12 | `CellUnion::contains_cell` and `intersects_cell`, within size bounds (002); for `Cell`, the generic laws and `contains_cell`, `intersects_cell` and `cell_union_bound` (004); for `Rect`, `rect_bound` (005), and containment implies intersection and the vertex law under contract, and the point test's `LatLng` (010); for `Cap`, three of the four generic laws (containment implies intersection, no vertex of a non-intersected cell, the bounding cap) with lemma stubs, the crash freedom of five of the six methods (`cell_union_bound`'s, under contract, times out weekly) and `Cell::cap_bound` containing the cell's vertices (008); for `PointRegion`, five of the six generic laws (the vertex law times out) and every method (011); for `RegionUnion` and `RegionIntersection`, every method's crash freedom and the preservation of three laws over any members (012); for `Cell`, its covering law in the closed form (012); for `CellUnion`'s float methods, the point test, both bounds' containment of each cell's bound, the areas, and containment implies intersection (011) | `Cap`'s, `Rect`'s and `CellUnion`'s covering laws (need `asin`'s value); `Rect`'s bounding-cap law (needs `atan2`'s and `sin_cos`'s values; widened against U-016 and tested); `CellUnion`'s bounding-cap and rectangle laws (wait on `Cell`'s); `Cell`'s bounding-cap and rectangle laws for its own points (time out, need `atan2`'s values; its `contains_point` margin is outside them, U-017); the adaptors' bounding-cap and covering laws; and every method of `Loop`, `Polygon`, `Polyline`, `ShapeIndexRegion`, `ShapeIndexBufferedRegion` |
+| `Region` | 12 | `CellUnion::contains_cell` and `intersects_cell`, within size bounds (002); for `Cell`, the generic laws and `contains_cell`, `intersects_cell` and `cell_union_bound` (004); for `Rect`, `rect_bound` (005), and containment implies intersection and the vertex law under contract, and the point test's `LatLng` (010); for `Cap`, three of the four generic laws (containment implies intersection, no vertex of a non-intersected cell, the bounding cap) with lemma stubs, the crash freedom of five of the six methods (`cell_union_bound`'s, under contract, times out weekly) and `Cell::cap_bound` containing the cell's vertices (008); for `PointRegion`, five of the six generic laws (the vertex law times out) and every method (011); for `RegionUnion` and `RegionIntersection`, every method's crash freedom and the preservation of three laws over any members (012); for `Cell`, its covering law in the closed form (012) and its bounding rect for its own points, under an order contract for `atan2` (013), and so `CellUnion`'s for its cells' points (013); for `CellUnion`'s float methods, the point test, both bounds' containment of each cell's bound, the areas, and containment implies intersection (011) | `Cap`'s, `Rect`'s and `CellUnion`'s covering laws (need `asin`'s value); `Rect`'s bounding-cap law (needs `atan2`'s and `sin_cos`'s values; widened against U-016 and tested); `CellUnion`'s bounding-cap and rectangle laws (wait on `Cell`'s); `Cell`'s bounding-cap law for its own points (times out; its `contains_point` margin is outside both bounds, U-017); the adaptors' bounding-cap and covering laws; and every method of `Loop`, `Polygon`, `Polyline`, `ShapeIndexRegion`, `ShapeIndexBufferedRegion` |
 | `Shape` | 13 | none | all (the other branch has pilots, section 6, step 4) |
 | `Target` / `DistanceTarget` | 5 | none | `PointTarget`, `EdgeTarget`, `CellTarget`, `CellUnionTarget`, `ShapeIndexTarget` |
 | `Projection` | 2 | none | `PlateCarreeProjection`, `MercatorProjection` |

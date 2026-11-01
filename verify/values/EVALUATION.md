@@ -1905,3 +1905,104 @@ Ranked:
 `n_region_past_end` included); `make verify-mutants`: 14 of 14 killed; `make test` passed (1 min 39
 s, with `cpp_cell_bounds_diff`, the margin and `region(i)` tests and the twins); `cargo test` in
 `verify/` passed (the drift guards, the index by kind).
+
+# Spec 013: A monotone `atan2`, and the bounding laws it opens
+
+## Summary (spec 013)
+
+Spec 013 took spec 012's first recommendation: a tested monotonicity contract for `atan2`, and
+the laws it would open: `Cell`'s bounding-rectangle law (P-CREG-02), `Rect`'s bounding-cap law
+(P-LREG-03) and with it the adaptors' (P-ADREG-04), and P-PTDST-02.
+
+- **The contract** (`stubs::atan2_order`): results ordered by *dominance* within a closed
+  quadrant (first quadrant: `y₁ ≤ y₂ ∧ x₁ ≥ x₂ ⇒ r₁ ≤ r₂`, and the mirror images), across a proof's
+  calls and against six exact anchors, on top of spec 008's range contract. Dominance implies the
+  exact angle order and costs the checker only float comparisons. It is an **assumption about
+  the platform's `atan2`**, which no standard makes monotone: tested on x86-64 glibc with no
+  counterexample in 28 million adversarial pairs (the survey, exact order in big integers) and
+  ten million pairs per quadrant rule (`libm_contracts`, release). `sqrt`'s order and the
+  library's sum of squares being monotone are IEEE-754 facts; the second is trusted, since the
+  checker times out on two symbolic squares, and tested.
+- **P-CREG-02 proven** for every valid cell and every point of its u-v bound as the direction
+  `face_uv_to_xyz(face, u, v)`: level 0 and the latitude per change, the longitude one face at a
+  time weekly. Its premise, that no cell below level 0 crosses a u-v axis, is proven by
+  exhaustion over the 2³⁰ + 1 edge values. **`CellUnion`'s P-UREG-05** follows by composition for
+  its cells' points.
+- **Not opened:** the normalised point (an order cannot bound the rounding the `2ε` expansion
+  absorbs); P-LREG-03 and so P-ADREG-04 (the cap needs `sin_cos` related to `atan2`); P-PTDST-02
+  (with pure `atan2` and `sqrt` it times out).
+- **No library change**, no defect, no upstream finding. Non-vacuity: all 5 mutants `M-988` … `M-992` are killed.
+
+## What R0 found (spec 013)
+
+- **The cost is in the squares, not in `atan2`.** With the order contract alone, the latitude
+  timed out per face (the library's `x·x + y·y` for the point and both corners); through the
+  lemma stub it proves on every face at once in 261 s. The longitude, which squares nothing,
+  proves per face but times out for all faces at once.
+- **Kani cannot prove rounding monotone.** `|a| ≤ |b| ⇒ a·a ≤ b·b` times out at 12 minutes,
+  as does the real projection over a symbolic `(i, j)`: the first is IEEE-754's and trusted, the
+  second proven natively by enumerating its finite inputs.
+- **A pure `atan2` exposes CBMC's `sqrt`.** P-PTDST-02 failed with a pure `atan2` only because
+  `norm` takes `sqrt` twice; with both pure it times out.
+
+## Effort log (spec 013)
+
+| Date | Work |
+|------|------|
+| 2026-11-01 | The review fixes of spec 012; the survey (K1–K4); spec, R0 (22 harnesses), plan and tasks; the contracts, the lemma, the premise's enumeration, the tests, `cr_reg`, the twin, the mutants, the records |
+
+## Exclusions and tool limits (spec 013)
+
+- **Not proven:** P-CREG-02's normalised form; P-LREG-03; P-ADREG-04; P-PTDST-02 (tool limit,
+  re-measured). No inventory change: spec 013 adds no operation.
+
+## Upstream findings (spec 013)
+
+None.
+
+## Defects found (spec 013)
+
+None.
+
+## Measurements (spec 013)
+
+Per change (`make verify-values P=cellrect`, 2 jobs, 2026-11-01): 2 harnesses, 314 s wall with
+the crate tests and the build; `p_creg_02__l0` 109.2 s, `__lat` 259.2 s. Weekly (2 jobs): the six
+longitude members 191.4–362.6 s, 893 s in all. Native: the order tests 5 s in release, the
+premise's enumeration 5 s.
+
+## Non-vacuity (spec 013)
+
+`make verify-mutants` (2026-11-01): 5 mutants of `Cell::rect_bound` (`M-988` … `M-992`), **all
+killed**: the corner choices (the u axis, the latitude's second corner, the longitude's first),
+`polar_closure` and face 1's fixed bound. M-990 targets a polar face, since on the equatorial faces
+the longitude does not depend on v. The bound's `2ε` expansion has no mutant: under the order
+contract the corners bound a direction exactly, so the expansion serves the rounding the contract
+does not model; the C++ rows check it bit for bit.
+
+## Recommendations (spec 013)
+
+Ranked:
+
+1. **An accuracy contract for `atan2` and `sin_cos`** (`|r − θ| ≤ k ulp`, and `sin_cos(atan2(y,
+   x))` within ulps of `(y, x)/|(y, x)|`): it would open P-LREG-03, so P-ADREG-04, and the
+   normalised form of P-CREG-02. The checker cannot express `θ` exactly; the contract would have
+   to be stated through bounds on products, research first.
+2. **`Cell`'s bounding cap** (P-CREG-01): the same lemma-stub approach (monotone sums of squares)
+   may cut its timeouts.
+3. **The shape-backed regions**, the missing codecs, the two inexact remainders (spec 012's list).
+4. **U-017 upstream**: the maintainer decides.
+
+## Success criteria (SC-001 … SC-009) (spec 013)
+
+| Criterion | Outcome | Evidence |
+|-----------|---------|----------|
+| SC-001 the contract's tests | met | `libm_contracts`: ten million pairs per quadrant rule, the anchors bit for bit, no counterexample. |
+| SC-002 P-CREG-02 | met | Proven as directions for every valid cell (8 harnesses); the normalised form recorded with its reason (R5). |
+| SC-003 P-LREG-03, P-ADREG-04, P-UREG-05 | met (by recording) | P-LREG-03 and P-ADREG-04 recorded with the missing facts and R0's measurement; P-UREG-05 by composition. |
+| SC-004 the re-tried entries | met | P-PTDST-02 keeps its reason, re-measured (R7). |
+| SC-005 non-vacuity | met | 5 mutants, all killed; every harness satisfies its covers. |
+| SC-006 per change under 10 minutes on CI | met on the workstation | `P=cellrect` 314 s. Not measured on a hosted runner (T015, a push). |
+| SC-007 API and behaviour unchanged; the gate | met | No library change; `make test` passes. |
+| SC-008 the index by kind | met | `property_kinds` passes. |
+| SC-009 the evaluation answers | met | "Summary", "Recommendations". |

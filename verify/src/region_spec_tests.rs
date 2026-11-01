@@ -189,3 +189,15 @@ fn adaptors_are_upstreams() {
         );
     }
 }
+
+const LATLNG: &str = include_str!("../../core/src/s2/latlng.rs");
+
+/// `LatLng::latitude` is the text `stubs::latitude_lemma` restates, with its sum of squares
+/// abstracted (spec 013, lemma L-CR-01).
+#[test]
+fn latitude_is_the_librarys() {
+    assert_eq!(
+        body(LATLNG, "    pub fn latitude(p: Point) -> Angle {", "    "),
+        ["Angle::from_radians((p.z() + 0.0).atan2((p.x() * p.x() + p.y() * p.y()).sqrt()))"]
+    );
+}

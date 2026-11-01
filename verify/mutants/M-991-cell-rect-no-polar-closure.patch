@@ -1,0 +1,19 @@
+Mutant: M-991
+Targets: P-CREG-02
+Expect-Fail: cr_reg::p_creg_02__lng_f2
+Tier: slow
+Defect: `Cell::rect_bound` drops `polar_closure`, so a cell with a pole corner gets two corners' longitudes only
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -587,8 +587,7 @@
+ 
+             let eps2 = 2.0 * f64::EPSILON;
+             return Rect::new(lat, lng)
+-                .expanded(LatLng::from_radians(eps2, eps2))
+-                .polar_closure();
++                .expanded(LatLng::from_radians(eps2, eps2));
+         }
+ 
+         // Level 0 face cells

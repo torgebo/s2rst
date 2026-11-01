@@ -42,7 +42,7 @@
 use s2rst::r3::Vector;
 use s2rst::s1::ChordAngle;
 use s2rst::s2::{Cap, Cell, CellEdge, CellVertex, Point};
-use std::f64::consts::{FRAC_PI_2, PI};
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI, SQRT_2};
 use std::sync::Mutex;
 
 // ---- tables -------------------------------------------------------------------------------------
@@ -159,6 +159,9 @@ pub fn reset() {
         &ANGLE_DEG, &ANGLE_E5, &ANGLE_E6, &ANGLE_E7, &ANGLE_UE6, &ANGLE_UE7,
     ] {
         t.lock().unwrap().clear();
+    }
+    for t in [&ATAN2_LOG, &SQRT_LOG, &SUMSQ_LOG] {
+        t.lock().unwrap().used = 0;
     }
 }
 
@@ -902,4 +905,253 @@ pub fn pure_cell_contains(c: Cell, p: Point) -> bool {
             u64::from(kani::any::<bool>())
         })
         == 1
+}
+
+// ---- spec 013: the order contracts (research R1–R3) -------------------------------------------
+
+/// A contract's memory of the calls it has answered in one proof: up to [`SLOTS`] argument pairs
+/// and their results, as bits. A later call is related to every logged one; a call past the last
+/// slot is answered by the base contract alone (only more behaviours).
+pub struct Log {
+    e: [[u64; 3]; SLOTS],
+    used: usize,
+}
+
+impl Log {
+    const fn new() -> Self {
+        Log {
+            e: [[0; 3]; SLOTS],
+            used: 0,
+        }
+    }
+
+    /// The logged result for the arguments `(a, b)`, if any.
+    fn find(&self, a: f64, b: f64) -> Option<f64> {
+        for i in 0..SLOTS {
+            if i < self.used && self.e[i][0] == a.to_bits() && self.e[i][1] == b.to_bits() {
+                return Some(f64::from_bits(self.e[i][2]));
+            }
+        }
+        None
+    }
+
+    /// The `i`-th logged call, if logged.
+    fn at(&self, i: usize) -> Option<(f64, f64, f64)> {
+        (i < self.used).then(|| {
+            (
+                f64::from_bits(self.e[i][0]),
+                f64::from_bits(self.e[i][1]),
+                f64::from_bits(self.e[i][2]),
+            )
+        })
+    }
+
+    fn push(&mut self, a: f64, b: f64, r: f64) {
+        let n = self.used;
+        if n < SLOTS {
+            self.e[n] = [a.to_bits(), b.to_bits(), r.to_bits()];
+            self.used = n + 1;
+        }
+    }
+}
+
+static ATAN2_LOG: Mutex<Log> = Mutex::new(Log::new());
+static SQRT_LOG: Mutex<Log> = Mutex::new(Log::new());
+static SUMSQ_LOG: Mutex<Log> = Mutex::new(Log::new());
+
+/// `atan2(1, √2)`, which is `asin(1/√3)`, the latitude of a face's corner: the library's
+/// `POLE_MIN_LAT` (`cell.rs`), bit for bit (`libm_contracts::atan2_anchors_are_exact`).
+pub const POLE_ANCHOR: f64 = 0.615_479_708_670_387_3;
+
+/// The anchors of [`atan2_order`]: exact values of the real `atan2`, related to every call as
+/// if it had been made (`libm_contracts::atan2_anchors_are_exact`).
+pub const ATAN2_ANCHORS: [(f64, f64, f64); 6] = [
+    (1.0, 1.0, FRAC_PI_4),
+    (1.0, -1.0, 3.0 * FRAC_PI_4),
+    (-1.0, 1.0, -FRAC_PI_4),
+    (-1.0, -1.0, -3.0 * FRAC_PI_4),
+    (1.0, SQRT_2, POLE_ANCHOR),
+    (-1.0, SQRT_2, -POLE_ANCHOR),
+];
+
+/// The closed quadrant of `(y, x)` by sign bits: bit 0 set for a negative `x`, bit 1 for a
+/// negative `y`.
+pub fn quadrant(y: f64, x: f64) -> u8 {
+    u8::from(x.is_sign_negative()) | (u8::from(y.is_sign_negative()) << 1)
+}
+
+/// Whether `(y1, x1)` lies at most at `(y2, x2)`'s angle by dominance in quadrant `q`, both in
+/// it. In the first quadrant the angle grows with `y` and shrinks with `x`; in the second
+/// (negative `x`) it shrinks with both; in the fourth (negative `y`) it grows with both; in the
+/// third it shrinks with `y` and grows with `x`. Dominance implies the exact angle order.
+pub fn below(q: u8, y1: f64, x1: f64, y2: f64, x2: f64) -> bool {
+    match q {
+        0 => y1 <= y2 && x1 >= x2,
+        1 => y1 >= y2 && x1 >= x2,
+        2 => y1 <= y2 && x1 <= x2,
+        _ => y1 >= y2 && x1 <= x2,
+    }
+}
+
+/// `atan2(y, x)`'s order contract (spec 013 research R1): [`atan2_contract`]'s range and sign;
+/// one value per argument pair across a proof's calls; the axes exactly (C11 F.10.1.4:
+/// `atan2(±0, x)` is `±0` for a clear `x` sign bit and `±π` for a set one, `atan2(y, ±0)` is
+/// `±π/2` for `y ≠ 0`); at least `π/2` in magnitude for a set `x` sign bit; and results ordered
+/// by [`below`] against every earlier call and every [`ATAN2_ANCHORS`] entry in the same
+/// quadrant. A monotone `atan2` satisfies it; that the platform's is monotone is an assumption,
+/// checked by `libm_contracts::atan2_keeps_quadrant_order` (`TRUSTED_BASE.md`).
+pub fn atan2_order(y: f64, x: f64) -> f64 {
+    if y.is_nan() || x.is_nan() {
+        return f64::NAN;
+    }
+    let mut log = ATAN2_LOG.lock().unwrap();
+    if let Some(r) = log.find(y, x) {
+        return r;
+    }
+    let r = atan2_contract(y, x);
+    if x.is_sign_negative() {
+        kani::assume(r.abs() >= FRAC_PI_2);
+    }
+    if x == 0.0 && y != 0.0 {
+        kani::assume(r == if y > 0.0 { FRAC_PI_2 } else { -FRAC_PI_2 });
+    }
+    if y == 0.0 {
+        kani::assume(if x.is_sign_positive() {
+            r.to_bits() == y.to_bits()
+        } else if y.is_sign_positive() {
+            r == PI
+        } else {
+            r == -PI
+        });
+    }
+    let q = quadrant(y, x);
+    for (ay, ax, ar) in ATAN2_ANCHORS {
+        if quadrant(ay, ax) == q {
+            if below(q, y, x, ay, ax) {
+                kani::assume(r <= ar);
+            }
+            if below(q, ay, ax, y, x) {
+                kani::assume(ar <= r);
+            }
+        }
+    }
+    for i in 0..SLOTS {
+        if let Some((y2, x2, r2)) = log.at(i)
+            && quadrant(y2, x2) == q
+        {
+            if below(q, y, x, y2, x2) {
+                kani::assume(r <= r2);
+            }
+            if below(q, y2, x2, y, x) {
+                kani::assume(r2 <= r);
+            }
+        }
+    }
+    log.push(y, x, r);
+    r
+}
+
+/// `sqrt`'s order contract (research R2): [`sqrt_contract`]; one value per argument; results
+/// ordered as their arguments; and `√2`'s place (`a ≤ 2 ⇒ r ≤ SQRT_2`, and the mirror).
+/// IEEE-754's `sqrt` is correctly rounded, so monotone, and `sqrt(2)` is `SQRT_2`
+/// (`libm_contracts::sqrt_is_monotone`).
+pub fn sqrt_order(a: f64) -> f64 {
+    let mut log = SQRT_LOG.lock().unwrap();
+    if let Some(r) = log.find(a, 0.0) {
+        return r;
+    }
+    let r = sqrt_contract(a);
+    if a >= 0.0 {
+        if a <= 2.0 {
+            kani::assume(r <= SQRT_2);
+        }
+        if a >= 2.0 {
+            kani::assume(r >= SQRT_2);
+        }
+        for i in 0..SLOTS {
+            if let Some((a2, _, r2)) = log.at(i)
+                && a2 >= 0.0
+            {
+                if a2 <= a {
+                    kani::assume(r2 <= r);
+                }
+                if a <= a2 {
+                    kani::assume(r <= r2);
+                }
+            }
+        }
+    }
+    log.push(a, 0.0, r);
+    r
+}
+
+/// The library's `x·x + y·y` for `x`, `y` in [−1, 1], abstracted (lemma L-CR-01, research R2):
+/// one value per pair, in [0, 2], monotone in `|x|` and `|y|`, and exact at `(0, 0)`, `(1, 0)`,
+/// `(0, 1)` and `(1, 1)`. IEEE-754's `×` and `+` are correctly rounded and rounding is monotone,
+/// so the real expression satisfies it; the checker times out proving it (R0), so it is trusted,
+/// and checked by `libm_contracts::sum_of_squares_is_monotone`.
+pub fn sumsq(x: f64, y: f64) -> f64 {
+    let mut log = SUMSQ_LOG.lock().unwrap();
+    if let Some(s) = log.find(x, y) {
+        return s;
+    }
+    let s: f64 = kani::any();
+    kani::assume((0.0..=2.0).contains(&s));
+    let (ax, ay) = (x.abs(), y.abs());
+    let relate = |bx: f64, by: f64, bs: f64| {
+        if ax <= bx && ay <= by {
+            kani::assume(s <= bs);
+        }
+        if bx <= ax && by <= ay {
+            kani::assume(bs <= s);
+        }
+    };
+    for (bx, by, bs) in [
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 1.0),
+        (0.0, 1.0, 1.0),
+        (1.0, 1.0, 2.0),
+    ] {
+        relate(bx, by, bs);
+    }
+    for i in 0..SLOTS {
+        if let Some((bx, by, bs)) = log.at(i) {
+            relate(bx.abs(), by.abs(), bs);
+        }
+    }
+    log.push(x, y, s);
+    s
+}
+
+/// `LatLng::latitude`, restated with [`sumsq`] for the library's `p.x * p.x + p.y * p.y`; the
+/// rest is the library's text (`(p.z + 0.0).atan2(….sqrt())`), pinned by the drift guard
+/// `region_spec_tests::latitude_is_the_librarys`. For points with coordinates in [−1, 1], as
+/// every `face_uv_to_xyz` of a u-v bound is.
+pub fn latitude_lemma(p: Point) -> s2rst::s1::Angle {
+    s2rst::s1::Angle::from_radians((p.0.z + 0.0).atan2(sumsq(p.0.x, p.0.y).sqrt()))
+}
+
+/// `ij_level_to_bound_uv`, abstracted as [`any_uv_bound`] with the quadrant premise (lemma
+/// L-CR-02, research R3): below level 0 neither interval crosses 0 and no bound is `−0`; at level
+/// 0 the face `[−1, 1]²`. Every real bound is such a rectangle: a cell below level 0 has
+/// `size ≤ 2²⁹` and an aligned low edge, so both its edges `k` lie on one side of `2²⁹` (or on
+/// it), and `tests/uv_projection.rs` checks every edge value `st_to_uv(ij_to_st_min(k))`:
+/// negative below `2²⁹`, `+0` at it, positive above.
+pub fn quadrant_uv_bound(_i: i32, _j: i32, level: s2rst::s2::Level) -> s2rst::r2::Rect {
+    let b: [f64; 4] = kani::any();
+    if level.as_u8() == 0 {
+        kani::assume(b[0] == -1.0 && b[1] == 1.0 && b[2] == -1.0 && b[3] == 1.0);
+    } else {
+        kani::assume(b[0] >= -1.0 && b[0] <= b[1] && b[1] <= 1.0);
+        kani::assume(b[2] >= -1.0 && b[2] <= b[3] && b[3] <= 1.0);
+        kani::assume(b[0] >= 0.0 || b[1] <= 0.0);
+        kani::assume(b[2] >= 0.0 || b[3] <= 0.0);
+        for v in b {
+            kani::assume(!(v == 0.0 && v.is_sign_negative()));
+        }
+    }
+    s2rst::r2::Rect {
+        x: s2rst::r1::Interval { lo: b[0], hi: b[1] },
+        y: s2rst::r1::Interval { lo: b[2], hi: b[3] },
+    }
 }
