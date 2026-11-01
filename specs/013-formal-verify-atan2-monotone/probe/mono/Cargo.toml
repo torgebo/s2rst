@@ -1,0 +1,12 @@
+[package]
+name = "probe013-mono"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+num-bigint = "0.4"
+[profile.release]
+debug = false
