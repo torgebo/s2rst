@@ -1,0 +1,17 @@
+Mutant: M-992
+Targets: P-CREG-02
+Expect-Fail: cr_reg::p_creg_02__l0
+Defect: face 1's fixed longitude bound starts at π/2
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -599,7 +599,7 @@
+             ),
+             Face::F1 => Rect::new(
+                 crate::r1::Interval::new(-FRAC_PI_4, FRAC_PI_4),
+-                crate::s1::Interval::new(FRAC_PI_4, 3.0 * FRAC_PI_4),
++                crate::s1::Interval::new(FRAC_PI_2, 3.0 * FRAC_PI_4),
+             ),
+             Face::F2 => Rect::new(
+                 crate::r1::Interval::new(POLE_MIN_LAT - 0.5 * f64::EPSILON, FRAC_PI_2),

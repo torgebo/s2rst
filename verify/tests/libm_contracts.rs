@@ -473,3 +473,221 @@ fn cell_cap_bound_satisfies_its_contract() {
         assert!(cell_cap_ok(Cell::from(id)), "{id:?}");
     }
 }
+
+// ---- spec 013: the order contracts (research R1, R2) --------------------------------------------
+
+/// `stubs::below`: `(y1, x1)` at most at `(y2, x2)`'s angle by dominance in quadrant `q` (bit 0 a
+/// negative `x`, bit 1 a negative `y`).
+fn below(q: u8, y1: f64, x1: f64, y2: f64, x2: f64) -> bool {
+    match q {
+        0 => y1 <= y2 && x1 >= x2,
+        1 => y1 >= y2 && x1 >= x2,
+        2 => y1 <= y2 && x1 <= x2,
+        _ => y1 >= y2 && x1 <= x2,
+    }
+}
+
+fn quadrant(y: f64, x: f64) -> u8 {
+    u8::from(x.is_sign_negative()) | (u8::from(y.is_sign_negative()) << 1)
+}
+
+/// A non-negative magnitude: subnormal, tiny, near 1, large, or any finite bit pattern.
+fn magnitude(rng: &mut Rng) -> f64 {
+    match rng.next() % 6 {
+        0 => f64::from_bits(rng.next() % (1 << 52)),
+        1 => rng.uniform(0.0, 1e-300),
+        2 => rng.uniform(0.0, 2.0),
+        3 => rng.uniform(0.5, 1.5),
+        4 => [0.0, 1.0, std::f64::consts::SQRT_2, f64::MIN_POSITIVE][(rng.next() % 4) as usize],
+        _ => loop {
+            let v = rng.bits().abs();
+            if v.is_finite() {
+                break v;
+            }
+        },
+    }
+}
+
+/// `v` moved by up to four ulps, staying non-negative.
+fn nudge(rng: &mut Rng, v: f64) -> f64 {
+    let k = (rng.next() % 9) as i64 - 4;
+    let b = v.to_bits() as i64 + k;
+    if b < 0 { 0.0 } else { f64::from_bits(b as u64) }.min(f64::MAX)
+}
+
+/// `atan2_order`'s dominance rule, on `n` ordered pairs per quadrant: near ties (each argument
+/// within four ulps), one coordinate shared, signed zeros, subnormals, axes.
+fn check_atan2_order(n: u64) {
+    let mut rng = Rng(0x0130_A7A2_0DE2_0001);
+    for q in 0..4u8 {
+        let (sx, sy) = (
+            if q & 1 == 1 { -1.0 } else { 1.0 },
+            if q & 2 == 2 { -1.0 } else { 1.0 },
+        );
+        let mut tested = 0u64;
+        while tested < n {
+            let (x1, y1) = (magnitude(&mut rng), magnitude(&mut rng));
+            let (mut x2, mut y2) = match rng.next() % 3 {
+                0 => (nudge(&mut rng, x1), nudge(&mut rng, y1)),
+                1 => (x1, magnitude(&mut rng)),
+                _ => (magnitude(&mut rng), y1),
+            };
+            if rng.next() % 2 == 0 {
+                (x2, y2) = (nudge(&mut rng, x2), y2);
+            }
+            let (a, b) = ((sy * y1, sx * x1), (sy * y2, sx * x2));
+            if quadrant(a.0, a.1) != q || quadrant(b.0, b.1) != q {
+                continue;
+            }
+            for ((ya, xa), (yb, xb)) in [(a, b), (b, a)] {
+                if below(q, ya, xa, yb, xb) {
+                    tested += 1;
+                    let (ra, rb) = (ya.atan2(xa), yb.atan2(xb));
+                    assert!(
+                        ra <= rb,
+                        "atan2({ya:e}, {xa:e}) = {ra:e} > atan2({yb:e}, {xb:e}) = {rb:e}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// `atan2_order`'s single-call rules: the axes exactly, `|r| ≥ π/2` for a set `x` sign bit.
+#[test]
+fn atan2_keeps_its_axes_and_half_planes() {
+    let mut s = specials();
+    let mut rng = Rng(0x0130_A7A2_0DE2_0002);
+    for _ in 0..RANDOM {
+        s.push(rng.uniform(-2.0, 2.0));
+        if s.len() > 200 {
+            break;
+        }
+    }
+    for &y in &s {
+        for &x in &s {
+            if y.is_nan() || x.is_nan() {
+                continue;
+            }
+            let r = y.atan2(x);
+            if x.is_sign_negative() {
+                assert!(r.abs() >= FRAC_PI_2, "atan2({y:e}, {x:e}) = {r:e}");
+            }
+            if x == 0.0 && y != 0.0 {
+                assert_eq!(r, FRAC_PI_2.copysign(y), "atan2({y:e}, {x:e})");
+            }
+            if y == 0.0 {
+                let want = if x.is_sign_positive() {
+                    y
+                } else {
+                    PI.copysign(y)
+                };
+                assert_eq!(r.to_bits(), want.to_bits(), "atan2({y:e}, {x:e})");
+            }
+        }
+    }
+}
+
+/// `atan2_order`'s dominance rule, 200,000 pairs per quadrant (every build).
+#[test]
+fn atan2_keeps_quadrant_order() {
+    check_atan2_order(200_000);
+}
+
+/// The same on ten million pairs per quadrant (FR-002): `cargo test --release --test
+/// libm_contracts -- --ignored`.
+#[test]
+#[ignore = "release only: ten million pairs per quadrant"]
+fn atan2_keeps_quadrant_order_10m() {
+    check_atan2_order(10_000_000);
+}
+
+/// `ATAN2_ANCHORS`: `atan2`'s exact values at the arguments the face cells' fixed bounds use;
+/// `POLE_ANCHOR` is the library's `POLE_MIN_LAT`, read back from face 2's bound.
+#[test]
+fn atan2_anchors_are_exact() {
+    use s2rst::s2::{Cell, CellId, Face};
+    use std::f64::consts::{FRAC_PI_4, SQRT_2};
+    let pole = 0.615_479_708_670_387_3_f64;
+    for (y, x, r) in [
+        (1.0f64, 1.0, FRAC_PI_4),
+        (1.0, -1.0, 3.0 * FRAC_PI_4),
+        (-1.0, 1.0, -FRAC_PI_4),
+        (-1.0, -1.0, -3.0 * FRAC_PI_4),
+        (1.0, SQRT_2, pole),
+        (-1.0, SQRT_2, -pole),
+    ] {
+        assert_eq!(y.atan2(x).to_bits(), r.to_bits(), "atan2({y}, {x})");
+    }
+    let lo = Cell::from(CellId::from_face(Face::F2)).rect_bound().lat.lo;
+    assert_eq!(lo, (pole - 0.5 * f64::EPSILON) - f64::EPSILON);
+}
+
+/// `sqrt_order`: monotone (near ties and random pairs) and `sqrt(2) = √2`.
+#[test]
+fn sqrt_is_monotone() {
+    assert_eq!(2.0f64.sqrt(), std::f64::consts::SQRT_2);
+    let mut rng = Rng(0x0130_5A27_0000_0003);
+    for _ in 0..RANDOM {
+        let a = magnitude(&mut rng);
+        let b = if rng.next() % 2 == 0 {
+            nudge(&mut rng, a)
+        } else {
+            magnitude(&mut rng)
+        };
+        let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+        assert!(lo.sqrt() <= hi.sqrt(), "sqrt({lo:e}) > sqrt({hi:e})");
+    }
+}
+
+/// Lemma L-CR-01 (`stubs::sumsq`): `x·x + y·y` on [−1, 1] is in [0, 2], monotone in `|x|` and
+/// `|y|`, and exact at the anchors, on `n` adversarial pairs.
+fn check_sum_of_squares(n: u64) {
+    for (x, y, s) in [
+        (0.0f64, 0.0f64, 0.0f64),
+        (1.0, 0.0, 1.0),
+        (0.0, 1.0, 1.0),
+        (1.0, 1.0, 2.0),
+    ] {
+        assert_eq!(x * x + y * y, s);
+    }
+    let mut rng = Rng(0x0130_5053_0000_0004);
+    let unit = |rng: &mut Rng| match rng.next() % 3 {
+        0 => rng.uniform(0.0, 1.0),
+        1 => f64::from_bits(rng.next() % (1 << 52)),
+        _ => [0.0, 1.0, 0.5, 1.0 / 3.0][(rng.next() % 4) as usize],
+    };
+    for _ in 0..n {
+        let (x1, y1) = (unit(&mut rng), unit(&mut rng));
+        let (mut x2, mut y2) = (nudge(&mut rng, x1).min(1.0), nudge(&mut rng, y1).min(1.0));
+        if x2 < x1 {
+            x2 = x1;
+        }
+        if y2 < y1 {
+            y2 = y1;
+        }
+        let sx = |v: f64, r: &mut Rng| if r.next() % 2 == 0 { v } else { -v };
+        let (x1, y1, x2, y2) = (
+            sx(x1, &mut rng),
+            sx(y1, &mut rng),
+            sx(x2, &mut rng),
+            sx(y2, &mut rng),
+        );
+        let (s1, s2) = (x1 * x1 + y1 * y1, x2 * x2 + y2 * y2);
+        assert!(
+            (0.0..=2.0).contains(&s1) && s1 <= s2,
+            "({x1:e}, {y1:e}) vs ({x2:e}, {y2:e})"
+        );
+    }
+}
+
+#[test]
+fn sum_of_squares_is_monotone() {
+    check_sum_of_squares(RANDOM as u64);
+}
+
+#[test]
+#[ignore = "release only: ten million pairs"]
+fn sum_of_squares_is_monotone_10m() {
+    check_sum_of_squares(10_000_000);
+}

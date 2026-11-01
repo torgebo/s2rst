@@ -1874,3 +1874,24 @@ fn region_adaptors_preserve_laws(
         && prop::region_no_intersect_no_vertex(&i, &cl)
         && prop::region_rect_bound_contains_point(&i, p)
 }
+
+// ─── Spec 013 FR-011: Cell's bounding rectangle over its points as directions ───
+
+/// `Cell`'s bounding rectangle contains `face_uv_to_xyz(face, u, v)` for every `(u, v)` of its
+/// u-v bound: its corners, its edges and its interior, normalised or not (P-CREG-02; the Kani
+/// statement is spec 013's `cr_reg`, for the direction).
+#[quickcheck]
+fn region_cell_rect_contains_directions(lat: i32, lng: i32, lvl: u8, a: u16, b: u16) -> bool {
+    let c = generators::cell(lat, lng, lvl);
+    let uv = c.bound_uv();
+    let t = |w: u16| f64::from(w) / f64::from(u16::MAX);
+    let at = |lo: f64, hi: f64, s: f64| (lo + (hi - lo) * s).clamp(lo, hi);
+    let (u, v) = (at(uv.x.lo, uv.x.hi, t(a)), at(uv.y.lo, uv.y.hi, t(b)));
+    let r = c.rect_bound();
+    [(u, v), (uv.x.lo, v), (u, uv.y.hi), (uv.x.hi, uv.y.lo)]
+        .into_iter()
+        .all(|(u, v)| {
+            let p = s2rst::s2::coords::face_uv_to_xyz(c.face(), u, v);
+            r.contains_point(Point(p)) && r.contains_point(Point(p.normalize()))
+        })
+}

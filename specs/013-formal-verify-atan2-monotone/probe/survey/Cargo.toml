@@ -1,0 +1,12 @@
+[package]
+name = "probe013-survey"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+s2rst = { path = "../../../../core" }
+[profile.release]
+debug = false

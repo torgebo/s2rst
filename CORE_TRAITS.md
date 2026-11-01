@@ -174,7 +174,9 @@ for its point) (for `Cap`, `Rect` and `CellUnion` not proven, P-CPREG-04, P-LREG
 -06: the covering's level needs `asin`'s value). Spec 012 proves that `RegionUnion` and
 `RegionIntersection` preserve containment implies intersection (P-ADREG-01), the vertex law
 (P-ADREG-02) and the bounding rect (P-ADREG-03) for any members that satisfy them, over abstract
-members; `Cell`'s bounding laws for its own points are not proven (P-CREG-01, -02). Every invariant
+members. Spec 013 proves `Cell`'s bounding rect for its own points (P-CREG-02, as directions,
+under an order contract for `atan2`), and with it `CellUnion`'s for its cells' points (P-UREG-05,
+by composition); `Cell`'s bounding cap is not proven (P-CREG-01). Every invariant
 also has quickcheck instances (below). Upstream's `S2LatLngRect::GetCapBound` breaks the
 bounding-cap invariant near a rectangle's boundary; `Rect::cap_bound` widens it, a documented
 deviation (`UPSTREAM.md` U-016, spec 010 FR-019).

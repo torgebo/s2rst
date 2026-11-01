@@ -1,0 +1,17 @@
+Mutant: M-989
+Targets: P-CREG-02
+Expect-Fail: cr_reg::p_creg_02__lat
+Defect: `Cell::rect_bound`'s second latitude corner shares the first's v edge
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -580,7 +580,7 @@
+             };
+ 
+             let lat = crate::r1::Interval::from_point(self.latitude(i, j))
+-                .add_point(self.latitude(1 - i, 1 - j));
++                .add_point(self.latitude(1 - i, j));
+             let lng = crate::s1::Interval::empty()
+                 .add_point(self.longitude(i, 1 - j))
+                 .add_point(self.longitude(1 - i, j));

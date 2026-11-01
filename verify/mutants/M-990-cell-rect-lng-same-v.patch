@@ -1,0 +1,18 @@
+Mutant: M-990
+Targets: P-CREG-02
+Expect-Fail: cr_reg::p_creg_02__lng_f2
+Tier: slow
+Defect: `Cell::rect_bound`'s first longitude corner moves to the other v edge (on a polar face, where the longitude depends on v)
+
+diff --git a/core/src/s2/cell.rs b/core/src/s2/cell.rs
+--- a/core/src/s2/cell.rs
++++ b/core/src/s2/cell.rs
+@@ -582,7 +582,7 @@
+             let lat = crate::r1::Interval::from_point(self.latitude(i, j))
+                 .add_point(self.latitude(1 - i, 1 - j));
+             let lng = crate::s1::Interval::empty()
+-                .add_point(self.longitude(i, 1 - j))
++                .add_point(self.longitude(i, j))
+                 .add_point(self.longitude(1 - i, j));
+ 
+             let eps2 = 2.0 * f64::EPSILON;

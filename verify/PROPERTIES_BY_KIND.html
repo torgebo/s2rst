@@ -3234,8 +3234,9 @@ antipodal, parallel or tiny points) the result is <code>ortho(p)</code>
 <td>The distance and the stable angle are symmetric, bit for bit, in the
 default build.</td>
 <td>—</td>
-<td>not proven: a tool limit (<code>atan2</code>); the C++ vectors and a
-property test check it</td>
+<td>not proven: a tool limit (<code>atan2</code>; with spec 013’s pure
+<code>atan2</code> and <code>sqrt</code> it times out); the C++ vectors
+and a property test check it</td>
 </tr>
 <tr class="even">
 <td><a href="values/PROPERTIES.md">P-CAORD-01</a></td>
@@ -3373,7 +3374,8 @@ contains.</td>
 contains (after FR-019’s widening).</td>
 <td>—</td>
 <td>not proven: it needs <code>atan2</code>’s and <code>sin_cos</code>’s
-values; tested natively, by the quickcheck twin and the C++ rows</td>
+values related, which spec 013’s order contracts do not; tested
+natively, by the quickcheck twin and the C++ rows</td>
 </tr>
 <tr class="odd">
 <td><a href="values/PROPERTIES.md">P-LREG-04</a></td>
@@ -3463,11 +3465,12 @@ tested</td>
 </tr>
 <tr class="odd">
 <td><a href="cell_union/PROPERTIES.md">P-UREG-05</a></td>
-<td>The union’s bounding rectangle contains every point it
-contains.</td>
+<td>The union’s bounding rectangle contains every point of its
+cells.</td>
 <td>—</td>
-<td>not proven: it waits on <code>Cell</code>’s own rectangle law;
-tested</td>
+<td>every union, by composition (P-UBND-01 and <code>Cell</code>‘s
+P-CREG-02), for its cells’ own points; not <code>contains_point</code>’s
+margin (U-017)</td>
 </tr>
 <tr class="even">
 <td><a href="cell_union/PROPERTIES.md">P-UREG-06</a></td>
@@ -3487,9 +3490,10 @@ C++ alike</td>
 <td><a href="values/PROPERTIES.md">P-CREG-02</a></td>
 <td>A cell’s bounding rectangle contains every point of the cell’s own
 u-v bound.</td>
-<td>—</td>
-<td>not proven: it needs <code>atan2</code>’s monotonicity; tested as
-P-CREG-01</td>
+<td><a href="src/cr_reg.rs"><code>cr_reg::p_creg_02__*</code></a>
+(longitude weekly)</td>
+<td>every cell, its points as directions, under <code>atan2</code>’s
+order contract (spec 013); not the normalised point</td>
 </tr>
 <tr class="odd">
 <td><a href="values/PROPERTIES.md">P-CREG-03</a></td>
